@@ -80,12 +80,14 @@ class PRFSession(Session):
         self.all_trials = []
         for i,trial in enumerate(self.trial_array):
 
+            this_trial_parameters = {}
+            this_trial_parameters['stim_duration'] = self.phase_durations[i, -2] # total phase duration for bar pass of trial
+            this_trial_parameters['orientation'] = trial[0] # orientation of bar pass
+            this_trial_parameters['stim_bool'] = trial[1] # if bar pass in trial or not
 
             self.all_trials.append(PRFTrial(session=self,
                                             trial_nr=i,  
-                                            stim_duration = self.phase_durations[i, -2], # total phase duration for bar pass of trial
-                                            orientation = trial[0], # orientation of bar pass
-                                            stim_bool = trial[1], # if bar pass in trial or not
+                                            parameters = this_trial_parameters, # Dict of parameters that needs to be added to the log of this trial
                                             phase_durations = self.phase_durations[i] # array with all phase timings for trial
                                             #,tracker=self.tracker_on
                                             ))
@@ -94,7 +96,7 @@ class PRFSession(Session):
         """ Loops over trials and runs them """
         
         # draw instructions
-        this_instruction_string = 'Please fixate at the center, \ndo not move your eyes \npress q to start'
+        this_instruction_string = 'Please fixate at the center, \ndo not move your eyes \n(press q to start)'
         self.display_text(this_instruction_string, keys=['q'],
                                     color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
                                     italic = True, alignHoriz = 'center')
@@ -148,4 +150,7 @@ class PRFSession(Session):
 
 # need to make a feature session
 # and add that as an argument in main, and according to user input will call and run specific session
+
+
+
 

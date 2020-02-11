@@ -9,8 +9,9 @@ from stim import PRFStim
 
 class PRFTrial(Trial):
         
-        def __init__(self, session, trial_nr, phase_durations, timing, trial_type, phase_names):
-            """ Initializes a StroopTrial object. 
+        def __init__(self, session, trial_nr, parameters = {}, phase_durations = [] ,timing='seconds', phase_names=None):
+
+            """ Initializes a PRFTrial object. 
 
             Parameters
             ----------
@@ -35,48 +36,75 @@ class PRFTrial(Trial):
                 Whether to print extra output (mostly timing info)
             """
             
-            super().__init__(session, trial_nr, phase_durations, timing, phase_names)
+            super().__init__(session = session, trial_nr=trial_nr, parameters = parameters, phase_durations = phase_durations)
 
-            # get trial type, to know what to actually present
-            self.trial_type = trial_type
-            self.prev_trial_type = []
+            #self.stim = PRFStim(self, self.session, orientation = self.parameters['orientation'])
+        
+            this_instruction_string = '\t\t\t  Index\t\t/\tMiddle:\n\nColor\t\t-\tB\t\t/\t\tW'
+            self.instruction = TextStim(self.session.win, text = this_instruction_string, 
+                                                font = 'Helvetica Neue', pos = (0, 0), 
+                                                italic = True, height = 30, alignHoriz = 'center')
+            self.instruction.setSize((1200,50))
 
-            # keep track of when trial types switch
-            if trial_nr == 0:
-                self.prev_trial_type = trial_type
-                self.switch = False
-            else:
-                if trial_type != self.prev_trial_type: # if current trial different from previous trial
-                    self.switch = True
-                    self.prev_trial_type = trial_type # update previous trial type
-                else:
-                    self.switch = False
+            self.run_time = 0.0
+            self.instruct_time = self.t_time = self.fix_time = self.stimulus_time = self.post_stimulus_time = 0.0
+            self.instruct_sound_played = False
+            self.ID = trial_nr
 
-            iti_s = self.session.settings['stimuli']['ITI_TR'] * self.session.settings['mri']['TR'] # iti in seconds
+                
+            def draw(self):
+                """docstring for draw"""
+                old_color = self.session.fixation.color[0]
 
-            # define fixation dot
-            fix_rad = self.session.settings['stimuli']['fixation_size'] # get value from yaml
-            self.fixation_dot = Circle(self.session.win, radius=fix_rad, edges=100,fillColor=(1, 1, 1))
+                self.session.fixation.color = [self.session.fix_task_frame_values[self.session.frame_nr], self.session.fix_task_frame_values[self.session.frame_nr], self.session.fix_task_frame_values[self.session.frame_nr]]
+                if (old_color != self.session.fixation.color[0]) and hasattr(self.session, 'scanner_start_time'):
+                    self.session.transition_list.append([self.session.clock.getTime() - self.session.scanner_start_time, self.session.fixation.color[0]])
+
+                if self.phase == 0:
+                    if self.ID == 0:
+                        self.instruction.draw()
+                #elif self.phase == 2:
+                    #self.stim.draw(phase = np.max([(self.phase_times[self.phase] - self.phase_times[self.phase-1]) / self.stim.period,0]))
+
+                self.session.fixation_0.draw()
+                self.session.fixation_1.draw()
 
 
-            self.prf_stim = PRFStim(session=self.session,
-                                    trial_type=self.trial_type,
-                                    prev_trial_type=self.prev_trial_type,
-                                    switch=self.switch) 
+
+
+            def event(self):
+                for ev in event.getKeys():
+                    if len(ev) > 0:
+                        if ev in ['esc', 'escape']:
+                            self.events.append([-99,self.session.clock.getTime()-self.start_time])
+                            self.stopped = True
+                            self.session.stopped = True
+                            print('run canceled by user')
+                        # it handles both numeric and lettering modes 
+                        elif ev == ' ':
+                            self.events.append([0,self.session.clock.getTime()-self.start_time])
+                            if self.phase == 0:
+                                self.phase_forward()
+                            else:
+                                self.events.append([-99,self.session.clock.getTime()-self.start_time])
+                                self.stopped = True
+                                print('trial canceled by user')
+                        elif ev == 't': # TR pulse
+                            self.events.append([99,self.session.clock.getTime()-self.start_time])
+                            if (self.phase == 0) and (self.ID == 0): 
+                                # first trial, first phase receives the first 't' of the experiment
+                                self.session.scanner_start_time = self.session.clock.getTime()
+                            if (self.phase == 0) + (self.phase==1):
+                                self.phase_forward()
+
+                        event_msg = 'trial ' + str(self.ID) + ' key: ' + str(ev) + ' at time: ' + str(self.session.clock.getTime())
+                        self.events.append(event_msg)
+                        print(event_msg + ' ' + str(self.phase))
+                
+                    super(PRFTrial, self).key_event( ev )
 
             
-        # draw stimuli depending on phase of trial
-        def draw(self):
-            
-            #if self.switch == True: # switching task, introduce an ITI
-
-            #    self.fixation_dot.draw()
-            #    self.session.win.flip()
-            #    core.wait(iti_s)
-             
-            if self.phase==0:   
-                # draw the stimulus 
-                self.prf_stim.draw()
+       
 
 
 

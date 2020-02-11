@@ -10,6 +10,7 @@ window:
   fullscr: True
   #winType: pyglet
   waitBlanking: True
+  framerate: 60
 
 stimuli:
   num_elements: 2000
@@ -22,9 +23,12 @@ stimuli:
 
   bar_pass_hor_TR: 15
   bar_pass_ver_TR: 10
-
+  empty_TR: 5
   ITI_TR: 1
-  blank_TR: 5
+
+  bar_present_booleans: [0,1,1,0,1,1,0]  
+  bar_orientation: ['empty','LR','UD','empty','RL','DU','empty']
+
 
 monitor:
   name: default

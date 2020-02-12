@@ -17,6 +17,8 @@ stimuli:
   element_spatial_frequency: 2
   element_size: 45.0
 
+  fixation_outer_rim_size: 0.4
+  fixation_rim_size: 0.25
   fixation_size: 0.15
   
   bar_width_ratio: 0.125

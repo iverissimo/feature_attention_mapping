@@ -5,7 +5,7 @@ from exptools2.core import Session
 
 from trial import PRFTrial
 
-from psychopy.visual import filters
+from psychopy.visual import filters, GratingStim
 from psychopy import core, visual, tools
 
 
@@ -23,7 +23,7 @@ class PRFSession(Session):
         # create trials before running!
         self.create_trials() 
 
-        
+
     def create_trials(self):
         """ Creates trials (before running the session) """
 
@@ -60,21 +60,28 @@ class PRFSession(Session):
         
         # fixation dot radius in pixels
         fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fixation_size'], self.monitor)/2 #Convert size in degrees to size in pixels for a given Monitor object
-        
+        fixation_rim_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fixation_rim_size'], self.monitor)/2
+        fixation_outer_rim_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fixation_outer_rim_size'], self.monitor)/2
+
         # fixation dot changes color during task
-        self.fixation_0 = visual.Circle(self.win, 
-            units='pix', radius=fixation_rad_pix, 
-            fillColor=[1,-1,-1], lineColor=[1,-1,-1])
-        
-        self.fixation_1 = visual.Circle(self.win, 
-            units='pix', radius=fixation_rad_pix, 
-            fillColor=[-1,1,-1], lineColor=[-1,1,-1])
+        self.fixation_outer_rim = GratingStim(self.win, mask='raisedCos', tex=None, size=fixation_outer_rim_rad_pix,
+                                                   pos=np.array((0.0, 0.0)), color=(0.25,0.25,0.25), maskParams={'fringeWidth': 0.4})
+
+        self.fixation_rim = GratingStim(self.win, mask='raisedCos', tex=None, size=fixation_rim_rad_pix,
+                                             pos=np.array((0.0, 0.0)), color=(-1.0, -1.0, -1.0), maskParams={'fringeWidth': 0.4})
+
+        self.fixation = GratingStim(self.win, mask='raisedCos', tex=None, size=fixation_rad_pix,
+                                         pos=np.array((0.0, 0.0)), color=(0.25,0.25,0.25), opacity=1.0, maskParams={'fringeWidth': 0.4})
 
 
         # fixation task timing
         self.fix_task_frame_values = self._get_frame_values(framerate=self.settings['window']['framerate'], 
                                                             trial_duration=self.total_duration, 
                                                             safety_margin=3000.0)
+
+        # to append fixation transitions
+        self.transition_list = []
+        self.frame_nr = 0
         
         # append all trials
         self.all_trials = []

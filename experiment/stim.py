@@ -5,7 +5,7 @@ import numpy as np
 
 
 class PRFStim(object):
-    def __init__(self,session,trial_type,prev_trial_type,switch):
+    def __init__(self,session,orientation):
 
         
         # parameters

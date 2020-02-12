@@ -17,19 +17,20 @@ stimuli:
   element_spatial_frequency: 2
   element_size: 45.0
 
-  fixation_outer_rim_size: 0.4
-  fixation_rim_size: 0.25
-  fixation_size: 0.15
+  #fixation_outer_rim_size: 0.4
+  #fixation_rim_size: 0.25
+  fixation_size_deg: 0.15
   
-  bar_width_ratio: 0.125
+  bar_width_deg: 0.6
 
   bar_pass_hor_TR: 15
   bar_pass_ver_TR: 10
+  bar_pass_diag_TR: 15
   empty_TR: 5
-  ITI_TR: 1
 
-  bar_present_booleans: [0,1,1,0,1,1,0]  
-  bar_orientation: ['empty','LR','UD','empty','RL','DU','empty']
+  #ITI_TR: 1
+  #bar_present_booleans: [0,1,1,0,1,1,0]  
+  bar_orientation: ['empty','L-R','UR-DL','empty','DR-UL','U-D','empty','R-L','D-U','empty']
 
 
 monitor:

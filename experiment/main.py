@@ -30,7 +30,7 @@ def main():
 
     # make output dir
     base_dir = os.path.split(os.getcwd())[0] # main path for all folders of project
-    output_dir = os.path.join(base_dir,'output')
+    output_dir = os.path.join(base_dir,'output','sub-{sj}'.format(sj=sj_num))
 
     # if output path doesn't exist, create it
     if not os.path.isdir(output_dir): 
@@ -38,16 +38,17 @@ def main():
     print('saving files in %s'%output_dir)
 
     # string for output data
-    output_str = 'sub-%s_ses-01_task-prf_run-%s'%(sj_num,run_num) 
+    output_str = 'sub-{sj}_ses-01_task-prf_run-{run}'.format(sj=sj_num,run=run_num)
 
     prf_sess = PRFSession(output_str = output_str,
                           output_dir = output_dir,
-                          settings_file='experiment_settings.yml',
-                          scanner = False,
-                          tracker_on = False)
+                          settings_file='experiment_settings.yml')
                          
     prf_sess.run()
 
 
 if __name__ == '__main__':
     main()
+
+
+

@@ -5,7 +5,7 @@ import numpy as np
 from exptools2.core import Session
 
 from trial import PRFTrial
-#from stim import PRFStim
+from stim import PRFStim
 
 from psychopy import visual, tools
 
@@ -25,15 +25,14 @@ class PRFSession(Session):
         self.create_stimuli()
         self.create_trials() 
 
-
     
     # create stimuli - pRF bar and fixation dot
     def create_stimuli(self):
         
         #generate PRF stimulus
-        #self.prf_stim = PRFStim(session=self, 
-        #                bar_width_deg=self.settings['stimuli']['bar_width_deg']
-        #                )
+        self.prf_stim = PRFStim(session=self, 
+                        bar_width_deg=self.settings['stimuli']['bar_width_deg']
+                        )
         
         # fixation dot radius in pixels
         fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fixation_size_deg'], self.monitor)/2 #Convert size in degrees to size in pixels for a given Monitor object
@@ -128,7 +127,7 @@ class PRFSession(Session):
 
         # print window size just to check, not actually needed
         print(self.win.size)
-        
+
 
     def draw_stimulus(self):
  
@@ -138,11 +137,12 @@ class PRFSession(Session):
         current_time = self.clock.getTime()
 
         # bar pass
-        #if self.this_trial.bar_orientation_at_TR != 'empty': # if orientation not empty, draw bar
-        #    self.prf_stim.draw(time=current_time, 
-        #                       bar_pos_midpoint=self.this_trial.bar_pos_midpoint, 
-        #                       orientation=self.this_trial.bar_orientation_at_TR
-        #                       )
+        if self.this_trial.bar_orientation_at_TR != 'empty': # if orientation not empty, draw bar
+            
+            self.prf_stim.draw(time=current_time, 
+                               bar_pos_midpoint=self.this_trial.bar_pos_midpoint, 
+                               orientation=self.this_trial.bar_orientation_at_TR
+                               )
             
         # fixation dot
         if self.fix_counter<len(self.fixation_switch_times):
@@ -177,6 +177,11 @@ class PRFSession(Session):
         for trl in self.all_trials: 
             self.this_trial = trl
             self.this_trial.run() # run forrest run
+
+
+        print('Expected number of responses: %d'%len(self.fixation_switch_times))
+        print('Total subject responses: %d'%self.total_responses)
+        print('Correct responses (within 0.8s of dot color change): %d'%self.correct_responses)
           
 
         self.close() # close session

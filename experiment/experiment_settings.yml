@@ -15,7 +15,7 @@ window:
 stimuli:
   num_elements: 2000
   element_spatial_frequency: 2
-  element_size: 45.0
+  element_size: 0.2
 
   #fixation_outer_rim_size: 0.4
   #fixation_rim_size: 0.25
@@ -31,6 +31,15 @@ stimuli:
   #ITI_TR: 1
   #bar_present_booleans: [0,1,1,0,1,1,0]  
   bar_orientation: ['empty','L-R','UR-DL','empty','DR-UL','U-D','empty','R-L','D-U','empty']
+  direction_angle: {'L-R': 0,
+                    'R-L': 180,
+                    'U-D': 270,
+                    'D-U': 90,
+                    'DR-UL': 135,
+                    'UR-DL': 225,
+                    'DL-UR': 45,
+                    'UL-DR': 315
+                      }
 
 
 monitor:

@@ -21,7 +21,7 @@ stimuli:
   #fixation_rim_size: 0.25
   fixation_size_deg: 0.15
   
-  bar_width_deg: 0.6
+  bar_width_deg: 1.2
 
   bar_pass_hor_TR: 15
   bar_pass_ver_TR: 10
@@ -40,7 +40,6 @@ stimuli:
                     'DL-UR': 45,
                     'UL-DR': 315
                       }
-
 
 monitor:
   name: default

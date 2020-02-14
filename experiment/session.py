@@ -139,10 +139,8 @@ class PRFSession(Session):
         # bar pass
         if self.this_trial.bar_orientation_at_TR != 'empty': # if orientation not empty, draw bar
             
-            self.prf_stim.draw(time=current_time, 
-                               bar_pos_midpoint=self.this_trial.bar_pos_midpoint, 
-                               orientation=self.this_trial.bar_orientation_at_TR
-                               )
+            self.prf_stim.draw(bar_pos_midpoint=self.this_trial.bar_pos_midpoint, 
+                               orientation=self.this_trial.bar_orientation_at_TR)
             
         # fixation dot
         if self.fix_counter<len(self.fixation_switch_times):

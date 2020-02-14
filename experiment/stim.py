@@ -27,8 +27,8 @@ class PRFStim(object):
         blue_ratio = 0.5
 
         # Now set the actual stimulus parameters
-        self.colors = np.concatenate((np.ones((int(np.round(self.num_elements*red_ratio)),3)) * np.array([1, -1, -1]),  # red elements
-                                np.ones((int(np.round(self.num_elements*blue_ratio)),3)) * np.array([-1,1,-1]))) # green elements                
+        self.colors = np.concatenate((np.ones((int(np.round(self.num_elements*red_ratio)),3)) * np.array([1, -1, 0]),  # red elements
+                                np.ones((int(np.round(self.num_elements*blue_ratio)),3)) * np.array([-1,1,0]))) # green elements                
         # shuffle the colors
         np.random.shuffle(self.colors)
 
@@ -45,7 +45,19 @@ class PRFStim(object):
 
 
 
-    def draw(self, time, bar_pos_midpoint, orientation):
+    def draw(self, bar_pos_midpoint, orientation):
+
+        # dictionary with all angles 
+        dict_orientation_deg = self.session.settings['stimuli']['direction_angle']
+
+        self.orientation_rad = np.radians(dict_orientation_deg[orientation]) # get orientation for bar pos in radians
+
+        # to rotate bar for diagonal bar passes
+        self.rotation_matrix = np.matrix([[np.cos(self.orientation_rad), -np.sin(self.orientation_rad)],
+                                [np.sin(self.orientation_rad), np.cos(self.orientation_rad)]])
+
+        # calculate screen diagonal length in pixels
+        diag_pix = np.sqrt(self.session.win.size[0]**2 + self.session.win.size[1]**2)
 
 
         # set boundaries for element positions, depending on bar position at TR and direction
@@ -57,13 +69,22 @@ class PRFStim(object):
             x_bound = np.array([-self.session.win.size[0]/2,self.session.win.size[0]/2])
             y_bound = np.array([bar_pos_midpoint[1]-self.bar_width_pix/2, bar_pos_midpoint[1]+self.bar_width_pix/2])
 
+        else: # diagonals
+            y_bound = np.array([-diag_pix/2,diag_pix/2])
+            x_bound = np.array([bar_pos_midpoint[0]-self.bar_width_pix/2, bar_pos_midpoint[0]+self.bar_width_pix/2])
+
 
         # x and y positions for all elements, within set boundaries
         x_pos = np.random.uniform(x_bound[0],x_bound[1],self.num_elements)
         y_pos = np.random.uniform(y_bound[0],y_bound[1],self.num_elements)
 
-        # bar element position in pairs (x,y)
-        self.element_positions = np.array([np.array([x_pos[i],y_pos[i]]) for i in range(self.num_elements)])
+        if orientation in np.array(['UR-DL','DR-UL','DL-UR','UL-DR']): # give diagonal correct orientation
+        #    # bar element position in pairs (x,y)
+            self.element_positions = np.array([np.array([x_pos[i],y_pos[i]]) for i in range(self.num_elements)]) * self.rotation_matrix
+        else:
+            # bar element position in pairs (x,y)
+            self.element_positions = np.array([np.array([x_pos[i],y_pos[i]]) for i in range(self.num_elements)])
+
 
         self.session.element_array = visual.ElementArrayStim(win=self.session.win, nElements = self.num_elements,
                                                                 units='pix', elementTex='sin', elementMask='gauss',

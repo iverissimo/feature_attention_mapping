@@ -12,11 +12,24 @@ window:
   waitBlanking: True
   framerate: 60
 
-stimuli:
-  num_elements: 2000
-  element_spatial_frequency: 2
-  element_size: 0.2
+background:
+  num_elements: 30000
+  element_sf: 4  # cycles per degree
+  element_size: 0.5 #0.2 # degrees
 
+stimuli:
+  num_elements: 2000 #2000
+  element_size: 0.5 #0.2 # degrees
+
+  element_high_sf: 6 # cycles per degree
+  element_low_sf: 2 # cycles per degree
+
+  element_red_color: [1,-1,-1]
+  element_green_color: [-1,1,-1]
+
+  element_right_ori: 10
+  element_left_ori: -10
+  
   #fixation_outer_rim_size: 0.4
   #fixation_rim_size: 0.25
   fixation_size_deg: 0.15

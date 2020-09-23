@@ -4,26 +4,35 @@ import numpy as np
 
 from exptools2.core import Session
 
-from trial import PRFTrial
+from trial import PRFTrial, FeatureTrial
 from stim import PRFStim
 
 from psychopy import visual, tools
 
 
 class PRFSession(Session):
-    # initialize child class
-    def __init__(self, output_str, output_dir, settings_file):
+   
+    def __init__(self, output_str, output_dir, settings_file):  # initialize child class
 
-        # need to initialize parent class, indicating output infos
+        """ Initializes PRFSession object. 
+      
+        Parameters
+        ----------
+        output_str : str
+            Basename for all output-files (like logs), e.g., "sub-01_task-PRFstandard_run-1"
+        output_dir : str
+            Path to desired output-directory (default: None, which results in $pwd/logs)
+        settings_file : str
+            Path to yaml-file with settings (default: None, which results in the package's
+            default settings file (in data/default_settings.yml)
+        """
+
+        # need to initialize parent class (Session), indicating output infos
         super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file)
 
         # some MRI params
         self.bar_step = self.settings['mri']['TR'] # in seconds
         self.mri_trigger='t'
-
-        # create trials before running!
-        self.create_stimuli()
-        self.create_trials() 
 
     
     # create stimuli - pRF bar and fixation dot
@@ -169,6 +178,10 @@ class PRFSession(Session):
                                 color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
                                 italic = True, alignHoriz = 'center')
 
+        # create trials before running!
+        self.create_stimuli()
+        self.create_trials() 
+
         self.start_experiment()
         
         # cycle through trials
@@ -186,8 +199,34 @@ class PRFSession(Session):
         
 
 
-# need to make a feature session
-# and add that as an argument in main, and according to user input will call and run specific session
+class FeatureSession(Session):
+    
+    def __init__(self, output_str, output_dir, settings_file): # initialize child class
+
+        """ Initializes PRFSession object. 
+      
+        Parameters
+        ----------
+        output_str : str
+            Basename for all output-files (like logs), e.g., "sub-01_task-PRFfeature_run-1"
+        output_dir : str
+            Path to desired output-directory (default: None, which results in $pwd/logs)
+        settings_file : str
+            Path to yaml-file with settings (default: None, which results in the package's
+            default settings file (in data/default_settings.yml)
+        """
+
+
+        # need to initialize parent class (Session), indicating output infos
+        #super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file)
+
+        pass # needs to be filled in
+
+    def run(self):
+        """ Loops over trials and runs them """
+
+        pass
+
 
 
 

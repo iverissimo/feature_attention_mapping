@@ -86,5 +86,14 @@ class PRFTrial(Trial):
 
 
 
+class FeatureTrial(Trial):
+
+    def __init__(self, session, trial_nr, bar_orientation_at_TR, bar_pos_midpoint ,timing='seconds', phase_names=None, *args, **kwargs):
+
+        pass
+
+
+
+
 
 

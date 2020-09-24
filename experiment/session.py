@@ -9,6 +9,8 @@ from stim import PRFStim
 
 from psychopy import visual, tools
 
+import itertools
+
 
 class PRFSession(Session):
    
@@ -32,7 +34,7 @@ class PRFSession(Session):
 
         # some MRI params
         self.bar_step = self.settings['mri']['TR'] # in seconds
-        self.mri_trigger='t'
+        self.mri_trigger = self.settings['mri']['sync'] #'t'
 
     
     # create stimuli - pRF bar and fixation dot
@@ -54,18 +56,38 @@ class PRFSession(Session):
     def create_trials(self):
         """ Creates trials (before running the session) """
 
+
+        ## make grid of possible positions for gabors 
+        # (grid spans whole display, bar will alter specific part of grid)
+
+        # first set the number of elements that fit each dimension
+        gabor_diameter_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['element_size'], self.monitor) # diameter of each element (pix)
+        elem_num = np.round(np.array(self.win.size)/(gabor_diameter_pix/2)) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
+
+        # then set equally spaced x and y coordinates for grid
+        x_grid_pos = np.linspace(-self.win.size[0]/2 + gabor_diameter_pix/2, # to make sure gabors within display
+                                 self.win.size[0]/2 - gabor_diameter_pix/2,
+                                 int(elem_num[0]))
+        y_grid_pos = np.linspace(-self.win.size[1]/2 + gabor_diameter_pix/2, # to make sure gabors within display
+                                 self.win.size[1]/2 - gabor_diameter_pix/2,
+                                 int(elem_num[1]))
+        self.grid_pos = np.array(list(itertools.product(x_grid_pos, y_grid_pos))) # list of lists [[x0,y0],[x0,y1],...]
+
+        #
         # counter for responses
         self.total_responses = 0
         self.correct_responses = 0
 
+        # number of TRs per "condition"
         bar_pass_hor_TR = self.settings['stimuli']['bar_pass_hor_TR']
         bar_pass_ver_TR = self.settings['stimuli']['bar_pass_ver_TR']
         bar_pass_diag_TR = self.settings['stimuli']['bar_pass_diag_TR']
         empty_TR = self.settings['stimuli']['empty_TR']
 
-        bar_orientation = self.settings['stimuli']['bar_orientation'] # order of bar orientations throught experiment
+        # list with order of bar orientations throught experiment
+        bar_orientation = self.settings['stimuli']['bar_orientation'] 
 
-        # all positions in pixels [x,y] for
+        # all positions in pixels [x,y] for for midpoint of
         # horizontal bar passes, 
         hor_x = self.win.size[0]*np.linspace(-0.5,0.5, bar_pass_hor_TR)
         hor_bar_pos_pix = np.array([np.array([x,0]) for _,x in enumerate(hor_x)])
@@ -78,9 +100,6 @@ class PRFSession(Session):
         diag_x = self.win.size[0]*np.linspace(-0.5,0.5, bar_pass_diag_TR)
         diag_y = self.win.size[1]*np.linspace(-0.5,0.5, bar_pass_diag_TR)
 
-        diag_pos_pix = np.array([np.array([diag_x[i],diag_y[i]]) for i in range(len(diag_x))  ])
-
-
         #create as many trials as TRs
         trial_number = 0
         bar_orientation_at_TR = [] # list of bar orientation at all TRs
@@ -92,29 +111,48 @@ class PRFSession(Session):
                 trial_number += empty_TR
                 bar_orientation_at_TR = bar_orientation_at_TR + np.repeat(bartype,empty_TR).tolist()
                 bar_pos_array.append([np.array([np.nan,np.nan]) for i in range(empty_TR)])
-                
+
             elif bartype in np.array(['U-D','D-U']): # vertical bar pass
                 trial_number += bar_pass_ver_TR
                 bar_orientation_at_TR =  bar_orientation_at_TR + np.repeat(bartype,bar_pass_ver_TR).tolist()
-                bar_pos_array.append(ver_bar_pos_pix)
                 
+                # order depending on starting point for bar pass, and append to list
+                position_list = np.sort(ver_bar_pos_pix,axis=0) if bartype=='D-U' else np.sort(ver_bar_pos_pix,axis=0)[::-1]
+                bar_pos_array.append(position_list)
+
             elif bartype in np.array(['L-R','R-L']): # horizontal bar pass
                 trial_number += bar_pass_hor_TR
                 bar_orientation_at_TR =  bar_orientation_at_TR + np.repeat(bartype,bar_pass_hor_TR).tolist()
-                bar_pos_array.append(hor_bar_pos_pix)
                 
+                # order depending on starting point for bar pass, and append to list
+                position_list = np.sort(hor_bar_pos_pix,axis=0) if bartype=='L-R' else np.sort(hor_bar_pos_pix,axis=0)[::-1]
+                bar_pos_array.append(position_list)
+
             elif bartype in np.array(['UR-DL','DL-UR','UL-DR','DR-UL']): # diagonal bar pass
                 trial_number += bar_pass_diag_TR
                 bar_orientation_at_TR =  bar_orientation_at_TR + np.repeat(bartype,bar_pass_diag_TR).tolist()
-                bar_pos_array.append(diag_pos_pix)
+                
+                # order depending on starting point for bar pass, and append to list
+                if bartype == 'DL-UR':
+                    position_list = np.array([np.array([np.sort(diag_x)[i],np.sort(diag_y)[i]]) for i in range(len(diag_x))])
+                    
+                elif bartype == 'UL-DR':
+                    position_list = np.array([np.array([np.sort(diag_x)[i],np.sort(diag_y)[::-1][i]]) for i in range(len(diag_x))])
+                
+                elif bartype == 'DR-UL':
+                    position_list = np.array([np.array([np.sort(diag_x)[::-1][i],np.sort(diag_y)[i]]) for i in range(len(diag_x))])
+
+                elif bartype == 'UR-DL':
+                    position_list = np.array([np.array([np.sort(diag_x)[::-1][i],np.sort(diag_y)[::-1][i]]) for i in range(len(diag_x))])
+
+                bar_pos_array.append(position_list)
 
         self.trial_number = trial_number # total number of trials 
         print("Total number of (expected) TRs: %d"%self.trial_number)
         self.bar_orientation_at_TR = bar_orientation_at_TR # list of strings with bar orientation/empty
 
-        # positions (x,y) of bar for all TRs
+        # list of midpoint position (x,y) of bar for all TRs (if empty, then nan)
         self.bar_pos_midpoint = np.array([val for sublist in bar_pos_array for val in sublist])
-
 
         # append all trials
         self.all_trials = []

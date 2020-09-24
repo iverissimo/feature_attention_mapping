@@ -25,11 +25,11 @@ mouse:
 background:
   num_elements: 60000
   element_sf: 4  # cycles per degree
-  element_size: 0.5 #0.2 # degrees
+  #element_size: 0.5 #0.2 # degrees
 
 stimuli:
   num_elements: 2000 #2000
-  element_size: 0.7 #0.5 #0.2 # degrees
+  element_size: 0.2 #0.2 # degrees
 
   element_high_sf: 4 #7 # cycles per degree
   element_low_sf: 2 # cycles per degree
@@ -45,21 +45,22 @@ stimuli:
   fixation_size_deg: 0.15
   
   bar_width_deg: 1.2
+  bar_width_ratio: 0.125 # ratio of the screen size
 
-  bar_pass_hor_TR: 15
-  bar_pass_ver_TR: 10
-  bar_pass_diag_TR: 15
+  bar_pass_hor_TR: 9 #15
+  bar_pass_ver_TR: 9 #10
+  bar_pass_diag_TR: 9 #15
   empty_TR: 5
 
   #ITI_TR: 1
   #bar_present_booleans: [0,1,1,0,1,1,0]  
-  bar_orientation: ['empty','L-R','UR-DL','empty','DR-UL','U-D','empty','R-L','D-U','empty']
+  bar_direction: ['empty','L-R','UR-DL','empty','DR-UL','U-D','empty','R-L','D-U','empty']
   direction_angle: {'L-R': 0,
                     'R-L': 180,
-                    'U-D': 270,
+                    'U-D': -90,
                     'D-U': 90,
-                    'DR-UL': 135,
-                    'UR-DL': 225,
+                    'DR-UL': 225,
+                    'UR-DL': 135, 
                     'DL-UR': 45,
                     'UL-DR': 315
                       }
@@ -77,6 +78,6 @@ mri: # refers to the Psychopy SyncGenerator class
   TR: 2.0  # seconds between volume acquisitions
   TA: 2.0  # seconds to acquire one slice (?)
   volumes: 10  # number of 3D volumes to obtain in a given scanning run
-  sync: t  # character used as flag for sync timing, default=‘5’
+  sync: 't'  # character used as flag for sync timing, default=‘5’
   skip: 0  # how many frames to silently omit initially during T1 stabilization, no sync pulse.
   sound: False  # simulate scanner noise

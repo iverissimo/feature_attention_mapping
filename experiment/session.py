@@ -85,7 +85,7 @@ class PRFSession(Session):
         empty_TR = self.settings['stimuli']['empty_TR']
 
         # list with order of bar orientations throught experiment
-        bar_orientation = self.settings['stimuli']['bar_orientation'] 
+        bar_direction = self.settings['stimuli']['bar_direction'] 
 
         # all positions in pixels [x,y] for for midpoint of
         # horizontal bar passes, 
@@ -102,19 +102,19 @@ class PRFSession(Session):
 
         #create as many trials as TRs
         trial_number = 0
-        bar_orientation_at_TR = [] # list of bar orientation at all TRs
+        bar_direction_at_TR = [] # list of bar orientation at all TRs
 
         bar_pos_array = [] # list with bar midpoint (x,y) for all TRs (if nan, then empty screen)
 
-        for _,bartype in enumerate(bar_orientation):
+        for _,bartype in enumerate(bar_direction):
             if bartype in np.array(['empty']): # empty screen
                 trial_number += empty_TR
-                bar_orientation_at_TR = bar_orientation_at_TR + np.repeat(bartype,empty_TR).tolist()
+                bar_direction_at_TR = bar_direction_at_TR + np.repeat(bartype,empty_TR).tolist()
                 bar_pos_array.append([np.array([np.nan,np.nan]) for i in range(empty_TR)])
 
             elif bartype in np.array(['U-D','D-U']): # vertical bar pass
                 trial_number += bar_pass_ver_TR
-                bar_orientation_at_TR =  bar_orientation_at_TR + np.repeat(bartype,bar_pass_ver_TR).tolist()
+                bar_direction_at_TR =  bar_direction_at_TR + np.repeat(bartype,bar_pass_ver_TR).tolist()
                 
                 # order depending on starting point for bar pass, and append to list
                 position_list = np.sort(ver_bar_pos_pix,axis=0) if bartype=='D-U' else np.sort(ver_bar_pos_pix,axis=0)[::-1]
@@ -122,7 +122,7 @@ class PRFSession(Session):
 
             elif bartype in np.array(['L-R','R-L']): # horizontal bar pass
                 trial_number += bar_pass_hor_TR
-                bar_orientation_at_TR =  bar_orientation_at_TR + np.repeat(bartype,bar_pass_hor_TR).tolist()
+                bar_direction_at_TR =  bar_direction_at_TR + np.repeat(bartype,bar_pass_hor_TR).tolist()
                 
                 # order depending on starting point for bar pass, and append to list
                 position_list = np.sort(hor_bar_pos_pix,axis=0) if bartype=='L-R' else np.sort(hor_bar_pos_pix,axis=0)[::-1]
@@ -130,7 +130,7 @@ class PRFSession(Session):
 
             elif bartype in np.array(['UR-DL','DL-UR','UL-DR','DR-UL']): # diagonal bar pass
                 trial_number += bar_pass_diag_TR
-                bar_orientation_at_TR =  bar_orientation_at_TR + np.repeat(bartype,bar_pass_diag_TR).tolist()
+                bar_direction_at_TR =  bar_direction_at_TR + np.repeat(bartype,bar_pass_diag_TR).tolist()
                 
                 # order depending on starting point for bar pass, and append to list
                 if bartype == 'DL-UR':
@@ -149,10 +149,10 @@ class PRFSession(Session):
 
         self.trial_number = trial_number # total number of trials 
         print("Total number of (expected) TRs: %d"%self.trial_number)
-        self.bar_orientation_at_TR = bar_orientation_at_TR # list of strings with bar orientation/empty
+        self.bar_direction_at_TR = bar_direction_at_TR # list of strings with bar orientation/empty
 
         # list of midpoint position (x,y) of bar for all TRs (if empty, then nan)
-        self.bar_pos_midpoint = np.array([val for sublist in bar_pos_array for val in sublist])
+        self.bar_midpoint_at_TR = np.array([val for sublist in bar_pos_array for val in sublist])
 
         # append all trials
         self.all_trials = []
@@ -160,8 +160,8 @@ class PRFSession(Session):
 
             self.all_trials.append(PRFTrial(session=self,
                                             trial_nr=i,  
-                                            bar_orientation_at_TR=self.bar_orientation_at_TR[i],
-                                            bar_pos_midpoint=self.bar_pos_midpoint[i]
+                                            bar_direction_at_TR=self.bar_direction_at_TR[i],
+                                            bar_midpoint_at_TR=self.bar_midpoint_at_TR[i]
                                             ))
 
         # define moments for fixation dot to change color
@@ -184,10 +184,10 @@ class PRFSession(Session):
         current_time = self.clock.getTime()
 
         # bar pass
-        if self.this_trial.bar_orientation_at_TR != 'empty': # if orientation not empty, draw bar
+        if self.this_trial.bar_direction_at_TR != 'empty': # if orientation not empty, draw bar
             
-            self.prf_stim.draw(bar_pos_midpoint=self.this_trial.bar_pos_midpoint, 
-                               orientation=self.this_trial.bar_orientation_at_TR)
+            self.prf_stim.draw(bar_midpoint=self.this_trial.bar_midpoint_at_TR, 
+                               bar_direction=self.this_trial.bar_direction_at_TR)
             
         # fixation dot
         if self.fix_counter<len(self.fixation_switch_times):

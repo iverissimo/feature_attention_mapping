@@ -8,7 +8,7 @@ from psychopy import event
 
 class PRFTrial(Trial):
 
-    def __init__(self, session, trial_nr, bar_orientation_at_TR, bar_pos_midpoint ,timing='seconds', phase_names=None, *args, **kwargs):
+    def __init__(self, session, trial_nr, bar_direction_at_TR, bar_midpoint_at_TR ,timing='seconds', phase_names=None, *args, **kwargs):
 
         """ Initializes a PRFTrial object. 
 
@@ -36,8 +36,8 @@ class PRFTrial(Trial):
         """
         
         self.ID = trial_nr
-        self.bar_orientation_at_TR = bar_orientation_at_TR
-        self.bar_pos_midpoint = bar_pos_midpoint
+        self.bar_direction_at_TR = bar_direction_at_TR
+        self.bar_midpoint_at_TR = bar_midpoint_at_TR
         self.session = session
 
         #dummy value: if scanning or simulating a scanner, everything is synced to the output 't' of the scanner
@@ -73,7 +73,6 @@ class PRFTrial(Trial):
                         self.session.correct_responses += 1
 
                 # log everything into session data frame
-                # where is this saved? need to check
                 idx = self.session.global_log.shape[0]
                 self.session.global_log.loc[idx, 'trial_nr'] = self.trial_nr
                 self.session.global_log.loc[idx, 'onset'] = t

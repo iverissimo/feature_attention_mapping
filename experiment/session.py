@@ -37,18 +37,20 @@ class PRFSession(Session):
         self.mri_trigger = self.settings['mri']['sync'] #'t'
 
     
-    # create stimuli - pRF bar and fixation dot
     def create_stimuli(self):
+        """ Create Stimuli - pRF bar and fixation dot """
         
         #generate PRF stimulus
         self.prf_stim = PRFStim(session=self, 
-                        bar_width_deg=self.settings['stimuli']['bar_width_deg']
-                        )
+                                bar_width_deg=self.settings['stimuli']['bar_width_deg']
+                                )
         
-        # fixation dot radius in pixels
-        fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fixation_size_deg'], self.monitor)/2 #Convert size in degrees to size in pixels for a given Monitor object
+        # Convert fixation dot radius in degrees to pixels for a given Monitor object
+        fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fixation_size_deg'], 
+                                                        self.monitor)/2 
         
-        # fixation dot changes color during task
+        # create fixation circle
+        # note - fixation dot will change color during task
         self.fixation = visual.Circle(self.win, units='pix', radius=fixation_rad_pix, 
                                             fillColor=[-1,-1,-1], lineColor=[-1,-1,-1])
 
@@ -164,41 +166,17 @@ class PRFSession(Session):
                                             bar_midpoint_at_TR=self.bar_midpoint_at_TR[i]
                                             ))
 
-        # define moments for fixation dot to change color
-        self.total_time = self.trial_number*self.bar_step # in seconds
+        ## define timepoints for fixation dot to change color
+        # total experiment time (in seconds)
+        self.total_time = self.trial_number*self.bar_step 
+        # switch time points (around 4 s between switches + jitter to avoid expectation effects)
         self.fixation_switch_times = np.arange(1,self.total_time,4)
-        self.fixation_switch_times += 2*np.random.random_sample((len(self.fixation_switch_times),)) # use these time points to switch colors
-
+        self.fixation_switch_times += 2*np.random.random_sample((len(self.fixation_switch_times),)) 
         # counter for fixation dot switches
         self.fix_counter = 0
 
         # print window size just to check, not actually needed
         print(self.win.size)
-
-
-    def draw_stimulus(self):
- 
-        # draw the actual stimuli
-
-        # get time
-        current_time = self.clock.getTime()
-
-        # bar pass
-        if self.this_trial.bar_direction_at_TR != 'empty': # if orientation not empty, draw bar
-            
-            self.prf_stim.draw(bar_midpoint=self.this_trial.bar_midpoint_at_TR, 
-                               bar_direction=self.this_trial.bar_direction_at_TR)
-            
-        # fixation dot
-        if self.fix_counter<len(self.fixation_switch_times):
-            if current_time<self.fixation_switch_times[self.fix_counter]:
-                self.fixation.draw()
-
-            else: # when switch time reached, switch color and increment counter
-                self.fixation.fillColor *= -1
-                self.fixation.lineColor *= -1
-                self.fixation.draw()
-                self.fix_counter += 1
 
     
     def run(self):
@@ -224,8 +202,7 @@ class PRFSession(Session):
         
         # cycle through trials
         for trl in self.all_trials: 
-            self.this_trial = trl
-            self.this_trial.run() # run forrest run
+            trl.run() # run forrest run
 
 
         print('Expected number of responses: %d'%len(self.fixation_switch_times))

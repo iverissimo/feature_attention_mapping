@@ -3,7 +3,10 @@ import os
 import numpy as np
 from exptools2.core import Trial
 
-from psychopy import event
+from psychopy import event #, visual, tools
+
+
+#from stim import PRFStim
 
 
 class PRFTrial(Trial):
@@ -23,19 +26,19 @@ class PRFTrial(Trial):
         phase_names : array-like
             List/tuple/array with names for phases (only for logging),
             optional (if None, all are named 'stim')
-        parameters : dict
-            Dict of parameters that needs to be added to the log of this trial
         timing : str
             The "units" of the phase durations. Default is 'seconds', where we
             assume the phase-durations are in seconds. The other option is
             'frames', where the phase-"duration" refers to the number of frames.
-        load_next_during_phase : int (or None)
-            If not None, the next trial will be loaded during this phase
-        verbose : bool
-            Whether to print extra output (mostly timing info)
+        bar_direction_at_TR : list
+            List/array with the bar direction at each TR. Total length = total # TRs
+        bar_midpoint_at_TR : array
+            Numpy array with the pairs of positions [x,y] of the midpoint of the bar
+            per TR. Shape (#TRs, 2)
+            
         """
         
-        self.ID = trial_nr
+        self.ID = trial_nr # trial identifier, not sure if needed
         self.bar_direction_at_TR = bar_direction_at_TR
         self.bar_midpoint_at_TR = bar_midpoint_at_TR
         self.session = session
@@ -46,9 +49,28 @@ class PRFTrial(Trial):
         super().__init__(session, trial_nr, phase_durations, verbose=False, *args, **kwargs)
        
 
-    def draw(self): # actually draw everything
-        self.session.draw_stimulus() 
+    def draw(self): 
+        """ Draw stimuli - pRF bar and fixation dot - for each trial """
+        ## actually draw the stimuli
+        
+        current_time = self.session.clock.getTime() # get time
 
+        # bar pass
+        if self.bar_direction_at_TR != 'empty': # if bar pass at TR, then draw bar
+            
+            self.session.prf_stim.draw(bar_midpoint=self.bar_midpoint_at_TR, 
+                                       bar_direction=self.bar_direction_at_TR)
+            
+        # fixation dot
+        if self.session.fix_counter<len(self.session.fixation_switch_times): # if counter within number of switch moments
+            if current_time<self.session.fixation_switch_times[self.session.fix_counter]: # if current time under switch time
+                self.session.fixation.draw() # just draw
+
+            else: # when switch time reached, switch color and increment counter
+                self.session.fixation.fillColor *= -1
+                self.session.fixation.lineColor *= -1
+                self.session.fixation.draw()
+                self.session.fix_counter += 1
 
 
     def get_events(self):

@@ -48,7 +48,7 @@ stimuli:
   bar_pass_ver_TR: 9 #10
   empty_TR: 5
 
-  bar_direction: ['empty','L-R','empty','U-D','empty','R-L','D-U','empty'] #['empty','L-R','UR-DL','empty','DR-UL','U-D','empty','R-L','D-U','empty']
+  bar_direction: ['empty','L-R','empty','R-L','empty','U-D','D-U','empty'] #['empty','L-R','UR-DL','empty','DR-UL','U-D','empty','R-L','D-U','empty']
   
 eyetracker:
   address: '100.1.1.1' #  Eyelink eyetracker IP

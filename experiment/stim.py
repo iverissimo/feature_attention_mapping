@@ -1,12 +1,124 @@
 
 import os
 import numpy as np
-from psychopy import visual
-from psychopy import tools 
-
+from psychopy import visual, tools
 
 
 class PRFStim(object):
+    def __init__(self, session, bar_width_ratio, grid_pos):
+        
+        """ Initializes a PRFStim object. 
+
+        Parameters
+        ----------
+        session : exptools Session object
+            A Session object (needed for metadata)
+        bar_width_ratio : float
+            Ratio of screen dim to use as bar width
+        grid_pos : array
+            List/array of grid positions within display, to select a subset that will be the bar
+            
+        """
+
+        
+        # general parameters
+        self.session = session
+        self.screen = self.session.win.size # screen res [hRes,vRes]
+        
+        self.bar_width_ratio = bar_width_ratio
+        
+        self.grid_pos = grid_pos
+        
+
+    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR):
+        
+        """ Draw stimuli - pRF bar - for each trial 
+        
+        Parameters
+        ----------
+        bar_midpoint_at_TR : array
+            List/array of bar midpoint positions [x,y] at that TR (trial)
+        bar_direction_at_TR : str
+            Direction of bar at that TR (trial)
+            
+        """
+        
+        ## define elements for bar
+        
+        # first define bar width in pixels (depends if vertical or horizontal bar pass)
+        # and bounds for x and y positions
+        
+        if bar_direction_at_TR in np.array(['L-R','R-L']): # if horizontal bar pass
+            
+            bar_width_pix = self.screen[0]*self.bar_width_ratio 
+            
+            x_bounds = np.array([bar_midpoint_at_TR[0]-bar_width_pix/2,bar_midpoint_at_TR[0]+bar_width_pix/2])
+            y_bounds = np.array([-self.screen[1]/2,self.screen[1]/2])
+
+        elif bar_direction_at_TR in np.array(['U-D','D-U']): # if vertical bar pass
+            
+            bar_width_pix = self.screen[1]*self.bar_width_ratio
+            
+            x_bounds = np.array([-self.screen[0]/2,self.screen[0]/2])
+            y_bounds = np.array([bar_midpoint_at_TR[1]-bar_width_pix/2, bar_midpoint_at_TR[1]+bar_width_pix/2])
+            
+            
+        # check which grid positions are within bounds
+        bar_ind = np.where(((self.grid_pos[...,0]>=min(x_bounds))&
+                    (self.grid_pos[...,0]<=max(x_bounds))&
+                    (self.grid_pos[...,1]>=min(y_bounds))&
+                    (self.grid_pos[...,1]<=max(y_bounds))
+                ))[0]
+        
+        # element positions (#elements,(x,y))
+        self.element_positions = self.grid_pos[bar_ind]
+        
+        # number of bar elements
+        self.num_elements = self.element_positions.shape[0]
+        
+        # element sizes
+        element_sizes_px = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['element_size'], self.session.monitor) # in pix
+        self.element_sizes = np.ones((self.num_elements)) * element_sizes_px 
+        
+        # element spatial frequency
+        element_sfs_pix = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['element_high_sf'], self.session.monitor) # (transform cycles/degree to cycles/pixel)
+        self.element_sfs = np.ones((self.num_elements)) * element_sfs_pix
+        
+        # element orientation
+        self.element_orientations = np.concatenate((np.ones((int(self.num_elements * .5))) * 180,  # vertical elements
+                                                   np.ones((int(self.num_elements * .5))) * 90)) # horizontal elements
+        
+        # add some jitter to the orientations 
+        jit = np.concatenate((np.random.uniform(-1,-0.5,int(self.num_elements * 0.5)),
+                              np.random.uniform(0.5,1,int(self.num_elements * 0.5))))
+        np.random.shuffle(jit)
+
+        self.element_orientations += jit
+        np.random.shuffle(self.element_orientations) # shuffle the orientations
+        
+        # element colors
+        self.colors = np.ones((int(np.round(self.num_elements)),3)) * np.array([-1, -1, -1])
+        np.random.shuffle(self.colors) # shuffle the colors
+        
+        
+        # define bar array element
+        self.session.element_array = visual.ElementArrayStim(win=self.session.win, nElements = self.num_elements,
+                                                                units='pix', elementTex='sin', elementMask='gauss',
+                                                                sizes = self.element_sizes, sfs = self.element_sfs, 
+                                                                xys = self.element_positions, oris=self.element_orientations, 
+                                                                colors = self.colors, 
+                                                                colorSpace = 'rgb') 
+        self.session.element_array.draw()
+
+
+
+
+
+
+#####
+
+
+class PRFStim2(object): # So then I still save older version here
     def __init__(self, session, bar_width_deg):
 
         

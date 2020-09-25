@@ -3,10 +3,7 @@ import os
 import numpy as np
 from exptools2.core import Trial
 
-from psychopy import event #, visual, tools
-
-
-#from stim import PRFStim
+from psychopy import event 
 
 
 class PRFTrial(Trial):
@@ -50,16 +47,16 @@ class PRFTrial(Trial):
        
 
     def draw(self): 
+
         """ Draw stimuli - pRF bar and fixation dot - for each trial """
-        ## actually draw the stimuli
         
         current_time = self.session.clock.getTime() # get time
 
         # bar pass
         if self.bar_direction_at_TR != 'empty': # if bar pass at TR, then draw bar
             
-            self.session.prf_stim.draw(bar_midpoint=self.bar_midpoint_at_TR, 
-                                       bar_direction=self.bar_direction_at_TR)
+            self.session.prf_stim.draw(bar_midpoint_at_TR=self.bar_midpoint_at_TR, 
+                                       bar_direction_at_TR=self.bar_direction_at_TR)
             
         # fixation dot
         if self.session.fix_counter<len(self.session.fixation_switch_times): # if counter within number of switch moments
@@ -96,11 +93,11 @@ class PRFTrial(Trial):
 
                 # log everything into session data frame
                 idx = self.session.global_log.shape[0]
-                self.session.global_log.loc[idx, 'trial_nr'] = self.trial_nr
+                self.session.global_log.loc[idx, 'trial_nr'] = self.ID
                 self.session.global_log.loc[idx, 'onset'] = t
                 self.session.global_log.loc[idx, 'event_type'] = event_type
                 self.session.global_log.loc[idx, 'phase'] = self.phase
-                self.session.global_log.loc[idx, 'response'] = ev
+                self.session.global_log.loc[idx, 'response'] = ev                
 
                 for param, val in self.parameters.items():
                     self.session.global_log.loc[idx, param] = val

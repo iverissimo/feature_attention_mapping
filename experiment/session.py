@@ -36,28 +36,6 @@ class PRFSession(Session):
         self.bar_step = self.settings['mri']['TR'] # in seconds
         self.mri_trigger = self.settings['mri']['sync'] #'t'
 
-    
-    def create_stimuli(self):
-        """ Create Stimuli - pRF bar and fixation dot """
-        
-        #generate PRF stimulus
-        self.prf_stim = PRFStim(session=self, 
-                                bar_width_deg=self.settings['stimuli']['bar_width_deg']
-                                )
-        
-        # Convert fixation dot radius in degrees to pixels for a given Monitor object
-        fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fixation_size_deg'], 
-                                                        self.monitor)/2 
-        
-        # create fixation circle
-        # note - fixation dot will change color during task
-        self.fixation = visual.Circle(self.win, units='pix', radius=fixation_rad_pix, 
-                                            fillColor=[-1,-1,-1], lineColor=[-1,-1,-1])
-
-
-    def create_trials(self):
-        """ Creates trials (before running the session) """
-
 
         ## make grid of possible positions for gabors 
         # (grid spans whole display, bar will alter specific part of grid)
@@ -74,6 +52,31 @@ class PRFSession(Session):
                                  self.win.size[1]/2 - gabor_diameter_pix/2,
                                  int(elem_num[1]))
         self.grid_pos = np.array(list(itertools.product(x_grid_pos, y_grid_pos))) # list of lists [[x0,y0],[x0,y1],...]
+
+    
+    def create_stimuli(self):
+
+        """ Create Stimuli - pRF bar and fixation dot """
+        
+        #generate PRF stimulus
+        self.prf_stim = PRFStim(session=self, 
+                                bar_width_ratio = self.settings['stimuli']['bar_width_ratio'], 
+                                grid_pos = self.grid_pos
+                                )
+        
+        # Convert fixation dot radius in degrees to pixels for a given Monitor object
+        fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fixation_size_deg'], 
+                                                        self.monitor)/2 
+        
+        # create black fixation circle
+        # note - fixation dot will change color during task
+        self.fixation = visual.Circle(self.win, units='pix', radius=fixation_rad_pix, 
+                                            fillColor=[-1,-1,-1], lineColor=[-1,-1,-1])
+
+
+    def create_trials(self):
+
+        """ Creates trials (before running the session) """
 
         #
         # counter for responses
@@ -104,19 +107,19 @@ class PRFSession(Session):
 
         #create as many trials as TRs
         trial_number = 0
-        bar_direction_at_TR = [] # list of bar orientation at all TRs
+        bar_direction_all = [] # list of bar orientation at all TRs
 
         bar_pos_array = [] # list with bar midpoint (x,y) for all TRs (if nan, then empty screen)
 
         for _,bartype in enumerate(bar_direction):
             if bartype in np.array(['empty']): # empty screen
                 trial_number += empty_TR
-                bar_direction_at_TR = bar_direction_at_TR + np.repeat(bartype,empty_TR).tolist()
+                bar_direction_all = bar_direction_all + np.repeat(bartype,empty_TR).tolist()
                 bar_pos_array.append([np.array([np.nan,np.nan]) for i in range(empty_TR)])
 
             elif bartype in np.array(['U-D','D-U']): # vertical bar pass
                 trial_number += bar_pass_ver_TR
-                bar_direction_at_TR =  bar_direction_at_TR + np.repeat(bartype,bar_pass_ver_TR).tolist()
+                bar_direction_all =  bar_direction_all + np.repeat(bartype,bar_pass_ver_TR).tolist()
                 
                 # order depending on starting point for bar pass, and append to list
                 position_list = np.sort(ver_bar_pos_pix,axis=0) if bartype=='D-U' else np.sort(ver_bar_pos_pix,axis=0)[::-1]
@@ -124,7 +127,7 @@ class PRFSession(Session):
 
             elif bartype in np.array(['L-R','R-L']): # horizontal bar pass
                 trial_number += bar_pass_hor_TR
-                bar_direction_at_TR =  bar_direction_at_TR + np.repeat(bartype,bar_pass_hor_TR).tolist()
+                bar_direction_all =  bar_direction_all + np.repeat(bartype,bar_pass_hor_TR).tolist()
                 
                 # order depending on starting point for bar pass, and append to list
                 position_list = np.sort(hor_bar_pos_pix,axis=0) if bartype=='L-R' else np.sort(hor_bar_pos_pix,axis=0)[::-1]
@@ -132,7 +135,7 @@ class PRFSession(Session):
 
             elif bartype in np.array(['UR-DL','DL-UR','UL-DR','DR-UL']): # diagonal bar pass
                 trial_number += bar_pass_diag_TR
-                bar_direction_at_TR =  bar_direction_at_TR + np.repeat(bartype,bar_pass_diag_TR).tolist()
+                bar_direction_all =  bar_direction_all + np.repeat(bartype,bar_pass_diag_TR).tolist()
                 
                 # order depending on starting point for bar pass, and append to list
                 if bartype == 'DL-UR':
@@ -151,10 +154,10 @@ class PRFSession(Session):
 
         self.trial_number = trial_number # total number of trials 
         print("Total number of (expected) TRs: %d"%self.trial_number)
-        self.bar_direction_at_TR = bar_direction_at_TR # list of strings with bar orientation/empty
+        self.bar_direction_all = bar_direction_all # list of strings with bar orientation/empty
 
         # list of midpoint position (x,y) of bar for all TRs (if empty, then nan)
-        self.bar_midpoint_at_TR = np.array([val for sublist in bar_pos_array for val in sublist])
+        self.bar_midpoint_all = np.array([val for sublist in bar_pos_array for val in sublist])
 
         # append all trials
         self.all_trials = []
@@ -162,8 +165,8 @@ class PRFSession(Session):
 
             self.all_trials.append(PRFTrial(session=self,
                                             trial_nr=i,  
-                                            bar_direction_at_TR=self.bar_direction_at_TR[i],
-                                            bar_midpoint_at_TR=self.bar_midpoint_at_TR[i]
+                                            bar_direction_at_TR=self.bar_direction_all[i],
+                                            bar_midpoint_at_TR=self.bar_midpoint_all[i]
                                             ))
 
         ## define timepoints for fixation dot to change color

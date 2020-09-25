@@ -54,7 +54,7 @@ stimuli:
 
   #ITI_TR: 1
   #bar_present_booleans: [0,1,1,0,1,1,0]  
-  bar_direction: ['empty','L-R','UR-DL','empty','DR-UL','U-D','empty','R-L','D-U','empty']
+  bar_direction: ['empty','L-R','empty','U-D','empty','R-L','D-U','empty'] #['empty','L-R','UR-DL','empty','DR-UL','U-D','empty','R-L','D-U','empty']
   direction_angle: {'L-R': 0,
                     'R-L': 180,
                     'U-D': -90,

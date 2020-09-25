@@ -22,14 +22,55 @@ monitor:
 mouse:
   visible: False
 
-background:
-  num_elements: 60000
-  element_sf: 4  # cycles per degree
-  #element_size: 0.5 #0.2 # degrees
 
 stimuli:
-  num_elements: 2000 #2000
-  element_size: 0.2 #0.2 # degrees
+  fixation_size_deg: 0.15
+  
+  bar_width_ratio: 0.125 # ratio of the screen res
+
+  bar_pass_hor_TR: 9 #15
+  bar_pass_ver_TR: 9 #10
+  empty_TR: 5
+
+  bar_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty'] 
+
+  element_size: 0.4 #0.2 # degrees
+
+  conditions: # feature conditions
+    background: 
+      element_sf: 4 # cycles per degree
+      element_color: [-1,-1,-1] # black and white
+      element_ori: [90,180] # half horizontal, half vertical
+
+    color_red:
+      element_sf: 4 # cycles per degree
+      element_color: [1,-1,-1] # red and black?
+      element_ori: [90,180] # half horizontal, half vertical
+
+    color_green:
+      element_sf: 4 # cycles per degree
+      element_color: [-1,1,-1] # green and black?
+      element_ori: [90,180] # half horizontal, half vertical
+
+    sf_high:
+      element_sf: 4.05 # cycles per degree
+      element_color: [-1,-1,-1] # black and white
+      element_ori: [90,180] # half horizontal, half vertical
+
+    sf_low:
+      element_sf: 2 # cycles per degree
+      element_color: [-1,-1,-1] # black and white
+      element_ori: [90,180] # half horizontal, half vertical
+
+    ori_left:
+      element_sf: 4 # cycles per degree
+      element_color: [-1,-1,-1] # black and white
+      element_ori: [45,225] # all right
+
+    ori_right:
+      element_sf: 4 # cycles per degree
+      element_color: [-1,-1,-1] # black and white
+      element_ori: [135,315] # all left
 
   element_high_sf: 4 #7 # cycles per degree
   element_low_sf: 2 # cycles per degree
@@ -40,15 +81,7 @@ stimuli:
   element_right_ori: 15
   element_left_ori: -15
   
-  fixation_size_deg: 0.15
   
-  bar_width_ratio: 0.125 # ratio of the screen size
-
-  bar_pass_hor_TR: 9 #15
-  bar_pass_ver_TR: 9 #10
-  empty_TR: 5
-
-  bar_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty'] 
   
 eyetracker:
   address: '100.1.1.1' #  Eyelink eyetracker IP

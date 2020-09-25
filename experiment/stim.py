@@ -29,6 +29,36 @@ class PRFStim(object):
         self.bar_width_ratio = bar_width_ratio
         
         self.grid_pos = grid_pos
+
+        self.condition_settings = self.session.settings['stimuli']['conditions']
+
+
+    def jitter(arr,max_val=1,min_val=0.5):
+
+        """ Add random jitter to an array
+        
+        Parameters
+        ----------
+        arr : array
+            List/array (N,) or (N,2) of values to add jitter to
+        max_val : int/float
+            maximun amount to add/subtract
+        min_val: int/float
+            minimum amount to add/subtract
+            
+        """
+
+        # element positions (#elements,(x,y))
+        size_arr = len(arr)
+
+        # add some randomly uniform jitter 
+        jit = np.concatenate((np.random.uniform(-max_val,-min_val,math.floor(size_arr * .5)),
+                              np.random.uniform(min_val,max_val,math.ceil(size_arr * .5))))
+        np.random.shuffle(jit)
+
+        arr += jit
+
+        return(arr)
         
 
     def draw(self, bar_midpoint_at_TR, bar_direction_at_TR):
@@ -74,7 +104,8 @@ class PRFStim(object):
         
         # element positions (#elements,(x,y))
         self.element_positions = self.grid_pos[bar_ind]
-        
+
+       
         # number of bar elements
         self.num_elements = self.element_positions.shape[0]
         
@@ -83,25 +114,18 @@ class PRFStim(object):
         self.element_sizes = np.ones((self.num_elements)) * element_sizes_px 
         
         # element spatial frequency
-        element_sfs_pix = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['element_high_sf'], self.session.monitor) # (transform cycles/degree to cycles/pixel)
+        element_sfs_pix = tools.monitorunittools.deg2pix(self.condition_settings['background']['element_sf'], self.session.monitor) # (transform cycles/degree to cycles/pixel)
         self.element_sfs = np.ones((self.num_elements)) * element_sfs_pix
         
-        # element orientation
-        self.element_orientations = np.concatenate((np.ones((math.floor(self.num_elements * .5))) * 180,  # vertical elements
-                                                   np.ones((math.ceil(self.num_elements * .5))) * 90)) # horizontal elements
+        # element orientation (half ori1, half ori2)
+        ori_arr = np.concatenate((np.ones((math.floor(self.num_elements * .5))) * self.condition_settings['background']['element_ori'][0], 
+                                  np.ones((math.ceil(self.num_elements * .5))) * self.condition_settings['background']['element_ori'][1])) 
+        self.element_orientations = self.jitter(ori_arr)
         
-        # add some jitter to the orientations 
-        jit = np.concatenate((np.random.uniform(-1,-0.5,math.floor(self.num_elements * .5)),
-                              np.random.uniform(0.5,1,math.ceil(self.num_elements * .5))))
-        np.random.shuffle(jit)
-
-        self.element_orientations += jit
         np.random.shuffle(self.element_orientations) # shuffle the orientations
         
         # element colors
-        self.colors = np.ones((int(np.round(self.num_elements)),3)) * np.array([-1, -1, -1])
-        np.random.shuffle(self.colors) # shuffle the colors
-        
+        self.colors = np.ones((int(np.round(self.num_elements)),3)) * np.array(self.condition_settings['background']['element_color'])
         
         # define bar array element
         self.session.element_array = visual.ElementArrayStim(win=self.session.win, nElements = self.num_elements,

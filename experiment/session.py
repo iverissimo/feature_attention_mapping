@@ -36,13 +36,12 @@ class PRFSession(Session):
         self.bar_step = self.settings['mri']['TR'] # in seconds
         self.mri_trigger = self.settings['mri']['sync'] #'t'
 
-
         ## make grid of possible positions for gabors 
         # (grid spans whole display, bar will alter specific part of grid)
 
         # first set the number of elements that fit each dimension
         gabor_diameter_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['element_size'], self.monitor) # diameter of each element (pix)
-        elem_num = np.round(np.array(self.win.size)/(gabor_diameter_pix/2)) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
+        elem_num = np.round(np.array(self.win.size)/(gabor_diameter_pix * 0.6)) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
 
         # then set equally spaced x and y coordinates for grid
         x_grid_pos = np.linspace(-self.win.size[0]/2 + gabor_diameter_pix/2, # to make sure gabors within display

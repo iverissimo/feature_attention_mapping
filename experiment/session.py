@@ -86,7 +86,6 @@ class PRFSession(Session):
         # number of TRs per "condition"
         bar_pass_hor_TR = self.settings['stimuli']['bar_pass_hor_TR']
         bar_pass_ver_TR = self.settings['stimuli']['bar_pass_ver_TR']
-        bar_pass_diag_TR = self.settings['stimuli']['bar_pass_diag_TR']
         empty_TR = self.settings['stimuli']['empty_TR']
 
         # list with order of bar orientations throught experiment
@@ -100,10 +99,6 @@ class PRFSession(Session):
         # vertical bar passes, 
         ver_y = self.win.size[1]*np.linspace(-0.5,0.5, bar_pass_ver_TR)
         ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(ver_y)])
-
-        # and diagonal bar passes
-        diag_x = self.win.size[0]*np.linspace(-0.5,0.5, bar_pass_diag_TR)
-        diag_y = self.win.size[1]*np.linspace(-0.5,0.5, bar_pass_diag_TR)
 
         #create as many trials as TRs
         trial_number = 0
@@ -131,25 +126,6 @@ class PRFSession(Session):
                 
                 # order depending on starting point for bar pass, and append to list
                 position_list = np.sort(hor_bar_pos_pix,axis=0) if bartype=='L-R' else np.sort(hor_bar_pos_pix,axis=0)[::-1]
-                bar_pos_array.append(position_list)
-
-            elif bartype in np.array(['UR-DL','DL-UR','UL-DR','DR-UL']): # diagonal bar pass
-                trial_number += bar_pass_diag_TR
-                bar_direction_all =  bar_direction_all + np.repeat(bartype,bar_pass_diag_TR).tolist()
-                
-                # order depending on starting point for bar pass, and append to list
-                if bartype == 'DL-UR':
-                    position_list = np.array([np.array([np.sort(diag_x)[i],np.sort(diag_y)[i]]) for i in range(len(diag_x))])
-                    
-                elif bartype == 'UL-DR':
-                    position_list = np.array([np.array([np.sort(diag_x)[i],np.sort(diag_y)[::-1][i]]) for i in range(len(diag_x))])
-                
-                elif bartype == 'DR-UL':
-                    position_list = np.array([np.array([np.sort(diag_x)[::-1][i],np.sort(diag_y)[i]]) for i in range(len(diag_x))])
-
-                elif bartype == 'UR-DL':
-                    position_list = np.array([np.array([np.sort(diag_x)[::-1][i],np.sort(diag_y)[::-1][i]]) for i in range(len(diag_x))])
-
                 bar_pos_array.append(position_list)
 
         self.trial_number = trial_number # total number of trials 

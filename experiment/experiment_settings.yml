@@ -40,31 +40,16 @@ stimuli:
   element_right_ori: 15
   element_left_ori: -15
   
-  #fixation_outer_rim_size: 0.4
-  #fixation_rim_size: 0.25
   fixation_size_deg: 0.15
   
-  bar_width_deg: 1.2
   bar_width_ratio: 0.125 # ratio of the screen size
 
   bar_pass_hor_TR: 9 #15
   bar_pass_ver_TR: 9 #10
-  bar_pass_diag_TR: 9 #15
   empty_TR: 5
 
-  #ITI_TR: 1
-  #bar_present_booleans: [0,1,1,0,1,1,0]  
   bar_direction: ['empty','L-R','empty','U-D','empty','R-L','D-U','empty'] #['empty','L-R','UR-DL','empty','DR-UL','U-D','empty','R-L','D-U','empty']
-  direction_angle: {'L-R': 0,
-                    'R-L': 180,
-                    'U-D': -90,
-                    'D-U': 90,
-                    'DR-UL': 225,
-                    'UR-DL': 135, 
-                    'DL-UR': 45,
-                    'UL-DR': 315
-                      }
-
+  
 eyetracker:
   address: '100.1.1.1' #  Eyelink eyetracker IP
   dot_size: 0.15  # in dva

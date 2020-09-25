@@ -1,6 +1,7 @@
 
 import os
 import numpy as np
+import math
 from psychopy import visual, tools
 
 
@@ -58,10 +59,11 @@ class PRFStim(object):
         elif bar_direction_at_TR in np.array(['U-D','D-U']): # if vertical bar pass
             
             bar_width_pix = self.screen[1]*self.bar_width_ratio
-            
+
             x_bounds = np.array([-self.screen[0]/2,self.screen[0]/2])
             y_bounds = np.array([bar_midpoint_at_TR[1]-bar_width_pix/2, bar_midpoint_at_TR[1]+bar_width_pix/2])
             
+
             
         # check which grid positions are within bounds
         bar_ind = np.where(((self.grid_pos[...,0]>=min(x_bounds))&
@@ -85,12 +87,12 @@ class PRFStim(object):
         self.element_sfs = np.ones((self.num_elements)) * element_sfs_pix
         
         # element orientation
-        self.element_orientations = np.concatenate((np.ones((int(self.num_elements * .5))) * 180,  # vertical elements
-                                                   np.ones((int(self.num_elements * .5))) * 90)) # horizontal elements
+        self.element_orientations = np.concatenate((np.ones((math.floor(self.num_elements * .5))) * 180,  # vertical elements
+                                                   np.ones((math.ceil(self.num_elements * .5))) * 90)) # horizontal elements
         
         # add some jitter to the orientations 
-        jit = np.concatenate((np.random.uniform(-1,-0.5,int(self.num_elements * 0.5)),
-                              np.random.uniform(0.5,1,int(self.num_elements * 0.5))))
+        jit = np.concatenate((np.random.uniform(-1,-0.5,math.floor(self.num_elements * .5)),
+                              np.random.uniform(0.5,1,math.ceil(self.num_elements * .5))))
         np.random.shuffle(jit)
 
         self.element_orientations += jit

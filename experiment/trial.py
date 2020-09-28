@@ -8,7 +8,7 @@ from psychopy import event
 
 class PRFTrial(Trial):
 
-    def __init__(self, session, trial_nr, bar_direction_at_TR, bar_midpoint_at_TR ,timing='seconds', phase_names=None, *args, **kwargs):
+    def __init__(self, session, trial_nr, bar_direction_at_TR, bar_midpoint_at_TR, phase_durations,timing='seconds', phase_names=None, *args, **kwargs):
 
         """ Initializes a PRFTrial object. 
 
@@ -41,7 +41,10 @@ class PRFTrial(Trial):
         self.session = session
 
         #dummy value: if scanning or simulating a scanner, everything is synced to the output 't' of the scanner
-        phase_durations = [100]
+        #phase_durations = [100]
+
+        # phase durations for each condition 
+        self.phase_durations = phase_durations 
 
         super().__init__(session, trial_nr, phase_durations, verbose=False, *args, **kwargs)
        
@@ -54,7 +57,7 @@ class PRFTrial(Trial):
 
         # bar pass
         if self.bar_direction_at_TR != 'empty': # if bar pass at TR, then draw bar
-            
+
             self.session.prf_stim.draw(bar_midpoint_at_TR=self.bar_midpoint_at_TR, 
                                        bar_direction_at_TR=self.bar_direction_at_TR)
             

@@ -96,7 +96,7 @@ class PRFStim(object):
         ori_arr = np.concatenate((np.ones((math.floor(self.num_elements * .5))) * self.condition_settings['background']['element_ori'][0], 
                                   np.ones((math.ceil(self.num_elements * .5))) * self.condition_settings['background']['element_ori'][1])) 
         
-        self.element_orientations = jitter(ori_arr)
+        self.element_orientations = jitter(ori_arr) # add some jitter to the orientations
         
         np.random.shuffle(self.element_orientations) # shuffle the orientations
         

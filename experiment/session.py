@@ -134,12 +134,20 @@ class PRFSession(Session):
         # list of midpoint position (x,y) of bar for all TRs (if empty, then nan)
         self.bar_midpoint_all = np.array([val for sublist in bar_pos_array for val in sublist])
 
+
+        # define list with number of phases and their duration (duration of each must be the same)
+        self.phase_durations = np.repeat(self.bar_step/len(self.settings['stimuli']['conditions'].keys()),
+                                    len(self.settings['stimuli']['conditions'].keys()))
+
+        
+
         # append all trials
         self.all_trials = []
         for i in range(self.trial_number):
 
             self.all_trials.append(PRFTrial(session=self,
                                             trial_nr=i,  
+                                            phase_durations = self.phase_durations,
                                             bar_direction_at_TR=self.bar_direction_all[i],
                                             bar_midpoint_at_TR=self.bar_midpoint_all[i]
                                             ))

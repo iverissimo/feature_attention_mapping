@@ -139,7 +139,18 @@ class PRFSession(Session):
         self.phase_durations = np.repeat(self.bar_step/len(self.settings['stimuli']['conditions'].keys()),
                                     len(self.settings['stimuli']['conditions'].keys()))
 
-        
+        # get condition names and randomize them for each trial 
+        key_list = []
+        for key in self.settings['stimuli']['conditions']:
+            key_list.append(key)
+
+        np.random.shuffle(key_list)
+        phase_conditions = np.array(key_list)
+
+        for r in range(trial_number-1):
+            np.random.shuffle(key_list)
+            
+            phase_conditions = np.vstack((phase_conditions,key_list))
 
         # append all trials
         self.all_trials = []
@@ -148,6 +159,7 @@ class PRFSession(Session):
             self.all_trials.append(PRFTrial(session=self,
                                             trial_nr=i,  
                                             phase_durations = self.phase_durations,
+                                            phase_names = phase_conditions[i],
                                             bar_direction_at_TR=self.bar_direction_all[i],
                                             bar_midpoint_at_TR=self.bar_midpoint_all[i]
                                             ))

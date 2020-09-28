@@ -8,7 +8,8 @@ from psychopy import event
 
 class PRFTrial(Trial):
 
-    def __init__(self, session, trial_nr, bar_direction_at_TR, bar_midpoint_at_TR, phase_durations,timing='seconds', phase_names=None, *args, **kwargs):
+    def __init__(self, session, trial_nr, bar_direction_at_TR, bar_midpoint_at_TR, phase_durations,
+    				phase_names, timing='seconds', *args, **kwargs):
 
         """ Initializes a PRFTrial object. 
 
@@ -44,9 +45,11 @@ class PRFTrial(Trial):
         #phase_durations = [100]
 
         # phase durations for each condition 
-        self.phase_durations = phase_durations 
+        self.phase_durations = phase_durations
+        # name of each condition
+        self.phase_names = phase_names 
 
-        super().__init__(session, trial_nr, phase_durations, verbose=False, *args, **kwargs)
+        super().__init__(session, trial_nr, phase_durations, phase_names, verbose=False, *args, **kwargs)
        
 
     def draw(self): 

@@ -36,7 +36,7 @@ class PRFStim(object):
 
 
 
-    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR):
+    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase):
         
         """ Draw stimuli - pRF bar - for each trial 
         
@@ -89,19 +89,19 @@ class PRFStim(object):
         self.element_sizes = np.ones((self.num_elements)) * element_sizes_px 
         
         # element spatial frequency
-        element_sfs_pix = tools.monitorunittools.deg2pix(self.condition_settings['background']['element_sf'], self.session.monitor) # (transform cycles/degree to cycles/pixel)
+        element_sfs_pix = tools.monitorunittools.deg2pix(self.condition_settings[this_phase]['element_sf'], self.session.monitor) # (transform cycles/degree to cycles/pixel)
         self.element_sfs = np.ones((self.num_elements)) * element_sfs_pix
         
         # element orientation (half ori1, half ori2)
-        ori_arr = np.concatenate((np.ones((math.floor(self.num_elements * .5))) * self.condition_settings['background']['element_ori'][0], 
-                                  np.ones((math.ceil(self.num_elements * .5))) * self.condition_settings['background']['element_ori'][1])) 
+        ori_arr = np.concatenate((np.ones((math.floor(self.num_elements * .5))) * self.condition_settings[this_phase]['element_ori'][0], 
+                                  np.ones((math.ceil(self.num_elements * .5))) * self.condition_settings[this_phase]['element_ori'][1])) 
         
         self.element_orientations = jitter(ori_arr) # add some jitter to the orientations
         
         np.random.shuffle(self.element_orientations) # shuffle the orientations
         
         # element colors
-        self.colors = np.ones((int(np.round(self.num_elements)),3)) * np.array(self.condition_settings['background']['element_color'])
+        self.colors = np.ones((int(np.round(self.num_elements)),3)) * np.array(self.condition_settings[this_phase]['element_color'])
         
         # define bar array element
         self.session.element_array = visual.ElementArrayStim(win=self.session.win, nElements = self.num_elements,

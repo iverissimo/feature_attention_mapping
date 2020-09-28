@@ -62,7 +62,10 @@ class PRFTrial(Trial):
         if self.bar_direction_at_TR != 'empty': # if bar pass at TR, then draw bar
 
             self.session.prf_stim.draw(bar_midpoint_at_TR=self.bar_midpoint_at_TR, 
-                                       bar_direction_at_TR=self.bar_direction_at_TR)
+                                       bar_direction_at_TR=self.bar_direction_at_TR,
+                                       this_phase=self.phase_names[int(self.phase)]) #'ori_left')
+
+            print(self.phase_names[int(self.phase)]) #'ori_left')
             
         # fixation dot
         if self.session.fix_counter<len(self.session.fixation_switch_times): # if counter within number of switch moments

@@ -44,12 +44,12 @@ stimuli:
 
     color_red:
       element_sf: 4 # cycles per degree
-      element_color: [1,-1,-1] # red and black?
+      element_color: [1,-1,1] # red and black?
       element_ori: [90,180] # half horizontal, half vertical
 
     color_green:
       element_sf: 4 # cycles per degree
-      element_color: [-1,1,-1] # green and black?
+      element_color: [1,1,-1] # green and black?
       element_ori: [90,180] # half horizontal, half vertical
 
     sf_high:
@@ -58,7 +58,7 @@ stimuli:
       element_ori: [90,180] # half horizontal, half vertical
 
     sf_low:
-      element_sf: 2 # cycles per degree
+      element_sf: 3.9 # cycles per degree
       element_color: [-1,-1,-1] # black and white
       element_ori: [90,180] # half horizontal, half vertical
 
@@ -71,16 +71,6 @@ stimuli:
       element_sf: 4 # cycles per degree
       element_color: [-1,-1,-1] # black and white
       element_ori: [135,315] # all left
-
-  element_high_sf: 4 #7 # cycles per degree
-  element_low_sf: 2 # cycles per degree
-
-  element_red_color: [1,-1,-1]
-  element_green_color: [-1,1,-1]
-
-  element_right_ori: 15
-  element_left_ori: -15
-  
   
   
 eyetracker:

@@ -4,6 +4,8 @@ import numpy as np
 import math
 from psychopy import visual, tools
 
+from utils import *
+
 
 class PRFStim(object):
     def __init__(self, session, bar_width_ratio, grid_pos):
@@ -33,33 +35,6 @@ class PRFStim(object):
         self.condition_settings = self.session.settings['stimuli']['conditions']
 
 
-    def jitter(arr,max_val=1,min_val=0.5):
-
-        """ Add random jitter to an array
-        
-        Parameters
-        ----------
-        arr : array
-            List/array (N,) or (N,2) of values to add jitter to
-        max_val : int/float
-            maximun amount to add/subtract
-        min_val: int/float
-            minimum amount to add/subtract
-            
-        """
-
-        # element positions (#elements,(x,y))
-        size_arr = len(arr)
-
-        # add some randomly uniform jitter 
-        jit = np.concatenate((np.random.uniform(-max_val,-min_val,math.floor(size_arr * .5)),
-                              np.random.uniform(min_val,max_val,math.ceil(size_arr * .5))))
-        np.random.shuffle(jit)
-
-        arr += jit
-
-        return(arr)
-        
 
     def draw(self, bar_midpoint_at_TR, bar_direction_at_TR):
         
@@ -120,7 +95,8 @@ class PRFStim(object):
         # element orientation (half ori1, half ori2)
         ori_arr = np.concatenate((np.ones((math.floor(self.num_elements * .5))) * self.condition_settings['background']['element_ori'][0], 
                                   np.ones((math.ceil(self.num_elements * .5))) * self.condition_settings['background']['element_ori'][1])) 
-        self.element_orientations = self.jitter(ori_arr)
+        
+        self.element_orientations = jitter(ori_arr)
         
         np.random.shuffle(self.element_orientations) # shuffle the orientations
         

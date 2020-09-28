@@ -108,12 +108,35 @@ class PRFStim(object):
         self.colors = np.ones((int(np.round(self.num_elements)),3)) * np.array(self.condition_settings[this_phase]['element_color'])
         
         # define bar array element
-        self.session.element_array = visual.ElementArrayStim(win=self.session.win, nElements = self.num_elements,
-                                                                units='pix', elementTex='sin', elementMask='gauss',
-                                                                sizes = self.element_sizes, sfs = self.element_sfs, 
-                                                                xys = self.element_positions, oris=self.element_orientations, 
-                                                                colors = self.colors, 
-                                                                colorSpace = 'rgb') 
+        if this_phase in ('color_green','color_red'):
+            
+            # to make colored gabor, need to do it a bit differently (psychopy forces colors to be opposite)
+            grating = visual.filters.makeGrating(res=math.ceil(element_sizes_px))
+
+            # initialise a 'black' texture
+            colored_grating = np.ones((math.ceil(element_sizes_px), math.ceil(element_sizes_px), 3)) * -1.0
+            
+            # replace the red/green channel with the grating
+            if this_phase=='color_red': 
+                colored_grating[..., 0] = grating 
+            else:
+                colored_grating[..., 1] = grating 
+
+            self.session.element_array = visual.ElementArrayStim(win=self.session.win, nElements = self.num_elements,
+                                                                    units='pix', elementTex=colored_grating, elementMask='gauss',
+                                                                    sizes = self.element_sizes, sfs = self.element_sfs, 
+                                                                    xys = self.element_positions, oris=self.element_orientations, 
+                                                                    #colors = self.colors, 
+                                                                    colorSpace = 'rgb') 
+
+
+        else:
+            self.session.element_array = visual.ElementArrayStim(win=self.session.win, nElements = self.num_elements,
+                                                                    units='pix', elementTex='sin', elementMask='gauss',
+                                                                    sizes = self.element_sizes, sfs = self.element_sfs, 
+                                                                    xys = self.element_positions, oris=self.element_orientations, 
+                                                                    colors = self.colors, 
+                                                                    colorSpace = 'rgb') 
         self.session.element_array.draw()
 
 

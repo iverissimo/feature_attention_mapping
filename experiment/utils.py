@@ -30,3 +30,29 @@ def jitter(arr,max_val=1,min_val=0.5):
     arr += jit
 
     return(arr)
+
+
+def near_power_of_2(x,near='previous'):
+    """ Get nearest power of 2
+    
+    Parameters
+    ----------
+    x : int/float
+        value for which we want to find the nearest power of 2
+    near : str
+        'previous' or 'next' to indicate if floor or ceiling power of 2        
+    """
+    if x == 0:
+        val = 1
+    else:
+        if near == 'previous':
+            val = 2**math.floor(math.log2(x))
+        elif near == 'next':
+            val = 2**math.ceil(math.log2(x))
+
+    return val
+
+
+
+
+

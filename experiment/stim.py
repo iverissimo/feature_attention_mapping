@@ -28,7 +28,7 @@ class PRFStim(object):
         self.session = session
         self.screen = self.session.win.size # screen res [hRes,vRes]
         
-        self.bar_width_ratio = bar_width_ratio
+        self.bar_width_pix = self.screen[1]*bar_width_ratio
         
         self.grid_pos = grid_pos
 
@@ -55,18 +55,14 @@ class PRFStim(object):
         # and bounds for x and y positions
         
         if bar_direction_at_TR in np.array(['L-R','R-L']): # if horizontal bar pass
-            
-            bar_width_pix = self.screen[0]*self.bar_width_ratio 
-            
-            x_bounds = np.array([bar_midpoint_at_TR[0]-bar_width_pix/2,bar_midpoint_at_TR[0]+bar_width_pix/2])
+                        
+            x_bounds = np.array([bar_midpoint_at_TR[0]-self.bar_width_pix/2,bar_midpoint_at_TR[0]+self.bar_width_pix/2])
             y_bounds = np.array([-self.screen[1]/2,self.screen[1]/2])
 
         elif bar_direction_at_TR in np.array(['U-D','D-U']): # if vertical bar pass
             
-            bar_width_pix = self.screen[1]*self.bar_width_ratio
-
             x_bounds = np.array([-self.screen[0]/2,self.screen[0]/2])
-            y_bounds = np.array([bar_midpoint_at_TR[1]-bar_width_pix/2, bar_midpoint_at_TR[1]+bar_width_pix/2])
+            y_bounds = np.array([bar_midpoint_at_TR[1]-self.bar_width_pix/2, bar_midpoint_at_TR[1]+self.bar_width_pix/2])
             
 
             
@@ -111,10 +107,11 @@ class PRFStim(object):
         if this_phase in ('color_green','color_red'):
             
             # to make colored gabor, need to do it a bit differently (psychopy forces colors to be opposite)
-            grating = visual.filters.makeGrating(res=math.ceil(element_sizes_px))
+            grat_res = near_power_of_2(element_sizes_px,near='previous') # use power of 2 as grating res, to avoid error
+            grating = visual.filters.makeGrating(res=grat_res)
 
             # initialise a 'black' texture
-            colored_grating = np.ones((math.ceil(element_sizes_px), math.ceil(element_sizes_px), 3)) * -1.0
+            colored_grating = np.ones((grat_res, grat_res, 3)) * -1.0
             
             # replace the red/green channel with the grating
             if this_phase=='color_red': 

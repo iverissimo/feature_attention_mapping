@@ -44,12 +44,12 @@ class PRFSession(Session):
         elem_num = np.round(np.array(self.win.size)/(gabor_diameter_pix * 0.6)) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
 
         # then set equally spaced x and y coordinates for grid
-        x_grid_pos = np.linspace(-self.win.size[0]/2 + gabor_diameter_pix/2, # to make sure gabors within display
-                                 self.win.size[0]/2 - gabor_diameter_pix/2,
-                                 int(elem_num[0]))
+        # use vertical dim because we want to make a square display
         y_grid_pos = np.linspace(-self.win.size[1]/2 + gabor_diameter_pix/2, # to make sure gabors within display
                                  self.win.size[1]/2 - gabor_diameter_pix/2,
                                  int(elem_num[1]))
+        x_grid_pos = y_grid_pos
+
         self.grid_pos = np.array(list(itertools.product(x_grid_pos, y_grid_pos))) # list of lists [[x0,y0],[x0,y1],...]
 
     
@@ -91,13 +91,13 @@ class PRFSession(Session):
         bar_direction = self.settings['stimuli']['bar_direction'] 
 
         # all positions in pixels [x,y] for for midpoint of
-        # horizontal bar passes, 
-        hor_x = self.win.size[0]*np.linspace(-0.5,0.5, bar_pass_hor_TR)
-        hor_bar_pos_pix = np.array([np.array([x,0]) for _,x in enumerate(hor_x)])
-
         # vertical bar passes, 
         ver_y = self.win.size[1]*np.linspace(-0.5,0.5, bar_pass_ver_TR)
         ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(ver_y)])
+
+        # horizontal bar passes (square display so we use vertical dim)
+        hor_x = self.win.size[1]*np.linspace(-0.5,0.5, bar_pass_hor_TR)
+        hor_bar_pos_pix = np.array([np.array([x,0]) for _,x in enumerate(hor_x)])
 
         #create as many trials as TRs
         trial_number = 0

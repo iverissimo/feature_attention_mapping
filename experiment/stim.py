@@ -7,10 +7,11 @@ from psychopy import visual, tools
 from utils import *
 
 
-class PRFStim(object):
+class Stim(object):
+
     def __init__(self, session, bar_width_ratio, grid_pos):
         
-        """ Initializes a PRFStim object. 
+        """ Initializes a Stim object. 
 
         Parameters
         ----------
@@ -22,7 +23,6 @@ class PRFStim(object):
             List/array of grid positions within display, to select a subset that will be the bar
             
         """
-
         
         # general parameters
         self.session = session
@@ -33,6 +33,15 @@ class PRFStim(object):
         self.grid_pos = grid_pos
 
         self.condition_settings = self.session.settings['stimuli']['conditions']
+
+
+
+class PRFStim(Stim):
+
+    def __init__(self, session, bar_width_ratio, grid_pos):
+
+        # need to initialize parent class (Stim)
+        super().__init__(session=session, bar_width_ratio=bar_width_ratio, grid_pos=grid_pos)
 
 
 

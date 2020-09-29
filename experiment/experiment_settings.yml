@@ -44,12 +44,12 @@ stimuli:
 
     color_red:
       element_sf: 4 # cycles per degree
-      element_color: [1,0,0] # red and black?
+      element_color: [-1,-1,-1] # black and white, is changed within code
       element_ori: [90,180] # half horizontal, half vertical
 
     color_green:
       element_sf: 4 # cycles per degree
-      element_color: [0,1,0] # green and black?
+      element_color: [-1,-1,-1] # black and white, is changed within code
       element_ori: [90,180] # half horizontal, half vertical
 
     # sf_high:

@@ -34,7 +34,51 @@ class Stim(object):
 
         self.condition_settings = self.session.settings['stimuli']['conditions']
 
+        
+        ## define elements array, with all grid positions
+        # by using background characteristics and contrast = 0 (so it will be hidden)
 
+        # element positions (#elements,(x,y))
+        self.element_positions = self.grid_pos 
+
+        # total number of elements (all grid points)
+        self.num_elements = self.element_positions.shape[0]
+
+        # set element contrasts (initially will be 0 because we don't want to see elements)
+        self.element_contrast = np.zeros((self.num_elements))
+
+        # element sizes
+        element_sizes_px = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['element_size'], self.session.monitor) # in pix
+        self.element_sizes = np.ones((self.num_elements)) * element_sizes_px 
+        
+        # element background spatial frequency 
+        element_sfs_pix = tools.monitorunittools.deg2pix(self.condition_settings['background']['element_sf'], self.session.monitor) # (transform cycles/degree to cycles/pixel)
+        self.element_sfs = np.ones((self.num_elements)) * element_sfs_pix
+        
+        # element background orientation (half ori1, half ori2)
+        ori_arr = np.concatenate((np.ones((math.floor(self.num_elements * .5))) * self.condition_settings['background']['element_ori'][0], 
+                                  np.ones((math.ceil(self.num_elements * .5))) * self.condition_settings['background']['element_ori'][1])) 
+
+        self.element_orientations = jitter(ori_arr) # add some jitter to the orientations
+
+        np.random.shuffle(self.element_orientations) # shuffle the orientations
+
+        # element background colors
+        self.colors = np.ones((int(np.round(self.num_elements)),3)) * np.array(self.condition_settings['background']['element_color'])
+
+        # element background texture
+        self.elementTex = 'sin'
+
+        # define bar array element
+        self.session.element_array = visual.ElementArrayStim(win = self.session.win, nElements = self.num_elements,
+                                                                    units = 'pix', elementTex = self.elementTex, elementMask = 'gauss',
+                                                                    sizes = self.element_sizes, sfs = self.element_sfs, 
+                                                                    xys = self.element_positions, oris = self.element_orientations,
+                                                                    contrs = self.element_contrast, 
+                                                                    colors = self.colors, 
+                                                                    colorSpace = 'rgb') 
+        
+        
 
 class PRFStim(Stim):
 
@@ -81,46 +125,58 @@ class PRFStim(Stim):
                     (self.grid_pos[...,1]>=min(y_bounds))&
                     (self.grid_pos[...,1]<=max(y_bounds))
                 ))[0]
-        
-        # element positions (#elements,(x,y))
-        self.element_positions = self.grid_pos[bar_ind]
 
-       
-        # number of bar elements
-        self.num_elements = self.element_positions.shape[0]
-        
-        # element sizes
-        element_sizes_px = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['element_size'], self.session.monitor) # in pix
-        self.element_sizes = np.ones((self.num_elements)) * element_sizes_px 
-        
+        # boolean mask of grid position
+        # to be updated throughout experiment, 
+        # False keeps background settings, True changes 
+
+        bool_mask = np.full(self.grid_pos.shape,False)
+        bool_mask[bar_ind] = True
+
+
+        # set element contrasts
+        self.element_contrast = np.array([1 if bool_mask[ind][0]==True else 0 for ind,val in enumerate(self.element_contrast)])
+                
         # element spatial frequency
         element_sfs_pix = tools.monitorunittools.deg2pix(self.condition_settings[this_phase]['element_sf'], self.session.monitor) # (transform cycles/degree to cycles/pixel)
-        self.element_sfs = np.ones((self.num_elements)) * element_sfs_pix
+        
+        self.element_sfs = np.array([element_sfs_pix if bool_mask[ind][0]==True else val for ind,val in enumerate(self.element_sfs)])
         
         # element orientation (half ori1, half ori2)
-        ori_arr = np.concatenate((np.ones((math.floor(self.num_elements * .5))) * self.condition_settings[this_phase]['element_ori'][0], 
-                                  np.ones((math.ceil(self.num_elements * .5))) * self.condition_settings[this_phase]['element_ori'][1])) 
+        ori_arr = np.concatenate((np.ones((math.floor(sum(bool_mask[...,0]) * .5))) * self.condition_settings[this_phase]['element_ori'][0], 
+                                  np.ones((math.ceil(sum(bool_mask[...,0]) * .5))) * self.condition_settings[this_phase]['element_ori'][1])) 
+
+        # add some jitter to the orientations
+        # needs to be bigger to allow for orientation differentiation
+        ori_arr = jitter(ori_arr,max_val=10,min_val=5) if this_phase in ('ori_left','ori_right') else jitter(ori_arr)
+
+        np.random.shuffle(ori_arr) # shuffle the orientations
+
+        updated_ori = []
+        ori_counter = 0
         
-        #self.element_orientations = ori_arr
-        if this_phase in ('ori_left','ori_right'):
-            self.element_orientations = jitter(ori_arr,max_val=10,min_val=5) # add some jitter to the orientations, needs to be bigger to allow for orientation differentiation
-        else:
-            self.element_orientations = jitter(ori_arr) # add some jitter to the orientations
+        for ind,val in enumerate(self.element_sfs):
+            if bool_mask[ind][0]==True:
+                updated_ori.append(ori_arr[ori_counter])
+                ori_counter +=1
+            else:
+                updated_ori.append(val)
+
+        self.element_orientations = np.array(updated_ori)
         
-        np.random.shuffle(self.element_orientations) # shuffle the orientations
         
-        # element colors
+        # # element colors
         self.colors = np.ones((int(np.round(self.num_elements)),3)) * np.array(self.condition_settings[this_phase]['element_color'])
         
         # define bar array element
         if this_phase in ('color_green','color_red'):
             
             # to make colored gabor, need to do it a bit differently (psychopy forces colors to be opposite)
-            grat_res = near_power_of_2(element_sizes_px,near='previous') # use power of 2 as grating res, to avoid error
+            grat_res = near_power_of_2(self.element_sizes[0],near='previous') # use power of 2 as grating res, to avoid error
             grating = visual.filters.makeGrating(res=grat_res)
 
-            # initialise a 'black' texture
-            colored_grating = np.ones((grat_res, grat_res, 3)) * -1.0
+            # initialise a 'black' texture 
+            colored_grating = np.ones((grat_res, grat_res, 3)) #* -1.0
             
             # replace the red/green channel with the grating
             if this_phase=='color_red': 
@@ -128,21 +184,19 @@ class PRFStim(Stim):
             else:
                 colored_grating[..., 1] = grating 
 
-            self.session.element_array = visual.ElementArrayStim(win=self.session.win, nElements = self.num_elements,
-                                                                    units='pix', elementTex=colored_grating, elementMask='gauss',
-                                                                    sizes = self.element_sizes, sfs = self.element_sfs, 
-                                                                    xys = self.element_positions, oris=self.element_orientations, 
-                                                                    #colors = self.colors, 
-                                                                    colorSpace = 'rgb') 
-
+            self.elementTex = colored_grating
 
         else:
-            self.session.element_array = visual.ElementArrayStim(win=self.session.win, nElements = self.num_elements,
-                                                                    units='pix', elementTex='sin', elementMask='gauss',
-                                                                    sizes = self.element_sizes, sfs = self.element_sfs, 
-                                                                    xys = self.element_positions, oris=self.element_orientations, 
-                                                                    colors = self.colors, 
-                                                                    colorSpace = 'rgb') 
+            self.elementTex = 'sin'
+
+        
+        # actually set the settings
+        self.session.element_array.setContrs(self.element_contrast)#, log=False)
+        self.session.element_array.setSfs(self.element_sfs)
+        self.session.element_array.setOris(self.element_orientations)
+        self.session.element_array.setColors(self.colors)
+        self.session.element_array.setTex(self.elementTex)#, log=False)
+
         self.session.element_array.draw()
 
 

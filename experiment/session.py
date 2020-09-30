@@ -12,7 +12,49 @@ from psychopy import visual, tools
 import itertools
 
 
-class PRFSession(Session):
+class ExpSession(Session):
+
+    def __init__(self, output_str, output_dir, settings_file):  # initialize child class
+
+            """ Initializes ExpSession object. 
+          
+            Parameters
+            ----------
+            output_str : str
+                Basename for all output-files (like logs), e.g., "sub-01_task-PRFstandard_run-1"
+            output_dir : str
+                Path to desired output-directory (default: None, which results in $pwd/logs)
+            settings_file : str
+                Path to yaml-file with settings (default: None, which results in the package's
+                default settings file (in data/default_settings.yml)
+            """
+
+            # need to initialize parent class (Session), indicating output infos
+            super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file)
+
+            # some MRI params
+            self.bar_step = self.settings['mri']['TR'] # in seconds
+            self.mri_trigger = self.settings['mri']['sync'] #'t'
+
+            ## make grid of possible positions for gabors 
+            # (grid spans whole display, bar will alter specific part of grid)
+
+            # first set the number of elements that fit each dimension
+            gabor_diameter_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['element_size'], self.monitor) # diameter of each element (pix)
+            elem_num = np.round(np.array(self.win.size)/(gabor_diameter_pix * 0.6)) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
+
+            # then set equally spaced x and y coordinates for grid
+            # use vertical dim because we want to make a square display
+            y_grid_pos = np.linspace(-self.win.size[1]/2 + gabor_diameter_pix/2, # to make sure gabors within display
+                                     self.win.size[1]/2 - gabor_diameter_pix/2,
+                                     int(elem_num[1]))
+            x_grid_pos = y_grid_pos
+
+            self.grid_pos = np.array(list(itertools.product(x_grid_pos, y_grid_pos))) # list of lists [[x0,y0],[x0,y1],...]
+
+
+
+class PRFSession(ExpSession):
    
     def __init__(self, output_str, output_dir, settings_file):  # initialize child class
 
@@ -32,27 +74,8 @@ class PRFSession(Session):
         # need to initialize parent class (Session), indicating output infos
         super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file)
 
-        # some MRI params
-        self.bar_step = self.settings['mri']['TR'] # in seconds
-        self.mri_trigger = self.settings['mri']['sync'] #'t'
+        
 
-        ## make grid of possible positions for gabors 
-        # (grid spans whole display, bar will alter specific part of grid)
-
-        # first set the number of elements that fit each dimension
-        gabor_diameter_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['element_size'], self.monitor) # diameter of each element (pix)
-        elem_num = np.round(np.array(self.win.size)/(gabor_diameter_pix * 0.6)) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
-
-        # then set equally spaced x and y coordinates for grid
-        # use vertical dim because we want to make a square display
-        y_grid_pos = np.linspace(-self.win.size[1]/2 + gabor_diameter_pix/2, # to make sure gabors within display
-                                 self.win.size[1]/2 - gabor_diameter_pix/2,
-                                 int(elem_num[1]))
-        x_grid_pos = y_grid_pos
-
-        self.grid_pos = np.array(list(itertools.product(x_grid_pos, y_grid_pos))) # list of lists [[x0,y0],[x0,y1],...]
-
-    
     def create_stimuli(self):
 
         """ Create Stimuli - pRF bar and fixation dot """
@@ -212,7 +235,7 @@ class PRFSession(Session):
         
 
 
-class FeatureSession(Session):
+class FeatureSession(ExpSession):
     
     def __init__(self, output_str, output_dir, settings_file): # initialize child class
 

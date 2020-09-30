@@ -12,6 +12,7 @@ window: # refers to the parameters for the Psychopy Window class
   waitBlanking: True
   framerate: 60
   #units: pix
+  display: 'square' # or 'rectangle', defines if square [vRes vRes] or rectangle [hRes vRes] display
 
 monitor:
   name: default
@@ -24,7 +25,16 @@ mouse:
 
 
 stimuli:
-  fixation_size_deg: 0.15
+  fix_dot_size_deg: 0.05
+  fix_dot_color: [-1,-1,-1] # start with black
+  fix_line_color: [-1,-1,-1] # start with black
+
+  fix_line_width: 1
+  fix_line_color: [-1,-1,-1]
+  fix_line_contrast: 0.2
+
+  rect_fill_color: [-1, -1, -1]
+  rect_line_color: [-1, -1, -1]
   
   bar_width_ratio: 0.0625 #0.125 # ratio of the screen res
 

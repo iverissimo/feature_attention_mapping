@@ -32,6 +32,15 @@ class ExpSession(Session):
             # need to initialize parent class (Session), indicating output infos
             super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file)
 
+            # set size of display
+            if self.settings['window']['display'] == 'square':
+                self.screen = np.array([self.win.size[1], self.win.size[1]])
+                rect_contrast = 1
+            
+            elif self.settings['window']['display'] == 'rectangle':
+                self.screen = np.array([self.win.size[0], self.win.size[1]])
+                rect_contrast = 0 # then rectangles will be hidden
+
             # some MRI params
             self.bar_step = self.settings['mri']['TR'] # in seconds
             self.mri_trigger = self.settings['mri']['sync'] #'t'
@@ -41,42 +50,68 @@ class ExpSession(Session):
 
             # first set the number of elements that fit each dimension
             gabor_diameter_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['element_size'], self.monitor) # diameter of each element (pix)
-            elem_num = np.round(np.array(self.win.size)/(gabor_diameter_pix * 0.6)) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
+            elem_num = np.round(np.array(self.screen)/(gabor_diameter_pix * 0.6)) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
 
             # then set equally spaced x and y coordinates for grid
-            # use vertical dim because we want to make a square display
-            y_grid_pos = np.linspace(-self.win.size[1]/2 + gabor_diameter_pix/2, # to make sure gabors within display
-                                     self.win.size[1]/2 - gabor_diameter_pix/2,
+            x_grid_pos = np.linspace(-self.screen[0]/2 + gabor_diameter_pix/2, # to make sure gabors within display
+                                     self.screen[0]/2 - gabor_diameter_pix/2,
+                                     int(elem_num[0]))
+
+            y_grid_pos = np.linspace(-self.screen[1]/2 + gabor_diameter_pix/2, # to make sure gabors within display
+                                     self.screen[1]/2 - gabor_diameter_pix/2,
                                      int(elem_num[1]))
-            x_grid_pos = y_grid_pos
+            
 
             self.grid_pos = np.array(list(itertools.product(x_grid_pos, y_grid_pos))) # list of lists [[x0,y0],[x0,y1],...]
 
 
             ## create some elements that will be common to both tasks ##
-            #create black bars on the side, because we want square display
-
-            res_diff = self.win.size[0]-self.win.size[1] # difference between horizontal and vertical resolution
-            rect_left_pos = [-(self.win.size[0]/2) + res_diff/4, 0] # left rectangle position
-            rect_right_pos = [(self.win.size[0]/2) - res_diff/4, 0] # right rectangle position
             
-            self.rect_left = visual.Rect(win=self.win,
-                                    units="pix",
-                                    width=res_diff/2,
-                                    height=self.win.size[1],
-                                    fillColor=[-1, -1, -1],
-                                    lineColor=[-1, -1, -1],
-                                    pos=rect_left_pos
+            #create black bars on the side, for cases where we want square display
+            rect_width = (self.win.size[0]-self.win.size[1])/2 # half of the difference between horizontal and vertical resolution
+            rect_left_pos = [-self.screen[1]/2 - rect_width/2, 0] #[-self.screen[1]/2 ,0] # left rectangle position
+            rect_right_pos = [self.screen[1]/2 + rect_width/2, 0] # [self.screen[1]/2 ,0] # right rectangle position
+            
+            self.rect_left = visual.Rect(win = self.win,
+                                        units = "pix",
+                                        width = rect_width,
+                                        height = self.screen[1],
+                                        fillColor = self.settings['stimuli']['rect_fill_color'],
+                                        lineColor = self.settings['stimuli']['rect_line_color'],
+                                        contrast = rect_contrast,
+                                        pos = rect_left_pos
+                                        )
+
+            self.rect_right = visual.Rect(win = self.win,
+                                        units = "pix",
+                                        width = rect_width,
+                                        height = self.screen[1],
+                                        fillColor = self.settings['stimuli']['rect_fill_color'],
+                                        lineColor = self.settings['stimuli']['rect_line_color'],
+                                        contrast = rect_contrast,
+                                        pos = rect_right_pos
+                                        )
+
+            
+            # create fixation lines
+            self.line1 = visual.Line(win = self.win,
+                                    units = "pix",
+                                    lineColor = self.settings['stimuli']['fix_line_color'],
+                                    lineWidth = self.settings['stimuli']['fix_line_width'],
+                                    contrast = self.settings['stimuli']['fix_line_contrast'],
+                                    start = [-self.screen[0]/2, self.screen[1]/2],
+                                    end = [self.screen[0]/2, -self.screen[1]/2]
                                     )
 
-            self.rect_right = visual.Rect(win=self.win,
-                                    units="pix",
-                                    width=res_diff/2,
-                                    height=self.win.size[1],
-                                    fillColor=[-1, -1, -1],
-                                    lineColor=[-1, -1, -1],
-                                    pos=rect_right_pos
+            self.line2 = visual.Line(win = self.win,
+                                    units = "pix",
+                                    lineColor = self.settings['stimuli']['fix_line_color'],
+                                    lineWidth = self.settings['stimuli']['fix_line_width'],
+                                    contrast = self.settings['stimuli']['fix_line_contrast'],
+                                    start = [-self.screen[0]/2, -self.screen[1]/2],
+                                    end = [self.screen[0]/2, self.screen[1]/2]
                                     )
+
 
 
 class PRFSession(ExpSession):
@@ -112,13 +147,14 @@ class PRFSession(ExpSession):
                                 )
         
         # Convert fixation dot radius in degrees to pixels for a given Monitor object
-        fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fixation_size_deg'], 
+        fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fix_dot_size_deg'], 
                                                         self.monitor)/2 
         
         # create black fixation circle
         # note - fixation dot will change color during task
-        self.fixation = visual.Circle(self.win, units='pix', radius=fixation_rad_pix, 
-                                            fillColor=[-1,-1,-1], lineColor=[-1,-1,-1])
+        self.fixation = visual.Circle(self.win, units = 'pix', radius = fixation_rad_pix, 
+                                            fillColor = self.settings['stimuli']['fix_dot_color'], 
+                                            lineColor = self.settings['stimuli']['fix_line_color'])  
 
 
 
@@ -141,11 +177,11 @@ class PRFSession(ExpSession):
 
         # all positions in pixels [x,y] for for midpoint of
         # vertical bar passes, 
-        ver_y = self.win.size[1]*np.linspace(-0.5,0.5, bar_pass_ver_TR)
+        ver_y = self.screen[1]*np.linspace(-0.5,0.5, bar_pass_ver_TR)
         ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(ver_y)])
 
-        # horizontal bar passes (square display so we use vertical dim)
-        hor_x = self.win.size[1]*np.linspace(-0.5,0.5, bar_pass_hor_TR)
+        # horizontal bar passes 
+        hor_x = self.screen[0]*np.linspace(-0.5,0.5, bar_pass_hor_TR)
         hor_bar_pos_pix = np.array([np.array([x,0]) for _,x in enumerate(hor_x)])
 
         #create as many trials as TRs
@@ -187,7 +223,7 @@ class PRFSession(ExpSession):
         # get condition names and randomize them for each trial 
         key_list = []
         for key in self.settings['stimuli']['conditions']:
-            if key != 'background':
+            if key != 'background': # we don't want to show background gabors in background
                 key_list.append(key)
 
         np.random.shuffle(key_list)
@@ -225,7 +261,7 @@ class PRFSession(ExpSession):
         self.fix_counter = 0
 
         # print window size just to check, not actually needed
-        print(self.win.size)
+        print(self.screen)
 
     
     def run(self):

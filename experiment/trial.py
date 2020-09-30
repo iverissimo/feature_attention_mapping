@@ -66,6 +66,14 @@ class PRFTrial(Trial):
                                        this_phase=self.phase_names[int(self.phase)]) #'ori_left')
 
             print(self.phase_names[int(self.phase)]) #'ori_left')
+
+        # draw delimitating black bars, to make display square
+        self.session.rect_left.draw()
+        self.session.rect_right.draw()
+
+        # fixation lines
+        self.session.line1.draw() 
+        self.session.line2.draw() 
             
         # fixation dot
         if self.session.fix_counter<len(self.session.fixation_switch_times): # if counter within number of switch moments
@@ -97,8 +105,9 @@ class PRFTrial(Trial):
                     self.session.total_responses += 1
 
                      #track percentage of correct responses per session (only correct if reply within 0.8s of color switch)
-                    if t>self.session.fixation_switch_times[self.session.fix_counter] and t<self.session.fixation_switch_times[self.session.fix_counter]+0.8:
-                        self.session.correct_responses += 1
+                    if t<self.session.fixation_switch_times[-1]: # avoid crash when running, need to optimize this later
+                        if t>self.session.fixation_switch_times[self.session.fix_counter] and t<self.session.fixation_switch_times[self.session.fix_counter]+0.8:
+                            self.session.correct_responses += 1
 
                 # log everything into session data frame
                 idx = self.session.global_log.shape[0]

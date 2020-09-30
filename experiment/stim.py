@@ -26,9 +26,8 @@ class Stim(object):
         
         # general parameters
         self.session = session
-        self.screen = self.session.win.size # screen res [hRes,vRes]
         
-        self.bar_width_pix = self.screen[1]*bar_width_ratio
+        self.bar_width_pix = self.session.screen*bar_width_ratio
         
         self.grid_pos = grid_pos
 
@@ -109,13 +108,13 @@ class PRFStim(Stim):
         
         if bar_direction_at_TR in np.array(['L-R','R-L']): # if horizontal bar pass
                         
-            x_bounds = np.array([bar_midpoint_at_TR[0]-self.bar_width_pix/2,bar_midpoint_at_TR[0]+self.bar_width_pix/2])
-            y_bounds = np.array([-self.screen[1]/2,self.screen[1]/2])
+            x_bounds = np.array([bar_midpoint_at_TR[0]-self.bar_width_pix[0]/2,bar_midpoint_at_TR[0]+self.bar_width_pix[0]/2])
+            y_bounds = np.array([-self.session.screen[1]/2,self.session.screen[1]/2])
 
         elif bar_direction_at_TR in np.array(['U-D','D-U']): # if vertical bar pass
             
-            x_bounds = np.array([-self.screen[0]/2,self.screen[0]/2])
-            y_bounds = np.array([bar_midpoint_at_TR[1]-self.bar_width_pix/2, bar_midpoint_at_TR[1]+self.bar_width_pix/2])
+            x_bounds = np.array([-self.session.screen[1]/2,self.session.screen[1]/2])
+            y_bounds = np.array([bar_midpoint_at_TR[1]-self.bar_width_pix[1]/2, bar_midpoint_at_TR[1]+self.bar_width_pix[1]/2])
             
 
             
@@ -200,9 +199,8 @@ class PRFStim(Stim):
         self.session.element_array.draw()
 
 
-        # draw delimitating black bars, to make display square
-        self.session.rect_left.draw()
-        self.session.rect_right.draw()
+        
+
 
 
 

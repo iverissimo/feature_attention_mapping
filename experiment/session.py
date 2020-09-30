@@ -53,6 +53,31 @@ class ExpSession(Session):
             self.grid_pos = np.array(list(itertools.product(x_grid_pos, y_grid_pos))) # list of lists [[x0,y0],[x0,y1],...]
 
 
+            ## create some elements that will be common to both tasks ##
+            #create black bars on the side, because we want square display
+
+            res_diff = self.win.size[0]-self.win.size[1] # difference between horizontal and vertical resolution
+            rect_left_pos = [-(self.win.size[0]/2) + res_diff/4, 0] # left rectangle position
+            rect_right_pos = [(self.win.size[0]/2) - res_diff/4, 0] # right rectangle position
+            
+            self.rect_left = visual.Rect(win=self.win,
+                                    units="pix",
+                                    width=res_diff/2,
+                                    height=self.win.size[1],
+                                    fillColor=[-1, -1, -1],
+                                    lineColor=[-1, -1, -1],
+                                    pos=rect_left_pos
+                                    )
+
+            self.rect_right = visual.Rect(win=self.win,
+                                    units="pix",
+                                    width=res_diff/2,
+                                    height=self.win.size[1],
+                                    fillColor=[-1, -1, -1],
+                                    lineColor=[-1, -1, -1],
+                                    pos=rect_right_pos
+                                    )
+
 
 class PRFSession(ExpSession):
    
@@ -94,6 +119,7 @@ class PRFSession(ExpSession):
         # note - fixation dot will change color during task
         self.fixation = visual.Circle(self.win, units='pix', radius=fixation_rad_pix, 
                                             fillColor=[-1,-1,-1], lineColor=[-1,-1,-1])
+
 
 
     def create_trials(self):

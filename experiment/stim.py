@@ -200,6 +200,11 @@ class PRFStim(Stim):
         self.session.element_array.draw()
 
 
+        # draw delimitating black bars, to make display square
+        self.session.rect_left.draw()
+        self.session.rect_right.draw()
+
+
 
 
 

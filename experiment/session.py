@@ -157,15 +157,12 @@ class PRFSession(ExpSession):
         # list of midpoint position (x,y) of bar for all TRs (if empty, then nan)
         self.bar_midpoint_all = np.array([val for sublist in bar_pos_array for val in sublist])
 
-
-        # define list with number of phases and their duration (duration of each must be the same)
-        self.phase_durations = np.repeat(self.bar_step/len(self.settings['stimuli']['conditions'].keys()),
-                                    len(self.settings['stimuli']['conditions'].keys()))
-
+        
         # get condition names and randomize them for each trial 
         key_list = []
         for key in self.settings['stimuli']['conditions']:
-            key_list.append(key)
+            if key != 'background':
+                key_list.append(key)
 
         np.random.shuffle(key_list)
         phase_conditions = np.array(key_list)
@@ -174,6 +171,11 @@ class PRFSession(ExpSession):
             np.random.shuffle(key_list)
             
             phase_conditions = np.vstack((phase_conditions,key_list))
+
+
+        # define list with number of phases and their duration (duration of each must be the same)
+        self.phase_durations = np.repeat(self.bar_step/phase_conditions.shape[-1],
+                                        phase_conditions.shape[-1])
 
         # append all trials
         self.all_trials = []

@@ -14,7 +14,7 @@ import itertools
 
 class ExpSession(Session):
 
-    def __init__(self, output_str, output_dir, settings_file):  # initialize child class
+    def __init__(self, output_str, output_dir, settings_file,macbook_bool):  # initialize child class
 
             """ Initializes ExpSession object. 
           
@@ -40,6 +40,9 @@ class ExpSession(Session):
             elif self.settings['window']['display'] == 'rectangle':
                 self.screen = np.array([self.win.size[0], self.win.size[1]])
                 rect_contrast = 0 # then rectangles will be hidden
+
+            if macbook_bool: # to compensate for macbook retina display
+                self.screen = self.screen/2
 
             # some MRI params
             self.bar_step = self.settings['mri']['TR'] # in seconds
@@ -116,7 +119,7 @@ class ExpSession(Session):
 
 class PRFSession(ExpSession):
    
-    def __init__(self, output_str, output_dir, settings_file):  # initialize child class
+    def __init__(self, output_str, output_dir, settings_file,macbook_bool):  # initialize child class
 
         """ Initializes PRFSession object. 
       
@@ -132,7 +135,7 @@ class PRFSession(ExpSession):
         """
 
         # need to initialize parent class (Session), indicating output infos
-        super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file)
+        super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file,macbook_bool=macbook_bool)
 
         
 
@@ -301,7 +304,7 @@ class PRFSession(ExpSession):
 
 class FeatureSession(ExpSession):
     
-    def __init__(self, output_str, output_dir, settings_file): # initialize child class
+    def __init__(self, output_str, output_dir, settings_file,macbook_bool): # initialize child class
 
         """ Initializes PRFSession object. 
       

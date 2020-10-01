@@ -8,7 +8,9 @@ window: # refers to the parameters for the Psychopy Window class
   pos: [0, 0]
   color: [0, 0, 0]
   fullscr: True
-  #winType: pyglet
+  screen: 0 #1
+  #useRetina: False
+  winType: 'pyglet'
   waitBlanking: True
   framerate: 60
   #units: pix
@@ -51,16 +53,19 @@ stimuli:
       element_sf: 4 # cycles per degree
       element_color: [-1,-1,-1] # black and white
       element_ori: [90,180] # half horizontal, half vertical
+      element_contrast: 1
 
     color_red:
       element_sf: 4 # cycles per degree
       element_color: [-1,-1,-1] # black and white, is changed within code
       element_ori: [90,180] # half horizontal, half vertical
+      element_contrast: 0.7
 
     color_green:
       element_sf: 4 # cycles per degree
       element_color: [-1,-1,-1] # black and white, is changed within code
       element_ori: [90,180] # half horizontal, half vertical
+      element_contrast: 0.7
 
     # sf_high:
     #   element_sf: 4.05 # cycles per degree
@@ -76,11 +81,13 @@ stimuli:
       element_sf: 4 # cycles per degree
       element_color: [-1,-1,-1] # black and white
       element_ori: [45,225] # all right
+      element_contrast: 1
 
     ori_right:
       element_sf: 4 # cycles per degree
       element_color: [-1,-1,-1] # black and white
       element_ori: [135,315] # all left
+      element_contrast: 1
   
   
 eyetracker:

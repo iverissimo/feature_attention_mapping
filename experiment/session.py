@@ -56,12 +56,12 @@ class ExpSession(Session):
             elem_num = np.round(np.array(self.screen)/(gabor_diameter_pix * 0.6)) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
 
             # then set equally spaced x and y coordinates for grid
-            x_grid_pos = np.linspace(-self.screen[0]/2 + gabor_diameter_pix/2, # to make sure gabors within display
-                                     self.screen[0]/2 - gabor_diameter_pix/2,
+            x_grid_pos = np.linspace(-self.screen[0]/2,
+                                     self.screen[0]/2,
                                      int(elem_num[0]))
 
-            y_grid_pos = np.linspace(-self.screen[1]/2 + gabor_diameter_pix/2, # to make sure gabors within display
-                                     self.screen[1]/2 - gabor_diameter_pix/2,
+            y_grid_pos = np.linspace(-self.screen[1]/2,
+                                     self.screen[1]/2,
                                      int(elem_num[1]))
             
 

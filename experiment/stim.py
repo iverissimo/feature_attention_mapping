@@ -44,7 +44,7 @@ class Stim(object):
         self.num_elements = self.element_positions.shape[0]
 
         # set element contrasts (initially will be 0 because we don't want to see elements)
-        self.element_contrast = np.zeros((self.num_elements))
+        self.element_contrast = np.ones((self.num_elements)) * self.condition_settings['background']['element_contrast']
 
         # element sizes
         element_sizes_px = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['element_size'], self.session.monitor) # in pix
@@ -58,7 +58,9 @@ class Stim(object):
         ori_arr = np.concatenate((np.ones((math.floor(self.num_elements * .5))) * self.condition_settings['background']['element_ori'][0], 
                                   np.ones((math.ceil(self.num_elements * .5))) * self.condition_settings['background']['element_ori'][1])) 
 
-        self.element_orientations = jitter(ori_arr) # add some jitter to the orientations
+        self.element_orientations = jitter(ori_arr,
+                                            max_val = self.condition_settings['background']['ori_jitter_max'],
+                                            min_val = self.condition_settings['background']['ori_jitter_min']) 
 
         np.random.shuffle(self.element_orientations) # shuffle the orientations
 

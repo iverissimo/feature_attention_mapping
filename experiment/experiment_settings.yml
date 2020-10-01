@@ -53,7 +53,7 @@ stimuli:
       element_sf: 4 # cycles per degree
       element_color: [-1,-1,-1] # black and white
       element_ori: [90,180] # half horizontal, half vertical
-      element_contrast: 1
+      element_contrast: 0 #0.5
       ori_jitter_max: 1 # max value for element orientation jitter range
       ori_jitter_min: 0.5 # min value for element orientation jitter range
 

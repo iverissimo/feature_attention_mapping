@@ -92,7 +92,7 @@ def update_display(ElementArrayStim, background_settings, condition_settings,
     # define new element settings, by first copying the background ones
     new_contrs = background_settings['contrs'].copy()
     new_sfs = background_settings['sfs'].copy()
-    new_oris = background_settings['oris'].copy()
+    new_oris = background_settings['oris'].copy(); np.random.shuffle(new_oris) # shuffle the orientations
     new_colors = background_settings['colors'].copy()
     new_elementTex = background_settings['elementTex']
     
@@ -143,7 +143,7 @@ def update_display(ElementArrayStim, background_settings, condition_settings,
         ori_arr = jitter(ori_arr,
                          max_val = condition_settings[this_phase[ind]]['ori_jitter_max'],
                          min_val = condition_settings[this_phase[ind]]['ori_jitter_min']) 
-        
+
         np.random.shuffle(ori_arr) # shuffle the orientations
         
         for w,val in enumerate(ori_arr): 
@@ -172,6 +172,7 @@ def update_display(ElementArrayStim, background_settings, condition_settings,
             new_elementTex = colored_grating
         else:
             new_elementTex = 'sin'
+
             
     # actually set the settings
     ElementArrayStim.setContrs(new_contrs)#, log=False)

@@ -40,8 +40,8 @@ stimuli:
   
   bar_width_ratio: 0.0625 #0.125 # ratio of the screen res
 
-  bar_pass_hor_TR: 17 #9 #15
-  bar_pass_ver_TR: 17 #9 #10
+  bar_pass_hor_TR: 16 #17 
+  bar_pass_ver_TR: 16 #17 
   empty_TR: 5
 
   bar_direction: ['L-R','U-D','R-L','D-U'] #['empty','L-R','U-D','empty','R-L','D-U','empty'] 

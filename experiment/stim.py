@@ -68,15 +68,25 @@ class Stim(object):
         # element background texture
         self.elementTex = 'sin'
 
-        # define bar array element
-        self.session.element_array = visual.ElementArrayStim(win = self.session.win, nElements = self.num_elements,
-                                                                    units = 'pix', elementTex = self.elementTex, elementMask = 'gauss',
-                                                                    sizes = self.element_sizes, sfs = self.element_sfs, 
-                                                                    xys = self.element_positions, oris = self.element_orientations,
-                                                                    contrs = self.element_contrast, 
-                                                                    colors = self.colors, 
-                                                                    colorSpace = 'rgb') 
-        
+        ### save these initial settings in dictionary, to be used later when display is updated
+        self.background_dict = {'nElements': self.num_elements,
+                               'elementTex': self.elementTex,
+                               'sfs': self.element_sfs,
+                               'xys': self.element_positions,
+                               'oris': self.element_orientations,
+                               'contrs': self.element_contrast,
+                               'colors': self.colors
+                               }
+
+        # define element array, for all possible display positions
+        self.session.element_array = visual.ElementArrayStim(win = self.session.win, nElements = self.background_dict['nElements'],
+                                                            units = 'pix', elementTex = self.background_dict['elementTex'], elementMask = 'gauss',
+                                                            sizes = self.element_sizes, sfs = self.background_dict['sfs'], 
+                                                            xys = self.background_dict['xys'], oris = self.background_dict['oris'],
+                                                            contrs = self.background_dict['contrs'], 
+                                                            colors = self.background_dict['colors'], 
+                                                            colorSpace = 'rgb') 
+
         
 
 class PRFStim(Stim):

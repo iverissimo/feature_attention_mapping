@@ -47,7 +47,7 @@ class Stim(object):
         self.element_contrast = np.ones((self.num_elements)) * self.condition_settings['background']['element_contrast']
 
         # element sizes
-        element_sizes_px = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['element_size'], self.session.monitor) # in pix
+        element_sizes_px = tools.monitorunittools.deg2pix(self.condition_settings['background']['element_size'], self.session.monitor) # in pix
         self.element_sizes = np.ones((self.num_elements)) * element_sizes_px 
         
         # element background spatial frequency 
@@ -81,8 +81,8 @@ class Stim(object):
                                'sizes': self.element_sizes
                                }
 
-        # define element array, for all possible display positions
-        self.session.element_array = visual.ElementArrayStim(win = self.session.win, nElements = self.background_dict['nElements'],
+        # define background element array, for all possible display positions
+        self.session.background_array = visual.ElementArrayStim(win = self.session.win, nElements = self.background_dict['nElements'],
                                                             units = 'pix', elementTex = self.background_dict['elementTex'], elementMask = 'gauss',
                                                             sizes = self.background_dict['sizes'], sfs = self.background_dict['sfs'], 
                                                             xys = self.background_dict['xys'], oris = self.background_dict['oris'],
@@ -100,6 +100,18 @@ class PRFStim(Stim):
         super().__init__(session=session, bar_width_ratio=bar_width_ratio, grid_pos=grid_pos)
 
 
+        # define a bar element array, for now same settings as background,
+        # will be updated later
+        self.session.bar0_array = visual.ElementArrayStim(win = self.session.win)
+        # self.session.bar0_array = visual.ElementArrayStim(win = self.session.win, nElements = self.background_dict['nElements'],
+        #                                                     units = 'pix', elementTex = self.background_dict['elementTex'], elementMask = 'gauss',
+        #                                                     sizes = self.background_dict['sizes'], sfs = self.background_dict['sfs'], 
+        #                                                     xys = self.background_dict['xys'], oris = self.background_dict['oris'],
+        #                                                     contrs = self.background_dict['contrs'], 
+        #                                                     colors = self.background_dict['colors'], 
+        #                                                     colorSpace = 'rgb')
+
+
 
     def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase):
         
@@ -114,19 +126,33 @@ class PRFStim(Stim):
             
         """
         
-        # update display elements
-        self.session.element_array = update_display(ElementArrayStim = self.session.element_array, 
-                                                    background_settings = self.background_dict, 
-                                                    condition_settings = self.condition_settings,
-                                                    bar_midpoint_at_TR = bar_midpoint_at_TR, 
-                                                    bar_direction_at_TR = bar_direction_at_TR, 
-                                                    this_phase = this_phase,
-                                                    bar_width_pix = self.bar_width_pix, 
+        # get bar and background positions
+        position_dictionary = get_bar_positions(self.grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
+                                                self.bar_width_pix, screen = self.session.screen, num_bar = 1)
+
+
+        # update background elements
+        # self.session.background_array =  update_elements(ElementArrayStim = self.session.background_array, 
+        #                                                 condition_settings = self.condition_settings, 
+        #                                                 this_phase = 'background', 
+        #                                                 elem_positions = position_dictionary['background']['xys'], 
+        #                                                 nElements = position_dictionary['background']['nElements'],
+        #                                                 monitor = self.session.monitor, 
+        #                                                 screen = self.session.screen)
+
+        # update bar elements
+        self.session.bar0_array =  update_elements(ElementArrayStim = self.session.background_array, 
+                                                    condition_settings = self.condition_settings, 
+                                                    this_phase = this_phase, 
+                                                    elem_positions = position_dictionary['bar0']['xys'], 
+                                                    nElements = position_dictionary['bar0']['nElements'],
                                                     monitor = self.session.monitor, 
                                                     screen = self.session.screen)
 
+
         # actually draw
-        self.session.element_array.draw()
+        # self.session.background_array.draw()
+        self.session.bar0_array.draw()
 
 
         

@@ -112,8 +112,8 @@ def update_display(ElementArrayStim, background_settings, condition_settings,
 
         elif bar_direction_at_TR[ind] in np.array(['U-D','D-U']): # if vertical bar pass
             
-            x_bounds = np.array([-screen[1]/2,
-                                 screen[1]/2])
+            x_bounds = np.array([-screen[0]/2,
+                                 screen[0]/2])
             y_bounds = np.array([bar_midpoint_at_TR[ind][1] - bar_width_pix[1]/2, 
                                  bar_midpoint_at_TR[ind][1] + bar_width_pix[1]/2])
             

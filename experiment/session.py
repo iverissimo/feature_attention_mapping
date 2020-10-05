@@ -145,7 +145,7 @@ class PRFSession(ExpSession):
         
         #generate PRF stimulus
         self.prf_stim = PRFStim(session=self, 
-                                bar_width_ratio = self.settings['stimuli']['bar_width_ratio'], 
+                                bar_width_ratio = self.settings['stimuli']['prf']['bar_width_ratio'], 
                                 grid_pos = self.grid_pos
                                 )
         
@@ -171,12 +171,12 @@ class PRFSession(ExpSession):
         self.correct_responses = 0
 
         # number of TRs per "condition"
-        bar_pass_hor_TR = self.settings['stimuli']['bar_pass_hor_TR']
-        bar_pass_ver_TR = self.settings['stimuli']['bar_pass_ver_TR']
-        empty_TR = self.settings['stimuli']['empty_TR']
+        bar_pass_hor_TR = self.settings['stimuli']['prf']['bar_pass_hor_TR']
+        bar_pass_ver_TR = self.settings['stimuli']['prf']['bar_pass_ver_TR']
+        empty_TR = self.settings['stimuli']['prf']['empty_TR']
 
         # list with order of bar orientations throught experiment
-        bar_direction = self.settings['stimuli']['bar_direction'] 
+        bar_direction = self.settings['stimuli']['prf']['bar_direction'] 
 
         # all positions in pixels [x,y] for for midpoint of
         # vertical bar passes, 
@@ -321,7 +321,7 @@ class FeatureSession(ExpSession):
 
 
         # need to initialize parent class (Session), indicating output infos
-        #super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file)
+        super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file,macbook_bool=macbook_bool)
 
         pass # needs to be filled in
 

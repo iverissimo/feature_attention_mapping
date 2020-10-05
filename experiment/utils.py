@@ -90,7 +90,7 @@ def get_bar_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
     if all(x == num_bar for x in [bar_midpoint_at_TR.shape[0], bar_direction_at_TR.shape[0]]):
     
         if bar_width_pix.shape[0] == 1:
-            print('Only one bar width given, using same width for all bars')
+            #print('Only one bar width given, using same width for all bars')
             bar_width_pix = np.repeat(bar_width_pix,num_bar)
             
         # iterate for number of bars on screen

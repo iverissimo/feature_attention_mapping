@@ -3,6 +3,7 @@ import numpy as np
 import os, sys
 import math
 from psychopy import visual, tools
+import itertools
 
 
 def jitter(arr,max_val=1,min_val=0.5):
@@ -54,10 +55,11 @@ def near_power_of_2(x,near='previous'):
     return val
 
 
-def get_bar_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
+def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
                       bar_width_pix, screen=np.array([1680,1050]), num_bar=1):
     
-    """ function to subselect bar positions 
+    """ function to subselect bar positions and
+    return bar and background element positions (and number of elements for each object)
     
     Parameters
     ----------
@@ -67,7 +69,7 @@ def get_bar_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
         numpy array with mid point position of bar(s) (B,[x,y]) with B=number of bars on screen
     bar_direction_at_TR: arr
         numpy array of strings with bar direction(s) at that TR
-    bar_width_pix: float/arr
+    bar_width_pix: arr
         width of bar(s) in pixels for each resolution. 
         If float or array (1,) then same width used for all bars
     num_bar: int
@@ -99,14 +101,14 @@ def get_bar_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
             # first define bar width in pixels (might depend if vertical or horizontal bar pass)
             # and bounds for x and y positions
 
-            if bar_direction_at_TR[ind] in np.array(['L-R','R-L']): # if horizontal bar pass
+            if bar_direction_at_TR[ind] in np.array(['L-R','R-L','horizontal']): # if horizontal bar pass
 
                 x_bounds = np.array([bar_midpoint_at_TR[ind][0] - bar_width_pix[ind]/2,
                                      bar_midpoint_at_TR[ind][0] + bar_width_pix[ind]/2])
                 y_bounds = np.array([-screen[1]/2,
                                      screen[1]/2])
 
-            elif bar_direction_at_TR[ind] in np.array(['U-D','D-U']): # if vertical bar pass
+            elif bar_direction_at_TR[ind] in np.array(['U-D','D-U','vertical']): # if vertical bar pass
 
                 x_bounds = np.array([-screen[0]/2,
                                      screen[0]/2])
@@ -229,6 +231,128 @@ def update_elements(win, condition_settings, this_phase, elem_positions, nElemen
     return(ElementArrayStim)
 
 
+def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
+                         mini_blocks = 4, num_bars = 4, num_ver_bars = 2, num_hor_bars = 2):
+    
+    """ set bar positions for all feature trials
+    
+    Parameters
+    ----------
+    attend_block_conditions : arr
+        array of strings with attended condition for each block (will then be the first condition of each block
+        of the return dictionary)
+    horizontal_pos: arr
+        array of shape (H,2) -> (number of possible horizontal positions, [x,y])
+        with midpoint coordinates for horizontal bars
+    vertical_pos: arr
+        array of shape (V,2) -> (number of possible vertical positions, [x,y])
+        with midpoint coordinates for vertical bars
+    mini_blocks: int
+        number of mini blocks in run
+    num_bars: int
+        number of bars to be displayed simultaneously
+    num_ver_bars: int
+        number of vertical bars to be displayed simultaneously
+    num_hor_bars:
+        number of horizontal bars to be displayed simultaneously
+        
+    """
+    
+    # make list of bar conditon names per mini block
+    # to associate names to position
+    bar_list = np.empty([mini_blocks, num_bars], dtype=list)
+
+    for b in range(mini_blocks):
+        # get name of non attended positions for that block
+        non_attend_cond = [x for x in attend_block_conditions if x != attend_block_conditions[b]]
+
+        for c in range(num_bars):
+            if c == 0:
+                bar_list[b][c] = attend_block_conditions[b]
+            else:
+                bar_list[b][c] = non_attend_cond[c-1]
+
+    # define dictionary to save positions and directions
+    # of all bars
+    output_dict = {}
+    
+    # actually store positions
+    for blk in range(mini_blocks):
+
+        ind_hor = np.empty((num_hor_bars,), dtype=list)
+        ind_ver = np.empty((num_ver_bars,), dtype=list)
+
+        # get indices for all possible horizontal bar positions
+        for w in range(num_hor_bars):
+            ind_hor[w] = np.arange(horizontal_pos.shape[0])
+            np.random.shuffle(ind_hor[w])
+
+            if w>0:
+                while any(ind_hor[w-1] == ind_hor[w]): # shuffle until sure that bars in different positions
+                    np.random.shuffle(ind_hor[w])
+
+        # get indices for all possible vertical bar positions
+        for w in range(num_ver_bars):
+            ind_ver[w] = np.arange(vertical_pos.shape[0])
+            np.random.shuffle(ind_ver[w])
+
+            if w>0:
+                while any(ind_ver[w-1] == ind_ver[w]): # shuffle until sure that bars in different positions
+                    np.random.shuffle(ind_ver[w])
+
+        # define direction of bar (randomly alternate between horizontal and vertical)
+        direction = np.concatenate([np.repeat('vertical',vertical_pos.shape[0]),
+                                    np.repeat('horizontal',horizontal_pos.shape[0])])
+        np.random.shuffle(direction)
+
+        # iterate over all conditions in miniblock
+
+        vert_counter = np.zeros((num_ver_bars,)) # set counter, to keep track of positions 
+        hor_counter = np.zeros((num_hor_bars,))
+
+        for k,cond in enumerate(bar_list[blk]):
+
+            cond_position = []
+
+            if (k % 2) == 0: # if even, use direction defined in array   
+                cond_direction = direction
+            else: 
+                cond_direction = ['vertical' if d=='horizontal' else 'horizontal' for _,d in enumerate(direction)]
+
+            # now get positions, depending if vertical or horizontal trial
+            for trl,direc in enumerate(cond_direction):
+
+                # restart counter when all different horizontal and vertical positions used
+                if sum(vert_counter) == len(list(itertools.chain(*ind_ver))): 
+                    vert_counter = np.zeros((num_ver_bars,))
+                if sum(hor_counter) == len(list(itertools.chain(*ind_hor))): 
+                    hor_counter = np.zeros((num_hor_bars,))
+
+                # append positions
+                if direc == 'vertical':
+                    if vert_counter[0] < len(ind_ver[0]):
+                        cond_position.append(vertical_pos[ind_ver[0][vert_counter[0]]])    
+                        vert_counter[0] += 1
+                    elif vert_counter[1] < len(ind_ver[1]):
+                        cond_position.append(vertical_pos[ind_ver[1][vert_counter[1]]])    
+                        vert_counter[1] += 1
+
+                elif direc == 'horizontal':
+                    if hor_counter[0] < len(ind_hor[0]):
+                        cond_position.append(horizontal_pos[ind_hor[0][hor_counter[0]]])    
+                        hor_counter[0] += 1
+                    elif hor_counter[1] < len(ind_hor[1]):
+                        cond_position.append(horizontal_pos[ind_hor[1][hor_counter[1]]])    
+                        hor_counter[1] += 1
+
+            # append to dictionary 
+            output_dict['mini_block_%i'%blk][cond] = {'bar_midpoint_at_TR': cond_position, 
+                                                     'bar_direction_at_TR': cond_direction}
+
+
+    return(output_dict)
+    
+    
 
 
 

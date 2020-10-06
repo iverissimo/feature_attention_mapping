@@ -27,6 +27,8 @@ class ExpSession(Session):
             settings_file : str
                 Path to yaml-file with settings (default: None, which results in the package's
                 default settings file (in data/default_settings.yml)
+            macbook_bool: bool
+                variable to know if using macbook for running experiment or not
             """
 
             # need to initialize parent class (Session), indicating output infos
@@ -132,9 +134,11 @@ class PRFSession(ExpSession):
         settings_file : str
             Path to yaml-file with settings (default: None, which results in the package's
             default settings file (in data/default_settings.yml)
+        macbook_bool: bool
+            variable to know if using macbook for running experiment or not
         """
 
-        # need to initialize parent class (Session), indicating output infos
+        # need to initialize parent class (ExpSession), indicating output infos
         super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file,macbook_bool=macbook_bool)
 
         
@@ -306,7 +310,7 @@ class FeatureSession(ExpSession):
     
     def __init__(self, output_str, output_dir, settings_file,macbook_bool): # initialize child class
 
-        """ Initializes PRFSession object. 
+        """ Initializes FeatureSession object. 
       
         Parameters
         ----------
@@ -317,18 +321,119 @@ class FeatureSession(ExpSession):
         settings_file : str
             Path to yaml-file with settings (default: None, which results in the package's
             default settings file (in data/default_settings.yml)
+        macbook_bool: bool
+                variable to know if using macbook for running experiment or not
         """
 
 
-        # need to initialize parent class (Session), indicating output infos
+        # need to initialize parent class (ExpSession), indicating output infos
         super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file,macbook_bool=macbook_bool)
+        
 
-        pass # needs to be filled in
+    
+    def create_stimuli(self):
+
+        """ Create Stimuli - pRF bars and fixation dot """
+        
+        #generate PRF stimulus
+        self.prf_stim = FeatureStim(session=self, 
+                                    bar_width_ratio = self.settings['stimuli']['feature']['bar_width_ratio'], 
+                                    grid_pos = self.grid_pos
+                                    )
+        
+        # Convert fixation dot radius in degrees to pixels for a given Monitor object
+        fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fix_dot_size_deg'], 
+                                                        self.monitor)/2 
+        
+        # create black fixation circle
+        self.fixation = visual.Circle(self.win, units = 'pix', radius = fixation_rad_pix, 
+                                            fillColor = self.settings['stimuli']['fix_dot_color'], 
+                                            lineColor = self.settings['stimuli']['fix_line_color'])  
+
+
+
+    def create_trials(self):
+
+        """ Creates trials (before running the session) """
+
+        #
+        # counter for responses
+        self.total_responses = 0
+        #self.correct_responses = 0
+
+        ## get condition names and randomize them 
+        ## setting order for what condition to attend per mini block 
+        key_list = []
+        for key in self.settings['stimuli']['conditions']:
+            if key != 'background': # we don't want to show background gabors
+                key_list.append(key)
+
+        np.random.shuffle(key_list)
+        self.attend_block_conditions = np.array(key_list)
+
+
+        ## get all possible bar positions
+
+        # define bar width 
+        bar_width_ratio = self.settings['stimuli']['feature']['bar_width_ratio']
+        self.bar_width_pix = self.session.screen*bar_width_ratio
+
+        # define number of bars per direction
+        num_bars = np.array(self.session.screen)/self.bar_width_pix; num_bars = np.array(num_bars,dtype=int)
+
+        # all positions in pixels [x,y] for for midpoint of
+        # vertical bar passes, 
+        ver_y = self.session.screen[1]*np.linspace(-0.5,0.5, num_bars[1])
+        ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(ver_y)])
+
+        # horizontal bar passes 
+        hor_x = self.session.screen[0]*np.linspace(-0.5,0.5, num_bars[0])
+        hor_bar_pos_pix = np.array([np.array([x,0]) for _,x in enumerate(hor_x)])
+
+
+        # set bar midpoint position and direction for each condition
+        # for the whole run (i.e., all mini blocks)
+        self.all_bar_pos = set_bar_positions(attend_block_conditions = self.attend_block_conditions,
+                                            horizontal_pos = hor_bar_pos_pix,
+                                            vertical_pos = ver_bar_pos_pix,
+                                            mini_blocks = self.settings['stimuli']['feature']['mini_blocks'], 
+                                            num_bars = len(self.attend_block_conditions), 
+                                            num_ver_bars = 2, 
+                                            num_hor_bars = 2)
+
+
+
 
     def run(self):
         """ Loops over trials and runs them """
 
-        pass
+        # draw instructions wait a few seconds
+        this_instruction_string = 'Please fixate at the center, \ndo not move your eyes'
+        self.display_text(this_instruction_string, duration=3,
+                                    color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
+                                    italic = True, alignHoriz = 'center')
+
+        # draw instructions wait for scanner t trigger
+        this_instruction_string = 'Index finger - vertical\n Middle finger - horizontal\nwaiting for scanner'
+        self.display_text(this_instruction_string, keys=self.settings['mri'].get('sync', 't'),
+                                color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
+                                italic = True, alignHoriz = 'center')
+
+        # create trials before running!
+        self.create_stimuli()
+        self.create_trials() 
+
+        self.start_experiment()
+        
+        # cycle through trials
+        for trl in self.all_trials: 
+            trl.run() # run forrest run
+
+
+        print('Total subject responses: %d'%self.total_responses)
+          
+
+        self.close() # close session
 
 
 

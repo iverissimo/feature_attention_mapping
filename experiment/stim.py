@@ -58,8 +58,8 @@ class PRFStim(Stim):
         """
         
         # get bar and background positions
-        position_dictionary = get_bar_positions(self.grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
-                                                self.bar_width_pix, screen = self.session.screen, num_bar = 1)
+        position_dictionary = get_object_positions(self.grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
+                                                    self.bar_width_pix, screen = self.session.screen, num_bar = 1)
 
 
         # update background elements

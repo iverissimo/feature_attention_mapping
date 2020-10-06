@@ -157,7 +157,7 @@ class FeatureTrial(Trial):
         self.session = session
 
         #dummy value: if scanning or simulating a scanner, everything is synced to the output 't' of the scanner
-        #phase_durations = [100]
+        phase_durations = [100]
 
 
         super().__init__(session, trial_nr, phase_durations, phase_names, verbose=False, *args, **kwargs)
@@ -165,9 +165,8 @@ class FeatureTrial(Trial):
 
     def draw(self): 
 
-        """ Draw stimuli - pRF bar and fixation dot - for each trial """
+        """ Draw stimuli - pRF bars and fixation dot - for each trial """
         
-        current_time = self.session.clock.getTime() # get time
 
         # bar pass
         if self.bar_direction_at_TR != 'empty': # if bar pass at TR, then draw bar
@@ -187,9 +186,7 @@ class FeatureTrial(Trial):
         self.session.line2.draw() 
             
         # fixation dot
-        if self.session.fix_counter<len(self.session.fixation_switch_times): # if counter within number of switch moments
-            if current_time<self.session.fixation_switch_times[self.session.fix_counter]: # if current time under switch time
-                self.session.fixation.draw() # just draw
+        self.session.fixation.draw() # just draw
 
 
 

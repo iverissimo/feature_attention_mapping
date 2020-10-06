@@ -275,6 +275,8 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
     # define dictionary to save positions and directions
     # of all bars
     output_dict = {}
+    for blk in range(mini_blocks):
+    	output_dict['mini_block_%i'%blk] = {}
     
     # actually store positions
     for blk in range(mini_blocks):
@@ -331,22 +333,22 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
                 # append positions
                 if direc == 'vertical':
                     if vert_counter[0] < len(ind_ver[0]):
-                        cond_position.append(vertical_pos[ind_ver[0][vert_counter[0]]])    
+                        cond_position.append(vertical_pos[ind_ver[0][int(vert_counter[0])]])    
                         vert_counter[0] += 1
                     elif vert_counter[1] < len(ind_ver[1]):
-                        cond_position.append(vertical_pos[ind_ver[1][vert_counter[1]]])    
+                        cond_position.append(vertical_pos[ind_ver[1][int(vert_counter[1])]])    
                         vert_counter[1] += 1
 
                 elif direc == 'horizontal':
                     if hor_counter[0] < len(ind_hor[0]):
-                        cond_position.append(horizontal_pos[ind_hor[0][hor_counter[0]]])    
+                        cond_position.append(horizontal_pos[ind_hor[0][int(hor_counter[0])]])    
                         hor_counter[0] += 1
                     elif hor_counter[1] < len(ind_hor[1]):
-                        cond_position.append(horizontal_pos[ind_hor[1][hor_counter[1]]])    
+                        cond_position.append(horizontal_pos[ind_hor[1][int(hor_counter[1])]])    
                         hor_counter[1] += 1
 
             # append to dictionary 
-            output_dict['mini_block_%i'%blk][cond] = {'bar_midpoint_at_TR': cond_position, 
+            output_dict['mini_block_%i'%blk][cond] = {'bar_midpoint_at_TR': np.array(cond_position), 
                                                      'bar_direction_at_TR': cond_direction}
 
 

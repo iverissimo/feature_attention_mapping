@@ -5,11 +5,13 @@ import numpy as np
 from exptools2.core import Session
 
 from trial import PRFTrial, FeatureTrial
-from stim import PRFStim
+from stim import PRFStim, FeatureStim
 
 from psychopy import visual, tools
 
 import itertools
+
+from utils import *
 
 
 class ExpSession(Session):
@@ -148,7 +150,7 @@ class PRFSession(ExpSession):
         """ Create Stimuli - pRF bar and fixation dot """
         
         #generate PRF stimulus
-        self.prf_stim = PRFStim(session=self, 
+        self.prf_stim = PRFStim(session = self, 
                                 bar_width_ratio = self.settings['stimuli']['prf']['bar_width_ratio'], 
                                 grid_pos = self.grid_pos
                                 )
@@ -250,8 +252,8 @@ class PRFSession(ExpSession):
         self.all_trials = []
         for i in range(self.trial_number):
 
-            self.all_trials.append(PRFTrial(session=self,
-                                            trial_nr=i,  
+            self.all_trials.append(PRFTrial(session =self ,
+                                            trial_nr = i,  
                                             phase_durations = self.phase_durations,
                                             phase_names = phase_conditions[i],
                                             bar_direction_at_TR=self.bar_direction_all[i],
@@ -336,7 +338,7 @@ class FeatureSession(ExpSession):
         """ Create Stimuli - pRF bars and fixation dot """
         
         #generate PRF stimulus
-        self.prf_stim = FeatureStim(session=self, 
+        self.prf_stim = FeatureStim(session = self, 
                                     bar_width_ratio = self.settings['stimuli']['feature']['bar_width_ratio'], 
                                     grid_pos = self.grid_pos
                                     )
@@ -376,18 +378,18 @@ class FeatureSession(ExpSession):
 
         # define bar width 
         bar_width_ratio = self.settings['stimuli']['feature']['bar_width_ratio']
-        self.bar_width_pix = self.session.screen*bar_width_ratio
+        self.bar_width_pix = self.screen*bar_width_ratio
 
         # define number of bars per direction
-        num_bars = np.array(self.session.screen)/self.bar_width_pix; num_bars = np.array(num_bars,dtype=int)
+        num_bars = np.array(self.screen)/self.bar_width_pix; num_bars = np.array(num_bars,dtype=int)
 
         # all positions in pixels [x,y] for for midpoint of
         # vertical bar passes, 
-        ver_y = self.session.screen[1]*np.linspace(-0.5,0.5, num_bars[1])
+        ver_y = self.screen[1]*np.linspace(-0.5,0.5, num_bars[1])
         ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(ver_y)])
 
         # horizontal bar passes 
-        hor_x = self.session.screen[0]*np.linspace(-0.5,0.5, num_bars[0])
+        hor_x = self.screen[0]*np.linspace(-0.5,0.5, num_bars[0])
         hor_bar_pos_pix = np.array([np.array([x,0]) for _,x in enumerate(hor_x)])
 
 

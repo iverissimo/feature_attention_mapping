@@ -51,7 +51,8 @@ stimuli:
     bar_width_ratio: 0.125 # ratio of the screen res
     mini_blocks: 4
 
-    empty_TR: 5
+    empty_TR: 4
+    cue_TR: 2
 
 
   conditions: # feature conditions

@@ -92,9 +92,8 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
         bar_direction_at_TR = np.array(bar_direction_at_TR) if len(np.array(bar_direction_at_TR).shape)>0 else np.array([bar_direction_at_TR])
         bar_width_pix = np.array([bar_width_pix])
         
-        # background positions will be same as grid (initially)
-        background_pos = grid_pos.copy()
-                
+        all_bar_ind = [] # append all bar position indices to later remove from background
+ 
         if all(x == num_bar for x in [bar_midpoint_at_TR.shape[0], bar_direction_at_TR.shape[0]]):
         
             if bar_width_pix.shape[0] == 1:
@@ -133,11 +132,15 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
                 output_dict['bar%i'%ind] = {'xys': grid_pos[bar_ind], 
                                              'nElements': grid_pos[bar_ind].shape[0]}
                 
-                # remove bar positions from background positions
-                background_pos = np.delete(background_pos, bar_ind, axis=0)
+                for _,p in enumerate(bar_ind):
+                    all_bar_ind.append(p)
+                
+            # make mask to get background positions
+            mask = np.ones(len(grid_pos), np.bool)
+            mask[all_bar_ind] = 0
             
-            output_dict['background'] = {'xys': background_pos, 
-                                        'nElements': background_pos.shape[0]}
+            output_dict['background'] = {'xys': grid_pos[mask], 
+                                        'nElements': grid_pos[mask].shape[0]}
 
         else:
             raise ValueError('Number of bars different from shape of input arrays')

@@ -338,10 +338,10 @@ class FeatureSession(ExpSession):
         """ Create Stimuli - pRF bars and fixation dot """
         
         #generate PRF stimulus
-        self.prf_stim = FeatureStim(session = self, 
-                                    bar_width_ratio = self.settings['stimuli']['feature']['bar_width_ratio'], 
-                                    grid_pos = self.grid_pos
-                                    )
+        self.feature_stim = FeatureStim(session = self, 
+                                        bar_width_ratio = self.settings['stimuli']['feature']['bar_width_ratio'], 
+                                        grid_pos = self.grid_pos
+                                        )
         
         # Convert fixation dot radius in degrees to pixels for a given Monitor object
         fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fix_dot_size_deg'], 
@@ -409,7 +409,7 @@ class FeatureSession(ExpSession):
         cue_TR = self.settings['stimuli']['feature']['cue_TR']
         empty_TR = self.settings['stimuli']['feature']['empty_TR']
         # get info from first block, to know how many trials in a mini block (all miniblocks have same length)
-        dict_blk0 = self.all_bar_pos['mini_block_0'][list(all_bar_pos['mini_block_0'].keys())[0]]
+        dict_blk0 = self.all_bar_pos['mini_block_0'][list(self.all_bar_pos['mini_block_0'].keys())[0]]
         mini_block_TR = dict_blk0[list(dict_blk0.keys())[0]].shape[0]
 
         # list with order of "type of stimuli" throught experiment (called bar direction to make analogous with other class)

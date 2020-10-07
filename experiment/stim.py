@@ -63,7 +63,7 @@ class PRFStim(Stim):
 
 
         # update background elements
-        self.session.background_array =  update_elements(win = self.session.win,
+        self.session.background_array = update_elements(win = self.session.win,
                                                         condition_settings = self.condition_settings, 
                                                         this_phase = 'background', 
                                                         elem_positions = position_dictionary['background']['xys'], 
@@ -73,7 +73,7 @@ class PRFStim(Stim):
 
         if this_phase != 'background':
             # update bar elements
-            self.session.bar0_array =  update_elements(win = self.session.win,
+            self.session.bar0_array = update_elements(win = self.session.win,
                                                         condition_settings = self.condition_settings, 
                                                         this_phase = this_phase, 
                                                         elem_positions = position_dictionary['bar0']['xys'], 
@@ -125,48 +125,50 @@ class FeatureStim(Stim):
                                                         nElements = position_dictionary['background']['nElements'],
                                                         monitor = self.session.monitor, 
                                                         screen = self.session.screen)
+        if this_phase != 'background':
 
-        # update bar elements
-        self.session.bar0_array =  update_elements(win = self.session.win,
-                                                    condition_settings = self.condition_settings, 
-                                                    this_phase = this_phase, 
-                                                    elem_positions = position_dictionary['bar0']['xys'], 
-                                                    nElements = position_dictionary['bar0']['nElements'],
-                                                    monitor = self.session.monitor, 
-                                                    screen = self.session.screen)
+            # update bar elements
+            self.session.bar0_array =  update_elements(win = self.session.win,
+                                                        condition_settings = self.condition_settings, 
+                                                        this_phase = this_phase[0], 
+                                                        elem_positions = position_dictionary['bar0']['xys'], 
+                                                        nElements = position_dictionary['bar0']['nElements'],
+                                                        monitor = self.session.monitor, 
+                                                        screen = self.session.screen)
 
-        self.session.bar1_array =  update_elements(win = self.session.win,
-                                                    condition_settings = self.condition_settings, 
-                                                    this_phase = this_phase, 
-                                                    elem_positions = position_dictionary['bar1']['xys'], 
-                                                    nElements = position_dictionary['bar1']['nElements'],
-                                                    monitor = self.session.monitor, 
-                                                    screen = self.session.screen)
+            self.session.bar1_array =  update_elements(win = self.session.win,
+                                                        condition_settings = self.condition_settings, 
+                                                        this_phase = this_phase[1], 
+                                                        elem_positions = position_dictionary['bar1']['xys'], 
+                                                        nElements = position_dictionary['bar1']['nElements'],
+                                                        monitor = self.session.monitor, 
+                                                        screen = self.session.screen)
 
-        self.session.bar2_array =  update_elements(win = self.session.win,
-                                                    condition_settings = self.condition_settings, 
-                                                    this_phase = this_phase, 
-                                                    elem_positions = position_dictionary['bar2']['xys'], 
-                                                    nElements = position_dictionary['bar2']['nElements'],
-                                                    monitor = self.session.monitor, 
-                                                    screen = self.session.screen)
+            self.session.bar2_array =  update_elements(win = self.session.win,
+                                                        condition_settings = self.condition_settings, 
+                                                        this_phase = this_phase[2], 
+                                                        elem_positions = position_dictionary['bar2']['xys'], 
+                                                        nElements = position_dictionary['bar2']['nElements'],
+                                                        monitor = self.session.monitor, 
+                                                        screen = self.session.screen)
 
-        self.session.bar3_array =  update_elements(win = self.session.win,
-                                                    condition_settings = self.condition_settings, 
-                                                    this_phase = this_phase, 
-                                                    elem_positions = position_dictionary['bar3']['xys'], 
-                                                    nElements = position_dictionary['bar3']['nElements'],
-                                                    monitor = self.session.monitor, 
-                                                    screen = self.session.screen)
+            self.session.bar3_array =  update_elements(win = self.session.win,
+                                                        condition_settings = self.condition_settings, 
+                                                        this_phase = this_phase[3], 
+                                                        elem_positions = position_dictionary['bar3']['xys'], 
+                                                        nElements = position_dictionary['bar3']['nElements'],
+                                                        monitor = self.session.monitor, 
+                                                        screen = self.session.screen)
 
 
 
         # actually draw
         self.session.background_array.draw()
-        self.session.bar0_array.draw()
-        self.session.bar1_array.draw()
-        self.session.bar2_array.draw()
-        self.session.bar3_array.draw()
+        if this_phase != 'background':
+            self.session.bar0_array.draw()
+            self.session.bar1_array.draw()
+            self.session.bar2_array.draw()
+            self.session.bar3_array.draw()
 
 
 

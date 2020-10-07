@@ -4,6 +4,7 @@ import numpy as np
 from exptools2.core import Trial
 
 from psychopy import event 
+from psychopy.visual import TextStim
 
 
 class PRFTrial(Trial):
@@ -162,6 +163,8 @@ class FeatureTrial(Trial):
         self.ID = trial_nr # trial identifier, not sure if needed
         self.bar_direction_at_TR = bar_direction_at_TR
         self.bar_midpoint_at_TR = bar_midpoint_at_TR
+        self.trial_type_at_TR = trial_type_at_TR
+        self.attend_block_conditions = attend_block_conditions
         self.session = session
 
         #dummy value: if scanning or simulating a scanner, everything is synced to the output 't' of the scanner
@@ -176,20 +179,47 @@ class FeatureTrial(Trial):
         """ Draw stimuli - pRF bars and fixation dot - for each trial """
         
 
-        ## CONTINUE FROM HERE ####
+        if 'cue' in self.trial_type_at_TR: # if cue at TR, draw background and word cue
 
-        if self.bar_direction_at_TR == 'cue':
-            print('cue')
+            self.session.feature_stim.draw(bar_midpoint_at_TR = np.nan, 
+                                       bar_direction_at_TR = np.nan,
+                                       this_phase = 'background')
+
+            # define appropriate cue string for the upcoming mini block
+            attend_cond = self.attend_block_conditions[int(self.trial_type_at_TR[-1])]
+
+            if attend_cond == 'ori_left':
+                cue_str = 'left'
+            elif attend_cond == 'ori_right':
+                cue_str = 'right'
+            elif attend_cond == 'color_red':
+                cue_str = 'red'
+            elif attend_cond == 'color_green':  
+                cue_str = 'green'
+
+            cue_stim = TextStim(self.session.win, text=cue_str,
+                                color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
+                                italic = False, alignHoriz = 'center')
+            cue_stim.draw()
+            
+            print(cue_str)
         
+        elif self.bar_direction_at_TR == 'empty': # if empty trial, show background
+
+            self.session.feature_stim.draw(bar_midpoint_at_TR = np.nan, 
+                                       bar_direction_at_TR = np.nan,
+                                       this_phase = 'background') 
+            print('background')
+
         # bar pass
 
-        if self.bar_direction_at_TR != 'empty': # if bar pass at TR, then draw bar
+        else: # if bar pass at TR, then draw bar
 
-            self.session.prf_stim.draw(bar_midpoint_at_TR=self.bar_midpoint_at_TR, 
-                                       bar_direction_at_TR=self.bar_direction_at_TR,
-                                       this_phase=self.phase_names[int(self.phase)]) #'ori_left')
+            self.session.feature_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
+                                           bar_direction_at_TR = self.bar_direction_at_TR,
+                                           this_phase = list(self.session.all_bar_pos[self.trial_type_at_TR].keys())) #'ori_left')
 
-            print(self.phase_names[int(self.phase)]) #'ori_left')
+            print('bar stim') 
 
         # draw delimitating black bars, to make display square
         self.session.rect_left.draw()

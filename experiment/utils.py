@@ -87,9 +87,9 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
                                     'nElements': grid_pos.shape[0]}
     else:
 
-        # make sure "all" inputs are arrays, avoid crashing
-        bar_midpoint_at_TR = np.array([bar_midpoint_at_TR])
-        bar_direction_at_TR = np.array([bar_direction_at_TR])
+        # make sure "all" inputs are 2d arrays, if not make them. avoids crashing. 
+        bar_midpoint_at_TR = np.array(bar_midpoint_at_TR) if len(np.array(bar_midpoint_at_TR).shape)>1 else np.array([bar_midpoint_at_TR])
+        bar_direction_at_TR = np.array(bar_direction_at_TR) if len(np.array(bar_direction_at_TR).shape)>0 else np.array([bar_direction_at_TR])
         bar_width_pix = np.array([bar_width_pix])
         
         # background positions will be same as grid (initially)

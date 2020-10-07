@@ -237,6 +237,33 @@ def update_elements(win, condition_settings, this_phase, elem_positions, nElemen
     return(ElementArrayStim)
 
 
+def get_non_overlapping_indices(arr_shape=[2,8]):
+    
+    """ get array of indices, that don't overlap
+    useful to make sure two bars with same orientation 
+    don't overlap spatially
+    
+    Parameters
+    ----------
+    arr_shape : list/arr
+        shape of indice arr -> [number of bars, number of positions]
+        
+    """ 
+    # initialize empty array
+    ind = np.empty((arr_shape[0],), dtype=list)
+    
+    # get indices for all possible horizontal bar positions
+    for w in range(arr_shape[0]):
+        ind[w] = np.arange(arr_shape[1])
+        np.random.shuffle(ind[w])
+
+        if w>0:
+            while any(ind[w-1] == ind[w]): # shuffle until sure that bars in different positions
+                np.random.shuffle(ind[w])
+
+
+    return ind
+
 def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
                          mini_blocks = 4, num_bars = 4, num_ver_bars = 2, num_hor_bars = 2):
     

@@ -45,7 +45,7 @@ stimuli:
     bar_pass_ver_TR: 16 #17 
     empty_TR: 5
 
-    bar_direction: ['L-R','U-D','R-L','D-U'] #['empty','L-R','U-D','empty','R-L','D-U','empty'] 
+    bar_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty']  #['L-R','U-D','R-L','D-U'] #
 
   feature:
     bar_width_ratio: 0.125 # ratio of the screen res
@@ -53,6 +53,11 @@ stimuli:
 
     empty_TR: 4
     cue_TR: 2
+
+    bar_direction: ['cue_0','empty','mini_block_0','empty',
+                    'cue_1','empty','mini_block_1','empty',
+                    'cue_2','empty','mini_block_2','empty',
+                    'cue_3','empty','mini_block_3','empty']
 
 
   conditions: # feature conditions

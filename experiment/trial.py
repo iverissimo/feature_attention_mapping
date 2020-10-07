@@ -124,7 +124,8 @@ class PRFTrial(Trial):
 
 class FeatureTrial(Trial):
 
-    def __init__(self, session, trial_nr, bar_direction_at_TR, bar_midpoint_at_TR, timing='seconds', *args, **kwargs):
+    def __init__(self, session, trial_nr, attend_block_conditions, bar_direction_at_TR, bar_midpoint_at_TR, trial_type_at_TR, timing='seconds', *args, **kwargs):
+
 
         """ Initializes a FeatureTrial object. 
 
@@ -134,20 +135,21 @@ class FeatureTrial(Trial):
             A Session object (needed for metadata)
         trial_nr: int
             Trial nr of trial
-        phase_durations : array-like
-            List/tuple/array with phase durations
-        phase_names : array-like
-            List/tuple/array with names for phases (only for logging),
-            optional (if None, all are named 'stim')
         timing : str
             The "units" of the phase durations. Default is 'seconds', where we
             assume the phase-durations are in seconds. The other option is
             'frames', where the phase-"duration" refers to the number of frames.
+        attend_block_conditions: arr
+        	list/array with name of attended condition on each miniblock. Total length = total # miniblocks
         bar_direction_at_TR : list
-            List/array with the bar direction at each TR. Total length = total # TRs
-        bar_midpoint_at_TR : array
-            Numpy array with the pairs of positions [x,y] of the midpoint of the bar
-            per TR. Shape (#TRs, 2)
+            List/array with the bar direction at each TR. In same cases it can have 
+            a list of direction (when several bars on screen). Total length = total # TRs
+        bar_midpoint_at_TR : arr
+            List/array with the pairs of positions [x,y] of the midpoint of the bar
+            per TR. In same cases it can have a list of pairs (when several bars on screen). Total length = total # TRs
+        trial_type_at_TR: arr
+			List/array with trial identifier ("trial type"). To know if cue, empty or miniblock
+
             
         """
         
@@ -160,7 +162,7 @@ class FeatureTrial(Trial):
         phase_durations = [100]
 
 
-        super().__init__(session, trial_nr, phase_durations, phase_names, verbose=False, *args, **kwargs)
+        super().__init__(session, trial_nr, phase_durations, verbose=False, *args, **kwargs)
        
 
     def draw(self): 
@@ -168,7 +170,13 @@ class FeatureTrial(Trial):
         """ Draw stimuli - pRF bars and fixation dot - for each trial """
         
 
+        ## CONTINUE FROM HERE ####
+
+        if self.bar_direction_at_TR == 'cue':
+        	print('cue')
+        
         # bar pass
+
         if self.bar_direction_at_TR != 'empty': # if bar pass at TR, then draw bar
 
             self.session.prf_stim.draw(bar_midpoint_at_TR=self.bar_midpoint_at_TR, 

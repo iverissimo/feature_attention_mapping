@@ -176,7 +176,7 @@ class PRFSession(ExpSession):
         self.total_responses = 0
         self.correct_responses = 0
 
-        # number of TRs per "condition"
+        # number of TRs per "type of stimuli"
         bar_pass_hor_TR = self.settings['stimuli']['prf']['bar_pass_hor_TR']
         bar_pass_ver_TR = self.settings['stimuli']['prf']['bar_pass_ver_TR']
         empty_TR = self.settings['stimuli']['prf']['empty_TR']
@@ -372,6 +372,7 @@ class FeatureSession(ExpSession):
 
         np.random.shuffle(key_list)
         self.attend_block_conditions = np.array(key_list)
+        print('Conditions to attend throughout blocks will be %s'%str(self.attend_block_conditions))
 
 
         ## get all possible bar positions
@@ -383,7 +384,7 @@ class FeatureSession(ExpSession):
         # define number of bars per direction
         num_bars = np.array(self.screen)/self.bar_width_pix; num_bars = np.array(num_bars,dtype=int)
 
-        # all positions in pixels [x,y] for for midpoint of
+        # all possible positions in pixels [x,y] for for midpoint of
         # vertical bar passes, 
         ver_y = self.screen[1]*np.linspace(-0.5,0.5, num_bars[1])
         ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(ver_y)])
@@ -394,7 +395,7 @@ class FeatureSession(ExpSession):
 
 
         # set bar midpoint position and direction for each condition
-        # for the whole run (i.e., all mini blocks)
+        # for all mini blocks
         self.all_bar_pos = set_bar_positions(attend_block_conditions = self.attend_block_conditions,
                                             horizontal_pos = hor_bar_pos_pix,
                                             vertical_pos = ver_bar_pos_pix,
@@ -404,6 +405,85 @@ class FeatureSession(ExpSession):
                                             num_hor_bars = 2)
 
 
+        # number of TRs per "type of stimuli"
+        cue_TR = self.settings['stimuli']['feature']['cue_TR']
+        empty_TR = self.settings['stimuli']['feature']['empty_TR']
+        # get info from first block, to know how many trials in a mini block (all miniblocks have same length)
+        dict_blk0 = self.all_bar_pos['mini_block_0'][list(all_bar_pos['mini_block_0'].keys())[0]]
+        mini_block_TR = dict_blk0[list(dict_blk0.keys())[0]].shape[0]
+
+        # list with order of "type of stimuli" throught experiment (called bar direction to make analogous with other class)
+        bar_direction = self.settings['stimuli']['feature']['bar_direction'] 
+
+        #create as many trials as TRs
+        trial_number = 0
+        bar_direction_all = [] # list of lists with bar orientation at all TRs
+        bar_pos_array = [] # list of lists with bar midpoint (x,y) for all TRs (if nan, then show background)
+        trial_type_all = [] # list of lists with trial type at all TRs,
+
+        for _,bartype in enumerate(bar_direction):
+            if bartype in np.array(['empty']): # empty screen
+                trial_number += empty_TR
+                trial_type_all = trial_type_all + np.repeat(bartype,empty_TR).tolist()
+                bar_direction_all = bar_direction_all + np.repeat(bartype,empty_TR).tolist()
+                
+                for i in range(empty_TR):
+                    bar_pos_array.append(np.array([np.nan,np.nan]))
+                
+            elif 'cue' in bartype: # cue on screen
+                trial_number += cue_TR
+                trial_type_all = trial_type_all + np.repeat(bartype,cue_TR).tolist()
+                bar_direction_all = bar_direction_all + np.repeat('empty',cue_TR).tolist()
+                
+                for i in range(cue_TR):
+                    bar_pos_array.append(np.array([np.nan,np.nan]))
+                
+            elif 'mini_block' in bartype: # bars on screen
+                trial_number += mini_block_TR
+                trial_type_all = trial_type_all + np.repeat(bartype,mini_block_TR).tolist()
+                
+                # get mini block condition keys
+                miniblock_cond_keys = list(self.all_bar_pos[bartype].keys())
+                
+                for t in range(mini_block_TR):
+                    
+                    temp_dir_list = [] # temporary helper lists
+                    temp_pos_list = [] 
+                    
+                    for _,key in enumerate(miniblock_cond_keys):
+                        temp_dir_list.append(self.all_bar_pos[bartype][key]['bar_direction_at_TR'][t])
+                        temp_pos_list.append(self.all_bar_pos[bartype][key]['bar_midpoint_at_TR'][t])
+                    
+                    bar_direction_all.append(temp_dir_list)
+                    bar_pos_array.append(temp_pos_list)
+                
+        
+
+        self.trial_number = trial_number # total number of trials 
+        print("Total number of (expected) TRs: %d"%self.trial_number)
+        self.bar_direction_all = np.array(bar_direction_all) # list of strings/lists with bar orientation or 'empty' 
+
+        # list of midpoint position (x,y) of bars for all TRs (if empty, then nan)
+        self.bar_midpoint_all = np.array(bar_pos_array)
+
+        # list of type of trial (cue, empty, miniblock) for all TRs
+        self.trial_type_all = np.array(trial_type_all)
+
+        # append all trials
+        self.all_trials = []
+        for i in range(self.trial_number):
+
+            self.all_trials.append(FeatureTrial(session =self ,
+                                                trial_nr = i, 
+                                                attend_block_conditions = self.attend_block_conditions, 
+                                                bar_direction_at_TR = self.bar_direction_all[i],
+                                                bar_midpoint_at_TR = self.bar_midpoint_all[i],
+                                                trial_type_at_TR = self.trial_type_all[i]
+                                                ))
+
+
+        # print window size just to check, not actually needed
+        print(self.screen)
 
 
     def run(self):

@@ -71,19 +71,21 @@ class PRFStim(Stim):
                                                         monitor = self.session.monitor, 
                                                         screen = self.session.screen)
 
-        # update bar elements
-        self.session.bar0_array =  update_elements(win = self.session.win,
-                                                    condition_settings = self.condition_settings, 
-                                                    this_phase = this_phase, 
-                                                    elem_positions = position_dictionary['bar0']['xys'], 
-                                                    nElements = position_dictionary['bar0']['nElements'],
-                                                    monitor = self.session.monitor, 
-                                                    screen = self.session.screen)
+        if this_phase != 'background':
+            # update bar elements
+            self.session.bar0_array =  update_elements(win = self.session.win,
+                                                        condition_settings = self.condition_settings, 
+                                                        this_phase = this_phase, 
+                                                        elem_positions = position_dictionary['bar0']['xys'], 
+                                                        nElements = position_dictionary['bar0']['nElements'],
+                                                        monitor = self.session.monitor, 
+                                                        screen = self.session.screen)
 
 
         # actually draw
         self.session.background_array.draw()
-        self.session.bar0_array.draw()
+        if this_phase != 'background':
+            self.session.bar0_array.draw() 
 
 
         

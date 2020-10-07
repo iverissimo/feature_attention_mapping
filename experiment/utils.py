@@ -76,66 +76,72 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
         number of bars to be displayed
                 
     """
-    
-    # make sure "all" inputs are arrays, avoid crashing
-    bar_midpoint_at_TR = np.array([bar_midpoint_at_TR])
-    bar_direction_at_TR = np.array([bar_direction_at_TR])
-    bar_width_pix = np.array([bar_width_pix])
-    
-    # background positions will be same as grid (initially)
-    background_pos = grid_pos.copy()
-    
+
     # define dictionary to save positions and number of elements
     # of all objects (bar(s) and background)
     output_dict = {}
-    
-    if all(x == num_bar for x in [bar_midpoint_at_TR.shape[0], bar_direction_at_TR.shape[0]]):
-    
-        if bar_width_pix.shape[0] == 1:
-            #print('Only one bar width given, using same width for all bars')
-            bar_width_pix = np.repeat(bar_width_pix,num_bar)
-            
-        # iterate for number of bars on screen
-        for ind in range(num_bar): 
 
-            # first define bar width in pixels (might depend if vertical or horizontal bar pass)
-            # and bounds for x and y positions
+    if np.isnan(bar_midpoint_at_TR).any():# or np.isnan(bar_direction_at_TR).any(): # when nan, position is whole background
 
-            if bar_direction_at_TR[ind] in np.array(['L-R','R-L','horizontal']): # if horizontal bar pass
-
-                x_bounds = np.array([bar_midpoint_at_TR[ind][0] - bar_width_pix[ind]/2,
-                                     bar_midpoint_at_TR[ind][0] + bar_width_pix[ind]/2])
-                y_bounds = np.array([-screen[1]/2,
-                                     screen[1]/2])
-
-            elif bar_direction_at_TR[ind] in np.array(['U-D','D-U','vertical']): # if vertical bar pass
-
-                x_bounds = np.array([-screen[0]/2,
-                                     screen[0]/2])
-                y_bounds = np.array([bar_midpoint_at_TR[ind][1] - bar_width_pix[ind]/2, 
-                                     bar_midpoint_at_TR[ind][1] + bar_width_pix[ind]/2])
-
-
-            # check which grid positions are within bounds for this conditions
-            bar_ind = np.where(((grid_pos[...,0]>=min(x_bounds))&
-                                (grid_pos[...,0]<=max(x_bounds))&
-                                (grid_pos[...,1]>=min(y_bounds))&
-                                (grid_pos[...,1]<=max(y_bounds))
-                                ))[0]
-
-            # append to dictionary 
-            output_dict['bar%i'%ind] = {'xys': grid_pos[bar_ind], 
-                                         'nElements': grid_pos[bar_ind].shape[0]}
-            
-            # remove bar positions from background positions
-            background_pos = np.delete(background_pos, bar_ind, axis=0)
-        
-        output_dict['background'] = {'xys': background_pos, 
-                                    'nElements': background_pos.shape[0]}
-
+        output_dict['background'] = {'xys': grid_pos, 
+                                    'nElements': grid_pos.shape[0]}
     else:
-        raise ValueError('Number of bars different from shape of input arrays')
-    
+
+        # make sure "all" inputs are arrays, avoid crashing
+        bar_midpoint_at_TR = np.array([bar_midpoint_at_TR])
+        bar_direction_at_TR = np.array([bar_direction_at_TR])
+        bar_width_pix = np.array([bar_width_pix])
+        
+        # background positions will be same as grid (initially)
+        background_pos = grid_pos.copy()
+                
+        if all(x == num_bar for x in [bar_midpoint_at_TR.shape[0], bar_direction_at_TR.shape[0]]):
+        
+            if bar_width_pix.shape[0] == 1:
+                #print('Only one bar width given, using same width for all bars')
+                bar_width_pix = np.repeat(bar_width_pix,num_bar)
+                
+            # iterate for number of bars on screen
+            for ind in range(num_bar): 
+
+                # first define bar width in pixels (might depend if vertical or horizontal bar pass)
+                # and bounds for x and y positions
+
+                if bar_direction_at_TR[ind] in np.array(['L-R','R-L','horizontal']): # if horizontal bar pass
+
+                    x_bounds = np.array([bar_midpoint_at_TR[ind][0] - bar_width_pix[ind]/2,
+                                         bar_midpoint_at_TR[ind][0] + bar_width_pix[ind]/2])
+                    y_bounds = np.array([-screen[1]/2,
+                                         screen[1]/2])
+
+                elif bar_direction_at_TR[ind] in np.array(['U-D','D-U','vertical']): # if vertical bar pass
+
+                    x_bounds = np.array([-screen[0]/2,
+                                         screen[0]/2])
+                    y_bounds = np.array([bar_midpoint_at_TR[ind][1] - bar_width_pix[ind]/2, 
+                                         bar_midpoint_at_TR[ind][1] + bar_width_pix[ind]/2])
+
+
+                # check which grid positions are within bounds for this conditions
+                bar_ind = np.where(((grid_pos[...,0]>=min(x_bounds))&
+                                    (grid_pos[...,0]<=max(x_bounds))&
+                                    (grid_pos[...,1]>=min(y_bounds))&
+                                    (grid_pos[...,1]<=max(y_bounds))
+                                    ))[0]
+
+                # append to dictionary 
+                output_dict['bar%i'%ind] = {'xys': grid_pos[bar_ind], 
+                                             'nElements': grid_pos[bar_ind].shape[0]}
+                
+                # remove bar positions from background positions
+                background_pos = np.delete(background_pos, bar_ind, axis=0)
+            
+            output_dict['background'] = {'xys': background_pos, 
+                                        'nElements': background_pos.shape[0]}
+
+        else:
+            raise ValueError('Number of bars different from shape of input arrays')
+        
 
     return(output_dict)
 

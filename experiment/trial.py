@@ -9,7 +9,7 @@ from psychopy import event
 class PRFTrial(Trial):
 
     def __init__(self, session, trial_nr, bar_direction_at_TR, bar_midpoint_at_TR, phase_durations,
-    				phase_names, timing='seconds', *args, **kwargs):
+                phase_names, timing='seconds', *args, **kwargs):
 
         """ Initializes a PRFTrial object. 
 
@@ -58,12 +58,18 @@ class PRFTrial(Trial):
         
         current_time = self.session.clock.getTime() # get time
 
-        # bar pass
-        if self.bar_direction_at_TR != 'empty': # if bar pass at TR, then draw bar
+        if self.bar_direction_at_TR == 'empty': # if empty trial, show background
 
-            self.session.prf_stim.draw(bar_midpoint_at_TR=self.bar_midpoint_at_TR, 
-                                       bar_direction_at_TR=self.bar_direction_at_TR,
-                                       this_phase=self.phase_names[int(self.phase)]) #'ori_left')
+            self.session.prf_stim.draw(bar_midpoint_at_TR = np.nan, 
+                                       bar_direction_at_TR = np.nan,
+                                       this_phase = 'background') 
+            print('background')
+
+        else: # if bar pass at TR, then draw bar
+
+            self.session.prf_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
+                                       bar_direction_at_TR = self.bar_direction_at_TR,
+                                       this_phase = self.phase_names[int(self.phase)]) 
 
             print(self.phase_names[int(self.phase)]) #'ori_left')
 
@@ -148,7 +154,7 @@ class FeatureTrial(Trial):
             List/array with the pairs of positions [x,y] of the midpoint of the bar
             per TR. In same cases it can have a list of pairs (when several bars on screen). Total length = total # TRs
         trial_type_at_TR: arr
-			List/array with trial identifier ("trial type"). To know if cue, empty or miniblock
+            List/array with trial identifier ("trial type"). To know if cue, empty or miniblock
 
             
         """
@@ -173,7 +179,7 @@ class FeatureTrial(Trial):
         ## CONTINUE FROM HERE ####
 
         if self.bar_direction_at_TR == 'cue':
-        	print('cue')
+            print('cue')
         
         # bar pass
 

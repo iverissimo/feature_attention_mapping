@@ -48,7 +48,7 @@ stimuli:
     bar_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty']  #['L-R','U-D','R-L','D-U'] #
 
   feature:
-    bar_width_ratio: 0.125 # ratio of the screen res
+    bar_width_ratio: 0.0625 #0.125 # ratio of the screen res
     mini_blocks: 4
 
     empty_TR: 4

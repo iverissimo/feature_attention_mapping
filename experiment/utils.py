@@ -130,7 +130,7 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
 
                 # append to dictionary 
                 output_dict['bar%i'%ind] = {'xys': grid_pos[bar_ind], 
-                                             'nElements': grid_pos[bar_ind].shape[0]}
+                                            'nElements': grid_pos[bar_ind].shape[0]}
                 
                 for _,p in enumerate(bar_ind):
                     all_bar_ind.append(p)
@@ -140,7 +140,7 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
             mask[all_bar_ind] = 0
             
             output_dict['background'] = {'xys': grid_pos[mask], 
-                                        'nElements': grid_pos[mask].shape[0]}
+                                         'nElements': grid_pos[mask].shape[0]}
 
         else:
             raise ValueError('Number of bars different from shape of input arrays')
@@ -149,23 +149,24 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
     return(output_dict)
 
 
-def update_elements(win, condition_settings, this_phase, elem_positions, nElements,
-                   monitor, screen=np.array([1680,1050])):
+def update_elements(ElementArrayStim, condition_settings, this_phase, elem_positions, grid_pos,
+                   	monitor, screen=np.array([1680,1050])):
     
-    """ update element array settings, returning an element array stim
+    """ update element array settings
     
     Parameters
     ----------
-    win:
-    	Window object
+    ElementArrayStim: Psychopy object
+    	ElementArrayStim to be updated 
     condition_settings: dict
         dictionary with all condition settings
     this_phase: str
         string with name of condition to be displayed
     elem_positions: arr
-         numpy array with element positions (N,2) -> (number of positions, [x,y])
-    nElements: int
-        number of elements in array
+         numpy array with element positions to be updated and shown (N,2) -> (number of positions, [x,y])
+         to be used for opacity update
+    grid_pos: arr
+        numpy array with element positions (N,2) of whole grid -> (number of positions, [x,y])
     monitor: object
         monitor object (to get monitor references for deg2pix transformation)
     screen: arr
@@ -173,6 +174,9 @@ def update_elements(win, condition_settings, this_phase, elem_positions, nElemen
         
     """
     
+    # set number of elements
+    nElements = grid_pos.shape[0]
+
     # update element sizes
     element_sizes_px = tools.monitorunittools.deg2pix(condition_settings[this_phase]['element_size'], 
                                                       monitor) 
@@ -212,30 +216,37 @@ def update_elements(win, condition_settings, this_phase, elem_positions, nElemen
                               np.ones((math.ceil(nElements * .5))) * condition_settings[this_phase]['element_ori'][1]))
 
     # add some jitter to the orientations
-    ori_arr = jitter(ori_arr,
+    element_ori = jitter(ori_arr,
                      max_val = condition_settings[this_phase]['ori_jitter_max'],
                      min_val = condition_settings[this_phase]['ori_jitter_min']) 
 
-    np.random.shuffle(ori_arr) # shuffle the orientations
-
-    # update element opacities
-    element_opacities = np.ones((nElements))
+    np.random.shuffle(element_ori) # shuffle the orientations
 
     # update element colors 
     element_color = np.ones((int(np.round(nElements)),3)) * np.array(condition_settings[this_phase]['element_color'])
+
+    # update element opacities
+
+    # make grid and element position lists of lists
+    list_grid_pos = [list(val) for _,val in enumerate(grid_pos)]
+    list_elem_pos = [list(val) for _,val in enumerate(elem_positions)]
+
+    # get indices of where one is in other
+    list_indices = [list_grid_pos.index(list_elem_pos[i]) for i in range(len(list_elem_pos)) ]
     
-    ElementArrayStim = visual.ElementArrayStim(win = win, 
-												nElements = nElements,
-                                                units = 'pix', 
-                                                elementTex = elementTex, 
-                                                elementMask = 'gauss',
-                                                sizes = element_sizes, 
-                                                sfs = element_sfs, 
-                                                xys = elem_positions, 
-                                                oris = ori_arr,
-                                                contrs = element_contrast, 
-                                                colors = element_color, 
-                                                colorSpace = 'rgb') 
+    # set opacities
+    element_opacities = np.zeros(len(grid_pos))
+    element_opacities[list_indices] = 1
+
+    # set all of the above settings
+    ElementArrayStim.setSizes(element_sizes)
+    ElementArrayStim.setTex(elementTex)
+    ElementArrayStim.setContrs(element_contrast)
+    ElementArrayStim.setSfs(element_sfs)
+    ElementArrayStim.setOris(element_ori)
+    ElementArrayStim.setColors(element_color)
+    ElementArrayStim.setOpacities(element_opacities)
+
 
     return(ElementArrayStim)
 
@@ -362,12 +373,12 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
                 # get coordinates for vertical bars
                 if output_dict['mini_block_%i'%blk][cond]['bar_direction_at_TR'][trl] == 'vertical':
                     
-                    if vert_counter[0] == False: #(len(ind_ver[0])>0) and (vert_counter[0] == False):
+                    if vert_counter[0] == False: 
                         coord = vertical_pos[ind_ver[0][0]]
                         ind_ver[0] = ind_ver[0][1:] # removed used indice, to not repeat position
                         vert_counter[0] = True
                         
-                    elif vert_counter[1] == False: #(len(ind_ver[1])>0) and (vert_counter[1] == False):
+                    elif vert_counter[1] == False: 
                         coord = vertical_pos[ind_ver[1][0]]
                         ind_ver[1] = ind_ver[1][1:] # removed used indice, to not repeat position
                         vert_counter[1] = True
@@ -375,12 +386,12 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
                 # get coordinates for horizontal bars
                 elif output_dict['mini_block_%i'%blk][cond]['bar_direction_at_TR'][trl] == 'horizontal':
                     
-                    if hor_counter[0] == False: #(len(ind_hor[0])>0) and (vert_counter[0] == False):
+                    if hor_counter[0] == False: 
                         coord = horizontal_pos[ind_hor[0][0]]
                         ind_hor[0] = ind_hor[0][1:] # removed used indice, to not repeat position
                         hor_counter[0] = True
                         
-                    elif hor_counter[1] == False: #(len(ind_hor[1])>0) and (vert_counter[1] == False):
+                    elif hor_counter[1] == False: 
                         coord = horizontal_pos[ind_hor[1][0]]
                         ind_hor[1] = ind_hor[1][1:] # removed used indice, to not repeat position
                         hor_counter[1] = True

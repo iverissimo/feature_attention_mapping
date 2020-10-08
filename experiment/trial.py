@@ -199,7 +199,7 @@ class FeatureTrial(Trial):
 
             cue_stim = TextStim(self.session.win, text=cue_str,
                                 color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                italic = False, alignHoriz = 'center')
+                                italic = False, alignHoriz = 'center', alignVert = 'center')
             cue_stim.draw()
             
             print(cue_str)

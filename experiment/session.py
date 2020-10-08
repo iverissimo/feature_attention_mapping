@@ -250,7 +250,7 @@ class PRFSession(ExpSession):
             if key != 'background': # we don't want to show background gabors in background
                 key_list.append(key)
 
-        key_list = np.repeat(key_list,2) # make it double, so for each bar pass it shows each condition twice
+        key_list = np.repeat(key_list,3) # make it triple, so for each bar pass it shows each condition 3 times
         np.random.shuffle(key_list)
         phase_conditions = key_list
 
@@ -293,16 +293,16 @@ class PRFSession(ExpSession):
         """ Loops over trials and runs them """
         
         # draw instructions wait a few seconds
-        this_instruction_string = 'Please fixate at the center, \ndo not move your eyes'
+        this_instruction_string = 'Please fixate at the center,\ndo not move your eyes'
         self.display_text(this_instruction_string, duration=3,
                                     color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                    italic = True, alignHoriz = 'center')
+                                    italic = True, alignHoriz = 'center', alignVert = 'center')
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = 'Index finger - Black\n Middle finger - White\nwaiting for scanner'
+        this_instruction_string = 'Index finger - Black\nMiddle finger - White\nwaiting for scanner'
         self.display_text(this_instruction_string, keys=self.settings['mri'].get('sync', 't'),
                                 color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                italic = True, alignHoriz = 'center')
+                                italic = True, alignHoriz = 'center', alignVert = 'center')
 
         # create trials before running!
         self.create_stimuli()
@@ -517,16 +517,16 @@ class FeatureSession(ExpSession):
         self.create_trials() 
 
         # draw instructions wait a few seconds
-        this_instruction_string = 'Please fixate at the center, \ndo not move your eyes'
+        this_instruction_string = 'Please fixate at the center,\ndo not move your eyes'
         self.display_text(this_instruction_string, duration=3,
                                     color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                    italic = True, alignHoriz = 'center')
+                                    italic = True, alignHoriz = 'center', alignVert = 'center')
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = 'Index finger - vertical\n Middle finger - horizontal\nwaiting for scanner'
+        this_instruction_string = 'Index finger - vertical\nMiddle finger - horizontal\nwaiting for scanner'
         self.display_text(this_instruction_string, keys=self.settings['mri'].get('sync', 't'),
                                 color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                italic = True, alignHoriz = 'center')
+                                italic = True, alignHoriz = 'center', alignVert = 'center')
 
         self.start_experiment()
         

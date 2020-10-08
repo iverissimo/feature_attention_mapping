@@ -201,9 +201,12 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     
     
     # update element spatial frequency
-    element_sfs_pix = tools.monitorunittools.deg2pix(condition_settings[this_phase]['element_sf'], 
-                                                     monitor) # (transform cycles/degree to cycles/pixel)
-    element_sfs = np.ones((nElements)) * element_sfs_pix
+    element_sfs_pix = condition_settings[this_phase]['element_sf']/tools.monitorunittools.deg2pix(1, monitor) # (transform cycles/degree to cycles/pixel)
+    element_sfs = np.ones((nElements)) * 4 #element_sfs_pix
+
+    if this_phase == 'ori_left':
+        #print(element_sfs_pix)
+        print(tools.monitorunittools.deg2pix(1, monitor))
         
     # update element orientation (half ori1, half ori2)
     ori_arr = np.concatenate((np.ones((math.floor(nElements * .5))) * condition_settings[this_phase]['element_ori'][0], 
@@ -332,29 +335,39 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
         ind_ver = get_non_overlapping_indices(arr_shape=[num_ver_bars,vertical_pos.shape[0]])
 
         # define direction of bar (randomly alternate between horizontal and vertical)
-        direction = np.concatenate([np.repeat('vertical',vertical_pos.shape[0]),
-                                    np.repeat('horizontal',horizontal_pos.shape[0])])
+        direction = np.concatenate([np.repeat('vertical',horizontal_pos.shape[0]),
+                                    np.repeat('horizontal',vertical_pos.shape[0])])
         np.random.shuffle(direction)
-        
+
+        # set opposite direction (to balance conditions)
+        opposite_direction = np.array(['vertical' if d=='horizontal' else 'horizontal' for _,d in enumerate(direction)])
+
+        # vertically stack, getting half of bars horizontal, other half vertical
+        for j in range(int(len(bar_list[blk])/2)-1):
+
+            direction = np.vstack((direction, direction))
+            opposite_direction = np.vstack((opposite_direction, opposite_direction))
+
+        cond_direction = np.vstack((direction,opposite_direction))
+
+        # shuffle columns of direction, to guarantee that each trial has half horizontal, half vertical
+        # but without bias of conditions always being one or the other
+        [np.random.shuffle(cond_direction[:,j]) for j in range(cond_direction.shape[-1])]
+
         # first define for all conditions in block, which will be 
         # vertical, which will be horizontal
         for k,cond in enumerate(bar_list[blk]):
 
             cond_position = []
 
-            if (k % 2) == 0: # if even, use direction defined in array   
-                cond_direction = direction
-            else: 
-                cond_direction = ['vertical' if d=='horizontal' else 'horizontal' for _,d in enumerate(direction)]
-                
             # append to dictionary 
             output_dict['mini_block_%i'%blk][cond] = {'bar_midpoint_at_TR': cond_position, 
-                                                     'bar_direction_at_TR': cond_direction} 
+                                                     'bar_direction_at_TR': cond_direction[k]}  
 
         # now according to bar direction (horizontal vs vertical)
         # set x,y coordinates for bar midpoint
 
-        for trl in range(len(cond_direction)): # for each trial
+        for trl in range(cond_direction.shape[-1]): # for each trial
             
             vert_counter = np.repeat(False,num_ver_bars) # set boolean counter, to keep track of positions 
             hor_counter = np.repeat(False,num_hor_bars) 

@@ -57,7 +57,9 @@ class ExpSession(Session):
 
             # first set the number of elements that fit each dimension
             gabor_diameter_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['conditions']['background']['element_size'], self.monitor) # diameter of each element (pix)
-            elem_num = np.round(np.array(self.screen)/(gabor_diameter_pix * 0.6)) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
+            print(gabor_diameter_pix)
+            
+            elem_num = np.round(np.array(self.screen)/(gabor_diameter_pix * self.settings['stimuli']['gab_ratio'])) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
 
             # then set equally spaced x and y coordinates for grid
             x_grid_pos = np.linspace(-self.screen[0]/2,
@@ -70,7 +72,7 @@ class ExpSession(Session):
             
 
             self.grid_pos = np.array(list(itertools.product(x_grid_pos, y_grid_pos))) # list of lists [[x0,y0],[x0,y1],...]
-
+            print(self.grid_pos.shape)
 
             ## create some elements that will be common to both tasks ##
             
@@ -248,8 +250,9 @@ class PRFSession(ExpSession):
             if key != 'background': # we don't want to show background gabors in background
                 key_list.append(key)
 
+        key_list = np.repeat(key_list,2) # make it double, so for each bar pass it shows each condition twice
         np.random.shuffle(key_list)
-        phase_conditions = np.array(key_list)
+        phase_conditions = key_list
 
         for r in range(trial_number-1):
             np.random.shuffle(key_list)
@@ -509,6 +512,10 @@ class FeatureSession(ExpSession):
     def run(self):
         """ Loops over trials and runs them """
 
+        # create trials before running!
+        self.create_stimuli()
+        self.create_trials() 
+
         # draw instructions wait a few seconds
         this_instruction_string = 'Please fixate at the center, \ndo not move your eyes'
         self.display_text(this_instruction_string, duration=3,
@@ -520,10 +527,6 @@ class FeatureSession(ExpSession):
         self.display_text(this_instruction_string, keys=self.settings['mri'].get('sync', 't'),
                                 color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
                                 italic = True, alignHoriz = 'center')
-
-        # create trials before running!
-        self.create_stimuli()
-        self.create_trials() 
 
         self.start_experiment()
         

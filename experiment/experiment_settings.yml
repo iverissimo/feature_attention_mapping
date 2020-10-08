@@ -41,14 +41,14 @@ stimuli:
   prf:
     bar_width_ratio: 0.0625 #0.125 # ratio of the screen res
 
-    bar_pass_hor_TR: 16 #17 
-    bar_pass_ver_TR: 16 #17 
+    #bar_pass_hor_TR: 16 #17 
+    #bar_pass_ver_TR: 16 #17 
     empty_TR: 5
 
     bar_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty']  #['L-R','U-D','R-L','D-U'] #
 
   feature:
-    bar_width_ratio: 0.0625 #0.125 # ratio of the screen res
+    bar_width_ratio: 0.125 #0.0625 #0.125 # ratio of the screen res
     mini_blocks: 4
 
     empty_TR: 4
@@ -68,7 +68,7 @@ stimuli:
       element_contrast: 0.5 #0.5
       ori_jitter_max: 1 # max value for element orientation jitter range
       ori_jitter_min: 0.5 # min value for element orientation jitter range
-      element_size: 0.4 #0.2 # degrees
+      element_size: 0.4 #0.6 #0.2 # degrees
 
     color_red:
       element_sf: 4 # cycles per degree
@@ -77,7 +77,7 @@ stimuli:
       element_contrast: 0.7
       ori_jitter_max: 1 # max value for element orientation jitter range
       ori_jitter_min: 0.5 # min value for element orientation jitter range
-      element_size: 0.4 #0.2 # degrees
+      element_size: 0.4 #0.6 #0.2 # degrees
 
     color_green:
       element_sf: 4 # cycles per degree
@@ -86,7 +86,7 @@ stimuli:
       element_contrast: 0.7
       ori_jitter_max: 1 # max value for element orientation jitter range
       ori_jitter_min: 0.5 # min value for element orientation jitter range
-      element_size: 0.4 #0.2 # degrees
+      element_size: 0.4 #0.6 #0.2 # degrees
 
     # sf_high:
     #   element_sf: 4.05 # cycles per degree
@@ -105,7 +105,7 @@ stimuli:
       element_contrast: 1
       ori_jitter_max: 10 # max value for element orientation jitter range
       ori_jitter_min: 5 # min value for element orientation jitter range
-      element_size: 0.4 #0.2 # degrees
+      element_size: 0.4 #0.6 #0.2 # degrees
 
     ori_right:
       element_sf: 4 # cycles per degree
@@ -114,7 +114,7 @@ stimuli:
       element_contrast: 1
       ori_jitter_max: 10 # max value for element orientation jitter range
       ori_jitter_min: 5 # min value for element orientation jitter range
-      element_size: 0.4 #0.2 # degrees
+      element_size: 0.4 #0.6 #0.2 # degrees
   
   
 eyetracker:

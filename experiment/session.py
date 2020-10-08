@@ -176,21 +176,34 @@ class PRFSession(ExpSession):
         self.total_responses = 0
         self.correct_responses = 0
 
+        # define bar width 
+        bar_width_ratio = self.settings['stimuli']['prf']['bar_width_ratio']
+        self.bar_width_pix = self.screen*bar_width_ratio
+
+        # define number of bars per direction
+        num_bars = np.array(self.screen)/self.bar_width_pix; num_bars = np.array(num_bars,dtype=int)
+
         # number of TRs per "type of stimuli"
-        bar_pass_hor_TR = self.settings['stimuli']['prf']['bar_pass_hor_TR']
-        bar_pass_ver_TR = self.settings['stimuli']['prf']['bar_pass_ver_TR']
+        bar_pass_hor_TR = num_bars[0] 
+        bar_pass_ver_TR = num_bars[1] 
         empty_TR = self.settings['stimuli']['prf']['empty_TR']
 
         # list with order of bar orientations throught experiment
         bar_direction = self.settings['stimuli']['prf']['bar_direction'] 
 
-        # all positions in pixels [x,y] for for midpoint of
+        # all possible positions in pixels [x,y] for for midpoint of
         # vertical bar passes, 
-        ver_y = self.screen[1]*np.linspace(-0.5,0.5, bar_pass_ver_TR)
+        ver_y = np.linspace((-self.screen[1]/2 + self.bar_width_pix[1]/2),
+                            (self.screen[1]/2 - self.bar_width_pix[1]/2),
+                            bar_pass_ver_TR)
+
         ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(ver_y)])
 
         # horizontal bar passes 
-        hor_x = self.screen[0]*np.linspace(-0.5,0.5, bar_pass_hor_TR)
+        hor_x = np.linspace((-self.screen[0]/2 + self.bar_width_pix[0]/2),
+                            (self.screen[0]/2 - self.bar_width_pix[0]/2),
+                            bar_pass_hor_TR)
+
         hor_bar_pos_pix = np.array([np.array([x,0]) for _,x in enumerate(hor_x)])
 
         #create as many trials as TRs
@@ -386,11 +399,17 @@ class FeatureSession(ExpSession):
 
         # all possible positions in pixels [x,y] for for midpoint of
         # vertical bar passes, 
-        ver_y = self.screen[1]*np.linspace(-0.5,0.5, num_bars[1])
+        ver_y = np.linspace((-self.screen[1]/2 + self.bar_width_pix[1]/2),
+                            (self.screen[1]/2 - self.bar_width_pix[1]/2),
+                            num_bars[1])
+
         ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(ver_y)])
 
         # horizontal bar passes 
-        hor_x = self.screen[0]*np.linspace(-0.5,0.5, num_bars[0])
+        hor_x = np.linspace((-self.screen[0]/2 + self.bar_width_pix[0]/2),
+                            (self.screen[0]/2 - self.bar_width_pix[0]/2),
+                            num_bars[0])
+
         hor_bar_pos_pix = np.array([np.array([x,0]) for _,x in enumerate(hor_x)])
 
 
@@ -475,6 +494,7 @@ class FeatureSession(ExpSession):
 
             self.all_trials.append(FeatureTrial(session =self ,
                                                 trial_nr = i, 
+                                                phase_durations = np.array([self.bar_step]),
                                                 attend_block_conditions = self.attend_block_conditions, 
                                                 bar_direction_at_TR = self.bar_direction_all[i],
                                                 bar_midpoint_at_TR = self.bar_midpoint_all[i],

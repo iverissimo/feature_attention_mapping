@@ -90,16 +90,13 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
         # make sure "all" inputs are 2d arrays, if not make them. avoids crashing. 
         bar_midpoint_at_TR = np.array(bar_midpoint_at_TR) if len(np.array(bar_midpoint_at_TR).shape)>1 else np.array([bar_midpoint_at_TR])
         bar_direction_at_TR = np.array(bar_direction_at_TR) if len(np.array(bar_direction_at_TR).shape)>0 else np.array([bar_direction_at_TR])
-        bar_width_pix = np.array([bar_width_pix])
+        bar_width_pix = np.array(bar_width_pix)
         
         all_bar_ind = [] # append all bar position indices to later remove from background
  
         if all(x == num_bar for x in [bar_midpoint_at_TR.shape[0], bar_direction_at_TR.shape[0]]):
         
-            if bar_width_pix.shape[0] == 1:
-                #print('Only one bar width given, using same width for all bars')
-                bar_width_pix = np.repeat(bar_width_pix,num_bar)
-                
+  
             # iterate for number of bars on screen
             for ind in range(num_bar): 
 
@@ -108,8 +105,8 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
 
                 if bar_direction_at_TR[ind] in np.array(['L-R','R-L','horizontal']): # if horizontal bar pass
 
-                    x_bounds = np.array([bar_midpoint_at_TR[ind][0] - bar_width_pix[ind]/2,
-                                         bar_midpoint_at_TR[ind][0] + bar_width_pix[ind]/2])
+                    x_bounds = np.array([bar_midpoint_at_TR[ind][0] - bar_width_pix[0]/2,
+                                         bar_midpoint_at_TR[ind][0] + bar_width_pix[0]/2])
                     y_bounds = np.array([-screen[1]/2,
                                          screen[1]/2])
 
@@ -117,8 +114,8 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
 
                     x_bounds = np.array([-screen[0]/2,
                                          screen[0]/2])
-                    y_bounds = np.array([bar_midpoint_at_TR[ind][1] - bar_width_pix[ind]/2, 
-                                         bar_midpoint_at_TR[ind][1] + bar_width_pix[ind]/2])
+                    y_bounds = np.array([bar_midpoint_at_TR[ind][1] - bar_width_pix[1]/2, 
+                                         bar_midpoint_at_TR[ind][1] + bar_width_pix[1]/2])
 
 
                 # check which grid positions are within bounds for this conditions

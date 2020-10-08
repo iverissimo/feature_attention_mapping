@@ -131,7 +131,7 @@ class PRFTrial(Trial):
 
 class FeatureTrial(Trial):
 
-    def __init__(self, session, trial_nr, attend_block_conditions, bar_direction_at_TR, bar_midpoint_at_TR, trial_type_at_TR, timing='seconds', *args, **kwargs):
+    def __init__(self, session, trial_nr, phase_durations, attend_block_conditions, bar_direction_at_TR, bar_midpoint_at_TR, trial_type_at_TR, timing='seconds', *args, **kwargs):
 
 
         """ Initializes a FeatureTrial object. 
@@ -168,7 +168,7 @@ class FeatureTrial(Trial):
         self.session = session
 
         #dummy value: if scanning or simulating a scanner, everything is synced to the output 't' of the scanner
-        phase_durations = [100]
+        self.phase_durations = phase_durations #= [100]
 
 
         super().__init__(session, trial_nr, phase_durations, verbose=False, *args, **kwargs)

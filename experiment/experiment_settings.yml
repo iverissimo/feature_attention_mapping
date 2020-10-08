@@ -37,6 +37,9 @@ stimuli:
 
   rect_fill_color: [-1, -1, -1]
   rect_line_color: [-1, -1, -1]
+
+  gab_ratio: 0.65 # ratio to multiply by gab diameter, to avoid empty spaces in grid
+  element_size: 0.4 #0.4 #0.2 # degrees
   
   prf:
     bar_width_ratio: 0.0625 #0.125 # ratio of the screen res
@@ -62,31 +65,28 @@ stimuli:
 
   conditions: # feature conditions
     background: 
-      element_sf: 4 # cycles per degree
+      element_sf: 6 # cycles/gabor width
       element_color: [-1,-1,-1] # black and white
       element_ori: [90,180] # half horizontal, half vertical
-      element_contrast: 0.5 #0.5
+      element_contrast: 0.4 #0.5
       ori_jitter_max: 1 # max value for element orientation jitter range
       ori_jitter_min: 0.5 # min value for element orientation jitter range
-      element_size: 0.4 #0.6 #0.2 # degrees
 
     color_red:
-      element_sf: 4 # cycles per degree
+      element_sf: 6 # cycles/gabor width
       element_color: [-1,-1,-1] # black and white, is changed within code
       element_ori: [90,180] # half horizontal, half vertical
-      element_contrast: 0.7
+      element_contrast: 0.6
       ori_jitter_max: 1 # max value for element orientation jitter range
       ori_jitter_min: 0.5 # min value for element orientation jitter range
-      element_size: 0.4 #0.6 #0.2 # degrees
 
     color_green:
-      element_sf: 4 # cycles per degree
+      element_sf: 6 # cycles/gabor width
       element_color: [-1,-1,-1] # black and white, is changed within code
       element_ori: [90,180] # half horizontal, half vertical
-      element_contrast: 0.7
+      element_contrast: 0.6
       ori_jitter_max: 1 # max value for element orientation jitter range
       ori_jitter_min: 0.5 # min value for element orientation jitter range
-      element_size: 0.4 #0.6 #0.2 # degrees
 
     # sf_high:
     #   element_sf: 4.05 # cycles per degree
@@ -99,23 +99,20 @@ stimuli:
     #   element_ori: [90,180] # half horizontal, half vertical
 
     ori_left:
-      element_sf: 4 # cycles per degree
+      element_sf: 6 # cycles/gabor width
       element_color: [-1,-1,-1] # black and white
-      element_ori: [45,225] # all right
+      element_ori: [45.0,225.0] # all right
       element_contrast: 1
-      ori_jitter_max: 10 # max value for element orientation jitter range
-      ori_jitter_min: 5 # min value for element orientation jitter range
-      element_size: 0.4 #0.6 #0.2 # degrees
+      ori_jitter_max: 5.0 # max value for element orientation jitter range
+      ori_jitter_min: 0.5 # min value for element orientation jitter range
 
     ori_right:
-      element_sf: 4 # cycles per degree
+      element_sf: 6 # cycles/gabor width
       element_color: [-1,-1,-1] # black and white
-      element_ori: [135,315] # all left
+      element_ori: [135.0, 315.0] # all left
       element_contrast: 1
-      ori_jitter_max: 10 # max value for element orientation jitter range
-      ori_jitter_min: 5 # min value for element orientation jitter range
-      element_size: 0.4 #0.6 #0.2 # degrees
-  
+      ori_jitter_max: 5.0 # max value for element orientation jitter range
+      ori_jitter_min: 0.5 # min value for element orientation jitter range  
   
 eyetracker:
   address: '100.1.1.1' #  Eyelink eyetracker IP

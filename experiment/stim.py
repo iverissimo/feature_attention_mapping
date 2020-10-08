@@ -44,12 +44,11 @@ class Stim(object):
         self.element_positions = self.grid_pos
 
          # element sizes
-        element_sizes_px = tools.monitorunittools.deg2pix(self.condition_settings['background']['element_size'], self.session.monitor) 
+        element_sizes_px = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['element_size'], self.session.monitor) 
         self.element_sizes = np.ones((self.nElements)) * element_sizes_px 
 
         # elements spatial frequency
-        element_sfs_pix = self.condition_settings['background']['element_sf']/tools.monitorunittools.deg2pix(1, self.session.monitor) # (transform cycles/degree to cycles/pixel)
-        self.element_sfs = np.ones((self.nElements)) * 4 #element_sfs_pix
+        self.element_sfs = np.ones((self.nElements)) * self.condition_settings['background']['element_sf'] # in cycles/gabor width
 
         # element orientation (half ori1, half ori2)
         ori_arr = np.concatenate((np.ones((math.floor(self.nElements * .5))) * self.condition_settings['background']['element_ori'][0], 

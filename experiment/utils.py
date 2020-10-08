@@ -174,16 +174,12 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     # set number of elements
     nElements = grid_pos.shape[0]
 
-    # update element sizes
-    element_sizes_px = tools.monitorunittools.deg2pix(condition_settings[this_phase]['element_size'], 
-                                                      monitor) 
-    element_sizes = np.ones((nElements)) * element_sizes_px 
         
     # update element texture
     if this_phase in ('color_green','color_red'):
 
         # to make colored gabor, need to do it a bit differently (psychopy forces colors to be opposite)
-        grat_res = near_power_of_2(element_sizes[0],near='previous') # use power of 2 as grating res, to avoid error
+        grat_res = near_power_of_2(ElementArrayStim.sizes[0][0],near='previous') # use power of 2 as grating res, to avoid error
         grating = visual.filters.makeGrating(res=grat_res)
 
         # initialise a 'black' texture 
@@ -201,11 +197,9 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     
     
     # update element spatial frequency
-    element_sfs_pix = condition_settings[this_phase]['element_sf']/tools.monitorunittools.deg2pix(1, monitor) # (transform cycles/degree to cycles/pixel)
-    element_sfs = np.ones((nElements)) * 4 #element_sfs_pix
+    element_sfs = np.ones((nElements)) * condition_settings[this_phase]['element_sf'] # in cycles/gabor width
 
     if this_phase == 'ori_left':
-        #print(element_sfs_pix)
         print(tools.monitorunittools.deg2pix(1, monitor))
         
     # update element orientation (half ori1, half ori2)
@@ -240,7 +234,6 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     element_opacities[list_indices] = 1
 
     # set all of the above settings
-    ElementArrayStim.setSizes(element_sizes)
     ElementArrayStim.setTex(elementTex)
     ElementArrayStim.setContrs(element_contrast)
     ElementArrayStim.setSfs(element_sfs)

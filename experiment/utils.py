@@ -200,9 +200,6 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
         elementTex = 'sin'
     
     
-    # update element contrasts
-    element_contrast =  np.ones((nElements)) * condition_settings[this_phase]['element_contrast']
-    
     # update element spatial frequency
     element_sfs_pix = tools.monitorunittools.deg2pix(condition_settings[this_phase]['element_sf'], 
                                                      monitor) # (transform cycles/degree to cycles/pixel)
@@ -229,7 +226,11 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     list_elem_pos = [list(val) for _,val in enumerate(elem_positions)]
 
     # get indices of where one is in other
-    list_indices = [list_grid_pos.index(list_elem_pos[i]) for i in range(len(list_elem_pos)) ]
+    list_indices = [list_grid_pos.index(list_elem_pos[i]) for i in range(len(list_elem_pos))]
+
+    # set element contrasts
+    element_contrast =  np.zeros(len(grid_pos))
+    element_contrast[list_indices] = condition_settings[this_phase]['element_contrast']
     
     # set opacities
     element_opacities = np.zeros(len(grid_pos))

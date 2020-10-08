@@ -38,8 +38,8 @@ stimuli:
   rect_fill_color: [-1, -1, -1]
   rect_line_color: [-1, -1, -1]
 
-  gab_ratio: 0.65 # ratio to multiply by gab diameter, to avoid empty spaces in grid
-  element_size: 0.4 #0.4 #0.2 # degrees
+  gab_ratio: 0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid
+  element_size: 0.55 #0.4 #0.2 # degrees
   
   prf:
     bar_width_ratio: 0.0625 #0.125 # ratio of the screen res

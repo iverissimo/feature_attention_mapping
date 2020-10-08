@@ -199,9 +199,6 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     # update element spatial frequency
     element_sfs = np.ones((nElements)) * condition_settings[this_phase]['element_sf'] # in cycles/gabor width
 
-    if this_phase == 'ori_left':
-        print(tools.monitorunittools.deg2pix(1, monitor))
-        
     # update element orientation (half ori1, half ori2)
     ori_arr = np.concatenate((np.ones((math.floor(nElements * .5))) * condition_settings[this_phase]['element_ori'][0], 
                               np.ones((math.ceil(nElements * .5))) * condition_settings[this_phase]['element_ori'][1]))

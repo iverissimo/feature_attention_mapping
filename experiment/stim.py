@@ -103,7 +103,7 @@ class PRFStim(Stim):
         super().__init__(session=session, bar_width_ratio=bar_width_ratio, grid_pos=grid_pos)
 
 
-    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase):
+    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase, position_dictionary):
         
         """ Draw stimuli - pRF bar - for each trial 
         
@@ -117,10 +117,6 @@ class PRFStim(Stim):
             strings with name of condition to draw
         """
         
-        # get bar and background positions
-        position_dictionary = get_object_positions(self.grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
-                                                    self.bar_width_pix, screen = self.session.screen, num_bar = 1)
-
 
         # update background elements
         self.session.background_array = update_elements(ElementArrayStim = self.session.background_array,
@@ -197,7 +193,7 @@ class FeatureStim(Stim):
 
 
 
-    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase):
+    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase, position_dictionary):
         
         """ Draw stimuli - pRF bars - for each trial 
         
@@ -212,10 +208,7 @@ class FeatureStim(Stim):
             
         """
         
-        # get bar and background positions
-        position_dictionary = get_object_positions(self.grid_pos, bar_midpoint_at_TR, bar_direction_at_TR,
-                                                    self.bar_width_pix, screen = self.session.screen, 
-                                                    num_bar = len(self.session.attend_block_conditions))
+        
 
 
         # update background elements

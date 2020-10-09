@@ -495,7 +495,7 @@ class FeatureSession(ExpSession):
         self.all_trials = []
         for i in range(self.trial_number):
 
-            self.all_trials.append(FeatureTrial(session =self ,
+            self.all_trials.append(FeatureTrial(session = self ,
                                                 trial_nr = i, 
                                                 phase_durations = np.array([self.bar_step]),
                                                 attend_block_conditions = self.attend_block_conditions, 

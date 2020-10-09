@@ -6,6 +6,8 @@ from exptools2.core import Trial
 from psychopy import event 
 from psychopy.visual import TextStim
 
+from utils import *
+
 
 class PRFTrial(Trial):
 
@@ -51,6 +53,10 @@ class PRFTrial(Trial):
         self.phase_names = phase_names 
 
         super().__init__(session, trial_nr, phase_durations, phase_names, verbose=False, *args, **kwargs)
+
+        # get bar and background positions
+        self.position_dictionary = get_object_positions(self.session.grid_pos, self.bar_midpoint_at_TR, self.bar_direction_at_TR,
+                                                    self.session.bar_width_pix, screen = self.session.screen, num_bar = 1)
        
 
     def draw(self): 
@@ -63,14 +69,16 @@ class PRFTrial(Trial):
 
             self.session.prf_stim.draw(bar_midpoint_at_TR = np.nan, 
                                        bar_direction_at_TR = np.nan,
-                                       this_phase = 'background') 
+                                       this_phase = 'background',
+                                       position_dictionary = self.position_dictionary) 
             print('background')
 
         else: # if bar pass at TR, then draw bar
 
             self.session.prf_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
                                        bar_direction_at_TR = self.bar_direction_at_TR,
-                                       this_phase = self.phase_names[int(self.phase)]) 
+                                       this_phase = self.phase_names[int(self.phase)],
+                                       position_dictionary = self.position_dictionary) 
 
             print(self.phase_names[int(self.phase)]) #'ori_left')
 
@@ -172,6 +180,12 @@ class FeatureTrial(Trial):
 
 
         super().__init__(session, trial_nr, phase_durations, verbose=False, *args, **kwargs)
+
+        # get bar and background positions for this trial
+        self.position_dictionary = get_object_positions(self.session.grid_pos, self.bar_midpoint_at_TR, self.bar_direction_at_TR,
+                                                    self.session.bar_width_pix, screen = self.session.screen, 
+                                                    num_bar = len(self.session.attend_block_conditions))
+
        
 
     def draw(self): 
@@ -183,7 +197,8 @@ class FeatureTrial(Trial):
 
             self.session.feature_stim.draw(bar_midpoint_at_TR = np.nan, 
                                        bar_direction_at_TR = np.nan,
-                                       this_phase = 'background')
+                                       this_phase = 'background',
+                                       position_dictionary = self.position_dictionary)
 
             # define appropriate cue string for the upcoming mini block
             attend_cond = self.attend_block_conditions[int(self.trial_type_at_TR[-1])]
@@ -208,7 +223,8 @@ class FeatureTrial(Trial):
 
             self.session.feature_stim.draw(bar_midpoint_at_TR = np.nan, 
                                        bar_direction_at_TR = np.nan,
-                                       this_phase = 'background') 
+                                       this_phase = 'background',
+                                       position_dictionary = self.position_dictionary) 
             print('background')
 
         # bar pass
@@ -217,7 +233,8 @@ class FeatureTrial(Trial):
 
             self.session.feature_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
                                            bar_direction_at_TR = self.bar_direction_at_TR,
-                                           this_phase = list(self.session.all_bar_pos[self.trial_type_at_TR].keys())) #'ori_left')
+                                           this_phase = list(self.session.all_bar_pos[self.trial_type_at_TR].keys()),
+                                           position_dictionary = self.position_dictionary) 
 
             print('bar stim') 
 

@@ -405,6 +405,102 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
     return(output_dict)
     
     
+def leave_one_out_lists(input_list):
+
+    """ make list of lists, leaving one item out in each iteration
+    
+    Parameters
+    ----------
+    input_list : list/arr
+        list with all items
+            
+    """
+
+    out_lists = []
+    for x in input_list:
+        out_lists.append([y for y in input_list if y != x])
+
+    return out_lists
+
+
+def get_crossing_positions(position_dictionary,condition_keys,bar_direction_at_TR):
+
+    """ finds positions of crossings between bars and update position dictionary
+    
+    Parameters
+    ----------
+    position_dictionary : dict
+        dictionary with positions of all bars and background
+    condition_keys: arr
+        array with names of bar conditions for that miniblock
+    bar_direction_at_TR: arr
+        bar directions (which are vertical and which are horizontal)
+            
+    """
+
+    # make condition keys in numpy array 
+    condition_keys = np.array([cond for _,cond in enumerate(condition_keys)])
+
+    # create new position dictionary, but copying structure of old
+    new_position_dictionary = position_dictionary.copy() 
+
+    # get bar key name 
+    bar_keys = position_dictionary.keys(); bar_keys = np.array([key for _,key in enumerate(bar_keys) if key != 'background'])
+
+    # get indices for vertical and horizontal bars
+    ind_ver = np.where(bar_direction_at_TR=='vertical')[0]
+    ind_hor = np.where(bar_direction_at_TR=='horizontal')[0]
+    
+    # set counter for dictionary key names
+    key_counter = 0
+
+    for v in range(len(ind_ver)): # for all vertical bars
+
+        for h in range(len(ind_hor)): # for all horizontal bars
+
+            # get indices where the 2 bars cross, for V and H bar
+            # (because also used to mask H and V bars)
+            cross_ind_ver = []
+            cross_ind_hor = []
+
+            for _,val in enumerate(new_position_dictionary[bar_keys[ind_hor[h]]]['xys']): # get vertical indices
+
+                ind = np.where(np.all(new_position_dictionary[bar_keys[ind_ver[v]]]['xys'] == val, axis=1)==True)[0]
+
+                if ind.size!=0: #if ind list not empty
+                    cross_ind_ver.append(ind[0])
+
+            new_position_dictionary['crossing%i'%key_counter] = {'xys': new_position_dictionary[bar_keys[ind_ver[v]]]['xys'][cross_ind_ver], 
+                                                                'nElements': len(cross_ind_ver),
+                                                                'conditions': np.array([condition_keys[int(bar_keys[ind_hor[h]][-1])],
+                                                                                        condition_keys[int(bar_keys[ind_ver[v]][-1])]])}        
+            key_counter += 1 # update key name counter
+
+            for _,val in enumerate(new_position_dictionary[bar_keys[ind_ver[v]]]['xys'][cross_ind_ver]): # get horizontal indices
+
+                ind = np.where(np.all(new_position_dictionary[bar_keys[ind_hor[h]]]['xys'] == val, axis=1)==True)[0]
+
+                if ind.size!=0: #if ind list not empty
+                    cross_ind_hor.append(ind[0])
+
+            # make bar position masks 
+            # for vertical
+            mask_ver = np.ones(len(new_position_dictionary[bar_keys[ind_ver[v]]]['xys']), np.bool)
+            mask_ver[cross_ind_ver] = 0
+
+            new_position_dictionary[bar_keys[ind_ver[v]]] = {'xys': new_position_dictionary[bar_keys[ind_ver[v]]]['xys'][mask_ver], 
+                                                             'nElements': new_position_dictionary[bar_keys[ind_ver[v]]]['xys'][mask_ver].shape[0]}
+
+            # and for horizontal
+            mask_hor = np.ones(len(new_position_dictionary[bar_keys[ind_hor[h]]]['xys']), np.bool)
+            mask_hor[cross_ind_hor] = 0
+
+            new_position_dictionary[bar_keys[ind_hor[h]]] = {'xys': new_position_dictionary[bar_keys[ind_hor[h]]]['xys'][mask_hor], 
+                                                             'nElements': new_position_dictionary[bar_keys[ind_hor[h]]]['xys'][mask_hor].shape[0]}
+
+
+    return(new_position_dictionary)
+
 
 
 

@@ -74,7 +74,7 @@ stimuli:
 
     color_red:
       element_sf: 6 # cycles/gabor width
-      element_color: [-1,-1,-1] # black and white, is changed within code
+      element_color: [1,-1,0] # red
       element_ori: [90,180] # half horizontal, half vertical
       element_contrast: 0.6
       ori_jitter_max: 1 # max value for element orientation jitter range
@@ -82,7 +82,7 @@ stimuli:
 
     color_green:
       element_sf: 6 # cycles/gabor width
-      element_color: [-1,-1,-1] # black and white, is changed within code
+      element_color: [-1,1,0] # green
       element_ori: [90,180] # half horizontal, half vertical
       element_contrast: 0.6
       ori_jitter_max: 1 # max value for element orientation jitter range

@@ -56,10 +56,10 @@ class ExpSession(Session):
             # (grid spans whole display, bar will alter specific part of grid)
 
             # first set the number of elements that fit each dimension
-            gabor_diameter_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['element_size'], self.monitor) # diameter of each element (pix)
-            print(gabor_diameter_pix)
+            self.gabor_diameter_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['element_size'], self.monitor) # diameter of each element (pix)
+            print(self.gabor_diameter_pix)
             
-            elem_num = np.round(np.array(self.screen)/(gabor_diameter_pix * self.settings['stimuli']['gab_ratio'])) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
+            elem_num = np.round(np.array(self.screen)/(self.gabor_diameter_pix * self.settings['stimuli']['gab_ratio'])) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
 
             # then set equally spaced x and y coordinates for grid
             x_grid_pos = np.linspace(-self.screen[0]/2,

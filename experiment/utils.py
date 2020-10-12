@@ -174,7 +174,9 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     # set number of elements
     nElements = grid_pos.shape[0]
 
-        
+    # update element colors 
+    element_color = np.ones((int(np.round(nElements)),3)) * np.array(condition_settings[this_phase]['element_color'])
+
     # update element texture
     if this_phase in ('color_green','color_red'):
 
@@ -192,6 +194,10 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
             colored_grating[..., 1] = grating 
 
         elementTex = colored_grating
+
+        # update element colors (to black, color will be given by texture)
+        element_color = np.ones((int(np.round(nElements)),3)) * np.array([-1,-1,-1])
+
     else:
         elementTex = 'sin'
     
@@ -209,9 +215,6 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
                      min_val = condition_settings[this_phase]['ori_jitter_min']) 
 
     np.random.shuffle(element_ori) # shuffle the orientations
-
-    # update element colors 
-    element_color = np.ones((int(np.round(nElements)),3)) * np.array(condition_settings[this_phase]['element_color'])
 
     # update element opacities
 
@@ -505,5 +508,102 @@ def get_crossing_positions(position_dictionary,condition_keys,bar_direction_at_T
     return(new_position_dictionary)
 
 
+def update_crossing_elements(ElementArrayStim, condition_settings, elem_positions,elem_condition_names, nElements,
+                            monitor, screen=np.array([1680,1050])):
+    
+    """ update crossing element array settings
+    will be misture of the two conditions that are crossing
+    
+    Parameters
+    ----------
+    ElementArrayStim: Psychopy object
+        ElementArrayStim to be updated 
+    condition_settings: dict
+        dictionary with all condition settings
+    elem_positions: arr
+         numpy array with element positions to be updated and shown (N,2) -> (number of positions, [x,y])
+         to be used for opacity update
+    elem_condition_names: arr
+        array with strings of names of conditions in crossings
+    nElements: int
+        total number of elements
+    monitor: object
+        monitor object (to get monitor references for deg2pix transformation)
+    screen: arr
+        array with display resolution
+        
+    """
+    
+    # set texture
+    elementTex = 'sin'
 
+    # check how many colors present in crossing
+    num_colors = len([True for _,key in enumerate(elem_condition_names) if 'color' in key])
+
+    if num_colors == 1: # if one color, then also change texture
+
+        # to make colored gabor, need to do it a bit differently (psychopy forces colors to be opposite)
+        grat_res = near_power_of_2(ElementArrayStim.sizes[0][0],near='previous') # use power of 2 as grating res, to avoid error
+        grating = visual.filters.makeGrating(res=grat_res)
+
+        # initialise a 'black' texture 
+        colored_grating = np.ones((grat_res, grat_res, 3)) #* -1.0
+
+        # replace the red/green channel with the grating
+        if 'color_red' in elem_condition_names: 
+            colored_grating[..., 0] = grating 
+        else:
+            colored_grating[..., 1] = grating 
+
+        elementTex = colored_grating
+
+        # update element colors (to black, color will be given by texture)
+        element_color = np.ones((int(np.round(nElements)),3)) * np.array([-1,-1,-1])
+
+    else: # if 2 colors (or "no" color), mix them 
+        element_color = np.concatenate((np.ones((math.floor(nElements * .5),3)) * np.array(condition_settings[elem_condition_names[0]]['element_color']) ,  # red/green
+                                        np.ones((math.ceil(nElements * .5),3)) * np.array(condition_settings[elem_condition_names[1]]['element_color'])
+                                       ))  # red/green
+
+
+    np.random.shuffle(element_color) # shuffle the colors    
+
+    # update element spatial frequency
+    element_sfs = np.concatenate((np.ones((math.floor(nElements * .5))) * condition_settings[elem_condition_names[0]]['element_sf'], 
+                                np.ones((math.ceil(nElements * .5))) * condition_settings[elem_condition_names[1]]['element_sf'])) # in cycles/gabor width
+
+    np.random.shuffle(element_sfs) # shuffle the sfs  
+
+    # update element orientation
+    ori_arr = np.concatenate((np.ones((math.floor(nElements * .25))) * condition_settings[elem_condition_names[0]]['element_ori'][0], 
+                              np.ones((math.ceil(nElements * .25))) * condition_settings[elem_condition_names[0]]['element_ori'][1],
+                              np.ones((math.floor(nElements * .25))) * condition_settings[elem_condition_names[1]]['element_ori'][0], 
+                              np.ones((math.ceil(nElements * .25))) * condition_settings[elem_condition_names[1]]['element_ori'][1]))
+
+    # add some jitter to the orientations
+    element_ori = np.concatenate((jitter(ori_arr[:int(len(ori_arr)/2)], max_val = condition_settings[elem_condition_names[0]]['ori_jitter_max'],
+                                                                     min_val = condition_settings[elem_condition_names[0]]['ori_jitter_min']),
+                                  jitter(ori_arr[int(len(ori_arr)/2):], max_val = condition_settings[elem_condition_names[1]]['ori_jitter_max'],
+                                                                     min_val = condition_settings[elem_condition_names[1]]['ori_jitter_min'])
+                                 ))
+
+    np.random.shuffle(element_ori) # shuffle the orientations
+
+    # set element contrasts
+    element_contrast =  np.concatenate((np.ones((math.floor(nElements * .5))) * condition_settings[elem_condition_names[0]]['element_contrast'], 
+                                    np.ones((math.ceil(nElements * .5))) * condition_settings[elem_condition_names[1]]['element_contrast']))
+
+    np.random.shuffle(element_contrast) # shuffle the contrasts
+
+    # set all of the above settings
+    ElementArrayStim.setTex(elementTex)
+    ElementArrayStim.setContrs(element_contrast)
+    ElementArrayStim.setSfs(element_sfs)
+    ElementArrayStim.setOris(element_ori)
+    ElementArrayStim.setColors(element_color)
+    #ElementArrayStim.setOpacities(element_opacities)
+    ElementArrayStim.setXYs(elem_positions) 
+
+
+    return(ElementArrayStim)
 

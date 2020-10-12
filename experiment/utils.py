@@ -437,6 +437,9 @@ def get_crossing_positions(position_dictionary,condition_keys,bar_direction_at_T
         bar directions (which are vertical and which are horizontal)
             
     """
+    
+    # make direction list an array (avoids crashing)
+    bar_direction_at_TR = np.array(bar_direction_at_TR)
 
     # make condition keys in numpy array 
     condition_keys = np.array([cond for _,cond in enumerate(condition_keys)])

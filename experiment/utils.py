@@ -2,7 +2,7 @@
 import numpy as np
 import os, sys
 import math
-from psychopy import visual, tools
+from psychopy import visual, tools, colors
 import itertools
 
 
@@ -175,31 +175,36 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     nElements = grid_pos.shape[0]
 
     # update element colors 
-    element_color = np.ones((int(np.round(nElements)),3)) * np.array(condition_settings[this_phase]['element_color'])
+    #element_color = np.ones((int(np.round(nElements)),3)) * np.array(condition_settings[this_phase]['element_color'])
 
     # update element texture
     if this_phase in ('color_green','color_red'):
 
         # to make colored gabor, need to do it a bit differently (psychopy forces colors to be opposite)
         grat_res = near_power_of_2(ElementArrayStim.sizes[0][0],near='previous') # use power of 2 as grating res, to avoid error
+        
+        # initialise grating
         grating = visual.filters.makeGrating(res=grat_res)
+        grating_norm = (grating - np.min(grating))/(np.max(grating) - np.min(grating)) # normalize between 0 and 1
+        
+        # initialise a base texture 
+        colored_grating = np.ones((grat_res, grat_res, 3)) 
 
-        # initialise a 'black' texture 
-        colored_grating = np.ones((grat_res, grat_res, 3)) #* -1.0
+        # replace the base texture red/green channel with the element color value, and the value channel with the grating
 
-        # replace the red/green channel with the grating
-        if this_phase == 'color_red': 
-            colored_grating[..., 0] = grating 
-        else:
-            colored_grating[..., 1] = grating 
+        colored_grating[..., 0] = condition_settings[this_phase]['element_color'][0]
+        colored_grating[..., 1] = condition_settings[this_phase]['element_color'][1]
+        colored_grating[..., 2] = grating_norm * condition_settings[this_phase]['element_color'][2]
 
-        elementTex = colored_grating
+        elementTex = colors.hsv2rgb(colored_grating) 
 
-        # update element colors (to black, color will be given by texture)
-        element_color = np.ones((int(np.round(nElements)),3)) * np.array([-1,-1,-1])
+        # update element colors to color of the patch 
+        element_color = np.ones((int(np.round(nElements)),3)) 
 
     else:
         elementTex = 'sin'
+        # update element colors 
+        element_color = np.ones((int(np.round(nElements)),3)) * np.array(condition_settings[this_phase]['element_color'])
     
     
     # update element spatial frequency
@@ -238,7 +243,7 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     ElementArrayStim.setContrs(element_contrast)
     ElementArrayStim.setSfs(element_sfs)
     ElementArrayStim.setOris(element_ori)
-    ElementArrayStim.setColors(element_color)
+    ElementArrayStim.setColors(element_color)#, colorSpace='hsv')
     ElementArrayStim.setOpacities(element_opacities)
 
 
@@ -539,26 +544,30 @@ def update_crossing_elements(ElementArrayStim, condition_settings, elem_position
 
     # check how many colors present in crossing
     num_colors = len([True for _,key in enumerate(elem_condition_names) if 'color' in key])
+    color_ind = [i for i,s in enumerate(elem_condition_names) if 'color' in s] # find index for color condition
 
     if num_colors == 1: # if one color, then also change texture
 
         # to make colored gabor, need to do it a bit differently (psychopy forces colors to be opposite)
         grat_res = near_power_of_2(ElementArrayStim.sizes[0][0],near='previous') # use power of 2 as grating res, to avoid error
+        
+        # initialise grating
         grating = visual.filters.makeGrating(res=grat_res)
+        grating_norm = (grating - np.min(grating))/(np.max(grating) - np.min(grating)) # normalize between 0 and 1
+        
+        # initialise a base texture 
+        colored_grating = np.ones((grat_res, grat_res, 3)) 
 
-        # initialise a 'black' texture 
-        colored_grating = np.ones((grat_res, grat_res, 3)) #* -1.0
+        # replace the base texture red/green channel with the element color value, and the value channel with the grating
 
-        # replace the red/green channel with the grating
-        if 'color_red' in elem_condition_names: 
-            colored_grating[..., 0] = grating 
-        else:
-            colored_grating[..., 1] = grating 
+        colored_grating[..., 0] = condition_settings[elem_condition_names[color_ind[0]]]['element_color'][0]
+        colored_grating[..., 1] = condition_settings[elem_condition_names[color_ind[0]]]['element_color'][1]
+        colored_grating[..., 2] = grating_norm * condition_settings[elem_condition_names[color_ind[0]]]['element_color'][2]
 
-        elementTex = colored_grating
+        elementTex = colors.hsv2rgb(colored_grating) 
 
-        # update element colors (to black, color will be given by texture)
-        element_color = np.ones((int(np.round(nElements)),3)) * np.array([-1,-1,-1])
+        # update element colors to color of the patch 
+        element_color = np.ones((int(np.round(nElements)),3)) 
 
     else: # if 2 colors (or "no" color), mix them 
         element_color = np.concatenate((np.ones((math.floor(nElements * .5),3)) * np.array(condition_settings[elem_condition_names[0]]['element_color']) ,  # red/green
@@ -575,9 +584,8 @@ def update_crossing_elements(ElementArrayStim, condition_settings, elem_position
     np.random.shuffle(element_sfs) # shuffle the sfs  
 
     # update element orientation
-    if any('color' in s for s in elem_condition_names):
-        ori_ind = [i for i,s in enumerate(elem_condition_names) if 'color' in s][0] # find index for color condition (to not use those orientations)
-        ori_ind = np.array([ori_ind,ori_ind])
+    if any('color' in s for s in elem_condition_names): # if color, we use orientations of other condition
+        ori_ind = np.array([color_ind[0],color_ind[0]])
     else:
         ori_ind = np.array([0,1])
 
@@ -601,7 +609,7 @@ def update_crossing_elements(ElementArrayStim, condition_settings, elem_position
     ElementArrayStim.setContrs(element_contrast)
     ElementArrayStim.setSfs(element_sfs)
     ElementArrayStim.setOris(element_ori)
-    ElementArrayStim.setColors(element_color)
+    ElementArrayStim.setColors(element_color)#, colorSpace='hsv')
     #ElementArrayStim.setOpacities(element_opacities)
     ElementArrayStim.setXYs(elem_positions) 
 

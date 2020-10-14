@@ -6,13 +6,14 @@ preferences:
 window: # refers to the parameters for the Psychopy Window class
   size: [1680, 1050]
   pos: [0, 0]
-  color: [0, 0, 0]
+  color: [0, 0, 0] #[127, 127, 127] #[0, 0, .5]
   fullscr: True
   screen: 0 #1
   #useRetina: False
   winType: 'pyglet'
   waitBlanking: True
   framerate: 60
+  colorSpace: 'rgb' #'hsv' #'rgb255'
   #units: pix
   display: 'square' # or 'rectangle', defines if square [vRes vRes] or rectangle [hRes vRes] display
 
@@ -27,18 +28,18 @@ mouse:
 
 
 stimuli:
-  colorSpace: 'hsv' #'rgb'
+  colorSpace: 'rgb' #'rgb255' #'hsv'
 
   fix_dot_size_deg: 0.05
-  fix_dot_color: [0, 0, 0] #[-1,-1,-1] # start with black
-  fix_line_color: [0, 0, 0] #[-1,-1,-1] # start with black
+  fix_dot_color: [-1,-1,-1] #[0, 0, 0]  # start with black
+  fix_line_color: [-1,-1,-1] #[0, 0, 0] # start with black
 
   fix_line_width: 1
-  fix_line_color: [0, 0, 0] #[-1,-1,-1]
+  fix_line_color: [-1,-1,-1] #[0, 0, 0]
   fix_line_contrast: 0.3
 
-  rect_fill_color: [0, 0, 0] #[-1, -1, -1]
-  rect_line_color: [0, 0, 0] #[-1, -1, -1]
+  rect_fill_color: [-1,-1,-1] #[0, 0, 0]
+  rect_line_color: [-1,-1,-1] #[0, 0, 0]
 
   gab_ratio: 0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid
   element_size: 0.55 #0.4 #0.2 # degrees
@@ -68,7 +69,7 @@ stimuli:
   conditions: # feature conditions
     background: 
       element_sf: 6 # cycles/gabor width
-      element_color: [0, 0, 0] #[-1,-1,-1] # black and white
+      element_color: [-1,-1,-1] #[0, 0, 0] # black and white
       element_ori: [90,180] # half horizontal, half vertical
       element_contrast: 0.4 #0.5
       ori_jitter_max: 1 # max value for element orientation jitter range
@@ -76,17 +77,17 @@ stimuli:
 
     color_red:
       element_sf: 6 # cycles/gabor width
-      element_color: [0, 100, 42] #[1,-1,0.25] # red
+      element_color: [0, .50, .61] # IN HSV WILL BE CONVERTED IN SCRIPT #[0, 100, 42] #[1,-1,0.25] # red
       element_ori: [90,180] # half horizontal, half vertical
-      element_contrast: 0.9
+      element_contrast: 1
       ori_jitter_max: 1 # max value for element orientation jitter range
       ori_jitter_min: 0.5 # min value for element orientation jitter range
 
     color_green:
       element_sf: 6 # cycles/gabor width
-      element_color: [137, 100, 42] #[-1,1,-0.25] # green
+      element_color: [100, .50, .50] # IN HSV WILL BE CONVERTED IN SCRIPT #[137, 100, 42] #[-1,1,-0.25] # green
       element_ori: [90,180] # half horizontal, half vertical
-      element_contrast: 0.9
+      element_contrast: 1
       ori_jitter_max: 1 # max value for element orientation jitter range
       ori_jitter_min: 0.5 # min value for element orientation jitter range
 
@@ -102,7 +103,7 @@ stimuli:
 
     ori_left:
       element_sf: 6 # cycles/gabor width
-      element_color: [0, 0, 0] #[-1,-1,-1] # black and white
+      element_color: [-1,-1,-1] #[0, 0, 0] # black and white
       element_ori: [45.0,225.0] # all right
       element_contrast: 0.9
       ori_jitter_max: 5.0 # max value for element orientation jitter range
@@ -110,7 +111,7 @@ stimuli:
 
     ori_right:
       element_sf: 6 # cycles/gabor width
-      element_color: [0, 0, 0] #[-1,-1,-1] # black and white
+      element_color: [-1,-1,-1] #[0, 0, 0] # black and white
       element_ori: [135.0, 315.0] # all left
       element_contrast: 0.9
       ori_jitter_max: 5.0 # max value for element orientation jitter range

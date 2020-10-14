@@ -114,7 +114,6 @@ class ExpSession(Session):
                                     contrast = self.settings['stimuli']['fix_line_contrast'],
                                     start = [-self.screen[0]/2, self.screen[1]/2],
                                     end = [self.screen[0]/2, -self.screen[1]/2],
-                                    #fillColorSpace = self.settings['stimuli']['colorSpace'],
                                     lineColorSpace = self.settings['stimuli']['colorSpace']
                                     )
 
@@ -125,7 +124,6 @@ class ExpSession(Session):
                                     contrast = self.settings['stimuli']['fix_line_contrast'],
                                     start = [-self.screen[0]/2, -self.screen[1]/2],
                                     end = [self.screen[0]/2, self.screen[1]/2],
-                                    #fillColorSpace = self.settings['stimuli']['colorSpace'],
                                     lineColorSpace = self.settings['stimuli']['colorSpace']
                                     )
 

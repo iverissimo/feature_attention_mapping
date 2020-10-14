@@ -204,7 +204,7 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     else:
         elementTex = 'sin'
         # update element colors 
-        element_color = np.ones((int(np.round(nElements)),3)) * np.array(condition_settings[this_phase]['element_color'])
+        element_color = np.ones((int(np.round(nElements)),3)) * np.array(colors.hsv2rgb(condition_settings[this_phase]['element_color']))
     
     
     # update element spatial frequency
@@ -570,8 +570,8 @@ def update_crossing_elements(ElementArrayStim, condition_settings, elem_position
         element_color = np.ones((int(np.round(nElements)),3)) 
 
     else: # if 2 colors (or "no" color), mix them 
-        element_color = np.concatenate((np.ones((math.floor(nElements * .5),3)) * np.array(condition_settings[elem_condition_names[0]]['element_color']) ,  # red/green
-                                        np.ones((math.ceil(nElements * .5),3)) * np.array(condition_settings[elem_condition_names[1]]['element_color'])
+        element_color = np.concatenate((np.ones((math.floor(nElements * .5),3)) * np.array(colors.hsv2rgb(condition_settings[elem_condition_names[0]]['element_color'])) ,  # red/green
+                                        np.ones((math.ceil(nElements * .5),3)) * np.array(colors.hsv2rgb(condition_settings[elem_condition_names[1]]['element_color']))
                                        ))  # red/green
 
 

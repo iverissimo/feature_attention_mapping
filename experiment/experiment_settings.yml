@@ -69,7 +69,7 @@ stimuli:
   conditions: # feature conditions
     background: 
       element_sf: 6 # cycles/gabor width
-      element_color: [-1,-1,-1] #[0, 0, 0] # black and white
+      element_color: [0, 0, 0]  #IN HSV WILL BE CONVERTED IN SCRIPT #[-1,-1,-1] #[0, 0, 0] # black and white
       element_ori: [90,180] # half horizontal, half vertical
       element_contrast: 0.4 #0.5
       ori_jitter_max: 1 # max value for element orientation jitter range
@@ -77,7 +77,7 @@ stimuli:
 
     color_red:
       element_sf: 6 # cycles/gabor width
-      element_color: [0, .50, .61] # IN HSV WILL BE CONVERTED IN SCRIPT #[0, 100, 42] #[1,-1,0.25] # red
+      element_color: [0, .10, .50] # IN HSV WILL BE CONVERTED IN SCRIPT #[0, 100, 42] #[1,-1,0.25] # red
       element_ori: [90,180] # half horizontal, half vertical
       element_contrast: 1
       ori_jitter_max: 1 # max value for element orientation jitter range
@@ -85,7 +85,7 @@ stimuli:
 
     color_green:
       element_sf: 6 # cycles/gabor width
-      element_color: [100, .50, .50] # IN HSV WILL BE CONVERTED IN SCRIPT #[137, 100, 42] #[-1,1,-0.25] # green
+      element_color: [120, .10, .50] # IN HSV WILL BE CONVERTED IN SCRIPT #[137, 100, 42] #[-1,1,-0.25] # green
       element_ori: [90,180] # half horizontal, half vertical
       element_contrast: 1
       ori_jitter_max: 1 # max value for element orientation jitter range
@@ -103,17 +103,17 @@ stimuli:
 
     ori_left:
       element_sf: 6 # cycles/gabor width
-      element_color: [-1,-1,-1] #[0, 0, 0] # black and white
+      element_color: [0, 0, 0]  #IN HSV WILL BE CONVERTED IN SCRIPT #[-1, -1, -1] # black and white
       element_ori: [45.0,225.0] # all right
-      element_contrast: 0.9
+      element_contrast: 1 #0.7
       ori_jitter_max: 5.0 # max value for element orientation jitter range
       ori_jitter_min: 0.5 # min value for element orientation jitter range
 
     ori_right:
       element_sf: 6 # cycles/gabor width
-      element_color: [-1,-1,-1] #[0, 0, 0] # black and white
+      element_color: [0, 0, 0]  #IN HSV WILL BE CONVERTED IN SCRIPT #[-1, -1, -1] # black and white
       element_ori: [135.0, 315.0] # all left
-      element_contrast: 0.9
+      element_contrast: 1 #0.7
       ori_jitter_max: 5.0 # max value for element orientation jitter range
       ori_jitter_min: 0.5 # min value for element orientation jitter range  
   
@@ -127,9 +127,9 @@ eyetracker:
 
 mri: # refers to the Psychopy SyncGenerator class
   simulate: False
-  TR: 2.0  # seconds between volume acquisitions
-  TA: 2.0  # seconds to acquire one slice (?)
-  volumes: 10  # number of 3D volumes to obtain in a given scanning run
+  TR: 1.5  # seconds between volume acquisitions
+  #TA: 2.0  # seconds to acquire one slice (?)
+  #volumes: 10  # number of 3D volumes to obtain in a given scanning run
   sync: 't'  # character used as flag for sync timing, default=‘5’
   skip: 0  # how many frames to silently omit initially during T1 stabilization, no sync pulse.
   sound: False  # simulate scanner noise

@@ -501,13 +501,17 @@ class FeatureSession(ExpSession):
         # list of type of trial (cue, empty, miniblock) for all TRs
         self.trial_type_all = np.array(trial_type_all)
 
+        # define list with number of phases and their duration (duration of each must be the same)
+        self.phase_durations = np.repeat(self.bar_step/2,2)
+
         # append all trials
         self.all_trials = []
         for i in range(self.trial_number):
 
             self.all_trials.append(FeatureTrial(session = self,
                                                 trial_nr = i, 
-                                                phase_durations = np.array([self.bar_step]),
+                                                phase_durations = self.phase_durations,
+                                                phase_names = ('bars','blank'),
                                                 attend_block_conditions = self.attend_block_conditions, 
                                                 bar_direction_at_TR = self.bar_direction_all[i],
                                                 bar_midpoint_at_TR = self.bar_midpoint_all[i],

@@ -139,7 +139,8 @@ class PRFTrial(Trial):
 
 class FeatureTrial(Trial):
 
-    def __init__(self, session, trial_nr, phase_durations, attend_block_conditions, bar_direction_at_TR, bar_midpoint_at_TR, trial_type_at_TR, timing='seconds', *args, **kwargs):
+    def __init__(self, session, trial_nr, phase_durations, phase_names, 
+        attend_block_conditions, bar_direction_at_TR, bar_midpoint_at_TR, trial_type_at_TR, timing='seconds', *args, **kwargs):
 
 
         """ Initializes a FeatureTrial object. 
@@ -175,11 +176,13 @@ class FeatureTrial(Trial):
         self.attend_block_conditions = attend_block_conditions
         self.session = session
 
-        #dummy value: if scanning or simulating a scanner, everything is synced to the output 't' of the scanner
-        self.phase_durations = phase_durations #= [100]
+        # phase durations for each condition 
+        self.phase_durations = phase_durations
+        # name of each condition
+        self.phase_names = phase_names 
 
 
-        super().__init__(session, trial_nr, phase_durations, verbose=False, *args, **kwargs)
+        super().__init__(session, trial_nr, phase_durations, phase_names, verbose=False, *args, **kwargs)
 
         # get bar and background positions for this trial
         self.position_dictionary = get_object_positions(self.session.grid_pos, self.bar_midpoint_at_TR, self.bar_direction_at_TR,
@@ -236,10 +239,20 @@ class FeatureTrial(Trial):
 
         else: # if bar pass at TR, then draw bar
 
-            self.session.feature_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
-                                           bar_direction_at_TR = self.bar_direction_at_TR,
-                                           this_phase = list(self.session.all_bar_pos[self.trial_type_at_TR].keys()),
-                                           position_dictionary = self.position_dictionary) 
+            if self.phase == 0: # if bar phase, draw stim
+
+                self.session.feature_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
+                                               bar_direction_at_TR = self.bar_direction_at_TR,
+                                               this_phase = list(self.session.all_bar_pos[self.trial_type_at_TR].keys()),
+                                               position_dictionary = self.position_dictionary) 
+            else:
+                
+                all_positions_dict = {'background': {'xys': self.session.grid_pos}} # draw background in all positions
+
+                self.session.feature_stim.draw(bar_midpoint_at_TR = np.nan, 
+                                               bar_direction_at_TR = np.nan,
+                                               this_phase = 'background',
+                                               position_dictionary = all_positions_dict)
 
             print('bar stim') 
 

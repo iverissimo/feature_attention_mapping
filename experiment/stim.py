@@ -79,7 +79,7 @@ class Stim(object):
                                                                 oris = self.element_ori,
                                                                 contrs = self.element_contrast, 
                                                                 colors = self.element_color, 
-                                                                colorSpace = 'rgb') 
+                                                                colorSpace = self.session.settings['stimuli']['colorSpace']) 
 
         self.session.bar0_array = visual.ElementArrayStim(win = self.session.win, 
                                                                 nElements = self.nElements,
@@ -92,7 +92,7 @@ class Stim(object):
                                                                 oris = self.element_ori,
                                                                 contrs = self.element_contrast, 
                                                                 colors = self.element_color, 
-                                                                colorSpace = 'rgb') 
+                                                                colorSpace = self.session.settings['stimuli']['colorSpace']) 
 
 
 class PRFStim(Stim):
@@ -163,7 +163,7 @@ class FeatureStim(Stim):
                                                                 oris = self.element_ori,
                                                                 contrs = self.element_contrast, 
                                                                 colors = self.element_color, 
-                                                                colorSpace = 'rgb') 
+                                                                colorSpace = self.session.settings['stimuli']['colorSpace']) 
         
         self.session.bar2_array = visual.ElementArrayStim(win = self.session.win, 
                                                                 nElements = self.nElements,
@@ -176,7 +176,7 @@ class FeatureStim(Stim):
                                                                 oris = self.element_ori,
                                                                 contrs = self.element_contrast, 
                                                                 colors = self.element_color, 
-                                                                colorSpace = 'rgb') 
+                                                                colorSpace = self.session.settings['stimuli']['colorSpace']) 
         
         self.session.bar3_array = visual.ElementArrayStim(win = self.session.win, 
                                                                 nElements = self.nElements,
@@ -189,7 +189,7 @@ class FeatureStim(Stim):
                                                                 oris = self.element_ori,
                                                                 contrs = self.element_contrast, 
                                                                 colors = self.element_color, 
-                                                                colorSpace = 'rgb') 
+                                                                colorSpace = self.session.settings['stimuli']['colorSpace']) 
 
 
         # define crossing elements
@@ -206,7 +206,7 @@ class FeatureStim(Stim):
                                                                 oris = self.element_ori[:self.num_cross_elem],
                                                                 contrs = self.element_contrast[:self.num_cross_elem], 
                                                                 colors = self.element_color[:self.num_cross_elem], 
-                                                                colorSpace = 'rgb')
+                                                                colorSpace = self.session.settings['stimuli']['colorSpace'])
 
         self.session.crossing1_array = visual.ElementArrayStim(win = self.session.win, 
                                                                 nElements = self.num_cross_elem,
@@ -219,7 +219,7 @@ class FeatureStim(Stim):
                                                                 oris = self.element_ori[:self.num_cross_elem],
                                                                 contrs = self.element_contrast[:self.num_cross_elem], 
                                                                 colors = self.element_color[:self.num_cross_elem], 
-                                                                colorSpace = 'rgb')
+                                                                colorSpace = self.session.settings['stimuli']['colorSpace'])
 
         self.session.crossing2_array = visual.ElementArrayStim(win = self.session.win, 
                                                                 nElements =self.num_cross_elem,
@@ -232,7 +232,7 @@ class FeatureStim(Stim):
                                                                 oris = self.element_ori[:self.num_cross_elem],
                                                                 contrs = self.element_contrast[:self.num_cross_elem], 
                                                                 colors = self.element_color[:self.num_cross_elem], 
-                                                                colorSpace = 'rgb')
+                                                                colorSpace = self.session.settings['stimuli']['colorSpace'])
 
         self.session.crossing3_array = visual.ElementArrayStim(win = self.session.win, 
                                                                 nElements =self.num_cross_elem,
@@ -245,7 +245,7 @@ class FeatureStim(Stim):
                                                                 oris = self.element_ori[:self.num_cross_elem],
                                                                 contrs = self.element_contrast[:self.num_cross_elem], 
                                                                 colors = self.element_color[:self.num_cross_elem], 
-                                                                colorSpace = 'rgb') 
+                                                                colorSpace = self.session.settings['stimuli']['colorSpace']) 
 
 
 

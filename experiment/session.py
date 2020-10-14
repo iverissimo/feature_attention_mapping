@@ -88,7 +88,9 @@ class ExpSession(Session):
                                         fillColor = self.settings['stimuli']['rect_fill_color'],
                                         lineColor = self.settings['stimuli']['rect_line_color'],
                                         contrast = rect_contrast,
-                                        pos = rect_left_pos
+                                        pos = rect_left_pos,
+                                        fillColorSpace = self.settings['stimuli']['colorSpace'],
+                                        lineColorSpace = self.settings['stimuli']['colorSpace']
                                         )
 
             self.rect_right = visual.Rect(win = self.win,
@@ -98,7 +100,9 @@ class ExpSession(Session):
                                         fillColor = self.settings['stimuli']['rect_fill_color'],
                                         lineColor = self.settings['stimuli']['rect_line_color'],
                                         contrast = rect_contrast,
-                                        pos = rect_right_pos
+                                        pos = rect_right_pos,
+                                        fillColorSpace = self.settings['stimuli']['colorSpace'],
+                                        lineColorSpace = self.settings['stimuli']['colorSpace']
                                         )
 
             
@@ -109,7 +113,9 @@ class ExpSession(Session):
                                     lineWidth = self.settings['stimuli']['fix_line_width'],
                                     contrast = self.settings['stimuli']['fix_line_contrast'],
                                     start = [-self.screen[0]/2, self.screen[1]/2],
-                                    end = [self.screen[0]/2, -self.screen[1]/2]
+                                    end = [self.screen[0]/2, -self.screen[1]/2],
+                                    #fillColorSpace = self.settings['stimuli']['colorSpace'],
+                                    lineColorSpace = self.settings['stimuli']['colorSpace']
                                     )
 
             self.line2 = visual.Line(win = self.win,
@@ -118,7 +124,9 @@ class ExpSession(Session):
                                     lineWidth = self.settings['stimuli']['fix_line_width'],
                                     contrast = self.settings['stimuli']['fix_line_contrast'],
                                     start = [-self.screen[0]/2, -self.screen[1]/2],
-                                    end = [self.screen[0]/2, self.screen[1]/2]
+                                    end = [self.screen[0]/2, self.screen[1]/2],
+                                    #fillColorSpace = self.settings['stimuli']['colorSpace'],
+                                    lineColorSpace = self.settings['stimuli']['colorSpace']
                                     )
 
 
@@ -165,7 +173,9 @@ class PRFSession(ExpSession):
         # note - fixation dot will change color during task
         self.fixation = visual.Circle(self.win, units = 'pix', radius = fixation_rad_pix, 
                                             fillColor = self.settings['stimuli']['fix_dot_color'], 
-                                            lineColor = self.settings['stimuli']['fix_line_color'])  
+                                            lineColor = self.settings['stimuli']['fix_line_color'],
+                                            fillColorSpace = self.settings['stimuli']['colorSpace'],
+                                            lineColorSpace = self.settings['stimuli']['colorSpace'])  
 
 
 
@@ -366,7 +376,9 @@ class FeatureSession(ExpSession):
         # create black fixation circle
         self.fixation = visual.Circle(self.win, units = 'pix', radius = fixation_rad_pix, 
                                             fillColor = self.settings['stimuli']['fix_dot_color'], 
-                                            lineColor = self.settings['stimuli']['fix_line_color'])  
+                                            lineColor = self.settings['stimuli']['fix_line_color'],
+                                            fillColorSpace = self.settings['stimuli']['colorSpace'],
+                                            lineColorSpace = self.settings['stimuli']['colorSpace'])  
 
 
 

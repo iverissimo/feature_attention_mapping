@@ -575,18 +575,19 @@ def update_crossing_elements(ElementArrayStim, condition_settings, elem_position
     np.random.shuffle(element_sfs) # shuffle the sfs  
 
     # update element orientation
-    ori_arr = np.concatenate((np.ones((math.floor(nElements * .25))) * condition_settings[elem_condition_names[0]]['element_ori'][0], 
-                              np.ones((math.ceil(nElements * .25))) * condition_settings[elem_condition_names[0]]['element_ori'][1],
-                              np.ones((math.floor(nElements * .25))) * condition_settings[elem_condition_names[1]]['element_ori'][0], 
-                              np.ones((math.ceil(nElements * .25))) * condition_settings[elem_condition_names[1]]['element_ori'][1]))
+    if any('color' in s for s in elem_condition_names):
+        ori_ind = [i for i,s in enumerate(elem_condition_names) if 'color' in s][0] # find index for color condition (to not use those orientations)
+        ori_ind = np.array([ori_ind,ori_ind])
+    else:
+        ori_ind = np.array([0,1])
+
+    ori_arr = np.concatenate((np.ones((math.floor(nElements * .5))) * condition_settings[elem_condition_names[ori_ind[0]-1]]['element_ori'][0], 
+                              np.ones((math.ceil(nElements * .5))) * condition_settings[elem_condition_names[ori_ind[1]-1]]['element_ori'][1]))
 
     # add some jitter to the orientations
-    element_ori = np.concatenate((jitter(ori_arr[:int(len(ori_arr)/2)], max_val = condition_settings[elem_condition_names[0]]['ori_jitter_max'],
-                                                                     min_val = condition_settings[elem_condition_names[0]]['ori_jitter_min']),
-                                  jitter(ori_arr[int(len(ori_arr)/2):], max_val = condition_settings[elem_condition_names[1]]['ori_jitter_max'],
-                                                                     min_val = condition_settings[elem_condition_names[1]]['ori_jitter_min'])
-                                 ))
-
+    element_ori = jitter(ori_arr, max_val = condition_settings[elem_condition_names[ori_ind[0]-1]]['ori_jitter_max'],
+                                min_val = condition_settings[elem_condition_names[ori_ind[1]-1]]['ori_jitter_min'])
+                                 
     np.random.shuffle(element_ori) # shuffle the orientations
 
     # set element contrasts

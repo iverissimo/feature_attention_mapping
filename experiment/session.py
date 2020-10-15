@@ -511,7 +511,7 @@ class FeatureSession(ExpSession):
             self.all_trials.append(FeatureTrial(session = self,
                                                 trial_nr = i, 
                                                 phase_durations = self.phase_durations,
-                                                phase_names = ('bars','blank'),
+                                                phase_names = ('stim','blank'),
                                                 attend_block_conditions = self.attend_block_conditions, 
                                                 bar_direction_at_TR = self.bar_direction_all[i],
                                                 bar_midpoint_at_TR = self.bar_midpoint_all[i],

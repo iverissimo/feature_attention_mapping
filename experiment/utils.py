@@ -174,38 +174,26 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     # set number of elements
     nElements = grid_pos.shape[0]
 
-    # update element colors 
-    #element_color = np.ones((int(np.round(nElements)),3)) * np.array(condition_settings[this_phase]['element_color'])
-
-    # update element texture
-    if this_phase in ('color_green','color_red'):
-
-        # to make colored gabor, need to do it a bit differently (psychopy forces colors to be opposite)
-        grat_res = near_power_of_2(ElementArrayStim.sizes[0][0],near='previous') # use power of 2 as grating res, to avoid error
-        
-        # initialise grating
-        grating = visual.filters.makeGrating(res=grat_res)
-        grating_norm = (grating - np.min(grating))/(np.max(grating) - np.min(grating)) # normalize between 0 and 1
-        
-        # initialise a base texture 
-        colored_grating = np.ones((grat_res, grat_res, 3)) 
-
-        # replace the base texture red/green channel with the element color value, and the value channel with the grating
-
-        colored_grating[..., 0] = condition_settings[this_phase]['element_color'][0]
-        colored_grating[..., 1] = condition_settings[this_phase]['element_color'][1]
-        colored_grating[..., 2] = grating_norm * condition_settings[this_phase]['element_color'][2]
-
-        elementTex = colors.hsv2rgb(colored_grating) 
-
-        # update element colors to color of the patch 
-        element_color = np.ones((int(np.round(nElements)),3)) 
-
-    else:
-        elementTex = 'sin'
-        # update element colors 
-        element_color = np.ones((int(np.round(nElements)),3)) * np.array(colors.hsv2rgb(condition_settings[this_phase]['element_color']))
+    # to make colored gabor, need to do it a bit differently (psychopy forces colors to be opposite)
+    grat_res = near_power_of_2(ElementArrayStim.sizes[0][0],near='previous') # use power of 2 as grating res, to avoid error
     
+    # initialise grating
+    grating = visual.filters.makeGrating(res=grat_res)
+    grating_norm = (grating - np.min(grating))/(np.max(grating) - np.min(grating)) # normalize between 0 and 1
+    
+    # initialise a base texture 
+    colored_grating = np.ones((grat_res, grat_res, 3)) 
+
+    # replace the base texture red/green channel with the element color value, and the value channel with the grating
+
+    colored_grating[..., 0] = condition_settings[this_phase]['element_color'][0]
+    colored_grating[..., 1] = condition_settings[this_phase]['element_color'][1]
+    colored_grating[..., 2] = grating_norm * condition_settings[this_phase]['element_color'][2]
+
+    elementTex = colors.hsv2rgb(colored_grating) 
+
+    # update element colors to color of the patch 
+    element_color = np.ones((int(np.round(nElements)),3)) 
     
     # update element spatial frequency
     element_sfs = np.ones((nElements)) * condition_settings[this_phase]['element_sf'] # in cycles/gabor width

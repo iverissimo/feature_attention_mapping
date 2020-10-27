@@ -295,6 +295,7 @@ class PRFSession(ExpSession):
 
         # print window size just to check, not actually needed
         print(self.screen)
+        print(tools.monitorunittools.pix2deg(self.screen[0], self.monitor))
 
     
     def run(self):
@@ -521,6 +522,7 @@ class FeatureSession(ExpSession):
 
         # print window size just to check, not actually needed
         print(self.screen)
+        print(self.screen[0])
 
 
     def run(self):

@@ -598,7 +598,6 @@ def update_crossing_elements(ElementArrayStim, condition_settings, elem_position
     ElementArrayStim.setSfs(element_sfs)
     ElementArrayStim.setOris(element_ori)
     ElementArrayStim.setColors(element_color)#, colorSpace='hsv')
-    #ElementArrayStim.setOpacities(element_opacities)
     ElementArrayStim.setXYs(elem_positions) 
 
 

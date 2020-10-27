@@ -63,15 +63,24 @@ class PRFTrial(Trial):
     def draw(self): 
 
         """ Draw stimuli - pRF bar and fixation dot - for each trial """
-        
+
         current_time = self.session.clock.getTime() # get time
 
+        ## orientation switch times
+        if self.session.ori_counter<len(self.session.ori_switch_times): # if counter within number of switch moments
+            if current_time >= self.session.ori_switch_times[self.session.ori_counter]: # when switch time reached, switch ori and increment counter
+                
+                self.session.ori_ind = 0 if (self.session.ori_counter % 2) == 0 else 1
+                self.session.ori_counter += 1
+
+        ## draw stim
         if self.bar_direction_at_TR == 'empty': # if empty trial, show background
 
             self.session.prf_stim.draw(bar_midpoint_at_TR = np.nan, 
                                        bar_direction_at_TR = np.nan,
                                        this_phase = 'background',
-                                       position_dictionary = self.position_dictionary) 
+                                       position_dictionary = self.position_dictionary,
+                                       orientation_ind = self.session.ori_ind) 
             print('background')
 
         else: # if bar pass at TR, then draw bar
@@ -79,19 +88,20 @@ class PRFTrial(Trial):
             self.session.prf_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
                                        bar_direction_at_TR = self.bar_direction_at_TR,
                                        this_phase = self.phase_names[int(self.phase)],
-                                       position_dictionary = self.position_dictionary) 
+                                       position_dictionary = self.position_dictionary,
+                                       orientation_ind = self.session.ori_ind) 
 
             print(self.phase_names[int(self.phase)]) #'ori_left')
 
-        # draw delimitating black bars, to make display square
+        ## draw delimitating black bars, to make display square
         self.session.rect_left.draw()
         self.session.rect_right.draw()
 
-        # fixation lines
+        ## fixation lines
         self.session.line1.draw() 
         self.session.line2.draw() 
             
-        # fixation dot
+        ## fixation dot
         if self.session.fix_counter<len(self.session.fixation_switch_times): # if counter within number of switch moments
             if current_time<self.session.fixation_switch_times[self.session.fix_counter]: # if current time under switch time
                 self.session.fixation.draw() # just draw
@@ -195,13 +205,23 @@ class FeatureTrial(Trial):
 
         """ Draw stimuli - pRF bars and fixation dot - for each trial """
         
+        current_time = self.session.clock.getTime() # get time
+        
+        ## orientation switch times
+        if self.session.ori_counter<len(self.session.ori_switch_times): # if counter within number of switch moments
+            if current_time >= self.session.ori_switch_times[self.session.ori_counter]: # when switch time reached, switch ori and increment counter
+                
+                self.session.ori_ind = 0 if (self.session.ori_counter % 2) == 0 else 1
+                self.session.ori_counter += 1
 
+        ## draw stim
         if 'cue' in self.trial_type_at_TR: # if cue at TR, draw background and word cue
 
             self.session.feature_stim.draw(bar_midpoint_at_TR = np.nan, 
                                        bar_direction_at_TR = np.nan,
                                        this_phase = 'background',
-                                       position_dictionary = self.position_dictionary)
+                                       position_dictionary = self.position_dictionary,
+                                       orientation_ind = self.session.ori_ind)
 
             # define appropriate cue string for the upcoming mini block
             attend_cond = self.attend_block_conditions[int(self.trial_type_at_TR[-1])]
@@ -227,7 +247,8 @@ class FeatureTrial(Trial):
             self.session.feature_stim.draw(bar_midpoint_at_TR = np.nan, 
                                        bar_direction_at_TR = np.nan,
                                        this_phase = 'background',
-                                       position_dictionary = self.position_dictionary) 
+                                       position_dictionary = self.position_dictionary,
+                                       orientation_ind = self.session.ori_ind) 
             print('background')
 
         # bar pass
@@ -239,7 +260,8 @@ class FeatureTrial(Trial):
                 self.session.feature_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
                                                bar_direction_at_TR = self.bar_direction_at_TR,
                                                this_phase = list(self.session.all_bar_pos[self.trial_type_at_TR].keys()),
-                                               position_dictionary = self.position_dictionary) 
+                                               position_dictionary = self.position_dictionary,
+                                               orientation_ind = self.session.ori_ind) 
             else:
                 
                 all_positions_dict = {'background': {'xys': self.session.grid_pos}} # draw background in all positions
@@ -247,7 +269,8 @@ class FeatureTrial(Trial):
                 self.session.feature_stim.draw(bar_midpoint_at_TR = np.nan, 
                                                bar_direction_at_TR = np.nan,
                                                this_phase = 'background',
-                                               position_dictionary = all_positions_dict)
+                                               position_dictionary = all_positions_dict,
+                                               orientation_ind = self.session.ori_ind)
 
             print('bar stim') 
 

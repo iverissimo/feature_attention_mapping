@@ -36,7 +36,7 @@ stimuli:
 
   fix_line_width: 1
   fix_line_color: [-1,-1,-1] #[0, 0, 0]
-  fix_line_contrast: 0.3
+  fix_line_contrast: 0.15
 
   rect_fill_color: [-1,-1,-1] #[0, 0, 0]
   rect_line_color: [-1,-1,-1] #[0, 0, 0]
@@ -44,7 +44,7 @@ stimuli:
   gab_ratio: 0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid
   element_size: 0.55 #0.4 #0.2 # degrees
 
-  ori_shift_rate: 5 # Hz, rate of element orientation change
+  ori_shift_rate: 2 #.25 #5 # Hz, rate of element orientation change
 
   pos_jitter: 0.03 #0.06 #degrees, x,y position jiter to add to gabor center 
   

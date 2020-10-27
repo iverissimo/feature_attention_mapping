@@ -254,9 +254,9 @@ class PRFSession(ExpSession):
                 key_list.append(key)
 
         # define how many times bar features switch during TR, according to flick rate defined 
-        switch_rate = self.settings['mri']['TR'] * self.settings['stimuli']['prf']['flick_rate']
+        feat_switch_rate = self.settings['mri']['TR'] * self.settings['stimuli']['prf']['flick_rate']
 
-        key_list = np.repeat(key_list,round(switch_rate/len(key_list))) # repeat keys, so for each bar pass it shows each condition X times
+        key_list = np.repeat(key_list,round(feat_switch_rate/len(key_list))) # repeat keys, so for each bar pass it shows each condition X times
         np.random.shuffle(key_list)
         phase_conditions = key_list
 
@@ -282,14 +282,24 @@ class PRFSession(ExpSession):
                                             bar_midpoint_at_TR=self.bar_midpoint_all[i]
                                             ))
 
-        ## define timepoints for fixation dot to change color
         # total experiment time (in seconds)
         self.total_time = self.trial_number*self.bar_step 
+
+        ## define timepoints for fixation dot to change color
         # switch time points (around 4 s between switches + jitter to avoid expectation effects)
         self.fixation_switch_times = np.arange(1,self.total_time,4)
         self.fixation_switch_times += 2*np.random.random_sample((len(self.fixation_switch_times),)) 
         # counter for fixation dot switches
         self.fix_counter = 0
+
+        # define time points for element orientation to change
+        # switch orientation time points
+        self.ori_switch_times = np.arange(0,self.total_time,1/self.settings['stimuli']['ori_shift_rate'])
+        self.ori_switch_times += np.random.random_sample((len(self.ori_switch_times),))  
+        # counter for orientation switches
+        self.ori_counter = 0
+        # index for orientation
+        self.ori_ind = 0 
 
         # print window size just to check, not actually needed
         print(self.screen)
@@ -528,6 +538,17 @@ class FeatureSession(ExpSession):
                                                 trial_type_at_TR = self.trial_type_all[i]
                                                 ))
 
+        # total experiment time (in seconds)
+        self.total_time = self.trial_number*self.bar_step 
+
+        # define time points for element orientation to change
+        # switch orientation time points
+        self.ori_switch_times = np.arange(0,self.total_time,1/self.settings['stimuli']['ori_shift_rate'])
+        self.ori_switch_times += np.random.random_sample((len(self.ori_switch_times),))  
+        # counter for orientation switches
+        self.ori_counter = 0
+        # index for orientation
+        self.ori_ind = 0
 
         # print window size just to check, not actually needed
         print(self.screen)

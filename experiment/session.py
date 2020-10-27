@@ -287,7 +287,7 @@ class PRFSession(ExpSession):
 
         ## define timepoints for fixation dot to change color
         # switch time points (around 4 s between switches + jitter to avoid expectation effects)
-        self.fixation_switch_times = np.arange(1,self.total_time,4)
+        self.fixation_switch_times = np.arange(1,self.total_time,1/self.settings['stimuli']['fix_dot_shift_rate'])
         self.fixation_switch_times += 2*np.random.random_sample((len(self.fixation_switch_times),)) 
         # counter for fixation dot switches
         self.fix_counter = 0
@@ -295,7 +295,6 @@ class PRFSession(ExpSession):
         # define time points for element orientation to change
         # switch orientation time points
         self.ori_switch_times = np.arange(0,self.total_time,1/self.settings['stimuli']['ori_shift_rate'])
-        self.ori_switch_times += np.random.random_sample((len(self.ori_switch_times),))  
         # counter for orientation switches
         self.ori_counter = 0
         # index for orientation
@@ -544,7 +543,6 @@ class FeatureSession(ExpSession):
         # define time points for element orientation to change
         # switch orientation time points
         self.ori_switch_times = np.arange(0,self.total_time,1/self.settings['stimuli']['ori_shift_rate'])
-        self.ori_switch_times += np.random.random_sample((len(self.ori_switch_times),))  
         # counter for orientation switches
         self.ori_counter = 0
         # index for orientation

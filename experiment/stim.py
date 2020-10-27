@@ -120,7 +120,8 @@ class PRFStim(Stim):
 
         # update background elements
         self.session.background_array = update_elements(ElementArrayStim = self.session.background_array,
-                                                        condition_settings = self.condition_settings, 
+                                                        condition_settings = self.condition_settings,
+                                                        position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor), 
                                                         this_phase = 'background', 
                                                         elem_positions = position_dictionary['background']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -131,6 +132,7 @@ class PRFStim(Stim):
             # update bar elements
             self.session.bar0_array = update_elements(ElementArrayStim = self.session.bar0_array,
                                                         condition_settings = self.condition_settings, 
+                                                        position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor), 
                                                         this_phase = this_phase, 
                                                         elem_positions = position_dictionary['bar0']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -270,6 +272,7 @@ class FeatureStim(Stim):
         # update background elements
         self.session.background_array =  update_elements(ElementArrayStim = self.session.background_array,
                                                         condition_settings = self.condition_settings, 
+                                                        position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
                                                         this_phase = 'background', 
                                                         elem_positions = position_dictionary['background']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -280,6 +283,7 @@ class FeatureStim(Stim):
             # update bar elements
             self.session.bar0_array =  update_elements(ElementArrayStim = self.session.bar0_array,
                                                         condition_settings = self.condition_settings, 
+                                                        position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
                                                         this_phase = this_phase[0], 
                                                         elem_positions = position_dictionary['bar0']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -288,6 +292,7 @@ class FeatureStim(Stim):
 
             self.session.bar1_array =  update_elements(ElementArrayStim = self.session.bar1_array,
                                                         condition_settings = self.condition_settings, 
+                                                        position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
                                                         this_phase = this_phase[1], 
                                                         elem_positions = position_dictionary['bar1']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -296,6 +301,7 @@ class FeatureStim(Stim):
 
             self.session.bar2_array =  update_elements(ElementArrayStim = self.session.bar2_array,
                                                         condition_settings = self.condition_settings, 
+                                                        position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
                                                         this_phase = this_phase[2], 
                                                         elem_positions = position_dictionary['bar2']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -304,6 +310,7 @@ class FeatureStim(Stim):
 
             self.session.bar3_array =  update_elements(ElementArrayStim = self.session.bar3_array,
                                                         condition_settings = self.condition_settings, 
+                                                        position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
                                                         this_phase = this_phase[3], 
                                                         elem_positions = position_dictionary['bar3']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -312,6 +319,7 @@ class FeatureStim(Stim):
 
             self.session.crossing0_array = update_crossing_elements(ElementArrayStim = self.session.crossing0_array, 
                                                                     condition_settings = self.condition_settings, 
+                                                                    position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
                                                                     elem_positions = position_dictionary['crossing0']['xys'],
                                                                     elem_condition_names = position_dictionary['crossing0']['conditions'], 
                                                                     nElements = self.num_cross_elem,
@@ -319,6 +327,7 @@ class FeatureStim(Stim):
                                                                     screen = self.session.screen)
             self.session.crossing1_array = update_crossing_elements(ElementArrayStim = self.session.crossing1_array, 
                                                                     condition_settings = self.condition_settings, 
+                                                                    position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
                                                                     elem_positions = position_dictionary['crossing1']['xys'],
                                                                     elem_condition_names = position_dictionary['crossing1']['conditions'], 
                                                                     nElements = self.num_cross_elem,
@@ -326,6 +335,7 @@ class FeatureStim(Stim):
                                                                     screen = self.session.screen)
             self.session.crossing2_array = update_crossing_elements(ElementArrayStim = self.session.crossing2_array, 
                                                                     condition_settings = self.condition_settings, 
+                                                                    position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
                                                                     elem_positions = position_dictionary['crossing2']['xys'],
                                                                     elem_condition_names = position_dictionary['crossing2']['conditions'], 
                                                                     nElements = self.num_cross_elem,
@@ -333,6 +343,7 @@ class FeatureStim(Stim):
                                                                     screen = self.session.screen)
             self.session.crossing3_array = update_crossing_elements(ElementArrayStim = self.session.crossing3_array, 
                                                                     condition_settings = self.condition_settings, 
+                                                                    position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
                                                                     elem_positions = position_dictionary['crossing3']['xys'],
                                                                     elem_condition_names = position_dictionary['crossing3']['conditions'], 
                                                                     nElements = self.num_cross_elem,

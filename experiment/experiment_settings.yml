@@ -43,6 +43,10 @@ stimuli:
 
   gab_ratio: 0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid
   element_size: 0.55 #0.4 #0.2 # degrees
+
+  ori_shift_rate: 5 # Hz, rate of element orientation change
+
+  pos_jitter: 0.03 #0.06 #degrees, x,y position jiter to add to gabor center 
   
   prf:
     bar_width_ratio: 0.125 #0.0625 # ratio of the screen res

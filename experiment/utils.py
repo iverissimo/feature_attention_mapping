@@ -29,9 +29,12 @@ def jitter(arr,max_val=1,min_val=0.5):
                           np.random.uniform(min_val,max_val,math.ceil(size_arr * .5))))
     np.random.shuffle(jit)
 
-    arr += jit
-
-    return(arr)
+    if arr.shape[-1] == 2:
+        output = arr + jit[:,None]
+    else:
+        output = arr + jit
+    
+    return(output)
 
 
 def near_power_of_2(x,near='previous'):
@@ -147,7 +150,7 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
 
 
 def update_elements(ElementArrayStim, condition_settings, this_phase, elem_positions, grid_pos,
-                   	monitor, screen=np.array([1680,1050])):
+                   	monitor, screen = np.array([1680,1050]), position_jitter = None):
     
     """ update element array settings
     
@@ -225,6 +228,13 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     # set opacities
     element_opacities = np.zeros(len(grid_pos))
     element_opacities[list_indices] = 1
+
+    if position_jitter != None: # if we want to add jitter to (x,y) center of elements
+        element_pos = jitter(grid_pos,
+                            max_val = position_jitter,
+                            min_val = 0)
+
+        ElementArrayStim.setXYs(element_pos)
 
     # set all of the above settings
     ElementArrayStim.setTex(elementTex)

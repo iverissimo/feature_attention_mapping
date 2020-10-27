@@ -251,7 +251,10 @@ class PRFSession(ExpSession):
             if key != 'background': # we don't want to show background gabors in background
                 key_list.append(key)
 
-        key_list = np.repeat(key_list,3) # make it triple, so for each bar pass it shows each condition 3 times
+        # define how many times bar features switch during TR, according to flick rate defined 
+        switch_rate = self.settings['mri']['TR'] * self.settings['stimuli']['prf']['flick_rate']
+
+        key_list = np.repeat(key_list,round(switch_rate/len(key_list))) # repeat keys, so for each bar pass it shows each condition X times
         np.random.shuffle(key_list)
         phase_conditions = key_list
 

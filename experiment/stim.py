@@ -194,62 +194,6 @@ class FeatureStim(Stim):
                                                                 colorSpace = self.session.settings['stimuli']['colorSpace']) 
 
 
-        # define crossing elements
-        self.num_cross_elem = int(max(np.round(self.bar_width_pix/ (self.session.gabor_diameter_pix * self.session.settings['stimuli']['gab_ratio']))**2))
-
-        self.session.crossing0_array = visual.ElementArrayStim(win = self.session.win, 
-                                                                nElements = self.num_cross_elem,
-                                                                units = 'pix', 
-                                                                elementTex = 'sin', 
-                                                                elementMask = 'gauss',
-                                                                sizes = self.element_sizes[:self.num_cross_elem], 
-                                                                sfs = self.element_sfs[:self.num_cross_elem], 
-                                                                xys = self.element_positions[:self.num_cross_elem], 
-                                                                oris = self.element_ori[:self.num_cross_elem],
-                                                                contrs = self.element_contrast[:self.num_cross_elem], 
-                                                                colors = self.element_color[:self.num_cross_elem], 
-                                                                colorSpace = self.session.settings['stimuli']['colorSpace'])
-
-        self.session.crossing1_array = visual.ElementArrayStim(win = self.session.win, 
-                                                                nElements = self.num_cross_elem,
-                                                                units = 'pix', 
-                                                                elementTex = 'sin', 
-                                                                elementMask = 'gauss',
-                                                                sizes = self.element_sizes[:self.num_cross_elem], 
-                                                                sfs = self.element_sfs[:self.num_cross_elem], 
-                                                                xys = self.element_positions[:self.num_cross_elem], 
-                                                                oris = self.element_ori[:self.num_cross_elem],
-                                                                contrs = self.element_contrast[:self.num_cross_elem], 
-                                                                colors = self.element_color[:self.num_cross_elem], 
-                                                                colorSpace = self.session.settings['stimuli']['colorSpace'])
-
-        self.session.crossing2_array = visual.ElementArrayStim(win = self.session.win, 
-                                                                nElements =self.num_cross_elem,
-                                                                units = 'pix', 
-                                                                elementTex = 'sin', 
-                                                                elementMask = 'gauss',
-                                                                sizes = self.element_sizes[:self.num_cross_elem], 
-                                                                sfs = self.element_sfs[:self.num_cross_elem], 
-                                                                xys = self.element_positions[:self.num_cross_elem], 
-                                                                oris = self.element_ori[:self.num_cross_elem],
-                                                                contrs = self.element_contrast[:self.num_cross_elem], 
-                                                                colors = self.element_color[:self.num_cross_elem], 
-                                                                colorSpace = self.session.settings['stimuli']['colorSpace'])
-
-        self.session.crossing3_array = visual.ElementArrayStim(win = self.session.win, 
-                                                                nElements =self.num_cross_elem,
-                                                                units = 'pix', 
-                                                                elementTex = 'sin', 
-                                                                elementMask = 'gauss',
-                                                                sizes = self.element_sizes[:self.num_cross_elem], 
-                                                                sfs = self.element_sfs[:self.num_cross_elem], 
-                                                                xys = self.element_positions[:self.num_cross_elem], 
-                                                                oris = self.element_ori[:self.num_cross_elem],
-                                                                contrs = self.element_contrast[:self.num_cross_elem], 
-                                                                colors = self.element_color[:self.num_cross_elem], 
-                                                                colorSpace = self.session.settings['stimuli']['colorSpace']) 
-
-
 
     def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase, position_dictionary):
         
@@ -266,8 +210,6 @@ class FeatureStim(Stim):
             
         """
         
-        
-
 
         # update background elements
         self.session.background_array =  update_elements(ElementArrayStim = self.session.background_array,
@@ -317,40 +259,6 @@ class FeatureStim(Stim):
                                                         monitor = self.session.monitor, 
                                                         screen = self.session.screen)
 
-            self.session.crossing0_array = update_crossing_elements(ElementArrayStim = self.session.crossing0_array, 
-                                                                    condition_settings = self.condition_settings, 
-                                                                    position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                                    elem_positions = position_dictionary['crossing0']['xys'],
-                                                                    elem_condition_names = position_dictionary['crossing0']['conditions'], 
-                                                                    nElements = self.num_cross_elem,
-                                                                    monitor = self.session.monitor, 
-                                                                    screen = self.session.screen)
-            self.session.crossing1_array = update_crossing_elements(ElementArrayStim = self.session.crossing1_array, 
-                                                                    condition_settings = self.condition_settings, 
-                                                                    position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                                    elem_positions = position_dictionary['crossing1']['xys'],
-                                                                    elem_condition_names = position_dictionary['crossing1']['conditions'], 
-                                                                    nElements = self.num_cross_elem,
-                                                                    monitor = self.session.monitor, 
-                                                                    screen = self.session.screen)
-            self.session.crossing2_array = update_crossing_elements(ElementArrayStim = self.session.crossing2_array, 
-                                                                    condition_settings = self.condition_settings, 
-                                                                    position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                                    elem_positions = position_dictionary['crossing2']['xys'],
-                                                                    elem_condition_names = position_dictionary['crossing2']['conditions'], 
-                                                                    nElements = self.num_cross_elem,
-                                                                    monitor = self.session.monitor, 
-                                                                    screen = self.session.screen)
-            self.session.crossing3_array = update_crossing_elements(ElementArrayStim = self.session.crossing3_array, 
-                                                                    condition_settings = self.condition_settings, 
-                                                                    position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                                    elem_positions = position_dictionary['crossing3']['xys'],
-                                                                    elem_condition_names = position_dictionary['crossing3']['conditions'], 
-                                                                    nElements = self.num_cross_elem,
-                                                                    monitor = self.session.monitor, 
-                                                                    screen = self.session.screen)
-
-
 
         # actually draw
         self.session.background_array.draw()
@@ -360,14 +268,7 @@ class FeatureStim(Stim):
             self.session.bar2_array.draw()
             self.session.bar3_array.draw()
 
-            self.session.crossing0_array.draw()
-            self.session.crossing1_array.draw()
-            self.session.crossing2_array.draw()
-            self.session.crossing3_array.draw()
-
-
-
-
+            
 
 
 

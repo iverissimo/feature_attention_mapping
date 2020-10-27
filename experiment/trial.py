@@ -190,12 +190,6 @@ class FeatureTrial(Trial):
                                                     self.session.bar_width_pix, screen = self.session.screen, 
                                                     num_bar = len(self.session.attend_block_conditions))
 
-        if 'mini_block' in self.trial_type_at_TR:
-            # update bar positions, taking into account the crossings
-            self.position_dictionary = get_crossing_positions(position_dictionary = self.position_dictionary,
-                                                            condition_keys = self.session.all_bar_pos[self.trial_type_at_TR].keys(),
-                                                            bar_direction_at_TR = self.bar_direction_at_TR)
-
 
     def draw(self): 
 

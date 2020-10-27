@@ -131,7 +131,7 @@ class ExpSession(Session):
 
 class PRFSession(ExpSession):
    
-    def __init__(self, output_str, output_dir, settings_file,macbook_bool):  # initialize child class
+    def __init__(self, output_str, output_dir, settings_file,macbook_bool, background):  # initialize child class
 
         """ Initializes PRFSession object. 
       
@@ -146,6 +146,8 @@ class PRFSession(ExpSession):
             default settings file (in data/default_settings.yml)
         macbook_bool: bool
             variable to know if using macbook for running experiment or not
+        background: bool
+            variable to know if run starts with or without background
         """
 
         # need to initialize parent class (ExpSession), indicating output infos

@@ -32,7 +32,7 @@ def main():
 
     mac_bool = True if (mac_bool=='y' or mac_bool=='yes') else False
     if mac_bool:
-    	print('Running experiment on macbook, defining display accordingly')
+        print('Running experiment on macbook, defining display accordingly')
 
 
     exp_type = ''
@@ -58,16 +58,26 @@ def main():
 
     # load approriate class object to be run
     if exp_type == 'standard': # run standard pRF mapper
+
+        bckg_contrast = '' # define if run starts with or without background
+        while bckg_contrast not in ('y','yes','n','no'):
+            bckg_contrast = input('Start pRF run with or without background (y/n)?: ')
+
+        bckg_contrast = True if (bckg_contrast=='y' or bckg_contrast=='yes') else False
+        if bckg_contrast:
+            print('Running Standard pRF mapping')
+
         exp_sess = PRFSession(output_str = output_str,
                               output_dir = output_dir,
-                              settings_file='experiment_settings.yml',
-                              macbook_bool=mac_bool)
+                              settings_file = 'experiment_settings.yml',
+                              macbook_bool = mac_bool,
+                              background = bckg_contrast)
 
     elif exp_type == 'feature': # run feature pRF mapper
          exp_sess = FeatureSession(output_str = output_str,
                               output_dir = output_dir,
-                              settings_file='experiment_settings.yml',
-                              macbook_bool=mac_bool)
+                              settings_file = 'experiment_settings.yml',
+                              macbook_bool = mac_bool)
    	                            
     exp_sess.run()
 

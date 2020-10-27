@@ -300,15 +300,26 @@ class PRFSession(ExpSession):
         """ Loops over trials and runs them """
         
         # draw instructions wait a few seconds
-        this_instruction_string = 'Please fixate at the center,\ndo not move your eyes'
-        self.display_text(this_instruction_string, duration=3,
-                                    color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
+        this_instruction_string = 'During the experiment you will see a flickering bar pass\nin different directions\nthroughout the screen'
+        self.display_text(this_instruction_string, keys = 'space', #duration = 10,
+                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
+                                    italic = True, alignHoriz = 'center', alignVert = 'center')
+
+        this_instruction_string = 'Your task is to fixate\nat the center of the screen,\nand indicate when the central dot changes color'
+        self.display_text(this_instruction_string, keys = 'space', # duration = 10,
+                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
+                                    italic = True, alignHoriz = 'center', alignVert = 'center')
+
+        # draw instructions wait a few seconds
+        this_instruction_string = 'Do NOT look at the bar!\nPlease fixate at the center,\nand do not move your eyes'
+        self.display_text(this_instruction_string, keys = 'space', # duration = 10,
+                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
                                     italic = True, alignHoriz = 'center', alignVert = 'center')
 
         # draw instructions wait for scanner t trigger
         this_instruction_string = 'Index finger - Black\nMiddle finger - White\nwaiting for scanner'
-        self.display_text(this_instruction_string, keys=self.settings['mri'].get('sync', 't'),
-                                color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
+        self.display_text(this_instruction_string, keys = self.settings['mri'].get('sync', 't'),
+                                color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
                                 italic = True, alignHoriz = 'center', alignVert = 'center')
 
         # create trials before running!

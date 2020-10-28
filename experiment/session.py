@@ -522,8 +522,8 @@ class FeatureSession(ExpSession):
                     bar_pos_array.append(np.array([np.nan,np.nan]))
                 
             elif 'mini_block' in bartype: # bars on screen
-                trial_number += mini_block_TR
-                trial_type_all = trial_type_all + np.repeat(bartype,mini_block_TR).tolist()
+                trial_number += 2*mini_block_TR 
+                trial_type_all = trial_type_all + list([bartype,'empty'])*mini_block_TR
                 
                 # get mini block condition keys
                 miniblock_cond_keys = list(self.all_bar_pos[bartype].keys())
@@ -536,9 +536,12 @@ class FeatureSession(ExpSession):
                     for _,key in enumerate(miniblock_cond_keys):
                         temp_dir_list.append(self.all_bar_pos[bartype][key]['bar_direction_at_TR'][t])
                         temp_pos_list.append(self.all_bar_pos[bartype][key]['bar_midpoint_at_TR'][t])
+
                     
                     bar_direction_all.append(temp_dir_list)
+                    bar_direction_all.append('empty')
                     bar_pos_array.append(temp_pos_list)
+                    bar_pos_array.append(np.array([np.nan,np.nan]))
                 
         
 
@@ -552,17 +555,13 @@ class FeatureSession(ExpSession):
         # list of type of trial (cue, empty, miniblock) for all TRs
         self.trial_type_all = np.array(trial_type_all)
 
-        # define list with number of phases and their duration (duration of each must be the same)
-        self.phase_durations = np.repeat(self.bar_step/2,2)
-
         # append all trials
         self.all_trials = []
         for i in range(self.trial_number):
 
             self.all_trials.append(FeatureTrial(session = self,
                                                 trial_nr = i, 
-                                                phase_durations = self.phase_durations,
-                                                phase_names = ('stim','blank'),
+                                                phase_durations = np.array([self.bar_step]),
                                                 attend_block_conditions = self.attend_block_conditions, 
                                                 bar_direction_at_TR = self.bar_direction_all[i],
                                                 bar_midpoint_at_TR = self.bar_midpoint_all[i],

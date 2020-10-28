@@ -66,6 +66,19 @@ class PRFTrial(Trial):
 
         current_time = self.session.clock.getTime() # get time
 
+        # background switch time
+        if self.session.bckg_counter<len(self.session.bckg_switch_times): # if counter within number of switch moments
+            if current_time >= (self.session.bckg_switch_times[self.session.bckg_counter] + self.session.switch_start_time): # when switch time reached, update background contrast and increment counter
+
+                _ , self.session.background_contrast = gradual_shift(curr_point = [self.session.bckg_switch_times[self.session.bckg_counter], self.session.background_contrast],
+                                                                  end_point = self.session.bckg_switch_end_point,
+                                                                  x_step = self.session.settings['stimuli']['prf']['switch_step'], 
+                                                                  slope = self.session.bckg_switch_slope, 
+                                                                  L = self.session.settings['stimuli']['conditions']['background']['element_contrast'], 
+                                                                  function = 'logistic')
+                self.session.bckg_counter += 1
+
+
         ## orientation switch times
         if self.session.ori_counter<len(self.session.ori_switch_times): # if counter within number of switch moments
             if current_time >= self.session.ori_switch_times[self.session.ori_counter]: # when switch time reached, switch ori and increment counter
@@ -74,13 +87,14 @@ class PRFTrial(Trial):
                 self.session.ori_counter += 1
 
         ## draw stim
-        if self.bar_direction_at_TR == 'empty': # if empty trial, show background
+        if (self.bar_direction_at_TR == 'empty') or (self.bar_direction_at_TR == 'switch_interval'): # if empty trial, show background
 
             self.session.prf_stim.draw(bar_midpoint_at_TR = np.nan, 
                                        bar_direction_at_TR = np.nan,
                                        this_phase = 'background',
                                        position_dictionary = self.position_dictionary,
-                                       orientation_ind = self.session.ori_ind) 
+                                       orientation_ind = self.session.ori_ind,
+                                       background_contrast = self.session.background_contrast) 
             print('background')
 
         else: # if bar pass at TR, then draw bar
@@ -89,7 +103,8 @@ class PRFTrial(Trial):
                                        bar_direction_at_TR = self.bar_direction_at_TR,
                                        this_phase = self.phase_names[int(self.phase)],
                                        position_dictionary = self.position_dictionary,
-                                       orientation_ind = self.session.ori_ind) 
+                                       orientation_ind = self.session.ori_ind,
+                                       background_contrast = self.session.background_contrast) 
 
             print(self.phase_names[int(self.phase)]) #'ori_left')
 
@@ -206,7 +221,7 @@ class FeatureTrial(Trial):
         """ Draw stimuli - pRF bars and fixation dot - for each trial """
         
         current_time = self.session.clock.getTime() # get time
-        
+
         ## orientation switch times
         if self.session.ori_counter<len(self.session.ori_switch_times): # if counter within number of switch moments
             if current_time >= self.session.ori_switch_times[self.session.ori_counter]: # when switch time reached, switch ori and increment counter

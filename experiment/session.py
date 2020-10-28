@@ -150,6 +150,8 @@ class PRFSession(ExpSession):
             variable to know if run starts with or without background
         """
 
+        self.background = background
+
         # need to initialize parent class (ExpSession), indicating output infos
         super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file,macbook_bool=macbook_bool)
 
@@ -196,6 +198,7 @@ class PRFSession(ExpSession):
         bar_pass_hor_TR = self.settings['stimuli']['prf']['bar_pass_hor_TR'] 
         bar_pass_ver_TR = self.settings['stimuli']['prf']['bar_pass_ver_TR']
         empty_TR = self.settings['stimuli']['prf']['empty_TR']
+        switch_bckg_TR = self.settings['stimuli']['prf']['switch_bckg_TR']
 
         # list with order of bar orientations throught experiment
         bar_direction = self.settings['stimuli']['prf']['bar_direction'] 
@@ -222,6 +225,11 @@ class PRFSession(ExpSession):
                 trial_number += empty_TR
                 bar_direction_all = bar_direction_all + np.repeat(bartype,empty_TR).tolist()
                 bar_pos_array.append([np.array([np.nan,np.nan]) for i in range(empty_TR)])
+
+            elif bartype in np.array(['switch_interval']): # switch background interval (no bar)
+                trial_number += switch_bckg_TR
+                bar_direction_all = bar_direction_all + np.repeat(bartype,switch_bckg_TR).tolist()
+                bar_pos_array.append([np.array([np.nan,np.nan]) for i in range(switch_bckg_TR)])
 
             elif bartype in np.array(['U-D','D-U']): # vertical bar pass
                 trial_number += bar_pass_ver_TR
@@ -270,6 +278,22 @@ class PRFSession(ExpSession):
         self.phase_durations = np.repeat(self.bar_step/phase_conditions.shape[-1],
                                         phase_conditions.shape[-1])
 
+        # total experiment time (in seconds)
+        self.total_time = self.trial_number*self.bar_step 
+        # total background switch interval time (in seconds)
+        self.switch_interval_time = switch_bckg_TR * self.bar_step
+
+        # set if run starts with or without background, and respective inputs for switch function
+        if self.background == True:
+            self.background_contrast = self.settings['stimuli']['conditions']['background']['element_contrast']
+            self.bckg_switch_slope = -self.settings['stimuli']['prf']['switch_slope'] 
+            self.bckg_switch_end_point = [self.switch_interval_time, 0]
+
+        else:
+            self.background_contrast = 0
+            self.bckg_switch_slope = self.settings['stimuli']['prf']['switch_slope']
+            self.bckg_switch_end_point = [self.switch_interval_time, self.settings['stimuli']['conditions']['background']['element_contrast']]
+
         # append all trials
         self.all_trials = []
         for i in range(self.trial_number):
@@ -278,12 +302,10 @@ class PRFSession(ExpSession):
                                             trial_nr = i,  
                                             phase_durations = self.phase_durations,
                                             phase_names = phase_conditions[i],
-                                            bar_direction_at_TR=self.bar_direction_all[i],
-                                            bar_midpoint_at_TR=self.bar_midpoint_all[i]
+                                            bar_direction_at_TR = self.bar_direction_all[i],
+                                            bar_midpoint_at_TR = self.bar_midpoint_all[i]
                                             ))
 
-        # total experiment time (in seconds)
-        self.total_time = self.trial_number*self.bar_step 
 
         ## define timepoints for fixation dot to change color
         # switch time points (around 4 s between switches + jitter to avoid expectation effects)
@@ -299,6 +321,16 @@ class PRFSession(ExpSession):
         self.ori_counter = 0
         # index for orientation
         self.ori_ind = 0 
+
+        # define time points (within switch interval) to update background contrast
+        
+        # switch background time points
+        self.bckg_switch_times = np.arange(0,self.switch_interval_time + self.settings['stimuli']['prf']['switch_step'],self.settings['stimuli']['prf']['switch_step'])
+        # define timepoint where switch interval starts, given total trial time
+        self.switch_start_time = (np.where(np.array(self.bar_direction_all) == 'switch_interval')[0][0] + 1) * self.bar_step 
+        # counter for background switches
+        self.bckg_counter = 0
+
 
         # print window size just to check, not actually needed
         print(self.screen)

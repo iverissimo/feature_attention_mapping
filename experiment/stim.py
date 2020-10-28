@@ -103,7 +103,7 @@ class PRFStim(Stim):
         super().__init__(session=session, bar_width_ratio=bar_width_ratio, grid_pos=grid_pos)
 
 
-    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase, position_dictionary, orientation_ind = 0):
+    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase, position_dictionary, orientation_ind = 0, background_contrast = 0):
         
         """ Draw stimuli - pRF bar - for each trial 
         
@@ -123,6 +123,7 @@ class PRFStim(Stim):
                                                         condition_settings = self.condition_settings,
                                                         position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
                                                         orientation_ind = orientation_ind,
+                                                        background_contrast = background_contrast,
                                                         this_phase = 'background', 
                                                         elem_positions = position_dictionary['background']['xys'], 
                                                         grid_pos = self.grid_pos,

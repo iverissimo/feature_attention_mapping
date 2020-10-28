@@ -150,7 +150,7 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
 
 
 def update_elements(ElementArrayStim, condition_settings, this_phase, elem_positions, grid_pos,
-                   	monitor, screen = np.array([1680,1050]), position_jitter = None, orientation_ind = None):
+                   	monitor, screen = np.array([1680,1050]), position_jitter = None, orientation_ind = None, background_contrast = None):
     
     """ update element array settings
     
@@ -225,7 +225,7 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
 
     # set element contrasts
     element_contrast =  np.zeros(len(grid_pos))
-    element_contrast[list_indices] = condition_settings[this_phase]['element_contrast']
+    element_contrast[list_indices] = background_contrast if background_contrast != None else condition_settings[this_phase]['element_contrast']
     
     # set opacities
     element_opacities = np.zeros(len(grid_pos))
@@ -614,4 +614,63 @@ def update_crossing_elements(ElementArrayStim, condition_settings, elem_position
 
 
     return(ElementArrayStim)
+
+def gradual_shift(curr_point,
+                  end_point = [12, 0.3], intersect = 0,
+                  x_step = .5, slope = None, L = 0.3, function = 'logistic'):
+    
+    """ gradual increase/decrease values according to distribution
+    
+    Parameters
+    ----------
+    curr_point : list/array
+        [x,y] for the current point to be updated
+    end_point : list/array
+        [x,y] for the ending point of the function
+    intersect : int/float
+        point where function intersects y-axis
+    x_step : int/float
+        time step (granularity) for function
+    slope : int/float
+        steepness of curve/line
+    L : int/float
+        curve's maximum value
+    function : str
+        name of mathematical function to be used (ex: 'linear', 'logistic')
+        
+    """
+    # define x coordinate for next point, given step
+    x_next = curr_point[0] + x_step
+    
+    if function == 'linear':
+        
+        # define slope for function
+        # if not given, calculate the slope of function, given the end point
+        k = end_point[1]/end_point[0] if slope == None else slope
+        
+        # define y coordinates for next point
+        y_next = k * x_next + intersect
+        
+        
+    elif function == 'logistic':
+        
+        # define slope for function
+        # if not given, calculate the slope of function, given the end point
+        k = 1 if slope == None else slope
+        
+        # define y coordinates for next point
+        y_next = L / (1 + np.exp(-k*(x_next-end_point[0]/2)))
+        
+    
+    # define next point array
+    if (x_next >= end_point[0]) or (k > 0 and y_next >= end_point[1]) or (k < 0 and y_next <= end_point[1]): # if endpoint reached             
+        # ensure saturation 
+        x_next = end_point[0]
+        y_next = end_point[1]         
+    
+        
+    return x_next, y_next
+    
+
+
 

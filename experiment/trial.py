@@ -146,8 +146,8 @@ class PRFTrial(Trial):
                     self.session.total_responses += 1
 
                      #track percentage of correct responses per session (only correct if reply within 0.8s of color switch)
-                    if t<self.session.fixation_switch_times[-1]: # avoid crash when running, need to optimize this later
-                        if t>self.session.fixation_switch_times[self.session.fix_counter] and t<self.session.fixation_switch_times[self.session.fix_counter]+0.8:
+                    if t < self.session.fixation_switch_times[-1]: # avoid crash when running, need to optimize this later
+                        if t < (self.session.fixation_switch_times[self.session.fix_counter]+0.8):
                             self.session.correct_responses += 1
 
                 # log everything into session data frame

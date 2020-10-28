@@ -593,15 +593,42 @@ class FeatureSession(ExpSession):
         self.create_trials() 
 
         # draw instructions wait a few seconds
-        this_instruction_string = 'Please fixate at the center,\ndo not move your eyes'
-        self.display_text(this_instruction_string, duration=3,
-                                    color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
+        this_instruction_string = 'During the experiment you will see several bars\noriented vertically or horizontally\nthroughout the screen\n[Press b/index finger to continue]'
+        self.display_text(this_instruction_string, keys = 'b', #duration = 10,
+                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
+                                    italic = True, alignHoriz = 'center', alignVert = 'center')
+
+        # draw instructions wait a few seconds
+        this_instruction_string = 'These bars are filled\nwith several elements\nall sharing the same\ncolor or orientation.\n[Press b/index finger to continue]'
+        self.display_text(this_instruction_string, keys = 'b', #duration = 10,
+                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
+                                    italic = True, alignHoriz = 'center', alignVert = 'center')
+
+        this_instruction_string = 'The experiment is divided into different mini-blocks.\nAt the beggining of each you will receive a cue word,\nwhich can be\nred/green/left/right\n[Press b/index finger to continue]'
+        self.display_text(this_instruction_string, keys = 'b', # duration = 10,
+                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
+                                    italic = True, alignHoriz = 'center', alignVert = 'center')
+
+        this_instruction_string = 'That will be the\nfeature of the bar elements\nthat you have to search for.\n[Press b/index finger to continue]'
+        self.display_text(this_instruction_string, keys = 'b', # duration = 10,
+                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
+                                    italic = True, alignHoriz = 'center', alignVert = 'center')
+
+        this_instruction_string = 'Your task is to fixate\nat the center of the screen,\nand indicate the\norientation of the bar\n(vertical or horizontal)\n whose elements have that feature\n[Press b/index finger to continue]'
+        self.display_text(this_instruction_string, keys = 'b', # duration = 10,
+                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
+                                    italic = True, alignHoriz = 'center', alignVert = 'center')
+
+        # draw instructions wait a few seconds
+        this_instruction_string = 'Do NOT look at the bars!\nPlease fixate at the center,\nand do not move your eyes\n[Press b/index finger to continue]'
+        self.display_text(this_instruction_string, keys = 'b', # duration = 10,
+                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
                                     italic = True, alignHoriz = 'center', alignVert = 'center')
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = 'Index finger - vertical\nMiddle finger - horizontal\nwaiting for scanner'
-        self.display_text(this_instruction_string, keys=self.settings['mri'].get('sync', 't'),
-                                color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
+        this_instruction_string = 'Index finger/b key - horizontal bar\nMiddle finger/y key - vertical bar\n\n[waiting for scanner]'
+        self.display_text(this_instruction_string, keys = self.settings['mri'].get('sync', 't'),
+                                color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
                                 italic = True, alignHoriz = 'center', alignVert = 'center')
 
         self.start_experiment()

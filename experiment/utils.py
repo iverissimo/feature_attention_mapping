@@ -2,6 +2,8 @@
 import numpy as np
 import os, sys
 import math
+import random
+
 from psychopy import visual, tools, colors
 import itertools
 
@@ -332,25 +334,34 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
         ind_hor = get_non_overlapping_indices(arr_shape=[num_hor_bars,horizontal_pos.shape[0]])
         ind_ver = get_non_overlapping_indices(arr_shape=[num_ver_bars,vertical_pos.shape[0]])
 
-        # define direction of bar (randomly alternate between horizontal and vertical)
-        direction = np.concatenate([np.repeat('vertical',horizontal_pos.shape[0]),
-                                    np.repeat('horizontal',vertical_pos.shape[0])])
-        np.random.shuffle(direction)
+        num_trials = horizontal_pos.shape[0]+vertical_pos.shape[0] # all trials
+        num_conditions = horizontal_pos.shape[1]+vertical_pos.shape[1] # all conditions
 
-        # set opposite direction (to balance conditions)
-        opposite_direction = np.array(['vertical' if d=='horizontal' else 'horizontal' for _,d in enumerate(direction)])
+        cond_direction = np.empty([num_conditions,num_trials], dtype=object) # (4,16)
 
-        # vertically stack, getting half of bars horizontal, other half vertical
-        for j in range(int(len(bar_list[blk])/2)-1):
+        for w in range(num_trials): # for all trials
 
-            direction = np.vstack((direction, direction))
-            opposite_direction = np.vstack((opposite_direction, opposite_direction))
+            for j in range(num_conditions): # for all conditions
 
-        cond_direction = np.vstack((direction,opposite_direction))
+                random_direction = random.choice(['vertical','horizontal']) # randomly choose direction
+                opposite_direction = 'vertical' if random_direction == 'horizontal' else 'horizontal'
 
-        # shuffle columns of direction, to guarantee that each trial has half horizontal, half vertical
-        # but without bias of conditions always being one or the other
-        [np.random.shuffle(cond_direction[:,j]) for j in range(cond_direction.shape[-1])]
+                if list(cond_direction[j]).count(random_direction) < num_trials/2:
+
+                    direction = random_direction # give random direction
+                else:
+                    direction = opposite_direction # give opposite direction
+
+                # now check for condition balance
+                if list(cond_direction[...,w]).count(direction) < num_conditions/2: # if less than half the conditions
+
+                    cond_direction[j][w] = direction # give random direction
+
+                else:
+                    # else, give complementary direction (assures balance within trial)
+                    cond_direction[j][w] = opposite_direction
+
+
 
         # first define for all conditions in block, which will be 
         # vertical, which will be horizontal

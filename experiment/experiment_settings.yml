@@ -89,7 +89,7 @@ stimuli:
 
     color_red:
       element_sf: 6 # cycles/gabor width
-      element_color: [0, 1, .94] #[0, .20, .80] # IN HSV WILL BE CONVERTED IN SCRIPT #[0, 100, 42] #[1,-1,0.25] # red
+      element_color: [0, .93, .85] #[0, 1, .94] # IN HSV WILL BE CONVERTED IN SCRIPT #[0, 100, 42] #[1,-1,0.25] # red
       element_ori: [90,90] #[90,180] # half horizontal, half vertical
       element_contrast: .3 #1
       ori_jitter_max: 1 # max value for element orientation jitter range
@@ -97,7 +97,7 @@ stimuli:
 
     color_green:
       element_sf: 6 # cycles/gabor width
-      element_color: [89, 1, .53] #[120, .20, .80] # IN HSV WILL BE CONVERTED IN SCRIPT #[137, 100, 42] #[-1,1,-0.25] # green
+      element_color: [120, 1, .59] #[89, 1, .53] #[120, .20, .80] # IN HSV WILL BE CONVERTED IN SCRIPT #[137, 100, 42] #[-1,1,-0.25] # green
       element_ori: [90,90] #[90,180] # half horizontal, half vertical
       element_contrast: .3 #1
       ori_jitter_max: 1 # max value for element orientation jitter range

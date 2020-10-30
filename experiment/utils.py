@@ -326,6 +326,9 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
     output_dict = {}
     for blk in range(mini_blocks):
         output_dict['mini_block_%i'%blk] = {}
+
+    num_trials = horizontal_pos.shape[0]+vertical_pos.shape[0] # all trials
+    num_conditions = horizontal_pos.shape[1]+vertical_pos.shape[1] # all conditions
     
     # actually store positions
     for blk in range(mini_blocks):
@@ -333,9 +336,6 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
         # get indices for all possible horizontal and vertical bar positions
         ind_hor = get_non_overlapping_indices(arr_shape=[num_hor_bars,horizontal_pos.shape[0]])
         ind_ver = get_non_overlapping_indices(arr_shape=[num_ver_bars,vertical_pos.shape[0]])
-
-        num_trials = horizontal_pos.shape[0]+vertical_pos.shape[0] # all trials
-        num_conditions = horizontal_pos.shape[1]+vertical_pos.shape[1] # all conditions
 
         cond_direction = np.empty([num_conditions,num_trials], dtype=object) # (4,16)
 
@@ -362,6 +362,14 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
                     cond_direction[j][w] = opposite_direction
 
 
+        # ########## check for balance in bar direction, both within and accross trials ############
+        # for i in range(cond_direction.shape[0]):
+        #     if list(cond_direction[i]).count('vertical') != num_trials/2:
+        #         raise TypeError("Number of bar direction in condition not balanced")
+        # for i in range(cond_direction.shape[1]):
+        #     if list(cond_direction[...,i]).count('vertical') != num_conditions/2:
+        #         raise TypeError("Number of bar direction in trial not balanced")
+        # ############################
 
         # first define for all conditions in block, which will be 
         # vertical, which will be horizontal
@@ -376,48 +384,51 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
         # now according to bar direction (horizontal vs vertical)
         # set x,y coordinates for bar midpoint
 
-        for trl in range(cond_direction.shape[-1]): # for each trial
-            
+        # counters
+        cond_vert_counter = [0, 0, 0, 0]
+        cond_hor_counter = [0, 0, 0, 0]
+
+        for trl in range(num_trials): # for each trial
+                
             vert_counter = np.repeat(False,num_ver_bars) # set boolean counter, to keep track of positions 
-            hor_counter = np.repeat(False,num_hor_bars) 
+            hor_counter = np.repeat(False,num_hor_bars) # for this trial
 
             for k,cond in enumerate(bar_list[blk]): # iterate per condition
                 
-                ## if indice arrays empty, get new non-overlapping indices
-                if (len(ind_ver[0])==0) and (len(ind_ver[1])==0):
-                    ind_ver = get_non_overlapping_indices(arr_shape=[num_ver_bars,vertical_pos.shape[0]])
-                elif (len(ind_hor[0])==0) and (len(ind_hor[1])==0):
-                    ind_hor = get_non_overlapping_indices(arr_shape=[num_hor_bars,horizontal_pos.shape[0]])
-                ##
+                index = np.where(bar_list[blk]==cond)[0][0]
 
                 # get coordinates for vertical bars
                 if output_dict['mini_block_%i'%blk][cond]['bar_direction_at_TR'][trl] == 'vertical':
-                    
+
                     if vert_counter[0] == False: 
-                        coord = vertical_pos[ind_ver[0][0]]
-                        ind_ver[0] = ind_ver[0][1:] # removed used indice, to not repeat position
+                        coord = vertical_pos[ind_ver[0][cond_vert_counter[index]]]
                         vert_counter[0] = True
-                        
+                        cond_vert_counter[index] += 1
+
                     elif vert_counter[1] == False: 
-                        coord = vertical_pos[ind_ver[1][0]]
-                        ind_ver[1] = ind_ver[1][1:] # removed used indice, to not repeat position
+                        coord = vertical_pos[ind_ver[1][cond_vert_counter[index]]]
                         vert_counter[1] = True
-                
+                        cond_vert_counter[index] += 1
+
                 # get coordinates for horizontal bars
                 elif output_dict['mini_block_%i'%blk][cond]['bar_direction_at_TR'][trl] == 'horizontal':
-                    
+
                     if hor_counter[0] == False: 
-                        coord = horizontal_pos[ind_hor[0][0]]
-                        ind_hor[0] = ind_hor[0][1:] # removed used indice, to not repeat position
+                        coord = horizontal_pos[ind_hor[0][cond_hor_counter[index]]]
                         hor_counter[0] = True
-                        
+                        cond_hor_counter[index] +=1
+
                     elif hor_counter[1] == False: 
-                        coord = horizontal_pos[ind_hor[1][0]]
-                        ind_hor[1] = ind_hor[1][1:] # removed used indice, to not repeat position
+                        coord = horizontal_pos[ind_hor[1][cond_hor_counter[index]]]
                         hor_counter[1] = True
-                        
+                        cond_hor_counter[index] +=1
+
                 # now append coordinates to corresponding condition list
                 output_dict['mini_block_%i'%blk][cond]['bar_midpoint_at_TR'].append(coord)
+
+        if all(x != num_trials/2 for x in cond_hor_counter) or all(x != num_trials/2 for x in cond_vert_counter):
+            raise TypeError("Issue in position placement")
+
 
 
 

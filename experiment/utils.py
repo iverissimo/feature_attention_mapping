@@ -339,37 +339,56 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
 
         cond_direction = np.empty([num_conditions,num_trials], dtype=object) # (4,16)
 
-        for w in range(num_trials): # for all trials
+        # define direction of bar (randomly alternate between horizontal and vertical, keeping balance)
+        direction = np.concatenate([np.repeat('vertical',horizontal_pos.shape[0]),
+                                    np.repeat('horizontal',vertical_pos.shape[0])])
 
-            for j in range(num_conditions): # for all conditions
+        for j in range(num_conditions): # for all conditions
 
-                random_direction = random.choice(['vertical','horizontal']) # randomly choose direction
-                opposite_direction = 'vertical' if random_direction == 'horizontal' else 'horizontal'
+            np.random.shuffle(direction)
 
-                if list(cond_direction[j]).count(random_direction) < num_trials/2:
+            random_index = [] # tracker for positions where direction can be random
 
-                    direction = random_direction # give random direction
-                else:
-                    direction = opposite_direction # give opposite direction
+            cond_direction[j] = direction.copy()
+            
+            if j>1: # conditioning starts for 3rd condition, before doesn't matter
+                
+                for w in range(num_trials): # for all trials, check if balanced within trial
 
-                # now check for condition balance
-                if list(cond_direction[...,w]).count(direction) < num_conditions/2: # if less than half the conditions
+                    if list(cond_direction[0:j,w]).count('vertical') == num_conditions/2: # if already 2 verticals in trial, set next condition to horizontal
+                        cond_direction[j][w] = 'horizontal'
+                    elif list(cond_direction[0:j,w]).count('horizontal') == num_conditions/2: # if already 2 horizontals in trial, set next condition to vertical
+                        cond_direction[j][w] = 'vertical'
+                    else:
+                        random_index.append(w) # indices where it doesn't matter if vertical or horizontal
 
-                    cond_direction[j][w] = direction # give random direction
+                if list(cond_direction[j]).count('vertical') < num_trials/2: # if less vertical directions than supposed to
 
-                else:
-                    # else, give complementary direction (assures balance within trial)
-                    cond_direction[j][w] = opposite_direction
+                    for i in range(int(num_trials/2 - list(cond_direction[j]).count('vertical'))):
+
+                        for s in range(len(random_index)):
+                            if cond_direction[j][random_index[s]] == 'horizontal': # replace horizontal with vertical
+                                cond_direction[j][random_index[s]] = 'vertical'
+                                break
+
+                elif list(cond_direction[j]).count('vertical') > num_trials/2: # if more vertical directions than supposed to
+
+                    for i in range(int(list(cond_direction[j]).count('vertical') - num_trials/2 )):
+
+                        for s in range(len(random_index)):
+                            if cond_direction[j][random_index[s]] == 'vertical': # replace vertical with horizontal
+                                cond_direction[j][random_index[s]] = 'horizontal'
+                                break
 
 
-        # ########## check for balance in bar direction, both within and accross trials ############
-        # for i in range(cond_direction.shape[0]):
-        #     if list(cond_direction[i]).count('vertical') != num_trials/2:
-        #         raise TypeError("Number of bar direction in condition not balanced")
-        # for i in range(cond_direction.shape[1]):
-        #     if list(cond_direction[...,i]).count('vertical') != num_conditions/2:
-        #         raise TypeError("Number of bar direction in trial not balanced")
-        # ############################
+        ########## check for balance in bar direction, both within and accross trials ############
+        for i in range(cond_direction.shape[0]):
+            if list(cond_direction[i]).count('vertical') != num_trials/2:
+                raise TypeError("Number of bar direction in condition not balanced")
+        for i in range(cond_direction.shape[1]):
+            if list(cond_direction[...,i]).count('vertical') != num_conditions/2:
+                raise TypeError("Number of bar direction in trial not balanced")
+        ############################
 
         # first define for all conditions in block, which will be 
         # vertical, which will be horizontal

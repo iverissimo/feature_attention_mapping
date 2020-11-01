@@ -359,14 +359,14 @@ def transform_direction_2_position(direction_array,num_hor_trials=8,num_vert_tri
 
                 elif vert_counter[1] == False: # second condition to be vertical
 
-                    break_time = time.time() + 2 # run while loop for 2 seconds max, if index not found raise error
-
                     while cond_ind_ver[k][0] == vert_used_index:
                         np.random.shuffle(cond_ind_ver[k]) # shuffle vertical position indexes for that condition, to avoid overlap
 
-                        if time.time() > break_time:
+                        if len(cond_ind_ver[k]) <= 1:
                             empty_arr = True # return empty array, non-overlapping index condition not met
                             break
+                    
+                        
                     vert_counter[1] = True
                 
                 
@@ -385,14 +385,13 @@ def transform_direction_2_position(direction_array,num_hor_trials=8,num_vert_tri
 
                 elif hor_counter[1] == False: # second condition to be horizontal
 
-                    break_time = time.time()+10 # run while loop for 5 seconds max, if index not found raise error
-
                     while cond_ind_hor[k][0] == hor_used_index:
                         np.random.shuffle(cond_ind_hor[k]) # shuffle horizontal position indexes for that condition, to avoid overlap
 
-                        if time.time() > break_time:
+                        if len(cond_ind_hor[k]) <= 1:
                             empty_arr = True # return empty array, non-overlapping index condition not met
                             break
+
                     hor_counter[1] = True
                 
                 out_ind_hor[k][trl] = cond_ind_hor[k][0] # save index

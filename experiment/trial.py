@@ -166,7 +166,7 @@ class PRFTrial(Trial):
 class FeatureTrial(Trial):
 
     def __init__(self, session, trial_nr, phase_durations, 
-        attend_block_conditions, bar_direction_at_TR, bar_midpoint_at_TR, trial_type_at_TR, timing='seconds', *args, **kwargs):
+        attend_block_conditions, bar_direction_at_TR, bar_midpoint_at_TR, trial_type_at_TR, plot_counter = 0, timing='seconds', *args, **kwargs):
 
 
         """ Initializes a FeatureTrial object. 
@@ -201,6 +201,8 @@ class FeatureTrial(Trial):
         self.trial_type_at_TR = trial_type_at_TR
         self.attend_block_conditions = attend_block_conditions
         self.session = session
+
+        self.plot_counter = plot_counter
 
         # phase durations for each condition 
         self.phase_durations = phase_durations
@@ -272,7 +274,8 @@ class FeatureTrial(Trial):
                                            bar_direction_at_TR = self.bar_direction_at_TR,
                                            this_phase = list(self.session.all_bar_pos[self.trial_type_at_TR].keys()),
                                            position_dictionary = self.position_dictionary,
-                                           orientation_ind = self.session.ori_ind) 
+                                           orientation_ind = self.session.ori_ind,
+                                           drawing_ind = self.session.drawing_ind[self.plot_counter]) 
             
             print('bar stim') 
 

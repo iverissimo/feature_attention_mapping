@@ -198,7 +198,7 @@ class FeatureStim(Stim):
 
 
 
-    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase, position_dictionary, orientation_ind = 0):
+    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase, position_dictionary, orientation_ind = 0, drawing_ind = [0,1,2,3]):
         
         """ Draw stimuli - pRF bars - for each trial 
         
@@ -271,10 +271,14 @@ class FeatureStim(Stim):
         # actually draw
         self.session.background_array.draw()
         if this_phase != 'background':
-            self.session.bar0_array.draw()
-            self.session.bar1_array.draw()
-            self.session.bar2_array.draw()
-            self.session.bar3_array.draw()
+            
+            bars2plot = [self.session.bar0_array,self.session.bar1_array,self.session.bar2_array,self.session.bar3_array]
+
+            bars2plot[drawing_ind[0]].draw()
+            bars2plot[drawing_ind[1]].draw()
+            bars2plot[drawing_ind[2]].draw()
+            bars2plot[drawing_ind[3]].draw()
+            
 
             
 

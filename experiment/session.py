@@ -555,6 +555,16 @@ class FeatureSession(ExpSession):
         # list of type of trial (cue, empty, miniblock) for all TRs
         self.trial_type_all = np.array(trial_type_all)
 
+        # set plotting order index, to randomize which bars appear on top, for all trials in all miniblocks
+        self.drawing_ind = np.empty((mini_block_TR * self.settings['stimuli']['feature']['mini_blocks'],), dtype=list)
+
+        for k in range(self.drawing_ind.shape[0]):
+            ind_list = np.arange(self.settings['stimuli']['feature']['num_bars'])
+            random.shuffle(ind_list)
+            self.drawing_ind[k] = ind_list
+
+        self.plot_counter = 0
+
         # append all trials
         self.all_trials = []
         for i in range(self.trial_number):
@@ -565,8 +575,12 @@ class FeatureSession(ExpSession):
                                                 attend_block_conditions = self.attend_block_conditions, 
                                                 bar_direction_at_TR = self.bar_direction_all[i],
                                                 bar_midpoint_at_TR = self.bar_midpoint_all[i],
-                                                trial_type_at_TR = self.trial_type_all[i]
+                                                trial_type_at_TR = self.trial_type_all[i],
+                                                plot_counter = self.plot_counter
                                                 ))
+
+            if 'mini_block' in self.trial_type_all[i]: 
+                self.plot_counter += 1
 
         # total experiment time (in seconds)
         self.total_time = self.trial_number*self.bar_step 

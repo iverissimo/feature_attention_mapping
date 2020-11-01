@@ -72,6 +72,8 @@ stimuli:
     empty_TR: 4
     cue_TR: 2
 
+    num_bars: 4
+
     bar_direction: ['cue_0','empty','mini_block_0','empty',
                     'cue_1','empty','mini_block_1','empty',
                     'cue_2','empty','mini_block_2','empty',

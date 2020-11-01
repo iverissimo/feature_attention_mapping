@@ -305,6 +305,118 @@ def repeat_random_lists(arr,num_rep):
     return new_arr
 
 
+def transform_direction_2_position(direction_array,num_hor_trials=8,num_vert_trials=8, 
+                                   num_ver_bars = 2, num_hor_bars = 2):
+
+    """ given a direction array (horizontal/vertical)
+    transform it into a position array, guaranteeing that positions
+    do not overlap.
+    returns 2 arrays with indices, vertical and horizontal
+    or empty arrays if non-overlapping requirement not met 
+    
+    Parameters
+    ----------
+    direction_array : arr 
+        array of arrays, with directions for all conditions and trials (num_cond,trials) -> (4,16)
+    num_hor_trials: int
+        number of horizontal trials, per condition
+    num_vert_trials: int
+        number of vertical trials, per condition
+    num_ver_bars: int
+        number of vertical bars, per trial
+    num_hor_bars: int
+        number of horizontal bars, per trial
+    """ 
+    
+    # get initial index lists
+    cond_ind_hor = get_non_overlapping_indices(arr_shape=[direction_array.shape[0],num_hor_trials])
+    cond_ind_ver  = get_non_overlapping_indices(arr_shape=[direction_array.shape[0],num_vert_trials])
+    
+    # create output arrays, to save indices
+    out_ind_hor = np.empty(direction_array.shape, dtype=object) # (4,16)
+    out_ind_ver = np.empty(direction_array.shape, dtype=object) # (4,16)
+
+    # counters, for sanity check
+    cond_vert_counter = [0, 0, 0, 0]
+    cond_hor_counter = [0, 0, 0, 0]
+    
+    # empty flag
+    empty_arr = False
+    
+    for trl in range(direction_array.shape[1]): # for each trial
+        
+        vert_counter = np.repeat(False,num_ver_bars) # set boolean counter, to keep track of positions 
+        hor_counter = np.repeat(False,num_hor_bars) # for this trial
+
+        for k in range(direction_array.shape[0]): # iterate per condition
+            
+            if direction_array[k][trl] == 'vertical':
+                
+                if vert_counter[0] == False: # first condition to be vertical
+
+                    vert_used_index = cond_ind_ver[k][0] # pick index, save in variable because need to compare later
+                    vert_counter[0] = True #set counter as true
+
+                elif vert_counter[1] == False: # second condition to be vertical
+
+                    break_time = time.time() + 2 # run while loop for 2 seconds max, if index not found raise error
+
+                    while cond_ind_ver[k][0] == vert_used_index:
+                        np.random.shuffle(cond_ind_ver[k]) # shuffle vertical position indexes for that condition, to avoid overlap
+
+                        if time.time() > break_time:
+                            empty_arr = True # return empty array, non-overlapping index condition not met
+                            break
+                    vert_counter[1] = True
+                
+                
+                out_ind_ver[k][trl] = cond_ind_ver[k][0] # save index
+                cond_ind_ver[k] = cond_ind_ver[k][1:] #remove that first position of array, to not repeat
+                
+                cond_vert_counter[k] += 1 # increment sanity counter
+                
+            # get coordinates for horizontal bars
+            elif direction_array[k][trl] == 'horizontal':
+
+                if hor_counter[0] == False: # first condition to be horizontal
+
+                    hor_used_index = cond_ind_hor[k][0] # pick index, save in variable because need to compare later
+                    hor_counter[0] = True
+
+                elif hor_counter[1] == False: # second condition to be horizontal
+
+                    break_time = time.time()+10 # run while loop for 5 seconds max, if index not found raise error
+
+                    while cond_ind_hor[k][0] == hor_used_index:
+                        np.random.shuffle(cond_ind_hor[k]) # shuffle horizontal position indexes for that condition, to avoid overlap
+
+                        if time.time() > break_time:
+                            empty_arr = True # return empty array, non-overlapping index condition not met
+                            break
+                    hor_counter[1] = True
+                
+                out_ind_hor[k][trl] = cond_ind_hor[k][0] # save index
+                cond_ind_hor[k] = cond_ind_hor[k][1:] # remove that first position of array, to not repeat
+                
+                cond_hor_counter[k] += 1 # increment sanity counter
+
+    if empty_arr == False:
+        # remove Nones
+        output_horizontal = np.empty((direction_array.shape[0],), dtype=list)
+        output_vertical = np.empty((direction_array.shape[0],), dtype=list)
+
+        for w in range(direction_array.shape[0]):
+            output_vertical[w] = np.array([i for _,i in enumerate(out_ind_ver[w]) if i != None])
+            output_horizontal[w] = np.array([i for _,i in enumerate(out_ind_hor[w]) if i != None])
+    else:
+        output_vertical = []
+        output_horizontal = []
+
+    return output_vertical,output_horizontal
+
+
+
+
 def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
                          mini_blocks = 4, num_bars = 4, num_ver_bars = 2, num_hor_bars = 2):
     
@@ -425,81 +537,32 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
         # set x,y coordinates for bar midpoint
 
         # get indices for all possible horizontal and vertical bar positions
-
-        cond_ind_hor = get_non_overlapping_indices(arr_shape=[num_conditions,horizontal_pos.shape[0]])
-        cond_ind_ver  = get_non_overlapping_indices(arr_shape=[num_conditions,vertical_pos.shape[0]])
-
-        # counters, for sanity check
-        cond_vert_counter = [0, 0, 0, 0]
-        cond_hor_counter = [0, 0, 0, 0]
+        cond_ind_ver = []
+        cond_ind_hor = []
+        
+        while len(cond_ind_ver) == 0 and len(cond_ind_hor) == 0:
+            cond_ind_ver, cond_ind_hor = transform_direction_2_position(cond_direction, 
+                                               num_hor_trials = horizontal_pos.shape[0],num_vert_trials = vertical_pos.shape[0], 
+                                               num_ver_bars = num_ver_bars, num_hor_bars = num_hor_bars)
 
         for trl in range(num_trials): # for each trial
 
-            vert_counter = np.repeat(False,num_ver_bars) # set boolean counter, to keep track of positions 
-            hor_counter = np.repeat(False,num_hor_bars) # for this trial
-
             for k,cond in enumerate(bar_list[blk]): # iterate per condition
-
-                index = np.where(bar_list[blk]==cond)[0][0] # condition index
 
                 # get coordinates for vertical bars
                 if output_dict['mini_block_%i'%blk][cond]['bar_direction_at_TR'][trl] == 'vertical':
 
-                    if vert_counter[0] == False: # first condition to be vertical
-
-                        vert_used_index = cond_ind_ver[index][0].copy() # pick index, save in variable because need to compare later
-                        vert_counter[0] = True #set counter as true
-
-                    elif vert_counter[1] == False: # second condition to be vertical
-
-                        break_time = time.time()+10 # run while loop for 5 seconds max, if index not found raise error
-
-                        while cond_ind_ver[index][0] == vert_used_index:
-                            np.random.shuffle(cond_ind_ver[index]) # shuffle vertical position indexes for that condition, to avoid overlap
-
-                            if time.time() > break_time:
-                                raise TypeError("Stuck in while loop, cannot find random position indices")
-
-                        vert_counter[1] = True
-
-                    coord = vertical_pos[cond_ind_ver[index][0]] # save coordinates
-                    cond_ind_ver[index] = cond_ind_ver[index][1:] #remove that first position of array, to not repeat
-
-                    cond_vert_counter[index] += 1 # increment sanity counter
+                    coord = vertical_pos[cond_ind_ver[k][0]] # save coordinates
+                    cond_ind_ver[k] = cond_ind_ver[k][1:] #remove that first position of array, to not repeat
 
                 # get coordinates for horizontal bars
                 elif output_dict['mini_block_%i'%blk][cond]['bar_direction_at_TR'][trl] == 'horizontal':
 
-                    if hor_counter[0] == False: # first condition to be horizontal
-
-                        hor_used_index = cond_ind_hor[index][0].copy() # pick index, save in variable because need to compare later
-                        hor_counter[0] = True
-
-                    elif hor_counter[1] == False: # second condition to be horizontal
-
-                        break_time = time.time()+10 # run while loop for 5 seconds max, if index not found raise error
-
-                        while cond_ind_hor[index][0] == hor_used_index:
-                            np.random.shuffle(cond_ind_hor[index]) # shuffle horizontal position indexes for that condition, to avoid overlap
-
-                            if time.time() > break_time:
-                                raise TypeError("Stuck in while loop, cannot find random position indices")
-
-                        hor_counter[1] = True
-
-                    coord = horizontal_pos[cond_ind_hor[index][0]] # save coordinates
-                    cond_ind_hor[index] = cond_ind_hor[index][1:] # remove that first position of array, to not repeat
-
-                    cond_hor_counter[index] += 1 # increment sanity counter
-
+                    coord = horizontal_pos[cond_ind_hor[k][0]] # save coordinates
+                    cond_ind_hor[k] = cond_ind_hor[k][1:] # remove that first position of array, to not repeat
                       
                 # now append coordinates to corresponding condition list
                 output_dict['mini_block_%i'%blk][cond]['bar_midpoint_at_TR'].append(coord)
-
-        if all(x != num_trials/2 for x in cond_hor_counter) or all(x != num_trials/2 for x in cond_vert_counter):
-            raise TypeError("Issue in position placement")
-
-
 
 
     return(output_dict)

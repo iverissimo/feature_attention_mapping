@@ -7,6 +7,8 @@ import random
 from psychopy import visual, tools, colors
 import itertools
 
+import time
+
 
 def jitter(arr,max_val=1,min_val=0.5):
 
@@ -280,6 +282,29 @@ def get_non_overlapping_indices(arr_shape=[2,8]):
     return ind
 
 
+def repeat_random_lists(arr,num_rep):
+    
+    """ repeat array, shuffled and stacked horizontally
+    
+    Parameters
+    ----------
+    arr : list/arr 
+        array to repeat
+    num_rep: int
+        number of repetions
+        
+    """ 
+    # initialize empty array
+    new_arr = np.empty((num_rep,), dtype=list)
+    
+    # get indices for all possible horizontal bar positions
+    for w in range(num_rep):
+        random.shuffle(arr)
+        new_arr[w] = arr.copy()
+
+    return new_arr
+
+
 def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
                          mini_blocks = 4, num_bars = 4, num_ver_bars = 2, num_hor_bars = 2):
     
@@ -332,10 +357,6 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
     
     # actually store positions
     for blk in range(mini_blocks):
-
-        # get indices for all possible horizontal and vertical bar positions
-        ind_hor = get_non_overlapping_indices(arr_shape=[num_hor_bars,horizontal_pos.shape[0]])
-        ind_ver = get_non_overlapping_indices(arr_shape=[num_ver_bars,vertical_pos.shape[0]])
 
         cond_direction = np.empty([num_conditions,num_trials], dtype=object) # (4,16)
 
@@ -403,45 +424,75 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
         # now according to bar direction (horizontal vs vertical)
         # set x,y coordinates for bar midpoint
 
-        # counters
+        # get indices for all possible horizontal and vertical bar positions
+
+        cond_ind_hor = get_non_overlapping_indices(arr_shape=[num_conditions,horizontal_pos.shape[0]])
+        cond_ind_ver  = get_non_overlapping_indices(arr_shape=[num_conditions,vertical_pos.shape[0]])
+
+        # counters, for sanity check
         cond_vert_counter = [0, 0, 0, 0]
         cond_hor_counter = [0, 0, 0, 0]
 
         for trl in range(num_trials): # for each trial
-                
+
             vert_counter = np.repeat(False,num_ver_bars) # set boolean counter, to keep track of positions 
             hor_counter = np.repeat(False,num_hor_bars) # for this trial
 
             for k,cond in enumerate(bar_list[blk]): # iterate per condition
-                
-                index = np.where(bar_list[blk]==cond)[0][0]
+
+                index = np.where(bar_list[blk]==cond)[0][0] # condition index
 
                 # get coordinates for vertical bars
                 if output_dict['mini_block_%i'%blk][cond]['bar_direction_at_TR'][trl] == 'vertical':
 
-                    if vert_counter[0] == False: 
-                        coord = vertical_pos[ind_ver[0][cond_vert_counter[index]]]
-                        vert_counter[0] = True
-                        cond_vert_counter[index] += 1
+                    if vert_counter[0] == False: # first condition to be vertical
 
-                    elif vert_counter[1] == False: 
-                        coord = vertical_pos[ind_ver[1][cond_vert_counter[index]]]
+                        vert_used_index = cond_ind_ver[index][0].copy() # pick index, save in variable because need to compare later
+                        vert_counter[0] = True #set counter as true
+
+                    elif vert_counter[1] == False: # second condition to be vertical
+
+                        break_time = time.time()+10 # run while loop for 5 seconds max, if index not found raise error
+
+                        while cond_ind_ver[index][0] == vert_used_index:
+                            np.random.shuffle(cond_ind_ver[index]) # shuffle vertical position indexes for that condition, to avoid overlap
+
+                            if time.time() > break_time:
+                                raise TypeError("Stuck in while loop, cannot find random position indices")
+
                         vert_counter[1] = True
-                        cond_vert_counter[index] += 1
+
+                    coord = vertical_pos[cond_ind_ver[index][0]] # save coordinates
+                    cond_ind_ver[index] = cond_ind_ver[index][1:] #remove that first position of array, to not repeat
+
+                    cond_vert_counter[index] += 1 # increment sanity counter
 
                 # get coordinates for horizontal bars
                 elif output_dict['mini_block_%i'%blk][cond]['bar_direction_at_TR'][trl] == 'horizontal':
 
-                    if hor_counter[0] == False: 
-                        coord = horizontal_pos[ind_hor[0][cond_hor_counter[index]]]
+                    if hor_counter[0] == False: # first condition to be horizontal
+
+                        hor_used_index = cond_ind_hor[index][0].copy() # pick index, save in variable because need to compare later
                         hor_counter[0] = True
-                        cond_hor_counter[index] +=1
 
-                    elif hor_counter[1] == False: 
-                        coord = horizontal_pos[ind_hor[1][cond_hor_counter[index]]]
+                    elif hor_counter[1] == False: # second condition to be horizontal
+
+                        break_time = time.time()+10 # run while loop for 5 seconds max, if index not found raise error
+
+                        while cond_ind_hor[index][0] == hor_used_index:
+                            np.random.shuffle(cond_ind_hor[index]) # shuffle horizontal position indexes for that condition, to avoid overlap
+
+                            if time.time() > break_time:
+                                raise TypeError("Stuck in while loop, cannot find random position indices")
+
                         hor_counter[1] = True
-                        cond_hor_counter[index] +=1
 
+                    coord = horizontal_pos[cond_ind_hor[index][0]] # save coordinates
+                    cond_ind_hor[index] = cond_ind_hor[index][1:] # remove that first position of array, to not repeat
+
+                    cond_hor_counter[index] += 1 # increment sanity counter
+
+                      
                 # now append coordinates to corresponding condition list
                 output_dict['mini_block_%i'%blk][cond]['bar_midpoint_at_TR'].append(coord)
 

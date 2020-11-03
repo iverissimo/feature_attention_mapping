@@ -4,7 +4,7 @@ import os, sys
 import math
 import random
 
-from psychopy import visual, tools, colors
+from psychopy import visual, tools, colors, event
 import itertools
 
 import time
@@ -825,6 +825,50 @@ def gradual_shift(curr_point,
         
     return x_next, y_next
     
+
+def draw_instructions(win, instructions, keys = ['b'], visual_obj = [], 
+                      color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), height = .65,
+                        italic = True, alignHoriz = 'center', alignVert = 'center'):
+    
+    """ draw instructions on screen
+    
+    Parameters
+    ----------
+    win : object
+        window object to draw on
+    instructions : str
+        instruction string to draw 
+    key: list
+        list of keys to skip instructions
+    visual_obj: list
+        if not empty, should have psychopy visual objects (to add to the display ex: side rectangles to limit display)
+        
+    """
+    
+    text = visual.TextStim(win = win,
+                        text = instructions,
+                        color = color, 
+                        font = font, 
+                        pos = pos, 
+                        height = height,
+                        italic = italic, 
+                        alignHoriz = alignHoriz, 
+                        alignVert = alignVert
+                        )
+    
+    # draw text again
+    text.draw()
+
+    if len(visual_obj)>0:
+        for w in range(len(visual_obj)):
+            visual_obj[w].draw()
+            
+    win.flip()
+
+    key_pressed = event.waitKeys(keyList = keys)
+
+    return(key_pressed)
+
 
 
 

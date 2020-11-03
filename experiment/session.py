@@ -340,32 +340,47 @@ class PRFSession(ExpSession):
     def run(self):
         """ Loops over trials and runs them """
         
-        # draw instructions wait a few seconds
-        this_instruction_string = 'During the experiment you will see a flickering bar pass\nin different directions\nthroughout the screen\n[Press b/index finger to continue]'
-        self.display_text(this_instruction_string, keys = 'b', #duration = 10,
-                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                    italic = True, alignHoriz = 'center', alignVert = 'center')
-
-        this_instruction_string = 'Your task is to fixate\nat the center of the screen,\nand indicate when the central dot changes color\n[Press b/index finger to continue]'
-        self.display_text(this_instruction_string, keys = 'b', # duration = 10,
-                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                    italic = True, alignHoriz = 'center', alignVert = 'center')
-
-        # draw instructions wait a few seconds
-        this_instruction_string = 'Do NOT look at the bar!\nPlease fixate at the center,\nand do not move your eyes\n[Press b/index finger to continue]'
-        self.display_text(this_instruction_string, keys = 'b', # duration = 10,
-                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                    italic = True, alignHoriz = 'center', alignVert = 'center')
-
-        # draw instructions wait for scanner t trigger
-        this_instruction_string = 'Index finger/b key - Black dot\nMiddle finger/y key - White dot\n\n[waiting for scanner]'
-        self.display_text(this_instruction_string, keys = self.settings['mri'].get('sync', 't'),
-                                color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                italic = True, alignHoriz = 'center', alignVert = 'center')
 
         # create trials before running!
         self.create_stimuli()
         self.create_trials() 
+
+        # draw instructions wait a few seconds
+        this_instruction_string = ('During the experiment\n'
+                                    'you will see a flickering bar pass\n'
+                                    'in different directions\n'
+                                    'throughout the screen\n\n\n'
+                                    '[Press b/index finger to continue]\n'
+                                    '[Press y/middle finger to skip]')
+
+        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['b','y'], visual_obj = [self.rect_left,self.rect_right])
+
+        if key_pressed[0] != 'y': #if instructions not skipped
+
+            # draw instructions wait a few seconds
+            this_instruction_string = ('Your task is to fixate\n'
+                                        'at the center of the screen,\n'
+                                        'and indicate when\n'
+                                        'the central dot changes color\n\n\n'
+                                        '[Press b/index finger to continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
+
+            
+            # draw instructions wait a few seconds
+            this_instruction_string = ('Do NOT look at the bars!\n'
+                                        'Please fixate at the center,\n'
+                                        'and do not move your eyes\n\n\n'
+                                        '[Press b/index finger to continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
+
+        # draw instructions wait for scanner t trigger
+        this_instruction_string = ('Index finger/b key - Black dot\n'
+                                    'Middle finger/y key - White dot\n\n\n'
+                                    '          [waiting for scanner]')
+        
+        draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
 
         self.start_experiment()
         
@@ -606,43 +621,67 @@ class FeatureSession(ExpSession):
         self.create_trials() 
 
         # draw instructions wait a few seconds
-        this_instruction_string = 'During the experiment you will see several bars\noriented vertically or horizontally\nthroughout the screen\n[Press b/index finger to continue]'
-        self.display_text(this_instruction_string, keys = 'b', #duration = 10,
-                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                    italic = True, alignHoriz = 'center', alignVert = 'center')
+        this_instruction_string = ('During the experiment\n you will see several bars\n'
+                                'oriented vertically or horizontally\n'
+                                'throughout the screen\n\n\n'
+                                '[Press b/index finger to continue]\n'
+                                '[Press y/middle finger to skip]')
 
-        # draw instructions wait a few seconds
-        this_instruction_string = 'These bars are filled\nwith several elements\nall sharing the same\ncolor or orientation.\n[Press b/index finger to continue]'
-        self.display_text(this_instruction_string, keys = 'b', #duration = 10,
-                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                    italic = True, alignHoriz = 'center', alignVert = 'center')
+        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['b','y'], visual_obj = [self.rect_left,self.rect_right])
 
-        this_instruction_string = 'The experiment is divided into different mini-blocks.\nAt the beggining of each you will receive a cue word,\nwhich can be\nred/green/left/right\n[Press b/index finger to continue]'
-        self.display_text(this_instruction_string, keys = 'b', # duration = 10,
-                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                    italic = True, alignHoriz = 'center', alignVert = 'center')
+        if key_pressed[0] != 'y': #if instructions not skipped
 
-        this_instruction_string = 'That will be the\nfeature of the bar elements\nthat you have to search for.\n[Press b/index finger to continue]'
-        self.display_text(this_instruction_string, keys = 'b', # duration = 10,
-                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                    italic = True, alignHoriz = 'center', alignVert = 'center')
+            # draw instructions wait a few seconds
+            this_instruction_string = ('These bars are filled\n'
+                                        'with several elements\n'
+                                        'all sharing the same\n'
+                                        'color or orientation\n\n\n'
+                                        '[Press b/index finger to continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
 
-        this_instruction_string = 'Your task is to fixate\nat the center of the screen,\nand indicate the\norientation of the bar\n(vertical or horizontal)\n whose elements have that feature\n[Press b/index finger to continue]'
-        self.display_text(this_instruction_string, keys = 'b', # duration = 10,
-                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                    italic = True, alignHoriz = 'center', alignVert = 'center')
+            this_instruction_string = ('The experiment is divided\n'
+                                        'into different mini-blocks.\n'
+                                        'At the beggining of each\n'
+                                        'you will receive a cue word,\n'
+                                        'which can be\n'
+                                        'red/green/left/right\n\n\n'
+                                        '[Press b/index finger to continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
 
-        # draw instructions wait a few seconds
-        this_instruction_string = 'Do NOT look at the bars!\nPlease fixate at the center,\nand do not move your eyes\n[Press b/index finger to continue]'
-        self.display_text(this_instruction_string, keys = 'b', # duration = 10,
-                                    color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                    italic = True, alignHoriz = 'center', alignVert = 'center')
+            this_instruction_string = ('That will be the\n'
+                                    'feature of the bar elements\n'
+                                    'that you have to search for.\n\n\n'
+                                    '[Press b/index finger to continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
+
+            this_instruction_string = ('Your task is to fixate\n'
+                                        'at the center of the screen,\n'
+                                        'and indicate the\n'
+                                        'orientation of the bar\n'
+                                        '(vertical or horizontal)\n'
+                                        'whose elements have that feature\n\n\n'
+                                        '[Press b/index finger to continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
+
+            # draw instructions wait a few seconds
+            this_instruction_string = ('Do NOT look at the bars!\n'
+                                        'Please fixate at the center,\n'
+                                        'and do not move your eyes\n\n\n'
+                                        '[Press b/index finger to continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = 'Index finger/b key - horizontal bar\nMiddle finger/y key - vertical bar\n\n[waiting for scanner]'
-        self.display_text(this_instruction_string, keys = self.settings['mri'].get('sync', 't'),
-                                color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                italic = True, alignHoriz = 'center', alignVert = 'center')
+        this_instruction_string = ('Index finger/b key - horizontal bar\n'
+                                    'Middle finger/y key - vertical bar\n\n\n'
+                                    '          [waiting for scanner]')
+        
+        draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
+
 
         self.start_experiment()
         

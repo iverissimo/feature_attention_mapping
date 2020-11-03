@@ -55,11 +55,11 @@ stimuli:
 
     bar_pass_hor_TR: 17 
     bar_pass_ver_TR: 17 
-    empty_TR: 5 #10
+    empty_TR: 19
 
     switch_bckg_TR: 10 #15
     switch_step: 0.5 # seconds, time step to update background contrast
-    switch_slope: 1 # absolute slope value for switch function
+    switch_slope: .25 #1 # absolute slope value for switch function
 
     flick_rate: 10 # Hz, rate of change of features in bar
 
@@ -69,8 +69,8 @@ stimuli:
     bar_width_ratio: 0.125 #0.0625 #0.125 # ratio of the screen res
     mini_blocks: 4
 
-    empty_TR: 4
-    cue_TR: 2
+    empty_TR: 19
+    cue_TR: 3
 
     num_bars: 4
 

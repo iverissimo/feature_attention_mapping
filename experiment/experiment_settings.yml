@@ -44,9 +44,9 @@ stimuli:
   rect_line_color: [-1,-1,-1] #[0, 0, 0]
 
   gab_ratio: 0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid
-  element_size: 0.55 #0.4 #0.2 # degrees
+  element_size: 1.1 #0.4 #0.2 # degrees
 
-  ori_shift_rate: 3 #.25 #5 # Hz, rate of element orientation change
+  ori_shift_rate: .25 #3 #.25 #5 # Hz, rate of element orientation change
 
   pos_jitter: 0.03 #0.06 #degrees, x,y position jiter to add to gabor center 
   
@@ -55,7 +55,7 @@ stimuli:
 
     bar_pass_hor_TR: 17 
     bar_pass_ver_TR: 17 
-    empty_TR: 19
+    empty_TR: 5 #19
 
     switch_bckg_TR: 10 #15
     switch_step: 0.5 # seconds, time step to update background contrast
@@ -69,7 +69,7 @@ stimuli:
     bar_width_ratio: 0.125 #0.0625 #0.125 # ratio of the screen res
     mini_blocks: 4
 
-    empty_TR: 19
+    empty_TR: 5 #19
     cue_TR: 3
 
     num_bars: 4
@@ -86,40 +86,40 @@ stimuli:
       element_color: [0, 0, .80]  #IN HSV WILL BE CONVERTED IN SCRIPT #[-1,-1,-1] #[0, 0, 0] # black and white
       element_ori: [90,180] # half horizontal, half vertical
       element_contrast: .3 #1 #0.5
-      ori_jitter_max: 1 # max value for element orientation jitter range
-      ori_jitter_min: 0.5 # min value for element orientation jitter range
+      ori_jitter_max: 1.0 # max value for element orientation jitter range
+      ori_jitter_min: 0 # min value for element orientation jitter range
 
     color_red:
       element_sf: 6 # cycles/gabor width
       element_color: [0, .93, .85] #[0, 1, .94] # IN HSV WILL BE CONVERTED IN SCRIPT #[0, 100, 42] #[1,-1,0.25] # red
-      element_ori: [90,90] #[90,180] # half horizontal, half vertical
+      element_ori: [90,180] #[90,180] # half horizontal, half vertical
       element_contrast: .3 #1
-      ori_jitter_max: 1 # max value for element orientation jitter range
-      ori_jitter_min: 0.5 # min value for element orientation jitter range
+      ori_jitter_max: 1.0 # max value for element orientation jitter range
+      ori_jitter_min: 0 # min value for element orientation jitter range
 
     color_green:
       element_sf: 6 # cycles/gabor width
       element_color: [120, 1, .59] #[89, 1, .53] #[120, .20, .80] # IN HSV WILL BE CONVERTED IN SCRIPT #[137, 100, 42] #[-1,1,-0.25] # green
-      element_ori: [90,90] #[90,180] # half horizontal, half vertical
+      element_ori: [90,180] #[90,180] # half horizontal, half vertical
       element_contrast: .3 #1
-      ori_jitter_max: 1 # max value for element orientation jitter range
-      ori_jitter_min: 0.5 # min value for element orientation jitter range
+      ori_jitter_max: 1.0 # max value for element orientation jitter range
+      ori_jitter_min: 0 # min value for element orientation jitter range
 
     ori_left:
       element_sf: 6 # cycles/gabor width
       element_color: [0, 0, .80]  #IN HSV WILL BE CONVERTED IN SCRIPT #[-1, -1, -1] # black and white
       element_ori: [45.0,225.0] # all right
       element_contrast: .3 #1 #0.7
-      ori_jitter_max: 5.0 # max value for element orientation jitter range
-      ori_jitter_min: 0.5 # min value for element orientation jitter range
+      ori_jitter_max: 1.0 # max value for element orientation jitter range
+      ori_jitter_min: 0 # min value for element orientation jitter range
 
     ori_right:
       element_sf: 6 # cycles/gabor width
       element_color: [0, 0, .80]  #IN HSV WILL BE CONVERTED IN SCRIPT #[-1, -1, -1] # black and white
       element_ori: [135.0, 315.0] # all left
       element_contrast: .3 #1 #0.7
-      ori_jitter_max: 5.0 # max value for element orientation jitter range
-      ori_jitter_min: 0.5 # min value for element orientation jitter range  
+      ori_jitter_max: 1.0 # max value for element orientation jitter range
+      ori_jitter_min: 0 # min value for element orientation jitter range  
   
 eyetracker:
   address: '100.1.1.1' #  Eyelink eyetracker IP

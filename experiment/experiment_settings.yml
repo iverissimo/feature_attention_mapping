@@ -44,9 +44,9 @@ stimuli:
   rect_line_color: [-1,-1,-1] #[0, 0, 0]
 
   gab_ratio: 0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid
-  element_size: 1.1 #0.4 #0.2 # degrees
+  element_size: 0.55 #0.4 #0.2 # degrees
 
-  ori_shift_rate: .25 #3 #.25 #5 # Hz, rate of element orientation change
+  ori_shift_rate: 'None' #0.83 #.25 #5 # Hz, rate of element orientation change
 
   pos_jitter: 0.03 #0.06 #degrees, x,y position jiter to add to gabor center 
   
@@ -55,21 +55,22 @@ stimuli:
 
     bar_pass_hor_TR: 17 
     bar_pass_ver_TR: 17 
-    empty_TR: 5 #19
+    empty_TR: 5 #20 #5
 
     switch_bckg_TR: 10 #15
-    switch_step: 0.5 # seconds, time step to update background contrast
+    switch_step: 0.25 # seconds, time step to update background contrast
     switch_slope: .25 #1 # absolute slope value for switch function
 
     flick_rate: 10 # Hz, rate of change of features in bar
 
-    bar_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty','switch_interval','empty','L-R','U-D','empty','R-L','D-U','empty']  #['L-R','U-D','R-L','D-U'] #
+    bar_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty','switch_interval',
+                    'empty','L-R','U-D','empty','R-L','D-U','empty']  #['L-R','U-D','R-L','D-U'] #
 
   feature:
     bar_width_ratio: 0.125 #0.0625 #0.125 # ratio of the screen res
     mini_blocks: 4
 
-    empty_TR: 5 #19
+    empty_TR: 5 #20 #5
     cue_TR: 3
 
     num_bars: 4

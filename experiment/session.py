@@ -598,11 +598,15 @@ class FeatureSession(ExpSession):
                 self.plot_counter += 1
 
         # total experiment time (in seconds)
-        self.total_time = self.trial_number*self.bar_step 
+        self.total_time = self.trial_number * self.bar_step 
 
         # define time points for element orientation to change
         # switch orientation time points
-        self.ori_switch_times = np.arange(0,self.total_time,1/self.settings['stimuli']['ori_shift_rate'])
+        if self.settings['stimuli']['ori_shift_rate'] == 'None':
+            ori_shift_rate = 1/self.bar_step 
+        else:
+            ori_shift_rate = self.settings['stimuli']['ori_shift_rate']
+        self.ori_switch_times = np.arange(0,self.total_time,1/ori_shift_rate)
         # counter for orientation switches
         self.ori_counter = 0
         # index for orientation

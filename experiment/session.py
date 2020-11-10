@@ -264,13 +264,10 @@ class PRFSession(ExpSession):
         # define how many times bar features switch during TR, according to flick rate defined 
         feat_switch_rate = self.settings['mri']['TR'] * self.settings['stimuli']['prf']['flick_rate']
 
-        key_list = np.repeat(key_list,round(feat_switch_rate/len(key_list))) # repeat keys, so for each bar pass it shows each condition X times
-        np.random.shuffle(key_list)
+        key_list = np.array(key_list*round(feat_switch_rate/len(key_list))) # repeat keys, so for each bar pass it shows each condition X times
         phase_conditions = key_list
 
-        for r in range(trial_number-1):
-            np.random.shuffle(key_list)
-            
+        for r in range(trial_number-1):            
             phase_conditions = np.vstack((phase_conditions,key_list))
 
 
@@ -316,7 +313,11 @@ class PRFSession(ExpSession):
 
         # define time points for element orientation to change
         # switch orientation time points
-        self.ori_switch_times = np.arange(0,self.total_time,1/self.settings['stimuli']['ori_shift_rate'])
+        if self.settings['stimuli']['ori_shift_rate'] == 'None':
+            ori_shift_rate = 1/self.bar_step 
+        else:
+            ori_shift_rate = self.settings['stimuli']['ori_shift_rate']
+        self.ori_switch_times = np.arange(0,self.total_time,1/ori_shift_rate)
         # counter for orientation switches
         self.ori_counter = 0
         # index for orientation

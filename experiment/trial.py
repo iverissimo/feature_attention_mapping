@@ -241,14 +241,14 @@ class FeatureTrial(Trial):
             # define appropriate cue string for the upcoming mini block
             attend_cond = self.attend_block_conditions[int(self.trial_type_at_TR[-1])]
 
-            if attend_cond == 'ori_left':
-                cue_str = 'left'
-            elif attend_cond == 'ori_right':
-                cue_str = 'right'
-            elif attend_cond == 'color_red':
-                cue_str = 'red'
-            elif attend_cond == 'color_green':  
-                cue_str = 'green'
+            if attend_cond == 'red_vertical':
+                cue_str = 'red_vertical'
+            elif attend_cond == 'red_horizontal':
+                cue_str = 'red_horizontal'
+            elif attend_cond == 'green_vertical':
+                cue_str = 'green_vertical'
+            elif attend_cond == 'green_horizontal':  
+                cue_str = 'green_horizontal'
 
             cue_stim = TextStim(self.session.win, text=cue_str,
                                 color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
@@ -270,9 +270,13 @@ class FeatureTrial(Trial):
 
         else: # if bar pass at TR, then draw bar
 
+            # get list of condition names (as defined in yml) for this phase
+            this_phase = list(self.session.all_bar_pos[self.trial_type_at_TR].keys())
+            this_phase = ['color_red' if 'red' in p else 'color_green' for _,p in enumerate(this_phase)]
+
             self.session.feature_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
                                            bar_direction_at_TR = self.bar_direction_at_TR,
-                                           this_phase = list(self.session.all_bar_pos[self.trial_type_at_TR].keys()),
+                                           this_phase = this_phase,
                                            position_dictionary = self.position_dictionary,
                                            orientation_ind = self.session.ori_ind,
                                            drawing_ind = self.session.drawing_ind[self.plot_counter]) 

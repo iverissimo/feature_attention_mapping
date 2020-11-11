@@ -415,7 +415,6 @@ def transform_direction_2_position(direction_array,num_hor_trials=8,num_vert_tri
 
 
 
-
 def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
                          mini_blocks = 4, num_bars = 4, num_ver_bars = 2, num_hor_bars = 2):
     
@@ -463,64 +462,11 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
     for blk in range(mini_blocks):
         output_dict['mini_block_%i'%blk] = {}
 
-    num_trials = horizontal_pos.shape[0]+vertical_pos.shape[0] # all trials
-    num_conditions = horizontal_pos.shape[1]+vertical_pos.shape[1] # all conditions
+    num_trials = horizontal_pos.shape[0] * vertical_pos.shape[0] # all trials
+    num_conditions = horizontal_pos.shape[1] + vertical_pos.shape[1] # all conditions
     
     # actually store positions
     for blk in range(mini_blocks):
-
-        cond_direction = np.empty([num_conditions,num_trials], dtype=object) # (4,16)
-
-        # define direction of bar (randomly alternate between horizontal and vertical, keeping balance)
-        direction = np.concatenate([np.repeat('vertical',horizontal_pos.shape[0]),
-                                    np.repeat('horizontal',vertical_pos.shape[0])])
-
-        for j in range(num_conditions): # for all conditions
-
-            np.random.shuffle(direction)
-
-            random_index = [] # tracker for positions where direction can be random
-
-            cond_direction[j] = direction.copy()
-            
-            if j>1: # conditioning starts for 3rd condition, before doesn't matter
-                
-                for w in range(num_trials): # for all trials, check if balanced within trial
-
-                    if list(cond_direction[0:j,w]).count('vertical') == num_conditions/2: # if already 2 verticals in trial, set next condition to horizontal
-                        cond_direction[j][w] = 'horizontal'
-                    elif list(cond_direction[0:j,w]).count('horizontal') == num_conditions/2: # if already 2 horizontals in trial, set next condition to vertical
-                        cond_direction[j][w] = 'vertical'
-                    else:
-                        random_index.append(w) # indices where it doesn't matter if vertical or horizontal
-
-                if list(cond_direction[j]).count('vertical') < num_trials/2: # if less vertical directions than supposed to
-
-                    for i in range(int(num_trials/2 - list(cond_direction[j]).count('vertical'))):
-
-                        for s in range(len(random_index)):
-                            if cond_direction[j][random_index[s]] == 'horizontal': # replace horizontal with vertical
-                                cond_direction[j][random_index[s]] = 'vertical'
-                                break
-
-                elif list(cond_direction[j]).count('vertical') > num_trials/2: # if more vertical directions than supposed to
-
-                    for i in range(int(list(cond_direction[j]).count('vertical') - num_trials/2 )):
-
-                        for s in range(len(random_index)):
-                            if cond_direction[j][random_index[s]] == 'vertical': # replace vertical with horizontal
-                                cond_direction[j][random_index[s]] = 'horizontal'
-                                break
-
-
-        ########## check for balance in bar direction, both within and accross trials ############
-        for i in range(cond_direction.shape[0]):
-            if list(cond_direction[i]).count('vertical') != num_trials/2:
-                raise TypeError("Number of bar direction in condition not balanced")
-        for i in range(cond_direction.shape[1]):
-            if list(cond_direction[...,i]).count('vertical') != num_conditions/2:
-                raise TypeError("Number of bar direction in trial not balanced")
-        ############################
 
         # first define for all conditions in block, which will be 
         # vertical, which will be horizontal
@@ -528,43 +474,76 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
 
             cond_position = []
 
+            if 'vertical' in cond:
+                cond_direction = np.repeat('vertical',num_trials)
+            elif 'horizontal' in cond:
+                cond_direction = np.repeat('horizontal',num_trials)
+
             # append to dictionary 
             output_dict['mini_block_%i'%blk][cond] = {'bar_midpoint_at_TR': cond_position, 
-                                                     'bar_direction_at_TR': cond_direction[k]}  
+                                                     'bar_direction_at_TR': cond_direction}  
 
         # now according to bar direction (horizontal vs vertical)
         # set x,y coordinates for bar midpoint
 
-        # get indices for all possible horizontal and vertical bar positions
-        cond_ind_ver = []
-        cond_ind_hor = []
-        
-        while len(cond_ind_ver) == 0 and len(cond_ind_hor) == 0:
-            cond_ind_ver, cond_ind_hor = transform_direction_2_position(cond_direction, 
-                                               num_hor_trials = horizontal_pos.shape[0],num_vert_trials = vertical_pos.shape[0], 
-                                               num_ver_bars = num_ver_bars, num_hor_bars = num_hor_bars)
+        ## get non overlapping indices for vertical and horizontal bar positions
+        # initialize empty lists for indices
+        cond_ind_ver = np.empty([num_ver_bars, vertical_pos.shape[0]], dtype=list)
+        cond_ind_hor = np.empty([num_hor_bars, horizontal_pos.shape[0]], dtype=list)
+
+        # get non-overlapping indices for vertical, throughout trials
+        for v in range(vertical_pos.shape[0]):
+
+            cond_ind_ver[0][v], cond_ind_ver[1][v] = get_non_overlapping_indices(arr_shape=[num_ver_bars,vertical_pos.shape[0]])
+
+        # get non-overlapping indices for horizontal, throughout trials
+        hor1, hor2 = get_non_overlapping_indices(arr_shape=[num_hor_bars,horizontal_pos.shape[0]])
+
+        for h in range(len(hor1)):
+
+            cond_ind_hor[0][h] = np.repeat(hor1[h],horizontal_pos.shape[0])
+            cond_ind_hor[1][h] = np.repeat(hor2[h],horizontal_pos.shape[0])
+
+        # reshape the indice arrays, and put in new arrays
+        ind_ver = np.empty([num_ver_bars, ], dtype=list)
+        ind_hor = np.empty([num_hor_bars, ], dtype=list)
+
+        ind_hor[0] = np.concatenate(cond_ind_hor[0]).ravel()
+        ind_hor[1] = np.concatenate(cond_ind_hor[1]).ravel()
+        ind_ver[0] = np.concatenate(cond_ind_ver[0]).ravel()
+        ind_ver[1] = np.concatenate(cond_ind_ver[1]).ravel()
+
+        # make indice array, that is shuffled, to randomly draw positions
+        random_ind = np.arange(num_trials)
+        np.random.shuffle(random_ind)
 
         for trl in range(num_trials): # for each trial
+    
+            vert_bool = False # boolean markers to keep track of conditions
+            hor_bool = False
 
             for k,cond in enumerate(bar_list[blk]): # iterate per condition
 
                 # get coordinates for vertical bars
                 if output_dict['mini_block_%i'%blk][cond]['bar_direction_at_TR'][trl] == 'vertical':
 
-                    coord = vertical_pos[cond_ind_ver[k][0]] # save coordinates
-                    cond_ind_ver[k] = cond_ind_ver[k][1:] #remove that first position of array, to not repeat
+                    m = 0 if vert_bool == False else 1
+                    coord = vertical_pos[ind_ver[m][random_ind[trl]]] # save coordinates
+                    vert_bool = True # update bool marker
 
                 # get coordinates for horizontal bars
                 elif output_dict['mini_block_%i'%blk][cond]['bar_direction_at_TR'][trl] == 'horizontal':
 
-                    coord = horizontal_pos[cond_ind_hor[k][0]] # save coordinates
-                    cond_ind_hor[k] = cond_ind_hor[k][1:] # remove that first position of array, to not repeat
-                      
+                    m = 0 if hor_bool == False else 1
+                    coord = horizontal_pos[ind_hor[m][random_ind[trl]]] # save coordinates
+                    hor_bool = True # update bool marker
+
                 # now append coordinates to corresponding condition list
                 output_dict['mini_block_%i'%blk][cond]['bar_midpoint_at_TR'].append(coord)
 
 
     return(output_dict)
+    
     
     
 def leave_one_out_lists(input_list):

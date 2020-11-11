@@ -459,7 +459,7 @@ class FeatureSession(ExpSession):
         ## get condition names and randomize them 
         ## setting order for what condition to attend per mini block 
         key_list = []
-        for key in self.settings['stimuli']['conditions']:
+        for key in self.settings['stimuli']['feature']['conditions']:
             if key != 'background': # we don't want to show background gabors
                 key_list.append(key)
 

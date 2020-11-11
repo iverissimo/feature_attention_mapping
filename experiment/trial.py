@@ -3,7 +3,7 @@ import os
 import numpy as np
 from exptools2.core import Trial
 
-from psychopy import event 
+from psychopy import event, tools 
 from psychopy.visual import TextStim
 
 from utils import *
@@ -232,31 +232,47 @@ class FeatureTrial(Trial):
         ## draw stim
         if 'cue' in self.trial_type_at_TR: # if cue at TR, draw background and word cue
 
-            self.session.feature_stim.draw(bar_midpoint_at_TR = np.nan, 
-                                       bar_direction_at_TR = np.nan,
-                                       this_phase = 'background',
-                                       position_dictionary = self.position_dictionary,
-                                       orientation_ind = self.session.ori_ind)
-
             # define appropriate cue string for the upcoming mini block
             attend_cond = self.attend_block_conditions[int(self.trial_type_at_TR[-1])]
 
-            if attend_cond == 'red_vertical':
-                cue_str = 'red_vertical'
-            elif attend_cond == 'red_horizontal':
-                cue_str = 'red_horizontal'
-            elif attend_cond == 'green_vertical':
-                cue_str = 'green_vertical'
-            elif attend_cond == 'green_horizontal':  
-                cue_str = 'green_horizontal'
-
-            cue_stim = TextStim(self.session.win, text=cue_str,
-                                color=(1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), 
-                                italic = False, alignHoriz = 'center', alignVert = 'center')
-            cue_stim.draw()
+            # define cue direction
+            cue_direction = 'vertical' if 'vertical' in attend_cond else 'horizontal'
             
-            print(cue_str)
-        
+            # get position for cue bar and background elements
+            cue_pos = get_object_positions(self.session.grid_pos, [np.array([0,0])], cue_direction,
+                                            self.session.bar_width_pix, screen = self.session.screen, 
+                                            num_bar = 1)
+
+            # get cue condition name, to use in local elements
+            cue_condition = 'color_red' if 'red' in attend_cond else 'color_green'
+
+            self.cue_background = update_elements(ElementArrayStim = self.session.background_array,
+                                                condition_settings = self.session.settings['stimuli']['conditions'],
+                                                position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
+                                                orientation_ind = self.session.ori_ind,
+                                                this_phase = 'background', 
+                                                elem_positions = cue_pos['background']['xys'], 
+                                                grid_pos = self.session.grid_pos,
+                                                monitor = self.session.monitor, 
+                                                screen = self.session.screen)
+
+
+            self.cue_stim = update_elements(ElementArrayStim = self.session.bar0_array,
+                                            condition_settings = self.session.settings['stimuli']['conditions'], 
+                                            position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor), 
+                                            orientation_ind = self.session.ori_ind,
+                                            this_phase = cue_condition, 
+                                            elem_positions = cue_pos['bar0']['xys'], 
+                                            grid_pos = self.session.grid_pos,
+                                            monitor = self.session.monitor, 
+                                            screen = self.session.screen)
+
+
+            self.cue_stim.draw()
+            self.cue_background.draw()
+
+            print('cue '+attend_cond)
+                    
         elif self.bar_direction_at_TR == 'empty': # if empty trial, show background
 
             self.session.feature_stim.draw(bar_midpoint_at_TR = np.nan, 

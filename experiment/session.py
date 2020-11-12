@@ -589,7 +589,7 @@ class FeatureSession(ExpSession):
         self.create_trials() 
 
         # draw instructions wait a few seconds
-        this_instruction_string = ('During the experiment\n you will see several bars\n'
+        this_instruction_string = ('During the experiment\nyou will see green and red bars\n'
                                 'oriented vertically or horizontally\n'
                                 'throughout the screen\n\n\n'
                                 '[Press b/index finger to continue]\n'
@@ -603,7 +603,7 @@ class FeatureSession(ExpSession):
             this_instruction_string = ('These bars are filled\n'
                                         'with several elements\n'
                                         'all sharing the same\n'
-                                        'color or orientation\n\n\n'
+                                        'orientation (left or right)\n\n\n'
                                         '[Press b/index finger to continue]')
             
             draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
@@ -611,15 +611,15 @@ class FeatureSession(ExpSession):
             this_instruction_string = ('The experiment is divided\n'
                                         'into different mini-blocks.\n'
                                         'At the beggining of each\n'
-                                        'you will receive a cue word,\n'
-                                        'which can be\n'
-                                        'red/green/left/right\n\n\n'
+                                        'you will see a single bar,\n'
+                                        'at the center of the screen.\n'
+                                        'This bar will be\n'
+                                        'vertical/horizontal and green/red\n\n\n'
                                         '[Press b/index finger to continue]')
             
             draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
 
-            this_instruction_string = ('That will be the\n'
-                                    'feature of the bar elements\n'
+            this_instruction_string = ('That will be the bar\n'
                                     'that you have to search for.\n\n\n'
                                     '[Press b/index finger to continue]')
             
@@ -628,9 +628,8 @@ class FeatureSession(ExpSession):
             this_instruction_string = ('Your task is to fixate\n'
                                         'at the center of the screen,\n'
                                         'and indicate the\n'
-                                        'orientation of the bar\n'
-                                        '(vertical or horizontal)\n'
-                                        'whose elements have that feature\n\n\n'
+                                        'orientation of the bar elements\n'
+                                        '(left or right)\n'
                                         '[Press b/index finger to continue]')
             
             draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
@@ -644,8 +643,8 @@ class FeatureSession(ExpSession):
             draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = ('Index finger/b key - horizontal bar\n'
-                                    'Middle finger/y key - vertical bar\n\n\n'
+        this_instruction_string = ('Index finger/b key - left oriented\n'
+                                    'Middle finger/y key - right oriented\n\n\n'
                                     '          [waiting for scanner]')
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])

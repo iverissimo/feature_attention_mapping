@@ -294,7 +294,7 @@ class FeatureTrial(Trial):
                                            bar_direction_at_TR = self.bar_direction_at_TR,
                                            this_phase = this_phase,
                                            position_dictionary = self.position_dictionary,
-                                           orientation_ind = self.session.ori_ind,
+                                           orientation_ind = [self.session.ori_ind] + self.session.local_ori[self.plot_counter],
                                            drawing_ind = self.session.drawing_ind[self.plot_counter]) 
             
             print('bar stim') 

@@ -213,12 +213,15 @@ class FeatureStim(Stim):
             
         """
         
+        if type(orientation_ind)== int:
+            orientation_ind = np.repeat(orientation_ind,5)
+
 
         # update background elements
         self.session.background_array =  update_elements(ElementArrayStim = self.session.background_array,
                                                         condition_settings = self.condition_settings, 
                                                         position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation_ind = orientation_ind,
+                                                        orientation_ind = orientation_ind[0],
                                                         this_phase = 'background', 
                                                         elem_positions = position_dictionary['background']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -230,7 +233,7 @@ class FeatureStim(Stim):
             self.session.bar0_array =  update_elements(ElementArrayStim = self.session.bar0_array,
                                                         condition_settings = self.condition_settings, 
                                                         position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation_ind = orientation_ind,
+                                                        orientation_ind = orientation_ind[1],
                                                         this_phase = this_phase[0], 
                                                         elem_positions = position_dictionary['bar0']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -240,7 +243,7 @@ class FeatureStim(Stim):
             self.session.bar1_array =  update_elements(ElementArrayStim = self.session.bar1_array,
                                                         condition_settings = self.condition_settings, 
                                                         position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation_ind = orientation_ind,
+                                                        orientation_ind = orientation_ind[2],
                                                         this_phase = this_phase[1], 
                                                         elem_positions = position_dictionary['bar1']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -250,7 +253,7 @@ class FeatureStim(Stim):
             self.session.bar2_array =  update_elements(ElementArrayStim = self.session.bar2_array,
                                                         condition_settings = self.condition_settings, 
                                                         position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation_ind = orientation_ind,
+                                                        orientation_ind = orientation_ind[3],
                                                         this_phase = this_phase[2], 
                                                         elem_positions = position_dictionary['bar2']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -260,7 +263,7 @@ class FeatureStim(Stim):
             self.session.bar3_array =  update_elements(ElementArrayStim = self.session.bar3_array,
                                                         condition_settings = self.condition_settings, 
                                                         position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation_ind = orientation_ind,
+                                                        orientation_ind = orientation_ind[4],
                                                         this_phase = this_phase[3], 
                                                         elem_positions = position_dictionary['bar3']['xys'], 
                                                         grid_pos = self.grid_pos,

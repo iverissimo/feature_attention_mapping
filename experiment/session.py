@@ -34,7 +34,7 @@ class ExpSession(Session):
             """
 
             # need to initialize parent class (Session), indicating output infos
-            super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file)
+            super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file)
 
             # set size of display
             if self.settings['window']['display'] == 'square':
@@ -153,7 +153,7 @@ class PRFSession(ExpSession):
         self.background = background
 
         # need to initialize parent class (ExpSession), indicating output infos
-        super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file,macbook_bool=macbook_bool)
+        super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, macbook_bool = macbook_bool)
 
         
 
@@ -420,7 +420,7 @@ class FeatureSession(ExpSession):
 
 
         # need to initialize parent class (ExpSession), indicating output infos
-        super().__init__(output_str=output_str,output_dir=output_dir,settings_file=settings_file,macbook_bool=macbook_bool)
+        super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, macbook_bool = macbook_bool)
         
 
     
@@ -573,11 +573,15 @@ class FeatureSession(ExpSession):
 
         # set plotting order index, to randomize which bars appear on top, for all trials in all miniblocks
         self.drawing_ind = np.empty((mini_block_TR * self.settings['stimuli']['feature']['mini_blocks'],), dtype=list)
+        # set orientation for local elements of bars, randomized
+        self.local_ori = np.empty((mini_block_TR * self.settings['stimuli']['feature']['mini_blocks'],), dtype=list)
+
 
         for k in range(self.drawing_ind.shape[0]):
             ind_list = np.arange(self.settings['stimuli']['feature']['num_bars'])
             random.shuffle(ind_list)
             self.drawing_ind[k] = ind_list
+            self.local_ori[k] = [random.randint(0, 1) for h in range(self.settings['stimuli']['feature']['num_bars'])]
 
         self.plot_counter = 0
 

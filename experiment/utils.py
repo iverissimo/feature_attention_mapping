@@ -3,6 +3,7 @@ import numpy as np
 import os, sys
 import math
 import random
+import pandas as pd
 
 from psychopy import visual, tools, colors, event
 import itertools
@@ -557,6 +558,176 @@ def draw_instructions(win, instructions, keys = ['b'], visual_obj = [],
 
     return(key_pressed)
 
+
+def randomize_conditions(cond_list):
+    
+    """ randomize condition names to attend in block
+    
+    Parameters
+    ----------
+    cond_list : array/list
+        List/array (N,) of strings with condition names        
+    """
+
+    key_list = []
+    for key in cond_list:
+        if key != 'background': # we don't want to show background gabors
+            key_list.append(key)
+
+    np.random.shuffle(key_list)
+    
+    return np.array(key_list)
+
+
+def save_bar_position(bar_dict,num_miniblock, output_path):
+    
+    """ get bar position dictionary (with all positions for whole run), convert to pandas df and 
+    save into appropriate output folder
+    
+    Parameters
+    ----------
+    bar_dict : dict
+        position dictionary
+    num_miniblock: int
+        number of miniblocks
+    output_path: str
+        absolute path to output file
+        
+    """
+    
+    df_bar_position = pd.DataFrame(columns=['mini_block', 'condition', 'bar_midpoint_at_TR', 'bar_direction_at_TR'])
+
+    for blk in range(num_miniblock):
+    
+        for _,cond in enumerate(bar_dict['mini_block_%i'%blk].keys()):
+
+            df_bar_position = df_bar_position.append({'mini_block': blk, 
+                                                      'condition': cond,
+                                                      'bar_midpoint_at_TR': bar_dict['mini_block_%i'%blk][cond]['bar_midpoint_at_TR'],
+                                                      'bar_direction_at_TR': bar_dict['mini_block_%i'%blk][cond]['bar_direction_at_TR']
+                                                     }, ignore_index=True) 
+
+
+    df_bar_position.to_csv(output_path, index = False, header=True)
+
+
+
+
+def define_feature_trials(bar_direction, bar_dict, empty_TR = 20, cue_TR = 3, mini_block_TR = 64):
+    
+    """ create feature trials based on order of "type of stimuli" throught experiment  
+    and bar positions in run. Outputs number and type of trials, and bar direction and midpoint position
+    per trial
+    
+    Parameters
+    ----------
+    bar_direction: array/list
+        list with order of "type of stimuli" throught experiment
+    bar_dict : dict
+        position dictionary
+    empty_TR: int
+        number of TRs for empty intervals of experiment
+    cue_TR: int
+        number of TRs for cue intervals of experiment
+    mini_block_TR: int
+        number of TRs for miniblocks of experiment
+        
+    """
+    
+    #create as many trials as TRs
+    trial_number = 0
+    bar_direction_all = [] # list of lists with bar orientation at all TRs
+    bar_pos_array = [] # list of lists with bar midpoint (x,y) for all TRs (if nan, then show background)
+    trial_type_all = [] # list of lists with trial type at all TRs,
+
+    for _,bartype in enumerate(bar_direction):
+        if bartype in np.array(['empty']): # empty screen
+            trial_number += empty_TR
+            trial_type_all = trial_type_all + np.repeat(bartype,empty_TR).tolist()
+            bar_direction_all = bar_direction_all + np.repeat(bartype,empty_TR).tolist()
+
+            for i in range(empty_TR):
+                bar_pos_array.append(np.array([np.nan,np.nan]))
+
+        elif 'cue' in bartype: # cue on screen
+            trial_number += cue_TR
+            trial_type_all = trial_type_all + np.repeat(bartype,cue_TR).tolist()
+            bar_direction_all = bar_direction_all + np.repeat('empty',cue_TR).tolist()
+
+            for i in range(cue_TR):
+                bar_pos_array.append(np.array([np.nan,np.nan]))
+
+        elif 'mini_block' in bartype: # bars on screen
+            trial_number += 2*mini_block_TR  # NOTE one feature trial is 1TR of bar display + 1TR of empty screen
+            trial_type_all = trial_type_all + list([bartype,'empty'])*mini_block_TR
+
+            # get mini block condition keys
+            miniblock_cond_keys = list(bar_dict[bartype].keys())
+
+            for t in range(mini_block_TR):
+
+                temp_dir_list = [] # temporary helper lists
+                temp_pos_list = [] 
+
+                for _,key in enumerate(miniblock_cond_keys):
+                    temp_dir_list.append(bar_dict[bartype][key]['bar_direction_at_TR'][t])
+                    temp_pos_list.append(bar_dict[bartype][key]['bar_midpoint_at_TR'][t])
+
+
+                bar_direction_all.append(temp_dir_list)
+                bar_direction_all.append('empty')
+                bar_pos_array.append(temp_pos_list)
+                bar_pos_array.append(np.array([np.nan,np.nan]))
+
+    
+    return trial_number, np.array(trial_type_all), np.array(bar_direction_all), np.array(bar_pos_array)
+
+
+def save_all_TR_info(bar_dict, trial_type, attend_block_conditions, bar_ori_ind, crossing_ind, output_path):
+    
+    """ save all relevant trial infos in pandas df and 
+    save into appropriate output folder
+    
+    Parameters
+    ----------
+    bar_dict : dict
+        position dictionary
+    trial_type : list/arr
+        list of type of trial ('cue', 'empty', 'miniblock') for all TRs
+    attend_block_conditions: list/arr
+        list of strings to attend in each miniblock
+    output_path: str
+        absolute path to output file
+    bar_ori_ind: list/arr
+        list of lists with orientation indices for each bar, for all TRS (if no bar on screen then nan)
+    crossing_ind: list/arr
+        list of lists with plotting indices,for all TRS (if no bar on screen then nan)
+        [useful for crossings (to know which bars on top)]
+        
+    """
+    
+    df_out = pd.DataFrame(columns=['trial_num','trial_type', 
+                                   'attend_condition', 'bars', 
+                                   'local_orientation_ind', 'crossing_ind'])
+
+    counter = 0
+    
+    for trl in range(len(trial_type)):
+        
+        if trial_type[trl] == 'cue_%i'%(counter+1):
+            counter += 1
+        
+        df_out = df_out.append({'trial_num': trl, 
+                                'trial_type': trial_type[trl],
+                                'attend_condition': attend_block_conditions[counter],
+                                'bars': bar_dict['mini_block_%i'%counter].keys(),
+                                'local_orientation_ind': bar_ori_ind[trl],
+                                'crossing_ind': crossing_ind[trl],
+                              }, ignore_index=True) 
+        
+        
+
+    df_out.to_csv(output_path, index = False, header=True)
 
 
 

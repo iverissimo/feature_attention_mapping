@@ -458,13 +458,7 @@ class FeatureSession(ExpSession):
 
         ## get condition names and randomize them 
         ## setting order for what condition to attend per mini block 
-        key_list = []
-        for key in self.settings['stimuli']['feature']['conditions']:
-            if key != 'background': # we don't want to show background gabors
-                key_list.append(key)
-
-        np.random.shuffle(key_list)
-        self.attend_block_conditions = np.array(key_list)
+        self.attend_block_conditions = randomize_conditions(self.settings['stimuli']['feature']['conditions'])
         print('Conditions to attend throughout blocks will be %s'%str(self.attend_block_conditions))
 
 
@@ -472,7 +466,7 @@ class FeatureSession(ExpSession):
 
         # define bar width 
         bar_width_ratio = self.settings['stimuli']['feature']['bar_width_ratio']
-        self.bar_width_pix = self.screen*bar_width_ratio
+        self.bar_width_pix = self.screen * bar_width_ratio
 
         # define number of bars per direction
         num_bars = np.array(self.screen)/self.bar_width_pix; num_bars = np.array(num_bars,dtype=int)
@@ -503,6 +497,10 @@ class FeatureSession(ExpSession):
                                             num_ver_bars = 2, 
                                             num_hor_bars = 2)
 
+        # save bar positions for run in output folder
+        save_bar_position(self.all_bar_pos, self.settings['stimuli']['feature']['mini_blocks'], 
+                          os.path.join(self.output_dir, self.output_str+'_bar_positions.csv'))
+
 
         # number of TRs per "type of stimuli"
         cue_TR = self.settings['stimuli']['feature']['cue_TR']
@@ -514,76 +512,41 @@ class FeatureSession(ExpSession):
         # list with order of "type of stimuli" throught experiment (called bar direction to make analogous with other class)
         bar_direction = self.settings['stimuli']['feature']['bar_direction'] 
 
-        #create as many trials as TRs
-        trial_number = 0
-        bar_direction_all = [] # list of lists with bar orientation at all TRs
-        bar_pos_array = [] # list of lists with bar midpoint (x,y) for all TRs (if nan, then show background)
-        trial_type_all = [] # list of lists with trial type at all TRs,
-
-        for _,bartype in enumerate(bar_direction):
-            if bartype in np.array(['empty']): # empty screen
-                trial_number += empty_TR
-                trial_type_all = trial_type_all + np.repeat(bartype,empty_TR).tolist()
-                bar_direction_all = bar_direction_all + np.repeat(bartype,empty_TR).tolist()
-                
-                for i in range(empty_TR):
-                    bar_pos_array.append(np.array([np.nan,np.nan]))
-                
-            elif 'cue' in bartype: # cue on screen
-                trial_number += cue_TR
-                trial_type_all = trial_type_all + np.repeat(bartype,cue_TR).tolist()
-                bar_direction_all = bar_direction_all + np.repeat('empty',cue_TR).tolist()
-                
-                for i in range(cue_TR):
-                    bar_pos_array.append(np.array([np.nan,np.nan]))
-                
-            elif 'mini_block' in bartype: # bars on screen
-                trial_number += 2*mini_block_TR 
-                trial_type_all = trial_type_all + list([bartype,'empty'])*mini_block_TR
-                
-                # get mini block condition keys
-                miniblock_cond_keys = list(self.all_bar_pos[bartype].keys())
-                
-                for t in range(mini_block_TR):
-                    
-                    temp_dir_list = [] # temporary helper lists
-                    temp_pos_list = [] 
-                    
-                    for _,key in enumerate(miniblock_cond_keys):
-                        temp_dir_list.append(self.all_bar_pos[bartype][key]['bar_direction_at_TR'][t])
-                        temp_pos_list.append(self.all_bar_pos[bartype][key]['bar_midpoint_at_TR'][t])
-
-                    
-                    bar_direction_all.append(temp_dir_list)
-                    bar_direction_all.append('empty')
-                    bar_pos_array.append(temp_pos_list)
-                    bar_pos_array.append(np.array([np.nan,np.nan]))
-                
-        
-
-        self.trial_number = trial_number # total number of trials 
-        print("Total number of (expected) TRs: %d"%self.trial_number)
-        self.bar_direction_all = np.array(bar_direction_all) # list of strings/lists with bar orientation or 'empty' 
-
+        # set number of trials,
+        # list of type of trial (cue, empty, miniblock) for all TRs,
+        # list of strings/lists with bar direction/orientation or 'empty',
         # list of midpoint position (x,y) of bars for all TRs (if empty, then nan)
-        self.bar_midpoint_all = np.array(bar_pos_array)
-
-        # list of type of trial (cue, empty, miniblock) for all TRs
-        self.trial_type_all = np.array(trial_type_all)
+        self.trial_number, self.trial_type_all, self.bar_direction_all, self.bar_midpoint_all = define_feature_trials(bar_direction, 
+                                                                                                                      self.all_bar_pos, 
+                                                                                                                      empty_TR = empty_TR, 
+                                                                                                                      cue_TR = cue_TR, 
+                                                                                                                      mini_block_TR = mini_block_TR)
+                
+        print("Total number of (expected) TRs: %d"%self.trial_number)
 
         # set plotting order index, to randomize which bars appear on top, for all trials in all miniblocks
-        self.drawing_ind = np.empty((mini_block_TR * self.settings['stimuli']['feature']['mini_blocks'],), dtype=list)
-        # set orientation for local elements of bars, randomized
-        self.local_ori = np.empty((mini_block_TR * self.settings['stimuli']['feature']['mini_blocks'],), dtype=list)
+        # and set orientation for local elements of bars, randomized
+        self.drawing_ind = []
+        self.local_ori = []
+
+        for _,val in enumerate(self.trial_type_all):
+            
+            if 'mini_block' in val:
+                ind_list = np.arange(self.settings['stimuli']['feature']['num_bars'])
+                random.shuffle(ind_list)
+                
+                self.drawing_ind.append(ind_list)
+                self.local_ori.append([random.randint(0, 1) for h in range(self.settings['stimuli']['feature']['num_bars'])])
+                
+            else: # if not in miniblock, these are nan
+                self.drawing_ind.append([np.nan])
+                self.local_ori.append([np.nan])
 
 
-        for k in range(self.drawing_ind.shape[0]):
-            ind_list = np.arange(self.settings['stimuli']['feature']['num_bars'])
-            random.shuffle(ind_list)
-            self.drawing_ind[k] = ind_list
-            self.local_ori[k] = [random.randint(0, 1) for h in range(self.settings['stimuli']['feature']['num_bars'])]
-
-        self.plot_counter = 0
+        # save relevant trial info in df (for later analysis)
+        save_all_TR_info(self.all_bar_pos, self.trial_type_all, self.attend_block_conditions, 
+                        self.local_ori, self.drawing_ind, os.path.join(self.output_dir, self.output_str+'_trial_info.csv'))
+                         
 
         # append all trials
         self.all_trials = []
@@ -596,11 +559,8 @@ class FeatureSession(ExpSession):
                                                 bar_direction_at_TR = self.bar_direction_all[i],
                                                 bar_midpoint_at_TR = self.bar_midpoint_all[i],
                                                 trial_type_at_TR = self.trial_type_all[i],
-                                                plot_counter = self.plot_counter
                                                 ))
 
-            if 'mini_block' in self.trial_type_all[i]: 
-                self.plot_counter += 1
 
         # total experiment time (in seconds)
         self.total_time = self.trial_number * self.bar_step 
@@ -619,7 +579,6 @@ class FeatureSession(ExpSession):
 
         # print window size just to check, not actually needed
         print(self.screen)
-        print(self.screen[0])
 
 
     def run(self):

@@ -213,7 +213,7 @@ class FeatureStim(Stim):
             
         """
         
-        if type(orientation_ind)== int:
+        if type(orientation_ind) == int:
             orientation_ind = np.repeat(orientation_ind,5)
 
 

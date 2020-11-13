@@ -3,7 +3,7 @@ import os
 import numpy as np
 from exptools2.core import Trial
 
-from psychopy import event, tools 
+from psychopy import event, tools, colors, visual
 from psychopy.visual import TextStim
 
 from utils import *
@@ -234,40 +234,36 @@ class FeatureTrial(Trial):
             attend_cond = self.attend_block_conditions[int(self.trial_type_at_TR[-1])]
 
             # define cue direction
-            cue_direction = 'vertical' if 'vertical' in attend_cond else 'horizontal'
-            
-            # get position for cue bar and background elements
-            cue_pos = get_object_positions(self.session.grid_pos, [np.array([0,0])], cue_direction,
-                                            self.session.bar_width_pix, screen = self.session.screen, 
-                                            num_bar = 1)
+            if 'vertical' in attend_cond:
+                cue_width = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['feature']['cue_width'], self.session.monitor)
+                cue_height = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['feature']['cue_height'], self.session.monitor)
+
+            else:
+                cue_width = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['feature']['cue_height'], self.session.monitor)
+                cue_height = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['feature']['cue_width'], self.session.monitor)
 
             # get cue condition name, to use in local elements
             cue_condition = 'color_red' if 'red' in attend_cond else 'color_green'
 
-            self.cue_background = update_elements(ElementArrayStim = self.session.background_array,
-                                                condition_settings = self.session.settings['stimuli']['conditions'],
-                                                position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                orientation_ind = self.session.ori_ind,
-                                                this_phase = 'background', 
-                                                elem_positions = cue_pos['background']['xys'], 
-                                                grid_pos = self.session.grid_pos,
-                                                monitor = self.session.monitor, 
-                                                screen = self.session.screen)
 
+            self.session.feature_stim.draw(bar_midpoint_at_TR = np.nan, 
+                                       bar_direction_at_TR = np.nan,
+                                       this_phase = 'background',
+                                       position_dictionary = self.position_dictionary,
+                                       orientation_ind = self.session.ori_ind)
 
-            self.cue_stim = update_elements(ElementArrayStim = self.session.bar0_array,
-                                            condition_settings = self.session.settings['stimuli']['conditions'], 
-                                            position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor), 
-                                            orientation_ind = self.session.ori_ind,
-                                            this_phase = cue_condition, 
-                                            elem_positions = cue_pos['bar0']['xys'], 
-                                            grid_pos = self.session.grid_pos,
-                                            monitor = self.session.monitor, 
-                                            screen = self.session.screen)
-
-
+            self.cue_stim = visual.Rect(win = self.session.win,
+                                        units = "pix",
+                                        width = cue_width,
+                                        height = cue_height,
+                                        fillColor = self.session.settings['stimuli']['conditions'][cue_condition]['element_color'],
+                                        lineColor = self.session.settings['stimuli']['conditions'][cue_condition]['element_color'],
+                                        contrast = self.session.settings['stimuli']['feature']['cue_contrast'],
+                                        pos = [0, 0],
+                                        fillColorSpace = 'hsv',
+                                        lineColorSpace = 'hsv'
+                                        )
             self.cue_stim.draw()
-            self.cue_background.draw()
 
             print('cue '+attend_cond)
                     

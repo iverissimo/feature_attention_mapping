@@ -313,7 +313,7 @@ class PRFSession(ExpSession):
 
         # define time points for element orientation to change
         # switch orientation time points
-        if self.settings['stimuli']['ori_shift_rate'] == 'None':
+        if self.settings['stimuli']['ori_shift_rate'] == 'TR':
             ori_shift_rate = 1/self.bar_step 
         else:
             ori_shift_rate = self.settings['stimuli']['ori_shift_rate']
@@ -390,7 +390,7 @@ class PRFSession(ExpSession):
             trl.run() # run forrest run
 
 
-        print('Expected number of responses: %d'%len(self.fixation_switch_times)+1)
+        print('Expected number of responses: %d'%(len(self.fixation_switch_times)+1))
         print('Total subject responses: %d'%self.total_responses)
         print('Correct responses (within 0.8s of dot color change): %d'%self.correct_responses)
           
@@ -567,7 +567,7 @@ class FeatureSession(ExpSession):
 
         # define time points for element orientation to change
         # switch orientation time points
-        if self.settings['stimuli']['ori_shift_rate'] == 'None':
+        if self.settings['stimuli']['ori_shift_rate'] == 'TR':
             ori_shift_rate = 1/self.bar_step 
         else:
             ori_shift_rate = self.settings['stimuli']['ori_shift_rate']
@@ -608,31 +608,34 @@ class FeatureSession(ExpSession):
             
             draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
 
-            this_instruction_string = ('The experiment is divided\n'
-                                        'into different mini-blocks.\n'
-                                        'At the beggining of each\n'
-                                        'you will see a single bar,\n'
-                                        'at the center of the screen.\n'
-                                        'This bar will be\n'
-                                        'vertical/horizontal and green/red\n\n\n'
-                                        '[Press b/index finger to continue]')
-            
-            draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
-
-            this_instruction_string = ('That will be the bar\n'
-                                    'that you have to search for.\n\n\n'
-                                    '[Press b/index finger to continue]')
-            
-            draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
-
             this_instruction_string = ('Your task is to fixate\n'
                                         'at the center of the screen,\n'
                                         'and indicate the\n'
                                         'orientation of the bar elements\n'
-                                        '(left or right)\n'
+                                        '(left or right)\n\n\n'
                                         '[Press b/index finger to continue]')
             
             draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
+
+            this_instruction_string = ('The experiment is divided\n'
+                                        'into different mini-blocks.\n\n'
+                                        'At the beggining of each\n'
+                                        'you will see a single bar,\n'
+                                        'at the center of the screen.\n\n\n'
+                                        '[Press b/index finger to continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
+
+            this_instruction_string = ('This bar will be\n'
+                                        'vertical/horizontal and\n'
+                                        'green/red\n\n'
+                                        'That will be the bar\n'
+                                        'whose ELEMENTS\n'
+                                        'you have to search for.\n\n\n'
+                                        '[Press b/index finger to continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
+
 
             # draw instructions wait a few seconds
             this_instruction_string = ('Do NOT look at the bars!\n'

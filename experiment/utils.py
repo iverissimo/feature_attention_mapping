@@ -27,17 +27,25 @@ def jitter(arr,max_val=1,min_val=0.5):
     """
 
     # element positions (#elements,(x,y))
-    size_arr = len(arr)
+    size_arr = arr.shape[0]
+    dim = arr.shape[-1] if len(arr.shape) == 2 else 1
+    
+    for k in range(dim):
 
-    # add some randomly uniform jitter 
-    jit = np.concatenate((np.random.uniform(-max_val,-min_val,math.floor(size_arr * .5)),
-                          np.random.uniform(min_val,max_val,math.ceil(size_arr * .5))))
-    np.random.shuffle(jit)
-
-    if arr.shape[-1] == 2:
-        output = arr + jit[:,None]
-    else:
-        output = arr + jit
+        # add some randomly uniform jitter 
+        jit = np.concatenate((np.random.uniform(-max_val,-min_val,math.floor(size_arr * .5)),
+                              np.random.uniform(min_val,max_val,math.ceil(size_arr * .5))))
+        np.random.shuffle(jit)
+        
+        if k == 0 and dim == 1:
+            output = arr + jit
+        elif k == 0:
+            output = arr[...,k] + jit
+        else:
+            output = np.vstack((output,arr[...,k] + jit))
+    
+    if dim > 1:
+        output = output.T
     
     return(output)
 

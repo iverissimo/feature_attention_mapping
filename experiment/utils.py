@@ -9,6 +9,7 @@ from psychopy import visual, tools, colors, event
 import itertools
 
 import time
+import colorsys
 
 
 def jitter(arr,max_val=1,min_val=0.5):
@@ -48,6 +49,25 @@ def jitter(arr,max_val=1,min_val=0.5):
         output = output.T
     
     return(output)
+
+
+def rgb255_2_hsv(arr):
+    
+    """ convert RGB 255 to HSV
+    
+    Parameters
+    ----------
+    arr: list/array
+        1D list of rgb values
+        
+    """
+    
+    rgb_norm = np.array(arr)/255
+    
+    hsv_color = np.array(colorsys.rgb_to_hsv(rgb_norm[0],rgb_norm[1],rgb_norm[2]))
+    hsv_color[0] = hsv_color[0] * 360
+    
+    return hsv_color
 
 
 def near_power_of_2(x,near='previous'):
@@ -190,7 +210,10 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     # set number of elements
     nElements = grid_pos.shape[0]
 
-    # to make colored gabor, need to do it a bit differently (psychopy forces colors to be opposite)
+    ## to make colored gabor, need to do it a bit differently (psychopy forces colors to be opposite)
+    # get rgb color and convert to hsv
+    hsv_color = rgb255_2_hsv(condition_settings[this_phase]['element_color'])
+
     grat_res = near_power_of_2(ElementArrayStim.sizes[0][0],near='previous') # use power of 2 as grating res, to avoid error
     
     # initialise grating
@@ -202,11 +225,11 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
 
     # replace the base texture red/green channel with the element color value, and the value channel with the grating
 
-    colored_grating[..., 0] = condition_settings[this_phase]['element_color'][0]
-    colored_grating[..., 1] = condition_settings[this_phase]['element_color'][1]
-    colored_grating[..., 2] = grating_norm * condition_settings[this_phase]['element_color'][2]
+    colored_grating[..., 0] = hsv_color[0]
+    colored_grating[..., 1] = hsv_color[1]
+    colored_grating[..., 2] = grating_norm * hsv_color[2]
 
-    elementTex = colors.hsv2rgb(colored_grating) 
+    elementTex = colors.hsv2rgb(colored_grating) # convert back to rgb
 
     # update element colors to color of the patch 
     element_color = np.ones((int(np.round(nElements)),3)) 
@@ -256,7 +279,7 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     ElementArrayStim.setContrs(element_contrast)
     ElementArrayStim.setSfs(element_sfs)
     ElementArrayStim.setOris(element_ori)
-    ElementArrayStim.setColors(element_color)#, colorSpace='hsv')
+    ElementArrayStim.setColors(element_color)
     ElementArrayStim.setOpacities(element_opacities)
 
 

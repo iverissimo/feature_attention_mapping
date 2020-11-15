@@ -259,9 +259,11 @@ class FeatureTrial(Trial):
                                         fillColor = self.session.settings['stimuli']['conditions'][cue_condition]['element_color'],
                                         lineColor = self.session.settings['stimuli']['conditions'][cue_condition]['element_color'],
                                         contrast = self.session.settings['stimuli']['feature']['cue_contrast'],
+                                        opacity = 1.0,
                                         pos = [0, 0],
-                                        fillColorSpace = 'hsv',
-                                        lineColorSpace = 'hsv'
+                                        fillColorSpace = 'rgb255',
+                                        lineColorSpace = 'rgb255',
+                                        colorSpace = 'rgb255'
                                         )
             self.cue_stim.draw()
 

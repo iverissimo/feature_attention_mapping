@@ -6,7 +6,7 @@ preferences:
 window: # refers to the parameters for the Psychopy Window class
   size: [1680, 1050]
   pos: [0, 0]
-  color: [0, 0, 0] #[127, 127, 127] #[0, 0, .5]
+  color: [0, 0, 0] # psychopy rgb
   fullscr: True
   screen: 0 #1
   #useRetina: False
@@ -31,17 +31,17 @@ stimuli:
   colorSpace: 'rgb' #'rgb255' #'hsv'
 
   fix_dot_size_deg: 0.05
-  fix_dot_color: [-1,-1,-1] #[0, 0, 0]  # start with black
-  fix_line_color: [-1,-1,-1] #[0, 0, 0] # start with black
+  fix_dot_color: [-1,-1,-1] # psychopy rgb, start with black
+  fix_line_color: [-1,-1,-1] # psychopy rgb
 
   fix_dot_shift_rate: .25 #Hz, rate of fixation dot color switch
 
   fix_line_width: 1
-  fix_line_color: [-1,-1,-1] #[0, 0, 0]
+  fix_line_color: [-1,-1,-1] # psychopy rgb
   fix_line_contrast: 0.15
 
-  rect_fill_color: [-1,-1,-1] #[0, 0, 0]
-  rect_line_color: [-1,-1,-1] #[0, 0, 0]
+  rect_fill_color: [-1,-1,-1] # psychopy rgb
+  rect_line_color: [-1,-1,-1] # psychopy rgb
 
   gab_ratio: 0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid
   element_size: 0.55 #0.4 #0.2 # degrees
@@ -67,7 +67,7 @@ stimuli:
                     'empty','L-R','U-D','empty','R-L','D-U','empty']  #['L-R','U-D','R-L','D-U'] #
 
   feature:
-    bar_width_ratio: 0.125 #0.0625 #0.125 # ratio of the screen res
+    bar_width_ratio: 0.125 # ratio of the screen res
     mini_blocks: 4
 
     empty_TR: 20 #5
@@ -90,7 +90,7 @@ stimuli:
   conditions: # feature conditions
     background: 
       element_sf: 6 # cycles/gabor width
-      element_color: [0, 0, .80]  #IN HSV WILL BE CONVERTED IN SCRIPT #[-1,-1,-1] #[0, 0, 0] # black and white
+      element_color: [204, 204, 204]  # rgb255, light grey
       element_ori: [90,180] # half horizontal, half vertical
       element_contrast: .3 #1 #0.5
       ori_jitter_max: 1.0 # max value for element orientation jitter range
@@ -98,7 +98,7 @@ stimuli:
 
     color_red:
       element_sf: 6 # cycles/gabor width
-      element_color: [0, .93, .85] #[0, 1, .94] # IN HSV WILL BE CONVERTED IN SCRIPT #[0, 100, 42] #[1,-1,0.25] # red
+      element_color: [240, 0, 0] # rgb255
       element_ori: [45,135] #[90,180] # half horizontal, half vertical
       element_contrast: .3 #1
       ori_jitter_max: 1.0 # max value for element orientation jitter range
@@ -106,7 +106,7 @@ stimuli:
 
     color_green:
       element_sf: 6 # cycles/gabor width
-      element_color: [120, 1, .59] #[89, 1, .53] #[120, .20, .80] # IN HSV WILL BE CONVERTED IN SCRIPT #[137, 100, 42] #[-1,1,-0.25] # green
+      element_color: [70, 135, 0] #rgb255
       element_ori: [45,135] #[90,180] # half horizontal, half vertical
       element_contrast: .3 #1
       ori_jitter_max: 1.0 # max value for element orientation jitter range

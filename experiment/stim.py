@@ -103,7 +103,7 @@ class PRFStim(Stim):
         super().__init__(session=session, bar_width_ratio=bar_width_ratio, grid_pos=grid_pos)
 
 
-    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase, position_dictionary, orientation_ind = 0, background_contrast = 0):
+    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase, position_dictionary, orientation = True, background_contrast = 0):
         
         """ Draw stimuli - pRF bar - for each trial 
         
@@ -122,7 +122,7 @@ class PRFStim(Stim):
         self.session.background_array = update_elements(ElementArrayStim = self.session.background_array,
                                                         condition_settings = self.condition_settings,
                                                         position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation_ind = orientation_ind,
+                                                        orientation = orientation,
                                                         background_contrast = background_contrast,
                                                         this_phase = 'background', 
                                                         elem_positions = position_dictionary['background']['xys'], 
@@ -135,7 +135,7 @@ class PRFStim(Stim):
             self.session.bar0_array = update_elements(ElementArrayStim = self.session.bar0_array,
                                                         condition_settings = self.condition_settings, 
                                                         position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor), 
-                                                        orientation_ind = orientation_ind,
+                                                        orientation = orientation,
                                                         this_phase = this_phase, 
                                                         elem_positions = position_dictionary['bar0']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -198,7 +198,7 @@ class FeatureStim(Stim):
 
 
 
-    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase, position_dictionary, orientation_ind = 0, drawing_ind = [0,1,2,3]):
+    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase, position_dictionary, orientation = True, drawing_ind = [0,1,2,3]):
         
         """ Draw stimuli - pRF bars - for each trial 
         
@@ -212,16 +212,13 @@ class FeatureStim(Stim):
             List/arr of strings with condition names to draw
             
         """
-        
-        if type(orientation_ind) == int:
-            orientation_ind = np.repeat(orientation_ind,5)
 
 
         # update background elements
         self.session.background_array =  update_elements(ElementArrayStim = self.session.background_array,
                                                         condition_settings = self.condition_settings, 
                                                         position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation_ind = orientation_ind[0],
+                                                        orientation = orientation,
                                                         this_phase = 'background', 
                                                         elem_positions = position_dictionary['background']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -233,7 +230,7 @@ class FeatureStim(Stim):
             self.session.bar0_array =  update_elements(ElementArrayStim = self.session.bar0_array,
                                                         condition_settings = self.condition_settings, 
                                                         position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation_ind = orientation_ind[1],
+                                                        orientation = orientation,
                                                         this_phase = this_phase[0], 
                                                         elem_positions = position_dictionary['bar0']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -243,7 +240,7 @@ class FeatureStim(Stim):
             self.session.bar1_array =  update_elements(ElementArrayStim = self.session.bar1_array,
                                                         condition_settings = self.condition_settings, 
                                                         position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation_ind = orientation_ind[2],
+                                                        orientation = orientation,
                                                         this_phase = this_phase[1], 
                                                         elem_positions = position_dictionary['bar1']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -253,7 +250,7 @@ class FeatureStim(Stim):
             self.session.bar2_array =  update_elements(ElementArrayStim = self.session.bar2_array,
                                                         condition_settings = self.condition_settings, 
                                                         position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation_ind = orientation_ind[3],
+                                                        orientation = orientation,
                                                         this_phase = this_phase[2], 
                                                         elem_positions = position_dictionary['bar2']['xys'], 
                                                         grid_pos = self.grid_pos,
@@ -263,7 +260,7 @@ class FeatureStim(Stim):
             self.session.bar3_array =  update_elements(ElementArrayStim = self.session.bar3_array,
                                                         condition_settings = self.condition_settings, 
                                                         position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation_ind = orientation_ind[4],
+                                                        orientation = orientation,
                                                         this_phase = this_phase[3], 
                                                         elem_positions = position_dictionary['bar3']['xys'], 
                                                         grid_pos = self.grid_pos,

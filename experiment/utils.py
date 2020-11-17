@@ -183,7 +183,7 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
 
 
 def update_elements(ElementArrayStim, condition_settings, this_phase, elem_positions, grid_pos,
-                   	monitor, screen = np.array([1680,1050]), position_jitter = None, orientation_ind = None, background_contrast = None):
+                   	monitor, screen = np.array([1680,1050]), position_jitter = None, orientation = True, background_contrast = None):
     
     """ update element array settings
     
@@ -237,18 +237,11 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     # update element spatial frequency
     element_sfs = np.ones((nElements)) * condition_settings[this_phase]['element_sf'] # in cycles/gabor width
 
-    # update element orientation (half ori1, half ori2)
-    ori_ind = np.array([orientation_ind,orientation_ind]) if orientation_ind != None else np.array([0,1])
+    # update element orientation randomly
+    if orientation == True:
+        element_ori = np.random.uniform(0,360,nElements)
+        ElementArrayStim.setOris(element_ori)
 
-    ori_arr = np.concatenate((np.ones((math.floor(nElements * .5))) * condition_settings[this_phase]['element_ori'][ori_ind[0]], 
-                              np.ones((math.ceil(nElements * .5))) * condition_settings[this_phase]['element_ori'][ori_ind[1]]))
-
-    # add some jitter to the orientations
-    element_ori = jitter(ori_arr,
-                     max_val = condition_settings[this_phase]['ori_jitter_max'],
-                     min_val = condition_settings[this_phase]['ori_jitter_min']) 
-
-    np.random.shuffle(element_ori) # shuffle the orientations
 
     # update element opacities
 
@@ -278,7 +271,6 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     ElementArrayStim.setTex(elementTex)
     ElementArrayStim.setContrs(element_contrast)
     ElementArrayStim.setSfs(element_sfs)
-    ElementArrayStim.setOris(element_ori)
     ElementArrayStim.setColors(element_color)
     ElementArrayStim.setOpacities(element_opacities)
 

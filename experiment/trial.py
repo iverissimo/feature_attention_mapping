@@ -83,7 +83,7 @@ class PRFTrial(Trial):
         if self.session.ori_counter<len(self.session.ori_switch_times): # if counter within number of switch moments
             if current_time >= self.session.ori_switch_times[self.session.ori_counter]: # when switch time reached, switch ori and increment counter
                 
-                self.session.ori_ind = 0 if (self.session.ori_counter % 2) == 0 else 1
+                self.session.ori_bool = True
                 self.session.ori_counter += 1
 
         ## draw stim
@@ -93,7 +93,7 @@ class PRFTrial(Trial):
                                        bar_direction_at_TR = np.nan,
                                        this_phase = 'background',
                                        position_dictionary = self.position_dictionary,
-                                       orientation_ind = self.session.ori_ind,
+                                       orientation = self.session.ori_bool,
                                        background_contrast = self.session.background_contrast) 
             print('background')
 
@@ -103,10 +103,13 @@ class PRFTrial(Trial):
                                        bar_direction_at_TR = self.bar_direction_at_TR,
                                        this_phase = self.phase_names[int(self.phase)],
                                        position_dictionary = self.position_dictionary,
-                                       orientation_ind = self.session.ori_ind,
+                                       orientation = self.session.ori_bool,
                                        background_contrast = self.session.background_contrast) 
 
             print(self.phase_names[int(self.phase)]) #'ori_left')
+
+        # set orientation bool counter to false
+        self.session.ori_bool = False
 
         ## draw delimitating black bars, to make display square
         self.session.rect_left.draw()
@@ -224,7 +227,7 @@ class FeatureTrial(Trial):
         if self.session.ori_counter<len(self.session.ori_switch_times): # if counter within number of switch moments
             if current_time >= self.session.ori_switch_times[self.session.ori_counter]: # when switch time reached, switch ori and increment counter
                 
-                self.session.ori_ind = 0 if (self.session.ori_counter % 2) == 0 else 1
+                self.session.ori_bool = True
                 self.session.ori_counter += 1
 
         ## draw stim
@@ -250,7 +253,7 @@ class FeatureTrial(Trial):
                                        bar_direction_at_TR = np.nan,
                                        this_phase = 'background',
                                        position_dictionary = self.position_dictionary,
-                                       orientation_ind = self.session.ori_ind)
+                                       orientation = self.session.ori_bool)
 
             self.cue_stim = visual.Rect(win = self.session.win,
                                         units = "pix",
@@ -275,7 +278,7 @@ class FeatureTrial(Trial):
                                        bar_direction_at_TR = np.nan,
                                        this_phase = 'background',
                                        position_dictionary = self.position_dictionary,
-                                       orientation_ind = self.session.ori_ind) 
+                                       orientation = self.session.ori_bool) 
             print('background')
 
         # bar pass
@@ -290,10 +293,13 @@ class FeatureTrial(Trial):
                                            bar_direction_at_TR = self.bar_direction_at_TR,
                                            this_phase = this_phase,
                                            position_dictionary = self.position_dictionary,
-                                           orientation_ind = [self.session.ori_ind] + self.session.local_ori[self.ID],
+                                           orientation = self.session.ori_bool,
                                            drawing_ind = self.session.drawing_ind[self.ID]) 
             
             print('bar stim') 
+
+        # set orientation bool counter to false
+        self.session.ori_bool = False
 
         # draw delimitating black bars, to make display square
         self.session.rect_left.draw()

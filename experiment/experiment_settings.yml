@@ -44,7 +44,7 @@ stimuli:
   rect_line_color: [-1,-1,-1] # psychopy rgb
 
   gab_ratio: 0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid
-  element_size: 0.55 #0.4 #0.2 # degrees
+  element_size: 0.55 #1.1 #0.55 #0.4 #0.2 # degrees
 
   ori_shift_rate: 'TR' #0.83 #.25 #5 # Hz, rate of element orientation change
 
@@ -59,7 +59,7 @@ stimuli:
 
     switch_bckg_TR: 15 #10 #15
     switch_step: 0.25 # seconds, time step to update background contrast
-    switch_slope: .25 #1 # absolute slope value for switch function
+    switch_slope: .65 #1 # absolute slope value for switch function
 
     flick_rate: 10 # Hz, rate of change of features in bar
 

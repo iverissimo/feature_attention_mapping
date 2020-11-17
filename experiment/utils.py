@@ -706,7 +706,7 @@ def define_feature_trials(bar_direction, bar_dict, empty_TR = 20, cue_TR = 3, mi
     return trial_number, np.array(trial_type_all), np.array(bar_direction_all), np.array(bar_pos_array)
 
 
-def save_all_TR_info(bar_dict, trial_type, attend_block_conditions, bar_ori_ind, crossing_ind, output_path):
+def save_all_TR_info(bar_dict, trial_type, attend_block_conditions, hemifield, crossing_ind, output_path):
     
     """ save all relevant trial infos in pandas df and 
     save into appropriate output folder
@@ -721,8 +721,8 @@ def save_all_TR_info(bar_dict, trial_type, attend_block_conditions, bar_ori_ind,
         list of strings to attend in each miniblock
     output_path: str
         absolute path to output file
-    bar_ori_ind: list/arr
-        list of lists with orientation indices for each bar, for all TRS (if no bar on screen then nan)
+    hemifield: list/arr
+        list of hemifield placement of attended bar, for all TRS (if no bar on screen then nan)
     crossing_ind: list/arr
         list of lists with plotting indices,for all TRS (if no bar on screen then nan)
         [useful for crossings (to know which bars on top)]
@@ -731,7 +731,7 @@ def save_all_TR_info(bar_dict, trial_type, attend_block_conditions, bar_ori_ind,
     
     df_out = pd.DataFrame(columns=['trial_num','trial_type', 
                                    'attend_condition', 'bars', 
-                                   'local_orientation_ind', 'crossing_ind'])
+                                   'hemifield', 'crossing_ind'])
 
     counter = 0
     
@@ -744,7 +744,7 @@ def save_all_TR_info(bar_dict, trial_type, attend_block_conditions, bar_ori_ind,
                                 'trial_type': trial_type[trl],
                                 'attend_condition': attend_block_conditions[counter],
                                 'bars': bar_dict['mini_block_%i'%counter].keys(),
-                                'local_orientation_ind': bar_ori_ind[trl],
+                                'hemifield': hemifield[trl],
                                 'crossing_ind': crossing_ind[trl],
                               }, ignore_index=True) 
         

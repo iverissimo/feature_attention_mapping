@@ -525,27 +525,41 @@ class FeatureSession(ExpSession):
         print("Total number of (expected) TRs: %d"%self.trial_number)
 
         # set plotting order index, to randomize which bars appear on top, for all trials in all miniblocks
-        # and set orientation for local elements of bars, randomized
+        # and get hemifield position of attended bar
         self.drawing_ind = []
-        self.local_ori = []
+        self.hemifield = []
 
-        for _,val in enumerate(self.trial_type_all):
+        for indx, val in enumerate(self.trial_type_all):
             
             if 'mini_block' in val:
                 ind_list = np.arange(self.settings['stimuli']['feature']['num_bars'])
                 random.shuffle(ind_list)
                 
                 self.drawing_ind.append(ind_list)
-                self.local_ori.append([random.randint(0, 1) for h in range(self.settings['stimuli']['feature']['num_bars'])])
+
+                if self.bar_direction_all[indx][0] == 'vertical': # if attended bar vertical
+
+                    if self.bar_midpoint_all[indx][0][-1] < 0: # append hemifield
+                        self.hemifield.append('left')
+                    else:
+                        self.hemifield.append('right')
+
+                elif self.bar_direction_all[indx][0] == 'horizontal': # if attended bar horizontal
+
+                    if self.bar_midpoint_all[indx][0][0] < 0: # append hemifield
+                        self.hemifield.append('down')
+                    else:
+                        self.hemifield.append('up')
+                    
                 
             else: # if not in miniblock, these are nan
                 self.drawing_ind.append([np.nan])
-                self.local_ori.append([np.nan])
+                self.hemifield.append(np.nan)
 
 
         # save relevant trial info in df (for later analysis)
         save_all_TR_info(self.all_bar_pos, self.trial_type_all, self.attend_block_conditions, 
-                        self.local_ori, self.drawing_ind, os.path.join(self.output_dir, self.output_str+'_trial_info.csv'))
+                        self.hemifield, self.drawing_ind, os.path.join(self.output_dir, self.output_str+'_trial_info.csv'))
                          
 
         # append all trials
@@ -600,19 +614,19 @@ class FeatureSession(ExpSession):
         if key_pressed[0] != 'y': #if instructions not skipped
 
             # draw instructions wait a few seconds
-            this_instruction_string = ('These bars are filled\n'
-                                        'with several elements\n'
-                                        'all sharing the same\n'
-                                        'orientation (left or right)\n\n\n'
+            this_instruction_string = ('These bars can be\n'
+                                        'on the right/left side\n'
+                                        'or above/below the\n'
+                                        'central fixation dot\n\n\n'
                                         '[Press b/index finger to continue]')
             
             draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
 
             this_instruction_string = ('Your task is to fixate\n'
                                         'at the center of the screen,\n'
-                                        'and indicate the\n'
-                                        'orientation of the bar elements\n'
-                                        '(left or right)\n\n\n'
+                                        'and indicate if one of the bars\n'
+                                        'is on the SAME side of the dot\n'
+                                        'relative to the PREVIOUS trial\n\n\n'
                                         '[Press b/index finger to continue]')
             
             draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
@@ -630,8 +644,7 @@ class FeatureSession(ExpSession):
                                         'vertical/horizontal and\n'
                                         'green/red\n\n'
                                         'That will be the bar\n'
-                                        'whose ELEMENTS\n'
-                                        'you have to search for.\n\n\n'
+                                        'that you have to search for.\n\n\n'
                                         '[Press b/index finger to continue]')
             
             draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
@@ -646,8 +659,8 @@ class FeatureSession(ExpSession):
             draw_instructions(self.win, this_instruction_string, keys = ['b'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = ('Index finger/b key - left oriented\n'
-                                    'Middle finger/y key - right oriented\n\n\n'
+        this_instruction_string = ('Index finger/b key - left/down\n'
+                                    'Middle finger/y key - right/up\n\n\n'
                                     '          [waiting for scanner]')
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])

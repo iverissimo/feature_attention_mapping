@@ -57,7 +57,7 @@ class ExpSession(Session):
 
             # first set the number of elements that fit each dimension
             self.gabor_diameter_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['element_size'], self.monitor) # diameter of each element (pix)
-            print(self.gabor_diameter_pix)
+            print('gabor diameter in pix %s'%str(self.gabor_diameter_pix))
             
             elem_num = np.round(np.array(self.screen)/(self.gabor_diameter_pix * self.settings['stimuli']['gab_ratio'])) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
 

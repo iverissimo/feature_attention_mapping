@@ -4,7 +4,7 @@ preferences:
     units: deg
 
 window: # refers to the parameters for the Psychopy Window class
-  size: [1680, 1050]
+  size: [1920, 1080] #[1680, 1050]
   pos: [0, 0]
   color: [0, 0, 0] # psychopy rgb
   fullscr: True
@@ -19,8 +19,8 @@ window: # refers to the parameters for the Psychopy Window class
 
 monitor:
   name: default
-  width: 69  # width of monitor (in cm)
-  distance: 225  # distance of participant from monitor (in cm)
+  width: 69.8 #69  # width of monitor (in cm)
+  distance: 210 #225  # distance of participant from monitor (in cm)
   gamma: 1 # specific value for gamma correction
 
 mouse:
@@ -43,8 +43,8 @@ stimuli:
   rect_fill_color: [-1,-1,-1] # psychopy rgb
   rect_line_color: [-1,-1,-1] # psychopy rgb
 
-  gab_ratio: 0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid
-  element_size: 0.55 #1.1 #0.55 #0.4 #0.2 # degrees
+  gab_ratio: 0.66 #0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid
+  element_size: 0.5 #1.1 #0.55 #0.4 #0.2 # degrees
 
   ori_shift_rate: 'TR' #0.83 #.25 #5 # Hz, rate of element orientation change
 
@@ -115,7 +115,7 @@ stimuli:
   
 eyetracker:
   address: '100.1.1.1' #  Eyelink eyetracker IP
-  dot_size: 0.15  # in dva
+  dot_size: 0.1  # in dva
   options: # Eyelink specific settings
     active_eye: left  # [right]
     calibration_type: HV9  # [H3, HV3, HV5, HV9]

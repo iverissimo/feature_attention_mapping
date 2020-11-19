@@ -265,8 +265,7 @@ class FeatureTrial(Trial):
                                         opacity = 1.0,
                                         pos = [0, 0],
                                         fillColorSpace = 'rgb255',
-                                        lineColorSpace = 'rgb255',
-                                        colorSpace = 'rgb255'
+                                        lineColorSpace = 'rgb255'
                                         )
             self.cue_stim.draw()
 

@@ -631,7 +631,7 @@ def save_bar_position(bar_dict,num_miniblock, output_path):
                                                      }, ignore_index=True) 
 
 
-    df_bar_position.to_csv(output_path, index = False, header=True)
+    df_bar_position.to_pickle(output_path)
 
 
 

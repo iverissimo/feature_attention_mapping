@@ -509,7 +509,7 @@ class FeatureSession(ExpSession):
 
         # save bar positions for run in output folder
         save_bar_position(self.all_bar_pos, self.settings['stimuli']['feature']['mini_blocks'], 
-                          os.path.join(self.output_dir, self.output_str+'_bar_positions.csv'))
+                          os.path.join(self.output_dir, self.output_str+'_bar_positions.pkl'))
 
 
         # number of TRs per "type of stimuli"
@@ -550,6 +550,7 @@ class FeatureSession(ExpSession):
                 if self.bar_direction_all[indx][0] == 'vertical': # if attended bar vertical
 
                     if self.bar_midpoint_all[indx][0][-1] < 0: # append hemifield
+                        
                         self.hemifield.append('left')
                     else:
                         self.hemifield.append('right')

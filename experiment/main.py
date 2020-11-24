@@ -4,7 +4,7 @@
 import sys
 import os
 import appnope
-from session import PRFSession, FeatureSession
+from session import PRFSession, FeatureSession, PylinkEyetrackerSession
 
 
 # define main function
@@ -71,13 +71,15 @@ def main():
                               output_dir = output_dir,
                               settings_file = 'experiment_settings.yml',
                               macbook_bool = mac_bool,
-                              background = bckg_contrast)
+                              background = bckg_contrast,
+                              eyetracker_on = False)
 
     elif exp_type == 'feature': # run feature pRF mapper
          exp_sess = FeatureSession(output_str = output_str,
                               output_dir = output_dir,
                               settings_file = 'experiment_settings.yml',
-                              macbook_bool = mac_bool)
+                              macbook_bool = mac_bool,
+                              eyetracker_on = False)
    	                            
     exp_sess.run()
 

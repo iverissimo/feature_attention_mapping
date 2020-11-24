@@ -2,7 +2,7 @@
 import os
 import numpy as np
 
-from exptools2.core import Session
+from exptools2.core import Session, PylinkEyetrackerSession
 
 from trial import PRFTrial, FeatureTrial
 from stim import PRFStim, FeatureStim
@@ -14,9 +14,9 @@ import itertools
 from utils import *
 
 
-class ExpSession(Session):
+class ExpSession(PylinkEyetrackerSession):
 
-    def __init__(self, output_str, output_dir, settings_file,macbook_bool):  # initialize child class
+    def __init__(self, output_str, output_dir, settings_file, macbook_bool, eyetracker_on = True):  # initialize child class
 
             """ Initializes ExpSession object. 
           
@@ -34,7 +34,7 @@ class ExpSession(Session):
             """
 
             # need to initialize parent class (Session), indicating output infos
-            super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file)
+            super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, eyetracker_on = eyetracker_on)
 
             # set size of display
             if self.settings['window']['display'] == 'square':
@@ -128,10 +128,9 @@ class ExpSession(Session):
                                     )
 
 
-
 class PRFSession(ExpSession):
    
-    def __init__(self, output_str, output_dir, settings_file,macbook_bool, background):  # initialize child class
+    def __init__(self, output_str, output_dir, settings_file, macbook_bool, eyetracker_on, background):  # initialize child class
 
         """ Initializes PRFSession object. 
       
@@ -152,8 +151,10 @@ class PRFSession(ExpSession):
 
         self.background = background
 
+
         # need to initialize parent class (ExpSession), indicating output infos
-        super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, macbook_bool = macbook_bool)
+        super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, 
+                        macbook_bool = macbook_bool, eyetracker_on = eyetracker_on)
 
         
 
@@ -383,7 +384,15 @@ class PRFSession(ExpSession):
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
 
+        # if eyetracking then calibrate
+        if self.eyetracker_on:
+            self.calibrate_eyetracker()
+
         self.start_experiment()
+
+        # start recording gaze
+        if self.eyetracker_on:
+            self.start_recording_eyetracker()
         
         # cycle through trials
         for trl in self.all_trials: 
@@ -401,7 +410,7 @@ class PRFSession(ExpSession):
 
 class FeatureSession(ExpSession):
     
-    def __init__(self, output_str, output_dir, settings_file,macbook_bool): # initialize child class
+    def __init__(self, output_str, output_dir, settings_file, eyetracker_on, macbook_bool): # initialize child class
 
         """ Initializes FeatureSession object. 
       
@@ -420,7 +429,8 @@ class FeatureSession(ExpSession):
 
 
         # need to initialize parent class (ExpSession), indicating output infos
-        super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, macbook_bool = macbook_bool)
+        super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, 
+                        macbook_bool = macbook_bool, eyetracker_on = eyetracker_on)
         
 
     
@@ -675,7 +685,15 @@ class FeatureSession(ExpSession):
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
 
 
+        # if eyetracking then calibrate
+        if self.eyetracker_on:
+            self.calibrate_eyetracker()
+
         self.start_experiment()
+
+        # start recording gaze
+        if self.eyetracker_on:
+            self.start_recording_eyetracker()
         
         # cycle through trials
         for trl in self.all_trials: 

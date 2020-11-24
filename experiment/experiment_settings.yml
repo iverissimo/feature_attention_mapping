@@ -115,7 +115,7 @@ stimuli:
   
 eyetracker:
   address: '100.1.1.1' #  Eyelink eyetracker IP
-  dot_size: 0.1  # in dva
+  dot_size: 0.15  # in dva
   options: # Eyelink specific settings
     active_eye: left  # [right]
     calibration_type: HV9  # [H3, HV3, HV5, HV9]

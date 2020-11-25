@@ -549,7 +549,7 @@ class FeatureSession(ExpSession):
 
                 if self.bar_pass_direction_all[indx][0] == 'horizontal': # if attended bar vertical (horizontal bar pass)
 
-                    if self.bar_midpoint_all[indx][0][-1] < 0: # append hemifield
+                    if self.bar_midpoint_all[indx][0][0] < 0: # append hemifield
                         
                         self.hemifield.append('left')
                     
@@ -559,7 +559,7 @@ class FeatureSession(ExpSession):
 
                 elif self.bar_pass_direction_all[indx][0] == 'vertical': # if attended bar horizontal (vertical bar pass)
 
-                    if self.bar_midpoint_all[indx][0][0] < 0: # append hemifield
+                    if self.bar_midpoint_all[indx][0][-1] < 0: # append hemifield
                         
                         self.hemifield.append('down')
                     

@@ -218,14 +218,6 @@ class FeatureTrial(Trial):
                                                     self.session.bar_width_pix, screen = self.session.screen, 
                                                     num_bar = len(self.session.attend_block_conditions))
 
-        if 'mini_block' in self.trial_type_at_TR:
-
-            file_to_write = open("trial_%i.pickle"%self.ID, "wb")
-
-            pickle.dump(self.position_dictionary, file_to_write)
-
-
-
 
     def draw(self): 
 

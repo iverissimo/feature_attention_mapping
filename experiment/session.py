@@ -202,7 +202,7 @@ class PRFSession(ExpSession):
         switch_bckg_TR = self.settings['stimuli']['prf']['switch_bckg_TR']
 
         # list with order of bar orientations throught experiment
-        bar_direction = self.settings['stimuli']['prf']['bar_direction'] 
+        bar_pass_direction = self.settings['stimuli']['prf']['bar_pass_direction'] 
 
         # all possible positions in pixels [x,y] for for midpoint of
         # vertical bar passes, 
@@ -217,24 +217,24 @@ class PRFSession(ExpSession):
 
         #create as many trials as TRs
         trial_number = 0
-        bar_direction_all = [] # list of bar orientation at all TRs
+        bar_pass_direction_all = [] # list of bar orientation at all TRs
 
         bar_pos_array = [] # list with bar midpoint (x,y) for all TRs (if nan, then empty screen)
 
-        for _,bartype in enumerate(bar_direction):
+        for _,bartype in enumerate(bar_pass_direction):
             if bartype in np.array(['empty']): # empty screen
                 trial_number += empty_TR
-                bar_direction_all = bar_direction_all + np.repeat(bartype,empty_TR).tolist()
+                bar_pass_direction_all = bar_pass_direction_all + np.repeat(bartype,empty_TR).tolist()
                 bar_pos_array.append([np.array([np.nan,np.nan]) for i in range(empty_TR)])
 
             elif bartype in np.array(['switch_interval']): # switch background interval (no bar)
                 trial_number += switch_bckg_TR
-                bar_direction_all = bar_direction_all + np.repeat(bartype,switch_bckg_TR).tolist()
+                bar_pass_direction_all = bar_pass_direction_all + np.repeat(bartype,switch_bckg_TR).tolist()
                 bar_pos_array.append([np.array([np.nan,np.nan]) for i in range(switch_bckg_TR)])
 
             elif bartype in np.array(['U-D','D-U']): # vertical bar pass
                 trial_number += bar_pass_ver_TR
-                bar_direction_all =  bar_direction_all + np.repeat(bartype,bar_pass_ver_TR).tolist()
+                bar_pass_direction_all =  bar_pass_direction_all + np.repeat(bartype,bar_pass_ver_TR).tolist()
                 
                 # order depending on starting point for bar pass, and append to list
                 position_list = np.sort(ver_bar_pos_pix,axis=0) if bartype=='D-U' else np.sort(ver_bar_pos_pix,axis=0)[::-1]
@@ -242,7 +242,7 @@ class PRFSession(ExpSession):
 
             elif bartype in np.array(['L-R','R-L']): # horizontal bar pass
                 trial_number += bar_pass_hor_TR
-                bar_direction_all =  bar_direction_all + np.repeat(bartype,bar_pass_hor_TR).tolist()
+                bar_pass_direction_all =  bar_pass_direction_all + np.repeat(bartype,bar_pass_hor_TR).tolist()
                 
                 # order depending on starting point for bar pass, and append to list
                 position_list = np.sort(hor_bar_pos_pix,axis=0) if bartype=='L-R' else np.sort(hor_bar_pos_pix,axis=0)[::-1]
@@ -250,7 +250,7 @@ class PRFSession(ExpSession):
 
         self.trial_number = trial_number # total number of trials 
         print("Total number of (expected) TRs: %d"%self.trial_number)
-        self.bar_direction_all = bar_direction_all # list of strings with bar orientation/empty
+        self.bar_pass_direction_all = bar_pass_direction_all # list of strings with bar orientation/empty
 
         # list of midpoint position (x,y) of bar for all TRs (if empty, then nan)
         self.bar_midpoint_all = np.array([val for sublist in bar_pos_array for val in sublist])
@@ -300,7 +300,7 @@ class PRFSession(ExpSession):
                                             trial_nr = i,  
                                             phase_durations = self.phase_durations,
                                             phase_names = phase_conditions[i],
-                                            bar_direction_at_TR = self.bar_direction_all[i],
+                                            bar_pass_direction_at_TR = self.bar_pass_direction_all[i],
                                             bar_midpoint_at_TR = self.bar_midpoint_all[i]
                                             ))
 
@@ -329,7 +329,7 @@ class PRFSession(ExpSession):
         # switch background time points
         self.bckg_switch_times = np.arange(0,self.switch_interval_time + self.settings['stimuli']['prf']['switch_step'],self.settings['stimuli']['prf']['switch_step'])
         # define timepoint where switch interval starts, given total trial time
-        self.switch_start_time = (np.where(np.array(self.bar_direction_all) == 'switch_interval')[0][0] + 1) * self.bar_step 
+        self.switch_start_time = (np.where(np.array(self.bar_pass_direction_all) == 'switch_interval')[0][0] + 1) * self.bar_step 
         # counter for background switches
         self.bckg_counter = 0
 
@@ -520,13 +520,13 @@ class FeatureSession(ExpSession):
         mini_block_TR = np.array(dict_blk0[list(dict_blk0.keys())[0]]).shape[0]
 
         # list with order of "type of stimuli" throught experiment (called bar direction to make analogous with other class)
-        bar_direction = self.settings['stimuli']['feature']['bar_direction'] 
+        bar_pass_direction = self.settings['stimuli']['feature']['bar_pass_direction'] 
 
         # set number of trials,
         # list of type of trial (cue, empty, miniblock) for all TRs,
         # list of strings/lists with bar direction/orientation or 'empty',
         # list of midpoint position (x,y) of bars for all TRs (if empty, then nan)
-        self.trial_number, self.trial_type_all, self.bar_direction_all, self.bar_midpoint_all = define_feature_trials(bar_direction, 
+        self.trial_number, self.trial_type_all, self.bar_pass_direction_all, self.bar_midpoint_all = define_feature_trials(bar_pass_direction, 
                                                                                                                       self.all_bar_pos, 
                                                                                                                       empty_TR = empty_TR, 
                                                                                                                       cue_TR = cue_TR, 
@@ -547,19 +547,24 @@ class FeatureSession(ExpSession):
                 
                 self.drawing_ind.append(ind_list)
 
-                if self.bar_direction_all[indx][0] == 'vertical': # if attended bar vertical
+                if self.bar_pass_direction_all[indx][0] == 'horizontal': # if attended bar vertical (horizontal bar pass)
 
                     if self.bar_midpoint_all[indx][0][-1] < 0: # append hemifield
                         
                         self.hemifield.append('left')
+                    
                     else:
+
                         self.hemifield.append('right')
 
-                elif self.bar_direction_all[indx][0] == 'horizontal': # if attended bar horizontal
+                elif self.bar_pass_direction_all[indx][0] == 'vertical': # if attended bar horizontal (vertical bar pass)
 
                     if self.bar_midpoint_all[indx][0][0] < 0: # append hemifield
+                        
                         self.hemifield.append('down')
+                    
                     else:
+                        
                         self.hemifield.append('up')
                     
                 
@@ -581,7 +586,7 @@ class FeatureSession(ExpSession):
                                                 trial_nr = i, 
                                                 phase_durations = np.array([self.bar_step]),
                                                 attend_block_conditions = self.attend_block_conditions, 
-                                                bar_direction_at_TR = self.bar_direction_all[i],
+                                                bar_pass_direction_at_TR = self.bar_pass_direction_all[i],
                                                 bar_midpoint_at_TR = self.bar_midpoint_all[i],
                                                 trial_type_at_TR = self.trial_type_all[i],
                                                 ))

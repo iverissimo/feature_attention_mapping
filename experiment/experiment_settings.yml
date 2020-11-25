@@ -63,7 +63,7 @@ stimuli:
 
     flick_rate: 10 # Hz, rate of change of features in bar
 
-    bar_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty','switch_interval',
+    bar_pass_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty','switch_interval',
                     'empty','L-R','U-D','empty','R-L','D-U','empty']  #['L-R','U-D','R-L','D-U'] #
 
   feature:
@@ -82,7 +82,7 @@ stimuli:
 
     conditions: ['red_vertical','red_horizontal','green_vertical','green_horizontal'] # all conditions to be attended during feature trial
 
-    bar_direction: ['cue_0','empty','mini_block_0','empty',
+    bar_pass_direction: ['cue_0','empty','mini_block_0','empty',
                     'cue_1','empty','mini_block_1','empty',
                     'cue_2','empty','mini_block_2','empty',
                     'cue_3','empty','mini_block_3','empty']

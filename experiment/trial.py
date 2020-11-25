@@ -8,10 +8,12 @@ from psychopy.visual import TextStim
 
 from utils import *
 
+import pickle
+
 
 class PRFTrial(Trial):
 
-    def __init__(self, session, trial_nr, bar_direction_at_TR, bar_midpoint_at_TR, phase_durations,
+    def __init__(self, session, trial_nr, bar_pass_direction_at_TR, bar_midpoint_at_TR, phase_durations,
                 phase_names, timing='seconds', *args, **kwargs):
 
         """ Initializes a PRFTrial object. 
@@ -31,7 +33,7 @@ class PRFTrial(Trial):
             The "units" of the phase durations. Default is 'seconds', where we
             assume the phase-durations are in seconds. The other option is
             'frames', where the phase-"duration" refers to the number of frames.
-        bar_direction_at_TR : list
+        bar_pass_direction_at_TR : list
             List/array with the bar direction at each TR. Total length = total # TRs
         bar_midpoint_at_TR : array
             Numpy array with the pairs of positions [x,y] of the midpoint of the bar
@@ -40,7 +42,7 @@ class PRFTrial(Trial):
         """
         
         self.ID = trial_nr # trial identifier, not sure if needed
-        self.bar_direction_at_TR = bar_direction_at_TR
+        self.bar_pass_direction_at_TR = bar_pass_direction_at_TR
         self.bar_midpoint_at_TR = bar_midpoint_at_TR
         self.session = session
 
@@ -56,7 +58,7 @@ class PRFTrial(Trial):
 
         # get bar and background positions
 
-        self.position_dictionary = get_object_positions(self.session.grid_pos, self.bar_midpoint_at_TR, self.bar_direction_at_TR,
+        self.position_dictionary = get_object_positions(self.session.grid_pos, self.bar_midpoint_at_TR, self.bar_pass_direction_at_TR,
                                                     self.session.bar_width_pix, screen = self.session.screen, num_bar = 1)
        
 
@@ -87,10 +89,10 @@ class PRFTrial(Trial):
                 self.session.ori_counter += 1
 
         ## draw stim
-        if (self.bar_direction_at_TR == 'empty') or (self.bar_direction_at_TR == 'switch_interval'): # if empty trial, show background
+        if (self.bar_pass_direction_at_TR == 'empty') or (self.bar_pass_direction_at_TR == 'switch_interval'): # if empty trial, show background
 
             self.session.prf_stim.draw(bar_midpoint_at_TR = np.nan, 
-                                       bar_direction_at_TR = np.nan,
+                                       bar_pass_direction_at_TR = np.nan,
                                        this_phase = 'background',
                                        position_dictionary = self.position_dictionary,
                                        orientation = self.session.ori_bool,
@@ -100,7 +102,7 @@ class PRFTrial(Trial):
         else: # if bar pass at TR, then draw bar
 
             self.session.prf_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
-                                       bar_direction_at_TR = self.bar_direction_at_TR,
+                                       bar_pass_direction_at_TR = self.bar_pass_direction_at_TR,
                                        this_phase = self.phase_names[int(self.phase)],
                                        position_dictionary = self.position_dictionary,
                                        orientation = self.session.ori_bool,
@@ -169,7 +171,7 @@ class PRFTrial(Trial):
 class FeatureTrial(Trial):
 
     def __init__(self, session, trial_nr, phase_durations, 
-        attend_block_conditions, bar_direction_at_TR, bar_midpoint_at_TR, trial_type_at_TR, timing='seconds', *args, **kwargs):
+        attend_block_conditions, bar_pass_direction_at_TR, bar_midpoint_at_TR, trial_type_at_TR, timing='seconds', *args, **kwargs):
 
 
         """ Initializes a FeatureTrial object. 
@@ -186,7 +188,7 @@ class FeatureTrial(Trial):
             'frames', where the phase-"duration" refers to the number of frames.
         attend_block_conditions: arr
         	list/array with name of attended condition on each miniblock. Total length = total # miniblocks
-        bar_direction_at_TR : list
+        bar_pass_direction_at_TR : list
             List/array with the bar direction at each TR. In same cases it can have 
             a list of direction (when several bars on screen). Total length = total # TRs
         bar_midpoint_at_TR : arr
@@ -199,7 +201,7 @@ class FeatureTrial(Trial):
         """
         
         self.ID = trial_nr # trial identifier, not sure if needed
-        self.bar_direction_at_TR = bar_direction_at_TR
+        self.bar_pass_direction_at_TR = bar_pass_direction_at_TR
         self.bar_midpoint_at_TR = bar_midpoint_at_TR
         self.trial_type_at_TR = trial_type_at_TR
         self.attend_block_conditions = attend_block_conditions
@@ -212,9 +214,17 @@ class FeatureTrial(Trial):
         super().__init__(session, trial_nr, phase_durations, verbose=False, *args, **kwargs)
 
         # get bar and background positions for this trial
-        self.position_dictionary = get_object_positions(self.session.grid_pos, self.bar_midpoint_at_TR, self.bar_direction_at_TR,
+        self.position_dictionary = get_object_positions(self.session.grid_pos, self.bar_midpoint_at_TR, self.bar_pass_direction_at_TR,
                                                     self.session.bar_width_pix, screen = self.session.screen, 
                                                     num_bar = len(self.session.attend_block_conditions))
+
+        if 'mini_block' in self.trial_type_at_TR:
+
+            file_to_write = open("trial_%i.pickle"%self.ID, "wb")
+
+            pickle.dump(self.position_dictionary, file_to_write)
+
+
 
 
     def draw(self): 
@@ -250,7 +260,7 @@ class FeatureTrial(Trial):
 
 
             self.session.feature_stim.draw(bar_midpoint_at_TR = np.nan, 
-                                       bar_direction_at_TR = np.nan,
+                                       bar_pass_direction_at_TR = np.nan,
                                        this_phase = 'background',
                                        position_dictionary = self.position_dictionary,
                                        orientation = self.session.ori_bool)
@@ -271,10 +281,10 @@ class FeatureTrial(Trial):
 
             print('cue '+attend_cond)
                     
-        elif self.bar_direction_at_TR == 'empty': # if empty trial, show background
+        elif self.bar_pass_direction_at_TR == 'empty': # if empty trial, show background
 
             self.session.feature_stim.draw(bar_midpoint_at_TR = np.nan, 
-                                       bar_direction_at_TR = np.nan,
+                                       bar_pass_direction_at_TR = np.nan,
                                        this_phase = 'background',
                                        position_dictionary = self.position_dictionary,
                                        orientation = self.session.ori_bool) 
@@ -289,7 +299,7 @@ class FeatureTrial(Trial):
             this_phase = ['color_red' if 'red' in p else 'color_green' for _,p in enumerate(this_phase)]
 
             self.session.feature_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
-                                           bar_direction_at_TR = self.bar_direction_at_TR,
+                                           bar_pass_direction_at_TR = self.bar_pass_direction_at_TR,
                                            this_phase = this_phase,
                                            position_dictionary = self.position_dictionary,
                                            orientation = self.session.ori_bool,

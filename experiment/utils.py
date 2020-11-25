@@ -91,7 +91,7 @@ def near_power_of_2(x,near='previous'):
     return val
 
 
-def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
+def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_pass_direction_at_TR,
                       bar_width_pix, screen=np.array([1680,1050]), num_bar=1):
     
     """ function to subselect bar positions and
@@ -103,7 +103,7 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
         numpy array with all possible grid positions (N,2) -> (number of positions, [x,y])
     bar_midpoint_at_TR: arr
         numpy array with mid point position of bar(s) (B,[x,y]) with B=number of bars on screen
-    bar_direction_at_TR: arr
+    bar_pass_direction_at_TR: arr
         numpy array of strings with bar direction(s) at that TR
     bar_width_pix: arr
         width of bar(s) in pixels for each resolution. 
@@ -117,7 +117,7 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
     # of all objects (bar(s) and background)
     output_dict = {}
 
-    if np.isnan(bar_midpoint_at_TR).any():# or np.isnan(bar_direction_at_TR).any(): # when nan, position is whole background
+    if np.isnan(bar_midpoint_at_TR).any():# or np.isnan(bar_pass_direction_at_TR).any(): # when nan, position is whole background
 
         output_dict['background'] = {'xys': grid_pos, 
                                     'nElements': grid_pos.shape[0]}
@@ -125,12 +125,12 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
 
         # make sure "all" inputs are 2d arrays, if not make them. avoids crashing. 
         bar_midpoint_at_TR = np.array(bar_midpoint_at_TR) if len(np.array(bar_midpoint_at_TR).shape)>1 else np.array([bar_midpoint_at_TR])
-        bar_direction_at_TR = np.array(bar_direction_at_TR) if len(np.array(bar_direction_at_TR).shape)>0 else np.array([bar_direction_at_TR])
+        bar_pass_direction_at_TR = np.array(bar_pass_direction_at_TR) if len(np.array(bar_pass_direction_at_TR).shape)>0 else np.array([bar_pass_direction_at_TR])
         bar_width_pix = np.array(bar_width_pix)
         
         all_bar_ind = [] # append all bar position indices to later remove from background
  
-        if all(x == num_bar for x in [bar_midpoint_at_TR.shape[0], bar_direction_at_TR.shape[0]]):
+        if all(x == num_bar for x in [bar_midpoint_at_TR.shape[0], bar_pass_direction_at_TR.shape[0]]):
         
   
             # iterate for number of bars on screen
@@ -139,14 +139,14 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_direction_at_TR,
                 # first define bar width in pixels (might depend if vertical or horizontal bar pass)
                 # and bounds for x and y positions
 
-                if bar_direction_at_TR[ind] in np.array(['L-R','R-L','horizontal']): # if horizontal bar pass
+                if bar_pass_direction_at_TR[ind] in np.array(['L-R','R-L','horizontal']): # if horizontal bar pass
 
                     x_bounds = np.array([bar_midpoint_at_TR[ind][0] - bar_width_pix[0]/2,
                                          bar_midpoint_at_TR[ind][0] + bar_width_pix[0]/2])
                     y_bounds = np.array([-screen[1]/2,
                                          screen[1]/2])
 
-                elif bar_direction_at_TR[ind] in np.array(['U-D','D-U','vertical']): # if vertical bar pass
+                elif bar_pass_direction_at_TR[ind] in np.array(['U-D','D-U','vertical']): # if vertical bar pass
 
                     x_bounds = np.array([-screen[0]/2,
                                          screen[0]/2])
@@ -384,19 +384,19 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
     for blk in range(mini_blocks):
 
         # first define for all conditions in block, which will be 
-        # vertical, which will be horizontal
+        # vertical bar pass, which will be horizontal bar pass
         for k,cond in enumerate(bar_list[blk]):
 
             cond_position = []
 
             if 'vertical' in cond:
-                cond_direction = np.repeat('vertical',num_trials)
-            elif 'horizontal' in cond:
                 cond_direction = np.repeat('horizontal',num_trials)
+            elif 'horizontal' in cond:
+                cond_direction = np.repeat('vertical',num_trials)
 
             # append to dictionary 
             output_dict['mini_block_%i'%blk][cond] = {'bar_midpoint_at_TR': cond_position, 
-                                                     'bar_direction_at_TR': cond_direction}  
+                                                     'bar_pass_direction_at_TR': cond_direction}  
 
         # now according to bar direction (horizontal vs vertical)
         # set x,y coordinates for bar midpoint
@@ -440,14 +440,14 @@ def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
             for k,cond in enumerate(bar_list[blk]): # iterate per condition
 
                 # get coordinates for vertical bars
-                if output_dict['mini_block_%i'%blk][cond]['bar_direction_at_TR'][trl] == 'vertical':
+                if output_dict['mini_block_%i'%blk][cond]['bar_pass_direction_at_TR'][trl] == 'vertical':
 
                     m = 0 if vert_bool == False else 1
                     coord = vertical_pos[ind_ver[m][random_ind[trl]]] # save coordinates
                     vert_bool = True # update bool marker
 
                 # get coordinates for horizontal bars
-                elif output_dict['mini_block_%i'%blk][cond]['bar_direction_at_TR'][trl] == 'horizontal':
+                elif output_dict['mini_block_%i'%blk][cond]['bar_pass_direction_at_TR'][trl] == 'horizontal':
 
                     m = 0 if hor_bool == False else 1
                     coord = horizontal_pos[ind_hor[m][random_ind[trl]]] # save coordinates
@@ -618,16 +618,19 @@ def save_bar_position(bar_dict,num_miniblock, output_path):
         
     """
     
-    df_bar_position = pd.DataFrame(columns=['mini_block', 'condition', 'bar_midpoint_at_TR', 'bar_direction_at_TR'])
+    df_bar_position = pd.DataFrame(columns=['mini_block','attend_condition', 'condition', 'bar_midpoint_at_TR', 'bar_pass_direction_at_TR'])
 
     for blk in range(num_miniblock):
     
-        for _,cond in enumerate(bar_dict['mini_block_%i'%blk].keys()):
+        for i,cond in enumerate(bar_dict['mini_block_%i'%blk].keys()):
+
+            attend = 1 if i==0 else 0
 
             df_bar_position = df_bar_position.append({'mini_block': blk, 
+                                                      'attend_condition': attend,
                                                       'condition': cond,
                                                       'bar_midpoint_at_TR': bar_dict['mini_block_%i'%blk][cond]['bar_midpoint_at_TR'],
-                                                      'bar_direction_at_TR': bar_dict['mini_block_%i'%blk][cond]['bar_direction_at_TR']
+                                                      'bar_pass_direction_at_TR': bar_dict['mini_block_%i'%blk][cond]['bar_pass_direction_at_TR']
                                                      }, ignore_index=True) 
 
 
@@ -636,7 +639,7 @@ def save_bar_position(bar_dict,num_miniblock, output_path):
 
 
 
-def define_feature_trials(bar_direction, bar_dict, empty_TR = 20, cue_TR = 3, mini_block_TR = 64):
+def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, cue_TR = 3, mini_block_TR = 64):
     
     """ create feature trials based on order of "type of stimuli" throught experiment  
     and bar positions in run. Outputs number and type of trials, and bar direction and midpoint position
@@ -644,7 +647,7 @@ def define_feature_trials(bar_direction, bar_dict, empty_TR = 20, cue_TR = 3, mi
     
     Parameters
     ----------
-    bar_direction: array/list
+    bar_pass_direction: array/list
         list with order of "type of stimuli" throught experiment
     bar_dict : dict
         position dictionary
@@ -659,15 +662,15 @@ def define_feature_trials(bar_direction, bar_dict, empty_TR = 20, cue_TR = 3, mi
     
     #create as many trials as TRs
     trial_number = 0
-    bar_direction_all = [] # list of lists with bar orientation at all TRs
+    bar_pass_direction_all = [] # list of lists with bar orientation at all TRs
     bar_pos_array = [] # list of lists with bar midpoint (x,y) for all TRs (if nan, then show background)
     trial_type_all = [] # list of lists with trial type at all TRs,
 
-    for _,bartype in enumerate(bar_direction):
+    for _,bartype in enumerate(bar_pass_direction):
         if bartype in np.array(['empty']): # empty screen
             trial_number += empty_TR
             trial_type_all = trial_type_all + np.repeat(bartype,empty_TR).tolist()
-            bar_direction_all = bar_direction_all + np.repeat(bartype,empty_TR).tolist()
+            bar_pass_direction_all = bar_pass_direction_all + np.repeat(bartype,empty_TR).tolist()
 
             for i in range(empty_TR):
                 bar_pos_array.append(np.array([np.nan,np.nan]))
@@ -675,7 +678,7 @@ def define_feature_trials(bar_direction, bar_dict, empty_TR = 20, cue_TR = 3, mi
         elif 'cue' in bartype: # cue on screen
             trial_number += cue_TR
             trial_type_all = trial_type_all + np.repeat(bartype,cue_TR).tolist()
-            bar_direction_all = bar_direction_all + np.repeat('empty',cue_TR).tolist()
+            bar_pass_direction_all = bar_pass_direction_all + np.repeat('empty',cue_TR).tolist()
 
             for i in range(cue_TR):
                 bar_pos_array.append(np.array([np.nan,np.nan]))
@@ -693,17 +696,17 @@ def define_feature_trials(bar_direction, bar_dict, empty_TR = 20, cue_TR = 3, mi
                 temp_pos_list = [] 
 
                 for _,key in enumerate(miniblock_cond_keys):
-                    temp_dir_list.append(bar_dict[bartype][key]['bar_direction_at_TR'][t])
+                    temp_dir_list.append(bar_dict[bartype][key]['bar_pass_direction_at_TR'][t])
                     temp_pos_list.append(bar_dict[bartype][key]['bar_midpoint_at_TR'][t])
 
 
-                bar_direction_all.append(temp_dir_list)
-                bar_direction_all.append('empty')
+                bar_pass_direction_all.append(temp_dir_list)
+                bar_pass_direction_all.append('empty')
                 bar_pos_array.append(temp_pos_list)
                 bar_pos_array.append(np.array([np.nan,np.nan]))
 
     
-    return trial_number, np.array(trial_type_all), np.array(bar_direction_all), np.array(bar_pos_array)
+    return trial_number, np.array(trial_type_all), np.array(bar_pass_direction_all), np.array(bar_pos_array)
 
 
 def save_all_TR_info(bar_dict, trial_type, attend_block_conditions, hemifield, crossing_ind, output_path):

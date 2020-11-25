@@ -103,7 +103,7 @@ class PRFStim(Stim):
         super().__init__(session=session, bar_width_ratio=bar_width_ratio, grid_pos=grid_pos)
 
 
-    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase, position_dictionary, orientation = True, background_contrast = 0):
+    def draw(self, bar_midpoint_at_TR, bar_pass_direction_at_TR, this_phase, position_dictionary, orientation = True, background_contrast = 0):
         
         """ Draw stimuli - pRF bar - for each trial 
         
@@ -111,7 +111,7 @@ class PRFStim(Stim):
         ----------
         bar_midpoint_at_TR : array
             List/array of bar midpoint positions [x,y] at that TR (trial)
-        bar_direction_at_TR : str
+        bar_pass_direction_at_TR : str
             Direction of bar at that TR (trial)
         this_phase: str
             strings with name of condition to draw
@@ -198,7 +198,7 @@ class FeatureStim(Stim):
 
 
 
-    def draw(self, bar_midpoint_at_TR, bar_direction_at_TR, this_phase, position_dictionary, orientation = True, drawing_ind = [0,1,2,3]):
+    def draw(self, bar_midpoint_at_TR, bar_pass_direction_at_TR, this_phase, position_dictionary, orientation = True, drawing_ind = [0,1,2,3]):
         
         """ Draw stimuli - pRF bars - for each trial 
         
@@ -206,7 +206,7 @@ class FeatureStim(Stim):
         ----------
         bar_midpoint_at_TR : array
             List/array of bar midpoint positions [x,y] at that TR (trial)
-        bar_direction_at_TR : str
+        bar_pass_direction_at_TR : str
             Direction of bar at that TR (trial)
         this_phase: arr
             List/arr of strings with condition names to draw

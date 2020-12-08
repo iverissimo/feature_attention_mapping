@@ -3,7 +3,7 @@
 # import relevant packages
 import sys
 import os
-import appnope
+#import appnope
 from session import PRFSession, FeatureSession, PylinkEyetrackerSession
 
 
@@ -42,7 +42,7 @@ def main():
     print('Running %s pRF mapping for subject-%s, run-%s'%(exp_type,sj_num,run_num))
 
 
-    appnope.nope() # disable power saving feature of Mac
+    #appnope.nope() # disable power saving feature of Mac
     
     # make output dir
     base_dir = os.path.split(os.getcwd())[0] # main path for all folders of project
@@ -79,7 +79,7 @@ def main():
                               output_dir = output_dir,
                               settings_file = 'experiment_settings.yml',
                               macbook_bool = mac_bool,
-                              eyetracker_on = False)
+                              eyetracker_on = True)
    	                            
     exp_sess.run()
 

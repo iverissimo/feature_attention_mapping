@@ -347,6 +347,10 @@ class PRFSession(ExpSession):
         self.create_stimuli()
         self.create_trials() 
 
+        # if eyetracking then calibrate
+        if self.eyetracker_on:
+            self.calibrate_eyetracker()
+
         # draw instructions wait a few seconds
         this_instruction_string = ('During the experiment\n'
                                     'you will see a flickering bar pass\n'
@@ -384,15 +388,12 @@ class PRFSession(ExpSession):
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
 
-        # if eyetracking then calibrate
-        if self.eyetracker_on:
-            self.calibrate_eyetracker()
-
-        self.start_experiment()
 
         # start recording gaze
         if self.eyetracker_on:
             self.start_recording_eyetracker()
+
+        self.start_experiment()
         
         # cycle through trials
         for trl in self.all_trials: 
@@ -618,6 +619,10 @@ class FeatureSession(ExpSession):
         self.create_stimuli()
         self.create_trials() 
 
+        # if eyetracking then calibrate
+        if self.eyetracker_on:
+            self.calibrate_eyetracker()
+
         # draw instructions wait a few seconds
         this_instruction_string = ('During the experiment\nyou will see green and red bars\n'
                                 'oriented vertically or horizontally\n'
@@ -690,16 +695,11 @@ class FeatureSession(ExpSession):
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
 
-
-        # if eyetracking then calibrate
-        if self.eyetracker_on:
-            self.calibrate_eyetracker()
-
-        self.start_experiment()
-
         # start recording gaze
         if self.eyetracker_on:
             self.start_recording_eyetracker()
+
+        self.start_experiment()
         
         # cycle through trials
         for trl in self.all_trials: 

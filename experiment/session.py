@@ -4,8 +4,8 @@ import numpy as np
 
 from exptools2.core import Session, PylinkEyetrackerSession
 
-from trial import PRFTrial, FeatureTrial
-from stim import PRFStim, FeatureStim
+from trial import PRFTrial, FeatureTrial, FlickerTrial
+from stim import PRFStim, FeatureStim, FlickerStim
 
 from psychopy import visual, tools
 
@@ -707,6 +707,244 @@ class FeatureSession(ExpSession):
 
 
         print('Total subject responses: %d'%self.total_responses)
+          
+
+        self.close() # close session
+
+
+
+class FlickerSession(ExpSession):
+    
+    def __init__(self, output_str, output_dir, settings_file, eyetracker_on, macbook_bool): # initialize child class
+
+        """ Initializes FlickerSession object. 
+      
+        Parameters
+        ----------
+        output_str : str
+            Basename for all output-files (like logs), e.g., "sub-01_task-PRFflicker_run-1"
+        output_dir : str
+            Path to desired output-directory (default: None, which results in $pwd/logs)
+        settings_file : str
+            Path to yaml-file with settings (default: None, which results in the package's
+            default settings file (in data/default_settings.yml)
+        macbook_bool: bool
+                variable to know if using macbook for running experiment or not
+        """
+
+
+        # need to initialize parent class (ExpSession), indicating output infos
+        super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, 
+                        macbook_bool = macbook_bool, eyetracker_on = eyetracker_on)
+        
+
+    
+    def create_stimuli(self):
+
+        """ Create Stimuli - pRF bars and fixation dot """
+        
+        #generate PRF stimulus
+        self.flicker_stim = FlickerStim(session = self, 
+                                        bar_width_ratio = self.settings['stimuli']['flicker']['bar_width_ratio'], 
+                                        grid_pos = self.grid_pos
+                                        )
+        
+        # Convert fixation dot radius in degrees to pixels for a given Monitor object
+        fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fix_dot_size_deg'], 
+                                                        self.monitor)/2 
+        
+        # create black fixation circle
+        self.fixation = visual.Circle(self.win, units = 'pix', radius = fixation_rad_pix, 
+                                            fillColor = self.settings['stimuli']['fix_dot_color'], 
+                                            lineColor = self.settings['stimuli']['fix_line_color'],
+                                            fillColorSpace = self.settings['stimuli']['colorSpace'],
+                                            lineColorSpace = self.settings['stimuli']['colorSpace'])  
+
+
+
+    def create_trials(self):
+
+        """ Creates trials (before running the session) """
+
+        #
+        # counter for responses, to register if increase or decrease luminance
+        self.lum_responses = 0
+
+        ## get all possible bar positions
+
+        # define bar width 
+        bar_width_ratio = self.settings['stimuli']['flicker']['bar_width_ratio']
+        self.bar_width_pix = self.screen * bar_width_ratio
+
+        # define number of bars per direction
+        num_bars = np.array(self.screen)/self.bar_width_pix; num_bars = np.array(num_bars,dtype=int)
+
+        # all possible positions in pixels [x,y] for for midpoint of
+        # vertical bar passes
+        ver_y = np.linspace((-self.screen[1]/2 + self.bar_width_pix[1]/2),
+                            (self.screen[1]/2 - self.bar_width_pix[1]/2),
+                            num_bars[1])
+
+        ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(ver_y)])
+
+
+        # positions to put bars of square, per trial
+        # eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
+        self.bar_ecc_index_all = self.settings['stimuli']['flicker']['bar_ecc_index']
+
+        # eccentricity (in pixels) of bar position for trial (if empty, then nan) 
+        self.ecc_midpoint_all = ver_bar_pos_pix[self.bar_ecc_index_all][...,1]
+
+        # one eccentricity for trial
+        self.trial_number = len(self.bar_ecc_index_all)
+
+        print("Total number of trials: %d"%self.trial_number)
+
+        # define how many times square colors switch, according to flick rate defined 
+        flick_rate = self.settings['stimuli']['flicker']['flick_rate']
+
+        # get condition names and randomize them for each trial 
+        key_list = []
+        for key in self.settings['stimuli']['conditions']:
+            if key != 'background': # we don't want to show background gabors in background
+                key_list.append(key)
+
+        # repeat keys, so for each trial it shows each condition X times
+        key_list = np.array(key_list*round((self.settings['stimuli']['flicker']['max_trial_time']*60*flick_rate)/len(key_list)))
+        phase_conditions = key_list
+        
+        for r in range(self.trial_number-1):            
+            phase_conditions = np.vstack((phase_conditions,key_list))
+
+        
+        # define list with number of phases and their duration (duration of each must be the same)
+        self.phase_durations = np.repeat(1/flick_rate,phase_conditions.shape[-1])
+
+
+        # append all trials
+        self.all_trials = []
+        for i in range(self.trial_number):
+
+            self.all_trials.append(FlickerTrial(session = self,
+                                                trial_nr = i, 
+                                                phase_durations = self.phase_durations,
+                                                phase_names = phase_conditions[i],
+                                                bar_ecc_index_at_trial = self.bar_ecc_index_all[i],
+                                                ecc_midpoint_at_trial = self.ecc_midpoint_all[i]
+                                                ))
+
+
+        # total experiment time (in seconds)
+        self.total_time = self.trial_number*self.settings['stimuli']['flicker']['max_trial_time']*60
+
+        # define time points for element orientation to change
+        # switch orientation time points
+        if self.settings['stimuli']['ori_shift_rate'] == 'TR':
+            ori_shift_rate = 1/self.settings['mri']['TR'] # in seconds
+        else:
+            ori_shift_rate = self.settings['stimuli']['ori_shift_rate']
+        self.ori_switch_times = np.arange(0,self.total_time,1/ori_shift_rate)
+        # counter for orientation switches
+        self.ori_counter = 0
+        # index for orientation
+        self.ori_ind = 0
+
+        # print window size just to check, not actually needed
+        print(self.screen)
+
+
+    def run(self):
+        """ Loops over trials and runs them """
+
+        # create trials before running!
+        self.create_stimuli()
+        self.create_trials() 
+
+        # if eyetracking then calibrate
+        if self.eyetracker_on:
+            self.calibrate_eyetracker()
+
+        # draw instructions wait a few seconds
+        this_instruction_string = ('During the experiment\nyou will see green and red bars\n'
+                                'oriented vertically or horizontally\n'
+                                'throughout the screen\n\n\n'
+                                '[Press left arrow key or\n'
+                                'index finger to continue]\n\n'
+                                '[Press right arrow key or\n'
+                                'middle finger to skip]')
+
+        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['b','left','y','right'], visual_obj = [self.rect_left,self.rect_right])
+
+        if key_pressed[0] != 'y': #if instructions not skipped
+
+            # draw instructions wait a few seconds
+            this_instruction_string = ('These bars can be\n'
+                                        'on the right/left side\n'
+                                        'or above/below the\n'
+                                        'central fixation dot\n\n\n'
+                                        '[Press left arrow key or\n'
+                                        'index finger to continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = ['b','left'], visual_obj = [self.rect_left,self.rect_right])
+
+            this_instruction_string = ('Your task is to fixate\n'
+                                        'at the center of the screen,\n'
+                                        'and indicate if one of the bars\n'
+                                        'is on the SAME side of the dot\n'
+                                        'relative to the PREVIOUS trial\n\n\n'
+                                        '[Press left arrow key or\n'
+                                        'index finger to continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = ['b','left'], visual_obj = [self.rect_left,self.rect_right])
+
+            this_instruction_string = ('The experiment is divided\n'
+                                        'into different mini-blocks.\n\n'
+                                        'At the beggining of each\n'
+                                        'you will see a single bar,\n'
+                                        'at the center of the screen.\n\n\n'
+                                        '[Press left arrow key or\n'
+                                        'index finger to continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = ['b','left'], visual_obj = [self.rect_left,self.rect_right])
+
+            this_instruction_string = ('This bar will be\n'
+                                        'vertical/horizontal and\n'
+                                        'green/red\n\n'
+                                        'That will be the bar\n'
+                                        'that you have to search for.\n\n\n'
+                                        '[Press left arrow key or\n'
+                                        'index finger to continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = ['b','left'], visual_obj = [self.rect_left,self.rect_right])
+
+
+            # draw instructions wait a few seconds
+            this_instruction_string = ('Do NOT look at the bars!\n'
+                                        'Please fixate at the center,\n'
+                                        'and do not move your eyes\n\n\n'
+                                        '[Press left arrow key or\n'
+                                        'index finger to continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = ['b','left'], visual_obj = [self.rect_left,self.rect_right])
+
+        # draw instructions wait for scanner t trigger
+        this_instruction_string = ('Index finger or\n'
+                                    'left arrow key - different side\n\n'
+                                    'Middle finger or\n'
+                                    'right arrow key - same side\n\n\n'
+                                    '          [waiting for scanner]')
+        
+        draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
+
+        # start recording gaze
+        if self.eyetracker_on:
+            self.start_recording_eyetracker()
+
+        self.start_experiment()
+        
+        # cycle through trials
+        for trl in self.all_trials: 
+            trl.run() # run forrest run
           
 
         self.close() # close session

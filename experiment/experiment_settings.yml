@@ -87,6 +87,16 @@ stimuli:
                     'cue_2','empty','mini_block_2','empty',
                     'cue_3','empty','mini_block_3','empty']
 
+  flicker:
+    bar_width_ratio: 0.125 # ratio of the screen res
+
+    bar_ecc_index: [1,2] # eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
+
+    flick_rate: 30 # Hz, rate of color for square
+
+    max_trial_time: 5 #max trial time (in minutes)
+
+
   conditions: # feature conditions
     background: 
       element_sf: 6 # cycles/gabor width

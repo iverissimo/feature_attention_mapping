@@ -4,7 +4,7 @@
 import sys
 import os
 #import appnope
-from session import PRFSession, FeatureSession, PylinkEyetrackerSession
+from session import PRFSession, FeatureSession, FlickerSession, PylinkEyetrackerSession
 
 
 # define main function
@@ -36,8 +36,8 @@ def main():
 
 
     exp_type = ''
-    while exp_type not in ('standard','feature'):
-        exp_type = input('Standard pRF mapping or Feature mapping (standard/feature)?: ')
+    while exp_type not in ('standard','feature','flicker'):
+        exp_type = input('Standard pRF mapping or Feature mapping (standard/feature/flicker)?: ')
 
     print('Running %s pRF mapping for subject-%s, run-%s'%(exp_type,sj_num,run_num))
 
@@ -76,10 +76,17 @@ def main():
 
     elif exp_type == 'feature': # run feature pRF mapper
          exp_sess = FeatureSession(output_str = output_str,
-                              output_dir = output_dir,
-                              settings_file = 'experiment_settings.yml',
-                              macbook_bool = mac_bool,
-                              eyetracker_on = True)
+                                  output_dir = output_dir,
+                                  settings_file = 'experiment_settings.yml',
+                                  macbook_bool = mac_bool,
+                                  eyetracker_on = True)
+
+    elif exp_type == 'flicker': # run feature pRF mapper
+         exp_sess = FlickerSession(output_str = output_str,
+                                  output_dir = output_dir,
+                                  settings_file = 'experiment_settings.yml',
+                                  macbook_bool = mac_bool,
+                                  eyetracker_on = False)
    	                            
     exp_sess.run()
 

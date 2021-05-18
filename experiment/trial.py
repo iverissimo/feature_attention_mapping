@@ -345,6 +345,138 @@ class FeatureTrial(Trial):
                     self.session.global_log.loc[idx, param] = val
 
 
+class FlickerTrial(Trial):
+
+    def __init__(self, session, trial_nr, phase_durations, phase_names,
+        bar_ecc_index_at_trial, ecc_midpoint_at_trial, timing='seconds', *args, **kwargs):
+
+
+        """ Initializes a FlickerTrial object. 
+
+        Parameters
+        ----------
+        session : exptools Session object
+            A Session object (needed for metadata)
+        trial_nr: int
+            Trial nr of trial
+        phase_durations : array-like
+            List/tuple/array with phase durations
+        phase_names : array-like
+            List/tuple/array with names for phases (only for logging),
+            optional (if None, all are named 'stim')
+        timing : str
+            The "units" of the phase durations. Default is 'seconds', where we
+            assume the phase-durations are in seconds. The other option is
+            'frames', where the phase-"duration" refers to the number of frames.
+        bar_ecc_index_at_trial : int
+            eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
+        ecc_midpoint_at_trial : float
+            eccentricity (in pixels) of bar position for trial (if empty, then nan) 
+
+            
+        """
+        
+        self.ID = trial_nr # trial identifier, not sure if needed
+        self.bar_ecc_index_at_trial = bar_ecc_index_at_trial
+        self.ecc_midpoint_at_trial = ecc_midpoint_at_trial
+        self.session = session
+
+        # phase durations for each condition 
+        self.phase_durations = phase_durations
+        # name of each condition
+        self.phase_names = phase_names 
+
+
+        super().__init__(session, trial_nr, phase_durations, phase_names, verbose=False, *args, **kwargs)
+
+        # get bar and background positions for this trial
+        self.position_dictionary = get_square_positions(self.session.grid_pos, self.ecc_midpoint_at_trial, 
+                                                    self.session.bar_width_pix, screen = self.session.screen)
+
+
+    def draw(self): 
+
+        """ Draw stimuli - pRF bars and fixation dot - for each trial """
+        
+        current_time = self.session.clock.getTime() # get time
+
+        ## orientation switch times
+        if self.session.ori_counter<len(self.session.ori_switch_times): # if counter within number of switch moments
+            if current_time >= self.session.ori_switch_times[self.session.ori_counter]: # when switch time reached, switch ori and increment counter
+                
+                self.session.ori_bool = True
+                self.session.ori_counter += 1
+
+        ## draw stim
+
+        self.session.flicker_stim.draw(ecc_midpoint_at_trial = self.ecc_midpoint_at_trial, 
+                                       this_phase = self.phase_names[int(self.phase)],
+                                       position_dictionary = self.position_dictionary,
+                                       orientation = self.session.ori_bool) 
+        
+        print('square stim') 
+
+        # set orientation bool counter to false
+        self.session.ori_bool = False
+
+        # draw delimitating black bars, to make display square
+        self.session.rect_left.draw()
+        self.session.rect_right.draw()
+
+        # fixation lines
+        self.session.line1.draw() 
+        self.session.line2.draw() 
+            
+        # fixation dot
+        self.session.fixation.draw() # just draw
+
+
+
+    def get_events(self):
+        """ Logs responses/triggers """
+        for ev, t in event.getKeys(timeStamped=self.session.clock): # list of of (keyname, time) relative to Clock’s last reset
+            if len(ev) > 0:
+                if ev in ['q']:
+                    print('experiment canceled by user')  
+                    self.session.close()
+                    self.session.quit()
+
+                elif ev == self.session.mri_trigger: # TR pulse
+                    event_type = 'pulse'
+                    self.exit_phase = True 
+
+                elif ev in ['space']: # end trial
+                    print('trial ended by user')  
+                    event_type = 'end_trial'
+                    self.exit_trial = True 
+
+                elif ev in ['up','down']: # end trial
+                    
+                    event_type = 'choice'
+                    
+                    if ev == ['up']:
+                        self.session.lum_responses += 1
+                    elif ev == ['down']:
+                        self.session.lum_responses -= 1
+
+                else: # any other key pressed will be response to color change
+                    event_type = 'response'
+
+
+                # log everything into session data frame
+                idx = self.session.global_log.shape[0]
+                self.session.global_log.loc[idx, 'trial_nr'] = self.ID
+                self.session.global_log.loc[idx, 'onset'] = t
+                self.session.global_log.loc[idx, 'event_type'] = event_type
+                self.session.global_log.loc[idx, 'phase'] = self.phase
+                self.session.global_log.loc[idx, 'response'] = ev                
+
+                for param, val in self.parameters.items():
+                    self.session.global_log.loc[idx, param] = val
+
+
+
+
 
 
 

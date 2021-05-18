@@ -280,7 +280,53 @@ class FeatureStim(Stim):
             bars2plot[drawing_ind[3]].draw()
             
 
-            
+class FlickerStim(Stim):
+
+    def __init__(self, session, bar_width_ratio, grid_pos):
+
+        # need to initialize parent class (Stim)
+        super().__init__(session=session, bar_width_ratio=bar_width_ratio, grid_pos=grid_pos)
+
+
+    def draw(self, ecc_midpoint_at_trial, this_phase, position_dictionary, orientation = True):
+        
+        """ Draw stimuli - pRF bar - for each trial 
+        
+        Parameters
+        ----------
+        ecc_midpoint_at_trial : float
+            eccentricity (in pixels) of bar position for trial (if empty, then nan) 
+        this_phase: str
+            strings with name of condition to draw
+        """
+        
+
+        # update background elements
+        self.session.background_array = update_elements(ElementArrayStim = self.session.background_array,
+                                                        condition_settings = self.condition_settings,
+                                                        position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
+                                                        orientation = orientation,
+                                                        this_phase = 'background', 
+                                                        elem_positions = position_dictionary['background']['xys'], 
+                                                        grid_pos = self.grid_pos,
+                                                        monitor = self.session.monitor, 
+                                                        screen = self.session.screen)
+
+
+        self.session.bar0_array = update_elements(ElementArrayStim = self.session.bar0_array,
+                                                    condition_settings = self.condition_settings, 
+                                                    position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor), 
+                                                    orientation = orientation,
+                                                    this_phase = this_phase, 
+                                                    elem_positions = position_dictionary['bar0']['xys'], 
+                                                    grid_pos = self.grid_pos,
+                                                    monitor = self.session.monitor, 
+                                                    screen = self.session.screen)
+
+
+        # actually draw
+        #self.session.background_array.draw()
+        self.session.bar0_array.draw()             
 
 
 

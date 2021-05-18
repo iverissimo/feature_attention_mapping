@@ -756,4 +756,71 @@ def save_all_TR_info(bar_dict, trial_type, attend_block_conditions, hemifield, c
     df_out.to_csv(output_path, index = False, header=True)
 
 
+def get_square_positions(grid_pos, ecc_midpoint_at_trial, bar_width_pix, screen=np.array([1680,1050])):
+    
+    """ function to subselect square positions and
+    return square and background element positions (and number of elements for each object)
+    
+    Parameters
+    ----------
+    grid_pos : arr
+        numpy array with all possible grid positions (N,2) -> (number of positions, [x,y])
+    ecc_midpoint_at_trial: float
+        eccentricity (in pixels) of bar position for trial (if empty, then nan) 
+    bar_width_pix: arr
+        width of bar(s) in pixels for each resolution. 
+        If float or array (1,) then same width used for all bars
+                
+    """
+    
+    # define dictionary to save positions and number of elements
+    # of all objects (bar(s) and background)
+    output_dict = {}
+
+    if np.isnan(ecc_midpoint_at_trial).any(): # when nan, position is whole background
+
+        output_dict['background'] = {'xys': grid_pos, 
+                                    'nElements': grid_pos.shape[0]}
+    else:
+        
+        # set bounds of the outer square
+        x_bounds = np.array([ecc_midpoint_at_trial - bar_width_pix[0]/2,
+                             np.abs(ecc_midpoint_at_trial) + bar_width_pix[0]/2])
+        y_bounds = np.array([ecc_midpoint_at_trial - bar_width_pix[1]/2, 
+                            np.abs(ecc_midpoint_at_trial) + bar_width_pix[1]/2])
+        
+        # check which grid positions are within bounds for this conditions
+        bar_ind = np.where(((grid_pos[...,0]>=min(x_bounds))&
+                            (grid_pos[...,0]<=max(x_bounds))&
+                            (grid_pos[...,1]>=min(y_bounds))&
+                            (grid_pos[...,1]<=max(y_bounds))
+                            ))[0]
+
+        # outer square position 
+        outer_xys = grid_pos[bar_ind]
+        
+        # set bounds of the inner square
+        x_bounds = np.array([ecc_midpoint_at_trial + bar_width_pix[0]/2,
+                             np.abs(ecc_midpoint_at_trial) - bar_width_pix[0]/2])
+        y_bounds = np.array([ecc_midpoint_at_trial + bar_width_pix[1]/2, 
+                            np.abs(ecc_midpoint_at_trial) - bar_width_pix[1]/2])
+
+        # check which outer square positions are not within inner square
+        bar_ind = np.where(((outer_xys[...,0]<=min(x_bounds))|
+                            (outer_xys[...,0]>=max(x_bounds))|
+                            (outer_xys[...,1]<=min(y_bounds))|
+                            (outer_xys[...,1]>=max(y_bounds))
+                            ))[0]
+
+        # append to dictionary 
+        output_dict['bar0'] = {'xys': outer_xys[bar_ind], 
+                                'nElements': outer_xys[bar_ind].shape[0]}
+        
+        # make mask to get background positions
+        mask = ~np.array([item in output_dict['bar0']['xys'] for item in grid_pos])
+
+        output_dict['background'] = {'xys': grid_pos,#[mask], 
+                                     'nElements': grid_pos.shape[0]}
+        
+    return(output_dict)
 

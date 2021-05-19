@@ -329,7 +329,10 @@ class PRFSession(ExpSession):
         # switch background time points
         self.bckg_switch_times = np.arange(0,self.switch_interval_time + self.settings['stimuli']['prf']['switch_step'],self.settings['stimuli']['prf']['switch_step'])
         # define timepoint where switch interval starts, given total trial time
-        self.switch_start_time = (np.where(np.array(self.bar_pass_direction_all) == 'switch_interval')[0][0] + 1) * self.bar_step 
+        if 'switch_interval' in np.array(self.bar_pass_direction_all):
+            self.switch_start_time = (np.where(np.array(self.bar_pass_direction_all) == 'switch_interval')[0][0] + 1) * self.bar_step 
+        else:
+            self.switch_start_time = np.nan
         # counter for background switches
         self.bckg_counter = 0
 

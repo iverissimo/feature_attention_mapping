@@ -63,8 +63,8 @@ stimuli:
 
     flick_rate: 10 # Hz, rate of change of features in bar
 
-    bar_pass_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty','switch_interval',
-                    'empty','L-R','U-D','empty','R-L','D-U','empty']  #['L-R','U-D','R-L','D-U'] #
+    bar_pass_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty'] #['empty','L-R','U-D','empty','R-L','D-U','empty','switch_interval','empty','L-R','U-D','empty','R-L','D-U','empty']  
+    #['L-R','U-D','R-L','D-U'] #
 
   feature:
     bar_width_ratio: 0.125 # ratio of the screen res

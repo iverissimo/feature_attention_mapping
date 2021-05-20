@@ -414,7 +414,6 @@ class FlickerTrial(Trial):
                                        position_dictionary = self.position_dictionary,
                                        orientation = self.session.ori_bool) 
         
-        print('square stim') 
 
         # set orientation bool counter to false
         self.session.ori_bool = False
@@ -448,19 +447,25 @@ class FlickerTrial(Trial):
                 elif ev in ['space']: # end trial
                     print('trial ended by user')  
                     event_type = 'end_trial'
-                    self.exit_trial = True 
 
-                elif ev in ['up','down']: # end trial
-                    
-                    event_type = 'choice'
-                    
-                    if ev == ['up']:
-                        self.session.lum_responses += 1
-                    elif ev == ['down']:
-                        self.session.lum_responses -= 1
+                    if self.ID == len(self.session.settings['stimuli']['flicker']['bar_ecc_index']): # if last trial
+                        self.session.close()
+                        self.session.quit()
+                    else:
+                        self.session.lum_responses = 0 # restart luminance counter for next trial
+                        self.exit_trial = True 
+
 
                 else: # any other key pressed will be response to color change
                     event_type = 'response'
+                    
+                    if ev in ['up']:
+                        self.session.lum_responses += self.session.settings['stimuli']['flicker']['increment']
+                    elif ev in ['down']:
+                        self.session.lum_responses -= self.session.settings['stimuli']['flicker']['increment']
+
+                    # clip it so it doesn't go above 100% or below 0%
+                    #self.session.lum_responses = np.clip(self.session.lum_responses,0,1) 
 
 
                 # log everything into session data frame

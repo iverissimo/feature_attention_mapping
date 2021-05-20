@@ -304,7 +304,7 @@ class FlickerStim(Stim):
         # update background elements
         self.session.background_array = update_elements(ElementArrayStim = self.session.background_array,
                                                         condition_settings = self.condition_settings,
-                                                        position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
+                                                        position_jitter = None, 
                                                         orientation = orientation,
                                                         this_phase = 'background', 
                                                         elem_positions = position_dictionary['background']['xys'], 
@@ -313,14 +313,18 @@ class FlickerStim(Stim):
                                                         monitor = self.session.monitor, 
                                                         screen = self.session.screen)
 
+        # we dial up or down luminance of green only
+        luminance_inc = self.session.lum_responses if this_phase == 'color_green' else None
+
 
         self.session.bar0_array = update_elements(ElementArrayStim = self.session.bar0_array,
                                                     condition_settings = self.condition_settings, 
-                                                    position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor), 
+                                                    position_jitter = None, 
                                                     orientation = orientation,
                                                     this_phase = this_phase, 
                                                     elem_positions = position_dictionary['bar0']['xys'], 
                                                     grid_pos = self.grid_pos,
+                                                    luminance_inc = luminance_inc,
                                                     monitor = self.session.monitor, 
                                                     screen = self.session.screen)
 

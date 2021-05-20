@@ -97,6 +97,7 @@ stimuli:
     max_trial_time: 5 #max trial time (in minutes)
 
     backgr_contrast: 0 # contrast for elements, 0 = no background elements shown
+    increment: 0.05 # increment value for luminance per button press
 
 
   conditions: # feature conditions
@@ -110,7 +111,7 @@ stimuli:
 
     color_red:
       element_sf: 6 # cycles/gabor width
-      element_color: [240, 0, 0] # rgb255
+      element_color: [255, 0, 0] # rgb255
       element_ori: [45,135] # [right, left]
       element_contrast: .3 #1
       ori_jitter_max: 1.0 # max value for element orientation jitter range
@@ -118,7 +119,7 @@ stimuli:
 
     color_green:
       element_sf: 6 # cycles/gabor width
-      element_color: [70, 135, 0] #rgb255
+      element_color: [0, 255, 0] #rgb255
       element_ori: [45,135] # [right, left]
       element_contrast: .3 #1
       ori_jitter_max: 1.0 # max value for element orientation jitter range

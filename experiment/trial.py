@@ -464,8 +464,9 @@ class FlickerTrial(Trial):
                     elif ev in ['down']:
                         self.session.lum_responses -= self.session.settings['stimuli']['flicker']['increment']
 
-                    # clip it so it doesn't go above 100% or below 0%
-                    #self.session.lum_responses = np.clip(self.session.lum_responses,0,1) 
+                    # clip it so participants don't endup with humongous values
+                    print(self.session.lum_responses)
+                    self.session.lum_responses = np.clip(self.session.lum_responses,-1,1) 
 
 
                 # log everything into session data frame

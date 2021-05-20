@@ -309,6 +309,7 @@ class FlickerStim(Stim):
                                                         this_phase = 'background', 
                                                         elem_positions = position_dictionary['background']['xys'], 
                                                         grid_pos = self.grid_pos,
+                                                        background_contrast = self.session.settings['stimuli']['flicker']['backgr_contrast'],
                                                         monitor = self.session.monitor, 
                                                         screen = self.session.screen)
 

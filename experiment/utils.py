@@ -183,7 +183,7 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_pass_direction_at_TR,
 
 
 def update_elements(ElementArrayStim, condition_settings, this_phase, elem_positions, grid_pos,
-                   	monitor, screen = np.array([1680,1050]), position_jitter = None, orientation = True, background_contrast = None, luminance_inc = None):
+                   	monitor, screen = np.array([1680,1050]), position_jitter = None, orientation = True, background_contrast = None, luminance = None):
     
     """ update element array settings
     
@@ -204,7 +204,7 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
         monitor object (to get monitor references for deg2pix transformation)
     screen: arr
         array with display resolution
-    luminance_inc: float or None
+    luminance: float or None
         luminance increment to alter color (used for flicker task)
         
     """
@@ -216,9 +216,9 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     # get rgb color and convert to hsv
     hsv_color = rgb255_2_hsv(condition_settings[this_phase]['element_color'])
 
-    if luminance_inc != None: # if we want to make color more or less luminate
+    if luminance != None: # if we want to make color more or less luminate
 
-        hsv_color[-1] += luminance_inc
+        hsv_color[-1] = luminance
         hsv_color[-1] = np.clip(hsv_color[-1],0,1) # clip it so it doesn't go above 100% or below 0%
         print(hsv_color)
 

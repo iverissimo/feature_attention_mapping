@@ -770,8 +770,8 @@ class FlickerSession(ExpSession):
         """ Creates trials (before running the session) """
 
         #
-        # counter for responses, to register if increase or decrease luminance
-        self.lum_responses = 0
+        # start luminance, will increase or decrease given responses
+        self.lum_responses = 1
 
         ## get all possible bar positions
 

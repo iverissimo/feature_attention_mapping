@@ -452,7 +452,7 @@ class FlickerTrial(Trial):
                         self.session.close()
                         self.session.quit()
                     else:
-                        self.session.lum_responses = 0 # restart luminance counter for next trial
+                        self.session.lum_responses = 1 # restart luminance counter for next trial
                         self.exit_trial = True 
 
 
@@ -465,8 +465,7 @@ class FlickerTrial(Trial):
                         self.session.lum_responses -= self.session.settings['stimuli']['flicker']['increment']
 
                     # clip it so participants don't endup with humongous values
-                    print(self.session.lum_responses)
-                    self.session.lum_responses = np.clip(self.session.lum_responses,-1,1) 
+                    self.session.lum_responses = np.clip(self.session.lum_responses,0,1) 
 
 
                 # log everything into session data frame

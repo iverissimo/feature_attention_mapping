@@ -314,7 +314,7 @@ class FlickerStim(Stim):
                                                         screen = self.session.screen)
 
         # we dial up or down luminance of green only
-        luminance_inc = self.session.lum_responses if this_phase == 'color_green' else None
+        luminance = self.session.lum_responses if this_phase == 'color_green' else None
 
 
         self.session.bar0_array = update_elements(ElementArrayStim = self.session.bar0_array,
@@ -324,7 +324,7 @@ class FlickerStim(Stim):
                                                     this_phase = this_phase, 
                                                     elem_positions = position_dictionary['bar0']['xys'], 
                                                     grid_pos = self.grid_pos,
-                                                    luminance_inc = luminance_inc,
+                                                    luminance = luminance,
                                                     monitor = self.session.monitor, 
                                                     screen = self.session.screen)
 

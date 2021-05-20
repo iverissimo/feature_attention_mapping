@@ -325,7 +325,7 @@ class FlickerStim(Stim):
 
 
         # actually draw
-        #self.session.background_array.draw()
+        self.session.background_array.draw()
         self.session.bar0_array.draw()             
 
 

@@ -816,11 +816,21 @@ def get_square_positions(grid_pos, ecc_midpoint_at_trial, bar_width_pix, screen=
         output_dict['bar0'] = {'xys': outer_xys[bar_ind], 
                                 'nElements': outer_xys[bar_ind].shape[0]}
         
-        # make mask to get background positions
-        mask = ~np.array([item in output_dict['bar0']['xys'] for item in grid_pos])
+        ## make mask to get background positions
+        # check which positions  within inner square
+        inner_square_ind = np.where(((grid_pos[...,0]>min(x_bounds))&
+                                    (grid_pos[...,0]<max(x_bounds))&
+                                    (grid_pos[...,1]>min(y_bounds))&
+                                    (grid_pos[...,1]<max(y_bounds))
+                                    ))[0]
+        backg_ind = np.concatenate((np.where(((grid_pos[...,0]<np.min(output_dict['bar0']['xys'][...,0]))|
+                                    (grid_pos[...,0]>np.max(output_dict['bar0']['xys'][...,0]))|
+                                    (grid_pos[...,1]<np.min(output_dict['bar0']['xys'][...,1]))|
+                                    (grid_pos[...,1]>np.max(output_dict['bar0']['xys'][...,1]))
+                                    ))[0],inner_square_ind))
 
-        output_dict['background'] = {'xys': grid_pos,#[mask], 
-                                     'nElements': grid_pos.shape[0]}
+        output_dict['background'] = {'xys': grid_pos[backg_ind], 
+                                     'nElements': grid_pos[backg_ind].shape[0]}
         
     return(output_dict)
 

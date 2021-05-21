@@ -773,6 +773,8 @@ class FlickerSession(ExpSession):
         # start luminance, will increase or decrease given responses
         self.lum_responses = 1
 
+        self.updated_settings = self.settings['stimuli']['conditions']
+
         ## get all possible bar positions
 
         # define bar width 

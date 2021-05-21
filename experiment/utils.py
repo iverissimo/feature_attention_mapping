@@ -183,7 +183,8 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_pass_direction_at_TR,
 
 
 def update_elements(ElementArrayStim, condition_settings, this_phase, elem_positions, grid_pos,
-                   	monitor, screen = np.array([1680,1050]), position_jitter = None, orientation = True, background_contrast = None, luminance = None):
+                   	monitor, screen = np.array([1680,1050]), position_jitter = None, orientation = True, 
+                    background_contrast = None, luminance = None, update_settings = False):
     
     """ update element array settings
     
@@ -206,6 +207,8 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
         array with display resolution
     luminance: float or None
         luminance increment to alter color (used for flicker task)
+    update_settings: bool
+        choose if we want to update settings or not (mainly for color changes)
         
     """
     
@@ -219,8 +222,11 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     if luminance != None: # if we want to make color more or less luminate
 
         hsv_color[-1] = luminance
-        hsv_color[-1] = np.clip(hsv_color[-1],0,1) # clip it so it doesn't go above 100% or below 0%
+        hsv_color[-1] = np.clip(hsv_color[-1],0.00001,1) # clip it so it doesn't go above 100% or below 0.0001% (latter avoids 0 division)
         print(hsv_color)
+
+        # update settings dict with new color 
+        condition_settings[this_phase]['element_color'] = [float(x*255.) for x in colorsys.hsv_to_rgb(hsv_color[0]/360.,hsv_color[1],hsv_color[2])]
 
 
     grat_res = near_power_of_2(ElementArrayStim.sizes[0][0],near='previous') # use power of 2 as grating res, to avoid error
@@ -283,8 +289,11 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     ElementArrayStim.setColors(element_color)
     ElementArrayStim.setOpacities(element_opacities)
 
-
-    return(ElementArrayStim)
+    # return updated settings, if such is the case
+    if update_settings == True: 
+        return(ElementArrayStim,condition_settings)
+    else:
+        return(ElementArrayStim)
 
 
 def get_non_overlapping_indices(arr_shape=[2,8]):

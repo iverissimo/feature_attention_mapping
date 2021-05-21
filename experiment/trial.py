@@ -1,6 +1,8 @@
 
 import os
 import numpy as np
+import yaml
+
 from exptools2.core import Trial
 
 from psychopy import event, tools, colors, visual
@@ -448,11 +450,19 @@ class FlickerTrial(Trial):
                     print('trial ended by user')  
                     event_type = 'end_trial'
 
-                    if self.ID == len(self.session.settings['stimuli']['flicker']['bar_ecc_index']): # if last trial
+                    if self.ID == (len(self.session.settings['stimuli']['flicker']['bar_ecc_index'])-1): # if last trial
+
+                        # save updated condition settings, so color is used for other tasks
+                        settings_out = os.path.join(self.session.output_dir, self.session.output_str + '_updated_settings.yml')
+                        #print(settings_out)
+                        with open(settings_out, 'w') as f_out:  # write settings to disk
+                            yaml.dump(self.session.updated_settings, f_out, indent=4, default_flow_style=False)
+                        
                         self.session.close()
                         self.session.quit()
                     else:
                         self.session.lum_responses = 1 # restart luminance counter for next trial
+                        self.stop_phase()
                         self.stop_trial() 
 
 

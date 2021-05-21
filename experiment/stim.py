@@ -317,16 +317,17 @@ class FlickerStim(Stim):
         luminance = self.session.lum_responses if this_phase == 'color_green' else None
 
 
-        self.session.bar0_array = update_elements(ElementArrayStim = self.session.bar0_array,
-                                                    condition_settings = self.condition_settings, 
-                                                    position_jitter = None, 
-                                                    orientation = orientation,
-                                                    this_phase = this_phase, 
-                                                    elem_positions = position_dictionary['bar0']['xys'], 
-                                                    grid_pos = self.grid_pos,
-                                                    luminance = luminance,
-                                                    monitor = self.session.monitor, 
-                                                    screen = self.session.screen)
+        self.session.bar0_array, self.session.updated_settings = update_elements(ElementArrayStim = self.session.bar0_array,
+                                                                                                condition_settings = self.condition_settings, 
+                                                                                                position_jitter = None, 
+                                                                                                orientation = orientation,
+                                                                                                this_phase = this_phase, 
+                                                                                                elem_positions = position_dictionary['bar0']['xys'], 
+                                                                                                grid_pos = self.grid_pos,
+                                                                                                luminance = luminance,
+                                                                                                update_settings = True,
+                                                                                                monitor = self.session.monitor, 
+                                                                                                screen = self.session.screen)
 
 
         # actually draw

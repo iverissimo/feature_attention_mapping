@@ -97,7 +97,7 @@ stimuli:
     max_trial_time: 5 #max trial time (in minutes)
 
     backgr_contrast: 0 # contrast for elements, 0 = no background elements shown
-    increment: 0.05 # increment value for luminance per button press
+    increment: 0.025 # increment value for luminance per button press
 
 
   conditions: # feature conditions

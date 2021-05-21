@@ -144,7 +144,7 @@ class PRFTrial(Trial):
 
                 elif ev == self.session.mri_trigger: # TR pulse
                     event_type = 'pulse'
-                    self.exit_phase=True # what for?
+                    self.stop_phase()
 
                 else: # any other key pressed will be response to color change
                     event_type = 'response'
@@ -326,7 +326,7 @@ class FeatureTrial(Trial):
 
                 elif ev == self.session.mri_trigger: # TR pulse
                     event_type = 'pulse'
-                    self.exit_phase=True # what for?
+                    self.stop_phase()
 
                 else: # any other key pressed will be response to color change
                     event_type = 'response'
@@ -442,7 +442,7 @@ class FlickerTrial(Trial):
 
                 elif ev == self.session.mri_trigger: # TR pulse
                     event_type = 'pulse'
-                    self.exit_phase = True 
+                    self.stop_phase()
 
                 elif ev in ['space']: # end trial
                     print('trial ended by user')  
@@ -453,7 +453,7 @@ class FlickerTrial(Trial):
                         self.session.quit()
                     else:
                         self.session.lum_responses = 1 # restart luminance counter for next trial
-                        self.exit_trial = True 
+                        self.stop_trial() 
 
 
                 else: # any other key pressed will be response to color change

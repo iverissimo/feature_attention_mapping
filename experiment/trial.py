@@ -1,7 +1,7 @@
 
 import os
 import numpy as np
-import yaml
+import yaml, re
 
 from exptools2.core import Trial
 
@@ -323,6 +323,7 @@ class FeatureTrial(Trial):
             if len(ev) > 0:
                 if ev in ['q']:
                     print('trial canceled by user')  
+                    #print(self.session.settings['stimuli']['conditions']['color_green']['element_color'])
                     self.session.close()
                     self.session.quit()
 
@@ -450,14 +451,17 @@ class FlickerTrial(Trial):
                     print('trial ended by user')  
                     event_type = 'end_trial'
 
-                    if self.ID == (len(self.session.settings['stimuli']['flicker']['bar_ecc_index'])-1): # if last trial
+                    # save updated condition settings per trial
+                    # so color is used for other tasks
+                    settings_out = os.path.join(self.session.output_dir, self.session.output_str + '_updated_settings.yml')
+                    settings_out = re.sub(r'run-.+?,?(\_|$)', "trial-{ID}_".format(ID = str(self.ID).zfill(2)), settings_out)
+                    
 
-                        # save updated condition settings, so color is used for other tasks
-                        settings_out = os.path.join(self.session.output_dir, self.session.output_str + '_updated_settings.yml')
-                        #print(settings_out)
-                        with open(settings_out, 'w') as f_out:  # write settings to disk
-                            yaml.dump(self.session.updated_settings, f_out, indent=4, default_flow_style=False)
-                        
+                    with open(settings_out, 'w') as f_out:  # write settings to disk
+                        yaml.dump(self.session.updated_settings, f_out, indent=4, default_flow_style=False)
+
+
+                    if self.ID == (len(self.session.settings['stimuli']['flicker']['bar_ecc_index'])-1): # if last trial                        
                         self.session.close()
                         self.session.quit()
                     else:

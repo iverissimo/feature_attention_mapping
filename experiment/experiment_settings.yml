@@ -94,10 +94,12 @@ stimuli:
 
     flick_rate: 30 # Hz, flicker rate of color for square
 
-    max_trial_time: 5 #max trial time (in minutes)
+    max_trial_time: 5 # max trial time (in minutes)
 
     backgr_contrast: 0 # contrast for elements, 0 = no background elements shown
     increment: 0.025 # increment value for luminance per button press
+
+    modulated_condition: ['color_green'] # color condition modulated by flicker task
 
 
   conditions: # feature conditions

@@ -344,6 +344,9 @@ class PRFSession(ExpSession):
     
     def run(self):
         """ Loops over trials and runs them """
+
+        # update color of settings
+        self.settings = get_average_color(self.output_dir, self.settings, task = 'standard')
         
 
         # create trials before running!
@@ -617,6 +620,9 @@ class FeatureSession(ExpSession):
 
     def run(self):
         """ Loops over trials and runs them """
+
+        # update color of settings
+        self.settings = get_average_color(self.output_dir, self.settings, task = 'feature')
 
         # create trials before running!
         self.create_stimuli()

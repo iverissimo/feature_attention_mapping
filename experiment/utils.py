@@ -4,6 +4,7 @@ import os, sys
 import math
 import random
 import pandas as pd
+import yaml
 
 from psychopy import visual, tools, colors, event
 import itertools
@@ -851,4 +852,46 @@ def get_square_positions(grid_pos, ecc_midpoint_at_trial, bar_width_pix, screen=
                                      'nElements': grid_pos[backg_ind].shape[0]}
         
     return(output_dict)
+
+
+
+def get_average_color(filedir,settings,task='standard'):
+    
+    """ get average color 
+    
+    Parameters
+    ----------
+    filedir : str
+        absolute directory where the new settings files are
+    settings: dict
+        settings dict, to be updated
+    task: str
+        name of task ('standard' vs 'feature')
+            
+    """
+    
+    # get settings files for all trials of flicker task  
+    updt_color_files = [os.path.join(filedir.replace('PRF{task}'.format(task = task),'PRFflicker'),x) for _,x in enumerate(os.listdir(filedir.replace('PRF{task}'.format(task = task),'PRFflicker'))) if 'trial' in x and x.endswith('_updated_settings.yml')]
+    updt_color_files.sort()
+    
+    # for each updated color
+    for _,col in enumerate(settings['stimuli']['flicker']['modulated_condition']) :
+    
+        new_color = []
+
+        for _,file in enumerate(updt_color_files):
+
+            # load updated settings for each trial 
+            with open(file, 'r', encoding='utf8') as f_in:
+                updated_settings = yaml.safe_load(f_in)
+
+            new_color.append(updated_settings[col]['element_color'])
+
+        # actually update color:
+        settings['stimuli']['conditions'][col]['element_color'] = list(np.mean(new_color, axis=0))
+        print('new rgb255 for %s is %s'%(col,str(settings['stimuli']['conditions'][col]['element_color'])))
+
+    return(settings)
+
+
 

@@ -876,76 +876,47 @@ class FlickerSession(ExpSession):
             self.calibrate_eyetracker()
 
         # draw instructions wait a few seconds
-        this_instruction_string = ('During the experiment\nyou will see green and red bars\n'
-                                'oriented vertically or horizontally\n'
-                                'throughout the screen\n\n\n'
-                                '[Press left arrow key or\n'
-                                'index finger to continue]\n\n'
-                                '[Press right arrow key or\n'
-                                'middle finger to skip]')
+        this_instruction_string = ('Welcome to this experiment!\n\n'
+                                'In the first task, you will see a\n'
+                                'flickering red/green square\n\n\n'
+                                '[Press right arrow key to continue]\n\n')
 
-        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['b','left','y','right'], visual_obj = [self.rect_left,self.rect_right])
+        draw_instructions(self.win, this_instruction_string, keys = ['right'], visual_obj = [self.rect_left,self.rect_right])
 
-        if key_pressed[0] != 'y': #if instructions not skipped
-
-            # draw instructions wait a few seconds
-            this_instruction_string = ('These bars can be\n'
-                                        'on the right/left side\n'
-                                        'or above/below the\n'
-                                        'central fixation dot\n\n\n'
-                                        '[Press left arrow key or\n'
-                                        'index finger to continue]')
-            
-            draw_instructions(self.win, this_instruction_string, keys = ['b','left'], visual_obj = [self.rect_left,self.rect_right])
-
-            this_instruction_string = ('Your task is to fixate\n'
-                                        'at the center of the screen,\n'
-                                        'and indicate if one of the bars\n'
-                                        'is on the SAME side of the dot\n'
-                                        'relative to the PREVIOUS trial\n\n\n'
-                                        '[Press left arrow key or\n'
-                                        'index finger to continue]')
-            
-            draw_instructions(self.win, this_instruction_string, keys = ['b','left'], visual_obj = [self.rect_left,self.rect_right])
-
-            this_instruction_string = ('The experiment is divided\n'
-                                        'into different mini-blocks.\n\n'
-                                        'At the beggining of each\n'
-                                        'you will see a single bar,\n'
-                                        'at the center of the screen.\n\n\n'
-                                        '[Press left arrow key or\n'
-                                        'index finger to continue]')
-            
-            draw_instructions(self.win, this_instruction_string, keys = ['b','left'], visual_obj = [self.rect_left,self.rect_right])
-
-            this_instruction_string = ('This bar will be\n'
-                                        'vertical/horizontal and\n'
-                                        'green/red\n\n'
-                                        'That will be the bar\n'
-                                        'that you have to search for.\n\n\n'
-                                        '[Press left arrow key or\n'
-                                        'index finger to continue]')
-            
-            draw_instructions(self.win, this_instruction_string, keys = ['b','left'], visual_obj = [self.rect_left,self.rect_right])
+        this_instruction_string = ('If you press the up/down arrow key\n'
+                                    'you will realize that\n'
+                                    'the flickering changes\n\n\n'
+                                    '[Press right arrow key to continue]\n\n')
+        
+        draw_instructions(self.win, this_instruction_string, keys = ['right'], visual_obj = [self.rect_left,self.rect_right])
 
 
-            # draw instructions wait a few seconds
-            this_instruction_string = ('Do NOT look at the bars!\n'
-                                        'Please fixate at the center,\n'
-                                        'and do not move your eyes\n\n\n'
-                                        '[Press left arrow key or\n'
-                                        'index finger to continue]')
-            
-            draw_instructions(self.win, this_instruction_string, keys = ['b','left'], visual_obj = [self.rect_left,self.rect_right])
+        this_instruction_string = ('Your task is to fixate\n'
+                                    'at the center of the screen,\n'
+                                    'and press the up/down arrow\n'
+                                    'until the square does not\n'
+                                    'flicker anymore\n\n\n'
+                                    '[Press right arrow key to continue]\n\n')
+        
+        draw_instructions(self.win, this_instruction_string, keys = ['right'], visual_obj = [self.rect_left,self.rect_right])
+
+
+        # draw instructions wait a few seconds
+        this_instruction_string = ('Do NOT look at the square!\n\n'
+                                    'Please fixate at the center,\n'
+                                    'and do not move your eyes\n\n\n'
+                                    '[Press right arrow key to continue]\n\n')
+        
+        draw_instructions(self.win, this_instruction_string, keys = ['right'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = ('Index finger or\n'
-                                    'left arrow key - different side\n\n'
-                                    'Middle finger or\n'
-                                    'right arrow key - same side\n\n\n'
-                                    '          [waiting for scanner]')
+        this_instruction_string = ('When you are certain the square\n'
+                                    'does not flicker anymore,\n'
+                                    'press the space bar\n\n'
+                                    'Ready when you are!\n\n\n'
+                                    '[Press space bar to start]\n\n')
         
-        draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
+        draw_instructions(self.win, this_instruction_string, keys = ['space'], visual_obj = [self.rect_left,self.rect_right])
 
         # start recording gaze
         if self.eyetracker_on:

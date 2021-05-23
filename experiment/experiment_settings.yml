@@ -90,7 +90,7 @@ stimuli:
   flicker:
     bar_width_ratio: 0.125 # ratio of the screen res
 
-    bar_ecc_index: [1,2] # eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
+    bar_ecc_index: [1,2,2,1,1,2,1,2] # eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
 
     flick_rate: 30 # Hz, flicker rate of color for square
 

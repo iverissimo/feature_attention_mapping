@@ -401,21 +401,12 @@ class FlickerTrial(Trial):
 
         """ Draw stimuli - pRF bars and fixation dot - for each trial """
         
-        current_time = self.session.clock.getTime() # get time
-
-        ## orientation switch times
-        if self.session.ori_counter<len(self.session.ori_switch_times): # if counter within number of switch moments
-            if current_time >= self.session.ori_switch_times[self.session.ori_counter]: # when switch time reached, switch ori and increment counter
-                
-                self.session.ori_bool = True
-                self.session.ori_counter += 1
-
         ## draw stim
 
         self.session.flicker_stim.draw(ecc_midpoint_at_trial = self.ecc_midpoint_at_trial, 
                                        this_phase = self.phase_names[int(self.phase)],
                                        position_dictionary = self.position_dictionary,
-                                       orientation = self.session.ori_bool) 
+                                       orientation = False) 
         
 
         # set orientation bool counter to false

@@ -144,7 +144,7 @@ class PRFStim(Stim):
 
 
         # actually draw
-        self.session.background_array.draw()
+        #self.session.background_array.draw()
         if this_phase != 'background':
             self.session.bar0_array.draw() 
 
@@ -269,7 +269,7 @@ class FeatureStim(Stim):
 
 
         # actually draw
-        self.session.background_array.draw()
+        #self.session.background_array.draw()
         if this_phase != 'background':
             
             bars2plot = [self.session.bar0_array,self.session.bar1_array,self.session.bar2_array,self.session.bar3_array]
@@ -331,7 +331,7 @@ class FlickerStim(Stim):
 
 
         # actually draw
-        self.session.background_array.draw()
+        #self.session.background_array.draw()
         self.session.bar0_array.draw()             
 
 

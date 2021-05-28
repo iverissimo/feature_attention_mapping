@@ -263,13 +263,21 @@ class PRFSession(ExpSession):
                 key_list.append(key)
 
         # define how many times bar features switch during TR, according to flick rate defined 
-        feat_switch_rate = self.settings['mri']['TR'] * self.settings['stimuli']['prf']['flick_rate']
+        if self.settings['stimuli']['prf']['flick_rate'] == 'TR':
 
-        key_list = np.array(key_list*round(feat_switch_rate/len(key_list))) # repeat keys, so for each bar pass it shows each condition X times
-        phase_conditions = key_list
+            phase_conditions = np.repeat(key_list, trial_number/len(key_list))
+            np.random.shuffle(phase_conditions)
 
-        for r in range(trial_number-1):            
-            phase_conditions = np.vstack((phase_conditions,key_list))
+            phase_conditions = np.array([[val] for _,val in enumerate(phase_conditions)])
+            
+        else:
+            feat_switch_rate = self.settings['mri']['TR'] * self.settings['stimuli']['prf']['flick_rate']
+
+            key_list = np.array(key_list*round(feat_switch_rate/len(key_list))) # repeat keys, so for each bar pass it shows each condition X times
+            phase_conditions = key_list
+
+            for r in range(trial_number-1):            
+                phase_conditions = np.vstack((phase_conditions,key_list))
 
 
         # define list with number of phases and their duration (duration of each must be the same)
@@ -550,7 +558,7 @@ class FeatureSession(ExpSession):
             
             if 'mini_block' in val:
                 ind_list = np.arange(self.settings['stimuli']['feature']['num_bars'])
-                random.shuffle(ind_list)
+                np.random.shuffle(ind_list)
                 
                 self.drawing_ind.append(ind_list)
 

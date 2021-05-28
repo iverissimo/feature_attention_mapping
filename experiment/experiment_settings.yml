@@ -61,7 +61,7 @@ stimuli:
     switch_step: 0.25 # seconds, time step to update background contrast
     switch_slope: .65 #1 # absolute slope value for switch function
 
-    flick_rate: 10 # Hz, rate of change of features in bar
+    flick_rate: 'TR' #10 # Hz, rate of change of features in bar
 
     bar_pass_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty'] #['empty','L-R','U-D','empty','R-L','D-U','empty','switch_interval','empty','L-R','U-D','empty','R-L','D-U','empty']  
     #['L-R','U-D','R-L','D-U'] #
@@ -75,7 +75,7 @@ stimuli:
 
     cue_width: .2 #.55
     cue_height: .5 #1.1
-    cue_contrast: 0.3
+    cue_contrast: 0.6
 
 
     num_bars: 4
@@ -107,7 +107,7 @@ stimuli:
       element_sf: 6 # cycles/gabor width
       element_color: [204, 204, 204]  # rgb255, light grey
       element_ori: [90,180] # half horizontal, half vertical
-      element_contrast: .3 #1 #0.5
+      element_contrast: 0.6 #.3 #1 #0.5
       ori_jitter_max: 1.0 # max value for element orientation jitter range
       ori_jitter_min: 0 # min value for element orientation jitter range
 
@@ -115,7 +115,7 @@ stimuli:
       element_sf: 6 # cycles/gabor width
       element_color: [255, 0, 0] # rgb255
       element_ori: [45,135] # [right, left]
-      element_contrast: .3 #1
+      element_contrast: 0.6 #.3 #1
       ori_jitter_max: 1.0 # max value for element orientation jitter range
       ori_jitter_min: 0 # min value for element orientation jitter range
 
@@ -123,7 +123,7 @@ stimuli:
       element_sf: 6 # cycles/gabor width
       element_color: [0, 255, 0] #rgb255
       element_ori: [45,135] # [right, left]
-      element_contrast: .3 #1
+      element_contrast: 0.6 #.3 #1
       ori_jitter_max: 1.0 # max value for element orientation jitter range
       ori_jitter_min: 0 # min value for element orientation jitter range
 

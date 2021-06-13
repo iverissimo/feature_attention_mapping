@@ -46,7 +46,7 @@ stimuli:
   gab_ratio: 0.66 #0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid
   element_size: 0.5 #1.1 #0.55 #0.4 #0.2 # degrees
 
-  ori_shift_rate: 'TR' #0.83 #.25 #5 # Hz, rate of element orientation change
+  ori_shift_rate: 5 #'TR' #0.83 #.25 #5 # Hz, rate of element orientation change
 
   pos_jitter: 0.03 #0.06 #degrees, x,y position jiter to add to gabor center 
   
@@ -61,7 +61,7 @@ stimuli:
     switch_step: 0.25 # seconds, time step to update background contrast
     switch_slope: .65 #1 # absolute slope value for switch function
 
-    flick_rate: 'TR' #10 # Hz, rate of change of features in bar
+    flick_rate: 10 # Hz, rate of change of features in bar
 
     bar_pass_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty'] #['empty','L-R','U-D','empty','R-L','D-U','empty','switch_interval','empty','L-R','U-D','empty','R-L','D-U','empty']  
     #['L-R','U-D','R-L','D-U'] #
@@ -115,7 +115,7 @@ stimuli:
       element_sf: 6 # cycles/gabor width
       element_color: [255, 0, 0] # rgb255
       element_ori: [45,135] # [right, left]
-      element_contrast: 0.6 #.3 #1
+      element_contrast: 1
       ori_jitter_max: 1.0 # max value for element orientation jitter range
       ori_jitter_min: 0 # min value for element orientation jitter range
 
@@ -123,7 +123,7 @@ stimuli:
       element_sf: 6 # cycles/gabor width
       element_color: [0, 255, 0] #rgb255
       element_ori: [45,135] # [right, left]
-      element_contrast: 0.6 #.3 #1
+      element_contrast: 1
       ori_jitter_max: 1.0 # max value for element orientation jitter range
       ori_jitter_min: 0 # min value for element orientation jitter range
 

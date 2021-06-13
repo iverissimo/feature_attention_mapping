@@ -160,26 +160,13 @@ class PRFSession(ExpSession):
 
     def create_stimuli(self):
 
-        """ Create Stimuli - pRF bar and fixation dot """
+        """ Create Stimuli - pRF bar """
         
         #generate PRF stimulus
         self.prf_stim = PRFStim(session = self, 
                                 bar_width_ratio = self.settings['stimuli']['prf']['bar_width_ratio'], 
                                 grid_pos = self.grid_pos
                                 )
-        
-        # Convert fixation dot radius in degrees to pixels for a given Monitor object
-        fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fix_dot_size_deg'], 
-                                                        self.monitor)/2 
-        
-        # create black fixation circle
-        # note - fixation dot will change color during task
-        self.fixation = visual.Circle(self.win, units = 'pix', radius = fixation_rad_pix, 
-                                            fillColor = self.settings['stimuli']['fix_dot_color'], 
-                                            lineColor = self.settings['stimuli']['fix_line_color'],
-                                            fillColorSpace = self.settings['stimuli']['colorSpace'],
-                                            lineColorSpace = self.settings['stimuli']['colorSpace'])  
-
 
 
     def create_trials(self):
@@ -313,13 +300,6 @@ class PRFSession(ExpSession):
                                             ))
 
 
-        ## define timepoints for fixation dot to change color
-        # switch time points (around 4 s between switches + jitter to avoid expectation effects)
-        self.fixation_switch_times = np.arange(1,self.total_time,1/self.settings['stimuli']['fix_dot_shift_rate'])
-        self.fixation_switch_times += 2*np.random.random_sample((len(self.fixation_switch_times),)) 
-        # counter for fixation dot switches
-        self.fix_counter = 0
-
         # define time points for element orientation to change
         # switch orientation time points
         if self.settings['stimuli']['ori_shift_rate'] == 'TR':
@@ -380,8 +360,9 @@ class PRFSession(ExpSession):
             # draw instructions wait a few seconds
             this_instruction_string = ('Your task is to fixate\n'
                                         'at the center of the screen,\n'
-                                        'and indicate when\n'
-                                        'the central dot changes color\n\n\n'
+                                        'and indicate the\n'
+                                        'bar color\n'
+                                        'every time the bar moves\n\n\n'
                                         '[Press y/middle finger to continue]')
             
             draw_instructions(self.win, this_instruction_string, keys = ['y'], visual_obj = [self.rect_left,self.rect_right])
@@ -396,8 +377,8 @@ class PRFSession(ExpSession):
             draw_instructions(self.win, this_instruction_string, keys = ['y'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = ('Index finger/b key - Black dot\n'
-                                    'Middle finger/y key - White dot\n\n\n'
+        this_instruction_string = ('Index finger/b key - Red color\n'
+                                    'Middle finger/y key - Green color\n\n\n'
                                     '          [waiting for scanner]')
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
@@ -414,9 +395,9 @@ class PRFSession(ExpSession):
             trl.run() # run forrest run
 
 
-        print('Expected number of responses: %d'%(len(self.fixation_switch_times)+1))
-        print('Total subject responses: %d'%self.total_responses)
-        print('Correct responses (within 0.8s of dot color change): %d'%self.correct_responses)
+        #print('Expected number of responses: %d'%(len(self.fixation_switch_times)+1))
+        #print('Total subject responses: %d'%self.total_responses)
+        #print('Correct responses (within 0.8s of dot color change): %d'%self.correct_responses)
           
 
         self.close() # close session
@@ -451,25 +432,13 @@ class FeatureSession(ExpSession):
     
     def create_stimuli(self):
 
-        """ Create Stimuli - pRF bars and fixation dot """
+        """ Create Stimuli - pRF bars """
         
         #generate PRF stimulus
         self.feature_stim = FeatureStim(session = self, 
                                         bar_width_ratio = self.settings['stimuli']['feature']['bar_width_ratio'], 
                                         grid_pos = self.grid_pos
                                         )
-        
-        # Convert fixation dot radius in degrees to pixels for a given Monitor object
-        fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fix_dot_size_deg'], 
-                                                        self.monitor)/2 
-        
-        # create black fixation circle
-        self.fixation = visual.Circle(self.win, units = 'pix', radius = fixation_rad_pix, 
-                                            fillColor = self.settings['stimuli']['fix_dot_color'], 
-                                            lineColor = self.settings['stimuli']['fix_line_color'],
-                                            fillColorSpace = self.settings['stimuli']['colorSpace'],
-                                            lineColorSpace = self.settings['stimuli']['colorSpace'])  
-
 
 
     def create_trials(self):
@@ -758,7 +727,7 @@ class FlickerSession(ExpSession):
     
     def create_stimuli(self):
 
-        """ Create Stimuli - pRF bars and fixation dot """
+        """ Create Stimuli - pRF bars """
         
         #generate PRF stimulus
         self.flicker_stim = FlickerStim(session = self, 
@@ -766,18 +735,6 @@ class FlickerSession(ExpSession):
                                         grid_pos = self.grid_pos
                                         )
         
-        # Convert fixation dot radius in degrees to pixels for a given Monitor object
-        fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fix_dot_size_deg'], 
-                                                        self.monitor)/2 
-        
-        # create black fixation circle
-        self.fixation = visual.Circle(self.win, units = 'pix', radius = fixation_rad_pix, 
-                                            fillColor = self.settings['stimuli']['fix_dot_color'], 
-                                            lineColor = self.settings['stimuli']['fix_line_color'],
-                                            fillColorSpace = self.settings['stimuli']['colorSpace'],
-                                            lineColorSpace = self.settings['stimuli']['colorSpace'])  
-
-
 
     def create_trials(self):
 

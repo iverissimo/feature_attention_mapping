@@ -66,7 +66,7 @@ class PRFTrial(Trial):
 
     def draw(self): 
 
-        """ Draw stimuli - pRF bar and fixation dot - for each trial """
+        """ Draw stimuli - pRF bar - for each trial """
 
         current_time = self.session.clock.getTime() # get time
 
@@ -123,17 +123,7 @@ class PRFTrial(Trial):
         self.session.line1.draw() 
         self.session.line2.draw() 
             
-        ## fixation dot
-        if self.session.fix_counter<len(self.session.fixation_switch_times): # if counter within number of switch moments
-            if current_time<self.session.fixation_switch_times[self.session.fix_counter]: # if current time under switch time
-                self.session.fixation.draw() # just draw
-
-            else: # when switch time reached, switch color and increment counter
-                self.session.fixation.fillColor *= -1
-                self.session.fixation.lineColor *= -1
-                self.session.fixation.draw()
-                self.session.fix_counter += 1
-
+        
 
     def get_events(self):
         """ Logs responses/triggers """
@@ -152,10 +142,6 @@ class PRFTrial(Trial):
                     event_type = 'response'
                     self.session.total_responses += 1
 
-                     #track percentage of correct responses per session (only correct if reply within 0.8s of color switch)
-                    if t < self.session.fixation_switch_times[-1]: # avoid crash when running, need to optimize this later
-                        if t < (self.session.fixation_switch_times[self.session.fix_counter]+0.8):
-                            self.session.correct_responses += 1
 
                 # log everything into session data frame
                 idx = self.session.global_log.shape[0]
@@ -223,7 +209,7 @@ class FeatureTrial(Trial):
 
     def draw(self): 
 
-        """ Draw stimuli - pRF bars and fixation dot - for each trial """
+        """ Draw stimuli - pRF bars - for each trial """
         
         current_time = self.session.clock.getTime() # get time
 
@@ -312,9 +298,6 @@ class FeatureTrial(Trial):
         self.session.line1.draw() 
         self.session.line2.draw() 
             
-        # fixation dot
-        self.session.fixation.draw() # just draw
-
 
 
     def get_events(self):
@@ -399,7 +382,7 @@ class FlickerTrial(Trial):
 
     def draw(self): 
 
-        """ Draw stimuli - pRF bars and fixation dot - for each trial """
+        """ Draw stimuli - pRF bars - for each trial """
         
         ## draw stim
 
@@ -420,10 +403,6 @@ class FlickerTrial(Trial):
         self.session.line1.draw() 
         self.session.line2.draw() 
             
-        # fixation dot
-        self.session.fixation.draw() # just draw
-
-
 
     def get_events(self):
         """ Logs responses/triggers """

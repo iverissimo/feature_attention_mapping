@@ -103,7 +103,7 @@ class PRFStim(Stim):
         super().__init__(session=session, bar_width_ratio=bar_width_ratio, grid_pos=grid_pos)
 
 
-    def draw(self, bar_midpoint_at_TR, bar_pass_direction_at_TR, this_phase, position_dictionary, orientation = True, background_contrast = 0):
+    def draw(self, bar_midpoint_at_TR, bar_pass_direction_at_TR, this_phase, position_dictionary, orientation = True):
         
         """ Draw stimuli - pRF bar - for each trial 
         
@@ -117,18 +117,6 @@ class PRFStim(Stim):
             strings with name of condition to draw
         """
         
-
-        # update background elements
-        self.session.background_array = update_elements(ElementArrayStim = self.session.background_array,
-                                                        condition_settings = self.condition_settings,
-                                                        position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation = orientation,
-                                                        background_contrast = background_contrast,
-                                                        this_phase = 'background', 
-                                                        elem_positions = position_dictionary['background']['xys'], 
-                                                        grid_pos = self.grid_pos,
-                                                        monitor = self.session.monitor, 
-                                                        screen = self.session.screen)
 
         if this_phase != 'background':
             # update bar elements
@@ -144,7 +132,6 @@ class PRFStim(Stim):
 
 
         # actually draw
-        #self.session.background_array.draw()
         if this_phase != 'background':
             self.session.bar0_array.draw() 
 
@@ -214,16 +201,6 @@ class FeatureStim(Stim):
         """
 
 
-        # update background elements
-        self.session.background_array =  update_elements(ElementArrayStim = self.session.background_array,
-                                                        condition_settings = self.condition_settings, 
-                                                        position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation = orientation,
-                                                        this_phase = 'background', 
-                                                        elem_positions = position_dictionary['background']['xys'], 
-                                                        grid_pos = self.grid_pos,
-                                                        monitor = self.session.monitor, 
-                                                        screen = self.session.screen)
         if this_phase != 'background':
 
             # update bar elements
@@ -269,7 +246,6 @@ class FeatureStim(Stim):
 
 
         # actually draw
-        #self.session.background_array.draw()
         if this_phase != 'background':
             
             bars2plot = [self.session.bar0_array,self.session.bar1_array,self.session.bar2_array,self.session.bar3_array]
@@ -301,37 +277,24 @@ class FlickerStim(Stim):
         """
         
 
-        # update background elements
-        self.session.background_array = update_elements(ElementArrayStim = self.session.background_array,
-                                                        condition_settings = self.condition_settings,
-                                                        position_jitter = None, 
-                                                        orientation = orientation,
-                                                        this_phase = 'background', 
-                                                        elem_positions = position_dictionary['background']['xys'], 
-                                                        grid_pos = self.grid_pos,
-                                                        background_contrast = self.session.settings['stimuli']['flicker']['backgr_contrast'],
-                                                        monitor = self.session.monitor, 
-                                                        screen = self.session.screen)
-
         # we dial up or down luminance of green only
         luminance = self.session.lum_responses if this_phase == 'color_green' else None
 
 
         self.session.bar0_array, self.session.updated_settings = update_elements(ElementArrayStim = self.session.bar0_array,
-                                                                                                condition_settings = self.condition_settings, 
-                                                                                                position_jitter = None, 
-                                                                                                orientation = orientation,
-                                                                                                this_phase = this_phase, 
-                                                                                                elem_positions = position_dictionary['bar0']['xys'], 
-                                                                                                grid_pos = self.grid_pos,
-                                                                                                luminance = luminance,
-                                                                                                update_settings = True,
-                                                                                                monitor = self.session.monitor, 
-                                                                                                screen = self.session.screen)
+                                                                                condition_settings = self.condition_settings, 
+                                                                                position_jitter = None, 
+                                                                                orientation = orientation,
+                                                                                this_phase = this_phase, 
+                                                                                elem_positions = position_dictionary['bar0']['xys'], 
+                                                                                grid_pos = self.grid_pos,
+                                                                                luminance = luminance,
+                                                                                update_settings = True,
+                                                                                monitor = self.session.monitor, 
+                                                                                screen = self.session.screen)
 
 
         # actually draw
-        #self.session.background_array.draw()
         self.session.bar0_array.draw()             
 
 

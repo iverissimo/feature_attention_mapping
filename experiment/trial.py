@@ -123,6 +123,11 @@ class PRFTrial(Trial):
                     event_type = 'response'
                     self.session.total_responses += 1
 
+                    if (ev in ['y']) and (self.phase_names == 'color_green'):
+                        self.session.correct_responses += 1
+                    elif (ev in ['b']) and (self.phase_names == 'color_red'):
+                        self.session.correct_responses += 1
+
 
                 # log everything into session data frame
                 idx = self.session.global_log.shape[0]

@@ -171,6 +171,7 @@ class PRFSession(ExpSession):
         #
         # counter for responses
         self.total_responses = 0
+        self.expected_responses = 0
         self.correct_responses = 0
 
         # define bar width 
@@ -211,6 +212,7 @@ class PRFSession(ExpSession):
 
             elif bartype in np.array(['U-D','D-U']): # vertical bar pass
                 trial_number += bar_pass_ver_TR
+                self.expected_responses += bar_pass_ver_TR
                 bar_pass_direction_all =  bar_pass_direction_all + np.repeat(bartype,bar_pass_ver_TR).tolist()
                 
                 # order depending on starting point for bar pass, and append to list
@@ -219,6 +221,7 @@ class PRFSession(ExpSession):
 
             elif bartype in np.array(['L-R','R-L']): # horizontal bar pass
                 trial_number += bar_pass_hor_TR
+                self.expected_responses += bar_pass_hor_TR
                 bar_pass_direction_all =  bar_pass_direction_all + np.repeat(bartype,bar_pass_hor_TR).tolist()
                 
                 # order depending on starting point for bar pass, and append to list
@@ -250,11 +253,11 @@ class PRFSession(ExpSession):
             phase_conditions = np.repeat(key_list, self.trial_number/len(key_list))
             np.random.shuffle(phase_conditions) # randomized conditions, for attention to bar task
 
-            phase_conditions = np.array([[val] for _,val in enumerate(phase_conditions)])
+            self.phase_conditions = np.array([[val] for _,val in enumerate(phase_conditions)])
 
             # define list with number of phases and their duration (duration of each must be the same)
             # in this case we want one color per trial
-            self.phase_durations = np.repeat(max_trial_time,phase_conditions.shape[-1])
+            self.phase_durations = np.repeat(max_trial_time,self.phase_conditions.shape[-1])
             
         else:
 
@@ -272,6 +275,8 @@ class PRFSession(ExpSession):
             for r in range(self.trial_number-1):            
                 phase_conditions = np.vstack((phase_conditions,key_list))
                 
+            self.phase_conditions = phase_conditions
+
             # define list with number of phases and their duration (duration of each must be the same)
             self.phase_durations = np.repeat(1/flick_rate,phase_conditions.shape[-1])
 
@@ -286,7 +291,7 @@ class PRFSession(ExpSession):
             self.all_trials.append(PRFTrial(session =self ,
                                             trial_nr = i,  
                                             phase_durations = self.phase_durations,
-                                            phase_names = phase_conditions[i],
+                                            phase_names = self.phase_conditions[i],
                                             bar_pass_direction_at_TR = self.bar_pass_direction_all[i],
                                             bar_midpoint_at_TR = self.bar_midpoint_all[i]
                                             ))
@@ -374,9 +379,9 @@ class PRFSession(ExpSession):
             trl.run() # run forrest run
 
 
-        #print('Expected number of responses: %d'%(len(self.fixation_switch_times)+1))
-        #print('Total subject responses: %d'%self.total_responses)
-        #print('Correct responses (within 0.8s of dot color change): %d'%self.correct_responses)
+        print('Expected number of responses: %d'%(self.expected_responses))
+        print('Total subject responses: %d'%self.total_responses)
+        print('Correct responses: %d'%self.correct_responses)
           
 
         self.close() # close session

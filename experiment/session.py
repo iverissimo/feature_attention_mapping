@@ -130,7 +130,7 @@ class ExpSession(PylinkEyetrackerSession):
 
 class PRFSession(ExpSession):
    
-    def __init__(self, output_str, output_dir, settings_file, macbook_bool, eyetracker_on, background):  # initialize child class
+    def __init__(self, output_str, output_dir, settings_file, macbook_bool, eyetracker_on):  # initialize child class
 
         """ Initializes PRFSession object. 
       
@@ -145,12 +145,7 @@ class PRFSession(ExpSession):
             default settings file (in data/default_settings.yml)
         macbook_bool: bool
             variable to know if using macbook for running experiment or not
-        background: bool
-            variable to know if run starts with or without background
         """
-
-        self.background = background
-
 
         # need to initialize parent class (ExpSession), indicating output infos
         super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, 
@@ -214,11 +209,6 @@ class PRFSession(ExpSession):
                 bar_pass_direction_all = bar_pass_direction_all + np.repeat(bartype,empty_TR).tolist()
                 bar_pos_array.append([np.array([np.nan,np.nan]) for i in range(empty_TR)])
 
-            elif bartype in np.array(['switch_interval']): # switch background interval (no bar)
-                trial_number += switch_bckg_TR
-                bar_pass_direction_all = bar_pass_direction_all + np.repeat(bartype,switch_bckg_TR).tolist()
-                bar_pos_array.append([np.array([np.nan,np.nan]) for i in range(switch_bckg_TR)])
-
             elif bartype in np.array(['U-D','D-U']): # vertical bar pass
                 trial_number += bar_pass_ver_TR
                 bar_pass_direction_all =  bar_pass_direction_all + np.repeat(bartype,bar_pass_ver_TR).tolist()
@@ -273,19 +263,6 @@ class PRFSession(ExpSession):
 
         # total experiment time (in seconds)
         self.total_time = self.trial_number*self.bar_step 
-        # total background switch interval time (in seconds)
-        self.switch_interval_time = switch_bckg_TR * self.bar_step
-
-        # set if run starts with or without background, and respective inputs for switch function
-        if self.background == True:
-            self.background_contrast = self.settings['stimuli']['conditions']['background']['element_contrast']
-            self.bckg_switch_slope = -self.settings['stimuli']['prf']['switch_slope'] 
-            self.bckg_switch_end_point = [self.switch_interval_time, 0]
-
-        else:
-            self.background_contrast = 0
-            self.bckg_switch_slope = self.settings['stimuli']['prf']['switch_slope']
-            self.bckg_switch_end_point = [self.switch_interval_time, self.settings['stimuli']['conditions']['background']['element_contrast']]
 
         # append all trials
         self.all_trials = []
@@ -299,7 +276,6 @@ class PRFSession(ExpSession):
                                             bar_midpoint_at_TR = self.bar_midpoint_all[i]
                                             ))
 
-
         # define time points for element orientation to change
         # switch orientation time points
         if self.settings['stimuli']['ori_shift_rate'] == 'TR':
@@ -311,18 +287,6 @@ class PRFSession(ExpSession):
         self.ori_counter = 0
         # index for orientation
         self.ori_ind = 0 
-
-        # define time points (within switch interval) to update background contrast
-        
-        # switch background time points
-        self.bckg_switch_times = np.arange(0,self.switch_interval_time + self.settings['stimuli']['prf']['switch_step'],self.settings['stimuli']['prf']['switch_step'])
-        # define timepoint where switch interval starts, given total trial time
-        if 'switch_interval' in np.array(self.bar_pass_direction_all):
-            self.switch_start_time = (np.where(np.array(self.bar_pass_direction_all) == 'switch_interval')[0][0] + 1) * self.bar_step 
-        else:
-            self.switch_start_time = np.nan
-        # counter for background switches
-        self.bckg_counter = 0
 
 
         # print window size just to check, not actually needed

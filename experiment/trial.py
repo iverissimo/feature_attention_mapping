@@ -117,6 +117,7 @@ class PRFTrial(Trial):
                 elif ev == self.session.mri_trigger: # TR pulse
                     event_type = 'pulse'
                     self.stop_phase()
+                    self.stop_trial()
 
                 else: # any other key pressed will be response to color change
                     event_type = 'response'

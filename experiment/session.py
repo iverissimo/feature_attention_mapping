@@ -239,27 +239,42 @@ class PRFSession(ExpSession):
             if key != 'background': # we don't want to show background gabors in background
                 key_list.append(key)
 
+
+        # if in scanner, we want it to be synced to trigger, so lets increase trial time (in seconds, like TR)
+        max_trial_time = 5 if self.settings['mri']['scanner']==True else self.settings['mri']['TR']
+
+
         # define how many times bar features switch during TR, according to flick rate defined 
         if self.settings['stimuli']['prf']['flick_rate'] == 'TR':
 
-            phase_conditions = np.repeat(key_list, trial_number/len(key_list))
-            np.random.shuffle(phase_conditions)
+            phase_conditions = np.repeat(key_list, self.trial_number/len(key_list))
+            np.random.shuffle(phase_conditions) # randomized conditions, for attention to bar task
 
             phase_conditions = np.array([[val] for _,val in enumerate(phase_conditions)])
+
+            # define list with number of phases and their duration (duration of each must be the same)
+            # in this case we want one color per trial
+            self.phase_durations = np.repeat(max_trial_time,phase_conditions.shape[-1])
             
         else:
-            feat_switch_rate = self.settings['mri']['TR'] * self.settings['stimuli']['prf']['flick_rate']
 
-            key_list = np.array(key_list*round(feat_switch_rate/len(key_list))) # repeat keys, so for each bar pass it shows each condition X times
+            # flicker frequency
+            flick_rate = self.settings['stimuli']['prf']['flick_rate']
+            
+            # number of samples in trial
+            n_samples = max_trial_time * flick_rate
+
+            # repeat keys, so for each bar pass it shows each condition X times
+            key_list = np.array(key_list*round(n_samples/len(key_list))) 
             phase_conditions = key_list
 
-            for r in range(trial_number-1):            
+            # stach them in trial
+            for r in range(self.trial_number-1):            
                 phase_conditions = np.vstack((phase_conditions,key_list))
-
-
-        # define list with number of phases and their duration (duration of each must be the same)
-        self.phase_durations = np.repeat(self.bar_step/phase_conditions.shape[-1],
-                                        phase_conditions.shape[-1])
+                
+            # define list with number of phases and their duration (duration of each must be the same)
+            self.phase_durations = np.repeat(1/flick_rate,phase_conditions.shape[-1])
+            
 
         # total experiment time (in seconds)
         self.total_time = self.trial_number*self.bar_step 

@@ -383,10 +383,6 @@ class FlickerTrial(Trial):
                     self.session.close()
                     self.session.quit()
 
-                elif ev == self.session.mri_trigger: # TR pulse
-                    event_type = 'pulse'
-                    self.stop_phase()
-
                 elif ev in ['space','r']: # end trial
                     print('trial ended by user')  
                     event_type = 'end_trial'

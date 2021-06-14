@@ -274,10 +274,10 @@ class PRFSession(ExpSession):
                 
             # define list with number of phases and their duration (duration of each must be the same)
             self.phase_durations = np.repeat(1/flick_rate,phase_conditions.shape[-1])
-            
+
 
         # total experiment time (in seconds)
-        self.total_time = self.trial_number*self.bar_step 
+        self.total_time = self.trial_number * max_trial_time  
 
         # append all trials
         self.all_trials = []
@@ -541,13 +541,16 @@ class FeatureSession(ExpSession):
                         self.hemifield, self.drawing_ind, os.path.join(self.output_dir, self.output_str+'_trial_info.csv'))
                          
 
+        # if in scanner, we want it to be synced to trigger, so lets increase trial time (in seconds, like TR)
+        max_trial_time = 5 if self.settings['mri']['scanner']==True else self.settings['mri']['TR']
+
         # append all trials
         self.all_trials = []
         for i in range(self.trial_number):
 
             self.all_trials.append(FeatureTrial(session = self,
                                                 trial_nr = i, 
-                                                phase_durations = np.array([self.bar_step]),
+                                                phase_durations = np.array([max_trial_time]),
                                                 attend_block_conditions = self.attend_block_conditions, 
                                                 bar_pass_direction_at_TR = self.bar_pass_direction_all[i],
                                                 bar_midpoint_at_TR = self.bar_midpoint_all[i],
@@ -556,7 +559,7 @@ class FeatureSession(ExpSession):
 
 
         # total experiment time (in seconds)
-        self.total_time = self.trial_number * self.bar_step 
+        self.total_time = self.trial_number * max_trial_time 
 
         # define time points for element orientation to change
         # switch orientation time points
@@ -755,17 +758,23 @@ class FlickerSession(ExpSession):
 
         print("Total number of trials: %d"%self.trial_number)
 
-        # define how many times square colors switch, according to flick rate defined 
-        flick_rate = self.settings['stimuli']['flicker']['flick_rate']
-
         # get condition names and randomize them for each trial 
         key_list = []
         for key in self.settings['stimuli']['conditions']:
             if key != 'background': # we don't want to show background gabors in background
                 key_list.append(key)
 
+        # max trial time
+        max_trial_time = self.settings['stimuli']['flicker']['max_trial_time']*60
+        
+        # define how many times square colors switch, according to flick rate defined 
+        flick_rate = self.settings['stimuli']['flicker']['flick_rate']
+
+        # number of samples in trial
+        n_samples = max_trial_time * flick_rate
+
         # repeat keys, so for each trial it shows each condition X times
-        key_list = np.array(key_list*round((self.settings['stimuli']['flicker']['max_trial_time']*60*flick_rate)/len(key_list)))
+        key_list = np.array(key_list*round(n_samples/len(key_list)))
         phase_conditions = key_list
         
         for r in range(self.trial_number-1):            
@@ -790,7 +799,7 @@ class FlickerSession(ExpSession):
 
 
         # total experiment time (in seconds)
-        self.total_time = self.trial_number*self.settings['stimuli']['flicker']['max_trial_time']*60
+        self.total_time = self.trial_number * max_trial_time
 
         # define time points for element orientation to change
         # switch orientation time points

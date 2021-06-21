@@ -605,7 +605,7 @@ class FeatureSession(ExpSession):
                                 '[Press left arrow key or\n'
                                 'index finger to skip]\n\n')
 
-        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['b','left','y','right'], visual_obj = [self.rect_left,self.rect_right])
+        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['b','left','y','right','3','1'], visual_obj = [self.rect_left,self.rect_right])
 
         if key_pressed[0] not in ['left','b']: #if instructions not skipped
 
@@ -617,7 +617,7 @@ class FeatureSession(ExpSession):
                                         '[Press right arrow key or\n'
                                         'middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = ['y','right','1'], visual_obj = [self.rect_left,self.rect_right])
 
             this_instruction_string = ('Your task is to fixate\n'
                                         'at the center of the screen,\n'
@@ -627,7 +627,7 @@ class FeatureSession(ExpSession):
                                         '[Press right arrow key or\n'
                                         'middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = ['y','right','1'], visual_obj = [self.rect_left,self.rect_right])
 
             this_instruction_string = ('The experiment is divided\n'
                                         'into different mini-blocks.\n\n'
@@ -637,7 +637,7 @@ class FeatureSession(ExpSession):
                                         '[Press right arrow key or\n'
                                         'middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = ['y','right','1'], visual_obj = [self.rect_left,self.rect_right])
 
             this_instruction_string = ('This bar will be\n'
                                         'vertical/horizontal and\n'
@@ -647,7 +647,7 @@ class FeatureSession(ExpSession):
                                         '[Press right arrow key or\n'
                                         'middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = ['y','right','1'], visual_obj = [self.rect_left,self.rect_right])
 
 
             # draw instructions wait a few seconds
@@ -657,7 +657,7 @@ class FeatureSession(ExpSession):
                                         '[Press right arrow key or\n'
                                         'middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = ['y','right','1'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
         this_instruction_string = ('Index finger or\n'
@@ -842,9 +842,9 @@ class FlickerSession(ExpSession):
                                 '[Press left arrow key or\n'
                                 'index finger to skip]\n\n')
 
-        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['right','y','left','b'], visual_obj = [self.rect_left,self.rect_right])
+        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['right','y','left','b','3','1'], visual_obj = [self.rect_left,self.rect_right])
 
-        if key_pressed[0] not in ['left','b']: #if instructions not skipped
+        if key_pressed[0] not in ['left','b','3']: #if instructions not skipped
 
             this_instruction_string = ('If you press the\n'
                                         'right arrow key/middle finger OR\n'
@@ -854,7 +854,7 @@ class FlickerSession(ExpSession):
                                         '[Press right arrow key or\n'
                                         'middle finger to continue]\n\n')
         
-            draw_instructions(self.win, this_instruction_string, keys = ['right','y'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = ['right','y','1'], visual_obj = [self.rect_left,self.rect_right])
 
 
             this_instruction_string = ('Your task is to fixate\n'
@@ -867,7 +867,7 @@ class FlickerSession(ExpSession):
                                         '[Press right arrow key or\n'
                                         'middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['right','y'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = ['right','y','1'], visual_obj = [self.rect_left,self.rect_right])
 
 
             # draw instructions wait a few seconds
@@ -877,7 +877,7 @@ class FlickerSession(ExpSession):
                                         '[Press right arrow key or\n'
                                         'middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['right','y'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = ['right','y','1'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
         this_instruction_string = ('When you are certain the square\n'
@@ -888,7 +888,7 @@ class FlickerSession(ExpSession):
                                     '[Press left arrow key or\n'
                                     'index finger to start]\n\n')
         
-        draw_instructions(self.win, this_instruction_string, keys = ['left','b'], visual_obj = [self.rect_left,self.rect_right])
+        draw_instructions(self.win, this_instruction_string, keys = ['left','b','3'], visual_obj = [self.rect_left,self.rect_right])
 
         # start recording gaze
         if self.eyetracker_on:

@@ -26,6 +26,9 @@ monitor:
 mouse:
   visible: False
 
+keys: # keys to press, valid for laptop, scanner and behav lab
+  index: ['left','b',3]
+  middle: ['right','y',1]
 
 stimuli:
   colorSpace: 'rgb' #'rgb255' #'hsv'

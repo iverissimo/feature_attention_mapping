@@ -334,12 +334,13 @@ class PRFSession(ExpSession):
                                     'you will see a flickering bar pass\n'
                                     'in different directions\n'
                                     'throughout the screen\n\n\n'
-                                    '[Press y/middle finger to continue]\n'
-                                    '[Press b/index finger to skip]')
+                                    '[Press middle finger to continue]\n'
+                                    '[Press index finger to skip]')
 
-        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['b','y'], visual_obj = [self.rect_left,self.rect_right])
+        key_pressed = draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['index']+self.settings['keys']['middle'], 
+            visual_obj = [self.rect_left,self.rect_right])
 
-        if key_pressed[0] != 'b': #if instructions not skipped
+        if key_pressed[0] not in self.settings['keys']['index']: #if instructions not skipped
 
             # draw instructions wait a few seconds
             this_instruction_string = ('Your task is to fixate\n'
@@ -347,22 +348,22 @@ class PRFSession(ExpSession):
                                         'and indicate the\n'
                                         'bar color\n'
                                         'every time the bar moves\n\n\n'
-                                        '[Press y/middle finger to continue]')
+                                        '[Press middle finger to continue]')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
             
             # draw instructions wait a few seconds
             this_instruction_string = ('Do NOT look at the bars!\n'
                                         'Please fixate at the center,\n'
                                         'and do not move your eyes\n\n\n'
-                                        '[Press y/middle finger to continue]')
+                                        '[Press middle finger to continue]')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = ('Index finger/b key - Red color\n'
-                                    'Middle finger/y key - Green color\n\n\n'
+        this_instruction_string = ('Index finger - Red color\n'
+                                    'Middle finger - Green color\n\n\n'
                                     '          [waiting for scanner]')
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
@@ -600,70 +601,61 @@ class FeatureSession(ExpSession):
         this_instruction_string = ('During the experiment\nyou will see green and red bars\n'
                                 'oriented vertically or horizontally\n'
                                 'throughout the screen\n\n\n'
-                                '[Press right arrow key or\n'
-                                'middle finger to continue]\n\n'
-                                '[Press left arrow key or\n'
-                                'index finger to skip]\n\n')
+                                '[Press middle finger to continue]\n\n'
+                                '[Press index finger to skip]\n\n')
 
-        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['b','left','y','right'], visual_obj = [self.rect_left,self.rect_right])
+        key_pressed = draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['index']+self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
-        if key_pressed[0] not in ['left','b']: #if instructions not skipped
+        if key_pressed[0] not in self.settings['keys']['index']: #if instructions not skipped
 
             # draw instructions wait a few seconds
             this_instruction_string = ('These bars can be\n'
                                         'on the right/left side\n'
                                         'or above/below the\n'
-                                        'central fixation dot\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        'central fixation cross\n\n\n'
+                                        '[Press middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
             this_instruction_string = ('Your task is to fixate\n'
                                         'at the center of the screen,\n'
                                         'and indicate if one of the bars\n'
                                         'is on the SAME side of the dot\n'
                                         'relative to the PREVIOUS trial\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        '[Press middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
             this_instruction_string = ('The experiment is divided\n'
                                         'into different mini-blocks.\n\n'
                                         'At the beggining of each\n'
                                         'you will see a single bar,\n'
                                         'at the center of the screen.\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        '[Press middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
             this_instruction_string = ('This bar will be\n'
                                         'vertical/horizontal and\n'
                                         'green/red\n\n'
                                         'That will be the bar\n'
                                         'that you have to search for.\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        '[Press middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
 
             # draw instructions wait a few seconds
             this_instruction_string = ('Do NOT look at the bars!\n'
                                         'Please fixate at the center,\n'
                                         'and do not move your eyes\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        '[Press middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = ('Index finger or\n'
-                                    'left arrow key - same side\n\n'
-                                    'Middle finger or\n'
-                                    'right arrow key - different side\n\n\n'
+        this_instruction_string = ('Index finger - same side\n\n'
+                                    'Middle finger - different side\n\n\n'
                                     '          [waiting for scanner]')
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
@@ -837,58 +829,49 @@ class FlickerSession(ExpSession):
         this_instruction_string = ('Welcome to this experiment!\n\n'
                                 'In the first task, you will see a\n'
                                 'flickering red/green square\n\n\n'
-                                '[Press right arrow key or\n'
-                                'middle finger to continue]\n\n'
-                                '[Press left arrow key or\n'
-                                'index finger to skip]\n\n')
+                                '[Press middle finger to continue]\n\n'
+                                '[Press index finger to skip]\n\n')
 
-        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['right','y','left','b'], visual_obj = [self.rect_left,self.rect_right])
+        key_pressed = draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['index']+self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
-        if key_pressed[0] not in ['left','b']: #if instructions not skipped
+        if key_pressed[0] not in self.settings['keys']['index']: #if instructions not skipped
 
-            this_instruction_string = ('If you press the\n'
-                                        'right arrow key/middle finger OR\n'
-                                        'left arrow key/index finger,\n'
+            this_instruction_string = ('If you press the buttons\n'
+                                        'with your index/middle finger\n'
                                         'you will realize that\n'
                                         'the flickering changes\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        '[Press middle finger to continue]\n\n')
         
-            draw_instructions(self.win, this_instruction_string, keys = ['right','y'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
 
             this_instruction_string = ('Your task is to fixate\n'
                                         'at the center of the screen,\n'
-                                        'and press the\n'
-                                        'right arrow key/middle finger OR\n'
-                                        'left arrow key/index finger,\n'
+                                        'and press the buttons\n'
                                         'until the square does not\n'
                                         'flicker anymore\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        '[Press middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['right','y'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
 
             # draw instructions wait a few seconds
             this_instruction_string = ('Do NOT look at the square!\n\n'
                                         'Please fixate at the center,\n'
                                         'and do not move your eyes\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        '[Press middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['right','y'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
         this_instruction_string = ('When you are certain the square\n'
                                     'does not flicker anymore,\n'
-                                    'press the space bar\n'
+                                    'press the enter button\n'
                                     '(or pinky finger if in the scanner)\n\n'
                                     'Ready when you are!\n\n\n'
-                                    '[Press left arrow key or\n'
-                                    'index finger to start]\n\n')
+                                    '[Press index finger to start]\n\n')
         
-        draw_instructions(self.win, this_instruction_string, keys = ['left','b'], visual_obj = [self.rect_left,self.rect_right])
+        draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['index'], visual_obj = [self.rect_left,self.rect_right])
 
         # start recording gaze
         if self.eyetracker_on:

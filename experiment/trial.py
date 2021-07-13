@@ -249,7 +249,7 @@ class FeatureTrial(Trial):
         # if feedback trial, show score
         elif 'feedback' in self.trial_type_at_TR:
 
-            feed_str = 'Accuracy = %.2f %%'%(self.session.correct_responses/len(self.session.true_responses))
+            feed_str = 'Accuracy = %.2f %%'%((self.session.correct_responses/self.session.bar_timing_counter)*100)
 
             self.feed_stim = visual.TextStim(win = self.session.win,
                                         text = feed_str,
@@ -318,13 +318,13 @@ class FeatureTrial(Trial):
                     self.session.total_responses += 1
 
                     #track percentage of correct responses per session (only correct if reply 2*TR)
-                    if t < (self.session.bar_timing[self.session.bar_timing_counter]+self.session.settings['mri']['TR']*2):
+                    if t < (self.session.bar_timing[self.session.bar_timing_counter]+self.session.settings['mri']['TR']*1.9):
 
                         if ev in self.session.settings['keys']['index']:
-                            if self.session.true_responses[self.session.bar_timing_counter]==self.session.true_responses[self.session.bar_timing_counter-1]:
+                            if self.session.true_responses[self.session.bar_timing_counter] == 'same':
                                 self.session.correct_responses += 1
                         elif ev in self.session.settings['keys']['middle']:
-                            if self.session.true_responses[self.session.bar_timing_counter]!=self.session.true_responses[self.session.bar_timing_counter-1]:
+                            if self.session.true_responses[self.session.bar_timing_counter] == 'different':
                                 self.session.correct_responses += 1
                         
 

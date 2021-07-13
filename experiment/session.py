@@ -1059,10 +1059,25 @@ class PracticeFeatureSession(ExpSession):
         hemi_bool = [True if type(x)==str else False for _,x in enumerate(self.hemifield)]
         # time in seconds for when bar trial on screen
         self.bar_timing = [x*self.settings['mri']['TR'] for _,x in enumerate(np.where(hemi_bool)[0])]
+        
         # set true responses
-        self.true_responses = np.array(self.hemifield)[hemi_bool]
+        bar_responses = np.array(self.hemifield)[hemi_bool]
+
+        true_responses = []
+        for i in range(len(bar_responses)):
+          
+            if i in np.linspace(0, len(bar_responses), num = self.settings['stimuli']['feature']['mini_blocks']+1):
+                true_responses.append(np.nan)
+                
+            elif bar_responses[i] == bar_responses[i-1]:
+                true_responses.append('same')
+                
+            elif bar_responses[i] != bar_responses[i-1]:
+                true_responses.append('different')
+        self.true_responses = np.array(true_responses)
+
         # bar timing counter
-        self.bar_timing_counter = 1            
+        self.bar_timing_counter = 0            
 
         # if in scanner, we want it to be synced to trigger, so lets increase trial time (in seconds, like TR)
         max_trial_time = 5 if self.settings['mri']['scanner']==True else self.settings['mri']['TR']

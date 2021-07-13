@@ -68,7 +68,7 @@ def main():
                                   output_dir = output_dir,
                                   settings_file = 'experiment_settings.yml',
                                   macbook_bool = mac_bool,
-                                  eyetracker_on = False)
+                                  eyetracker_on = True)
 
     elif exp_type == 'flicker': # run feature pRF mapper
          exp_sess = FlickerSession(output_str = output_str,

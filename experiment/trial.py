@@ -388,7 +388,7 @@ class FlickerTrial(Trial):
                     self.session.close()
                     self.session.quit()
 
-                elif ev in ['space','r']: # end trial
+                elif ev in ['space','r','return']: # end trial
                     print('trial ended by user')  
                     event_type = 'end_trial'
 
@@ -414,9 +414,9 @@ class FlickerTrial(Trial):
                 else: # any other key pressed will be response to color change
                     event_type = 'response'
                     
-                    if ev in ['right','y']:
+                    if ev in ['right','y','1']:
                         self.session.lum_responses += self.session.settings['stimuli']['flicker']['increment']
-                    elif ev in ['left','b']:
+                    elif ev in ['left','b','3']:
                         self.session.lum_responses -= self.session.settings['stimuli']['flicker']['increment']
 
                     # clip it so participants don't endup with humongous values

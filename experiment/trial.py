@@ -206,6 +206,11 @@ class FeatureTrial(Trial):
                 self.session.ori_bool = True
                 self.session.ori_counter += 1
 
+        # response times
+        if self.session.bar_timing_counter<(len(self.session.bar_timing)-1):
+            if current_time >= self.session.bar_timing[self.session.bar_timing_counter]: # when switch time reached, increment counter
+                self.session.bar_timing_counter += 1
+
         ## draw stim
         if 'cue' in self.trial_type_at_TR: # if cue at TR, draw background and word cue
 
@@ -240,8 +245,27 @@ class FeatureTrial(Trial):
             self.cue_stim.draw()
 
             print('cue '+attend_cond)
-                    
-        elif self.bar_pass_direction_at_TR == 'empty': # if empty trial, show background
+
+        # if feedback trial, show score
+        elif 'feedback' in self.trial_type_at_TR:
+
+            feed_str = 'Accuracy = %.2f %%'%(self.session.correct_responses/len(self.session.true_responses))
+
+            self.feed_stim = visual.TextStim(win = self.session.win,
+                                        text = feed_str,
+                                        color = (1, 1, 1), 
+                                        font = 'Helvetica Neue', 
+                                        pos = (0, 0), 
+                                        height = .65,
+                                        alignHoriz = 'center', 
+                                        alignVert = 'center'
+                                        )
+            self.feed_stim.draw()
+
+            print('feedback')
+          
+        # if empty trial, show background          
+        elif self.bar_pass_direction_at_TR == 'empty': 
 
             print('background')
 
@@ -272,7 +296,7 @@ class FeatureTrial(Trial):
         # fixation lines
         self.session.line1.draw() 
         self.session.line2.draw() 
-            
+  
 
 
     def get_events(self):
@@ -293,6 +317,16 @@ class FeatureTrial(Trial):
                     event_type = 'response'
                     self.session.total_responses += 1
 
+                    #track percentage of correct responses per session (only correct if reply 2*TR)
+                    if t < (self.session.bar_timing[self.session.bar_timing_counter]+self.session.settings['mri']['TR']*2):
+
+                        if ev in self.session.settings['keys']['index']:
+                            if self.session.true_responses[self.session.bar_timing_counter]==self.session.true_responses[self.session.bar_timing_counter-1]:
+                                self.session.correct_responses += 1
+                        elif ev in self.session.settings['keys']['middle']:
+                            if self.session.true_responses[self.session.bar_timing_counter]!=self.session.true_responses[self.session.bar_timing_counter-1]:
+                                self.session.correct_responses += 1
+                        
 
                 # log everything into session data frame
                 idx = self.session.global_log.shape[0]

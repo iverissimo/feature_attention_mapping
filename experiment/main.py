@@ -4,7 +4,7 @@
 import sys
 import os
 #import appnope
-from session import PRFSession, FeatureSession, FlickerSession, PylinkEyetrackerSession
+from session import PRFSession, FeatureSession, FlickerSession, PylinkEyetrackerSession, PracticeFeatureSession
 
 
 # define main function
@@ -36,8 +36,14 @@ def main():
 
 
     exp_type = ''
-    while exp_type not in ('standard','feature','flicker'):
-        exp_type = input('Standard pRF mapping or Feature mapping (standard/feature/flicker)?: ')
+    while exp_type not in ('standard','feature','flicker','practice'):
+        exp_type = input('Standard pRF mapping or Feature mapping (standard/feature/flicker/practice)?: ')
+
+    if exp_type == 'practice':
+        practice_type = ''
+        while practice_type not in ('prf','feature'):
+            practice_type = input('Practicing pRF or Feature mapping (prf/feature)?: ')
+        exp_type = '{exp}_{typ}'.format(exp=exp_type,typ=practice_type)
 
     print('Running %s pRF mapping for subject-%s, run-%s'%(exp_type,sj_num,run_num))
 
@@ -55,8 +61,8 @@ def main():
     output_str = 'sub-{sj}_ses-01_task-PRF{task}_run-{run}'.format(sj=sj_num,run=run_num,task=exp_type)
 
     # load approriate class object to be run
+    
     if exp_type == 'standard': # run standard pRF mapper
-
         exp_sess = PRFSession(output_str = output_str,
                               output_dir = output_dir,
                               settings_file = 'experiment_settings.yml',
@@ -64,19 +70,27 @@ def main():
                               eyetracker_on = False)
 
     elif exp_type == 'feature': # run feature pRF mapper
-         exp_sess = FeatureSession(output_str = output_str,
+        exp_sess = FeatureSession(output_str = output_str,
                                   output_dir = output_dir,
                                   settings_file = 'experiment_settings.yml',
                                   macbook_bool = mac_bool,
                                   eyetracker_on = True)
 
-    elif exp_type == 'flicker': # run feature pRF mapper
-         exp_sess = FlickerSession(output_str = output_str,
+    elif exp_type == 'flicker': # run flicker pRF mapper
+        exp_sess = FlickerSession(output_str = output_str,
                                   output_dir = output_dir,
                                   settings_file = 'experiment_settings.yml',
                                   macbook_bool = mac_bool,
                                   eyetracker_on = False)
-   	                            
+
+    elif exp_type == 'practice_feature': # run practice feature mapper
+        exp_sess = PracticeFeatureSession(output_str = output_str,
+                                          output_dir = output_dir,
+                                          settings_file = 'experiment_settings.yml',
+                                          macbook_bool = mac_bool,
+                                          eyetracker_on = False)
+       	                            
+    
     exp_sess.run()
 
 

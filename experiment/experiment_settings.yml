@@ -102,6 +102,17 @@ stimuli:
 
     modulated_condition: ['color_green'] # color condition modulated by flicker task
 
+  practice:
+    feature:
+      num_bars: [2,2] #[6,6] # number of bars per direction
+      empty_TR: 4
+      cue_TR: 3
+      feedback_TR: 3
+
+      bar_pass_direction: ['cue_0','empty','mini_block_0','feedback','empty',
+                    'cue_1','empty','mini_block_1','feedback','empty',
+                    'cue_2','empty','mini_block_2','feedback','empty',
+                    'cue_3','empty','mini_block_3','feedback','empty']
 
   conditions: # feature conditions
     background: 

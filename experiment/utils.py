@@ -658,7 +658,7 @@ def save_bar_position(bar_dict,num_miniblock, output_path):
 
 
 
-def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, cue_TR = 3, mini_block_TR = 64):
+def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, cue_TR = 3, mini_block_TR = 64, feedback_TR=3):
     
     """ create feature trials based on order of "type of stimuli" throught experiment  
     and bar positions in run. Outputs number and type of trials, and bar direction and midpoint position
@@ -676,6 +676,8 @@ def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, cue_TR = 
         number of TRs for cue intervals of experiment
     mini_block_TR: int
         number of TRs for miniblocks of experiment
+    feedback_TR: int
+        number of TRs for feedback intervals of experiment
         
     """
     
@@ -724,7 +726,15 @@ def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, cue_TR = 
                 bar_pos_array.append(temp_pos_list)
                 bar_pos_array.append(np.array([np.nan,np.nan]))
 
-    
+        elif 'feedback' in bartype: # if feedback on screen
+            trial_number += feedback_TR
+            trial_type_all = trial_type_all + np.repeat(bartype,feedback_TR).tolist()
+            bar_pass_direction_all = bar_pass_direction_all + np.repeat('empty',feedback_TR).tolist()
+
+            for i in range(feedback_TR):
+                bar_pos_array.append(np.array([np.nan,np.nan]))
+
+
     return trial_number, np.array(trial_type_all), np.array(bar_pass_direction_all), np.array(bar_pos_array)
 
 

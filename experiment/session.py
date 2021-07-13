@@ -896,5 +896,308 @@ class FlickerSession(ExpSession):
 
 
 
+class PracticeFeatureSession(ExpSession):
+    
+    def __init__(self, output_str, output_dir, settings_file, eyetracker_on, macbook_bool): # initialize child class
 
+        """ Initializes PracticeFeatureSession object. 
+      
+        Parameters
+        ----------
+        output_str : str
+            Basename for all output-files (like logs), e.g., "sub-01_task-PRFfeature_run-1"
+        output_dir : str
+            Path to desired output-directory (default: None, which results in $pwd/logs)
+        settings_file : str
+            Path to yaml-file with settings (default: None, which results in the package's
+            default settings file (in data/default_settings.yml)
+        macbook_bool: bool
+                variable to know if using macbook for running experiment or not
+        """
+
+
+        # need to initialize parent class (ExpSession), indicating output infos
+        super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, 
+                        macbook_bool = macbook_bool, eyetracker_on = eyetracker_on)
+        
+
+    
+    def create_stimuli(self):
+
+        """ Create Stimuli - pRF bars """
+        
+        #generate PRF stimulus
+        self.feature_stim = FeatureStim(session = self, 
+                                        bar_width_ratio = self.settings['stimuli']['feature']['bar_width_ratio'], 
+                                        grid_pos = self.grid_pos
+                                        )
+
+
+    def create_trials(self):
+
+        """ Creates trials (before running the session) """
+
+        #
+        # counter for responses
+        self.total_responses = 0
+        self.correct_responses = 0
+
+        ## get condition names and randomize them 
+        ## setting order for what condition to attend per mini block 
+        self.attend_block_conditions = randomize_conditions(self.settings['stimuli']['feature']['conditions'])
+        print('Conditions to attend throughout blocks will be %s'%str(self.attend_block_conditions))
+
+
+        ## get all possible bar positions
+
+        # define bar width 
+        bar_width_ratio = self.settings['stimuli']['feature']['bar_width_ratio']
+        self.bar_width_pix = self.screen * bar_width_ratio
+
+        # define number of bars per direction
+        num_bars = np.array(self.settings['stimuli']['practice']['feature']['num_bars'])
+
+        # all possible positions in pixels [x,y] for for midpoint of
+        # vertical bar passes, 
+        ver_y = np.linspace((-self.screen[1]/2 + self.bar_width_pix[1]/2),
+                            (self.screen[1]/2 - self.bar_width_pix[1]/2),
+                            num_bars[1])
+
+        ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(ver_y)])
+
+        # horizontal bar passes 
+        hor_x = np.linspace((-self.screen[0]/2 + self.bar_width_pix[0]/2),
+                            (self.screen[0]/2 - self.bar_width_pix[0]/2),
+                            num_bars[0])
+
+        hor_bar_pos_pix = np.array([np.array([x,0]) for _,x in enumerate(hor_x)])
+
+
+        # set bar midpoint position and direction for each condition
+        # for all mini blocks
+        self.all_bar_pos = set_bar_positions(attend_block_conditions = self.attend_block_conditions,
+                                            horizontal_pos = hor_bar_pos_pix,
+                                            vertical_pos = ver_bar_pos_pix,
+                                            mini_blocks = self.settings['stimuli']['feature']['mini_blocks'], 
+                                            num_bars = len(self.attend_block_conditions), 
+                                            num_ver_bars = 2, 
+                                            num_hor_bars = 2)
+
+        # save bar positions for run in output folder
+        save_bar_position(self.all_bar_pos, self.settings['stimuli']['feature']['mini_blocks'], 
+                          os.path.join(self.output_dir, self.output_str+'_bar_positions.pkl'))
+
+
+        # number of TRs per "type of stimuli"
+        cue_TR = self.settings['stimuli']['practice']['feature']['cue_TR']
+        empty_TR = self.settings['stimuli']['practice']['feature']['empty_TR']
+        feedback_TR = self.settings['stimuli']['practice']['feature']['feedback_TR']
+        # get info from first block, to know how many trials in a mini block (all miniblocks have same length)
+        dict_blk0 = self.all_bar_pos['mini_block_0'][list(self.all_bar_pos['mini_block_0'].keys())[0]]
+        mini_block_TR = np.array(dict_blk0[list(dict_blk0.keys())[0]]).shape[0]
+
+        # list with order of "type of stimuli" throught experiment (called bar direction to make analogous with other class)
+        bar_pass_direction = self.settings['stimuli']['practice']['feature']['bar_pass_direction'] 
+
+        # set number of trials,
+        # list of type of trial (cue, empty, miniblock) for all TRs,
+        # list of strings/lists with bar direction/orientation or 'empty',
+        # list of midpoint position (x,y) of bars for all TRs (if empty, then nan)
+        self.trial_number, self.trial_type_all, self.bar_pass_direction_all, self.bar_midpoint_all = define_feature_trials(bar_pass_direction, 
+                                                                                                                      self.all_bar_pos, 
+                                                                                                                      empty_TR = empty_TR, 
+                                                                                                                      cue_TR = cue_TR, 
+                                                                                                                      mini_block_TR = mini_block_TR,
+                                                                                                                      feedback_TR = feedback_TR)
+                
+        print("Total number of (expected) TRs: %d"%self.trial_number)
+
+        # set plotting order index, to randomize which bars appear on top, for all trials in all miniblocks
+        # and get hemifield position of attended bar
+        self.drawing_ind = []
+        self.hemifield = []
+
+        for indx, val in enumerate(self.trial_type_all):
+            
+            if 'mini_block' in val:
+                ind_list = np.arange(self.settings['stimuli']['feature']['num_bars'])
+                np.random.shuffle(ind_list)
+                
+                self.drawing_ind.append(ind_list)
+
+                if self.bar_pass_direction_all[indx][0] == 'horizontal': # if attended bar vertical (horizontal bar pass)
+
+                    if self.bar_midpoint_all[indx][0][0] < 0: # append hemifield
+                        
+                        self.hemifield.append('left')
+                    
+                    else:
+
+                        self.hemifield.append('right')
+
+                elif self.bar_pass_direction_all[indx][0] == 'vertical': # if attended bar horizontal (vertical bar pass)
+
+                    if self.bar_midpoint_all[indx][0][-1] < 0: # append hemifield
+                        
+                        self.hemifield.append('down')
+                    
+                    else:
+                        
+                        self.hemifield.append('up')
+                    
+                
+            else: # if not in miniblock, these are nan
+                self.drawing_ind.append([np.nan])
+                self.hemifield.append(np.nan)
+
+
+        # save relevant trial info in df (for later analysis)
+        save_all_TR_info(self.all_bar_pos, self.trial_type_all, self.attend_block_conditions, 
+                        self.hemifield, self.drawing_ind, os.path.join(self.output_dir, self.output_str+'_trial_info.csv'))
+
+        # make boolean array to see which trials are stim trials
+        hemi_bool = [True if type(x)==str else False for _,x in enumerate(self.hemifield)]
+        # time in seconds for when bar trial on screen
+        self.bar_timing = [x*self.settings['mri']['TR'] for _,x in enumerate(np.where(hemi_bool)[0])]
+        # set true responses
+        self.true_responses = np.array(self.hemifield)[hemi_bool]
+        # bar timing counter
+        self.bar_timing_counter = 1            
+
+        # if in scanner, we want it to be synced to trigger, so lets increase trial time (in seconds, like TR)
+        max_trial_time = 5 if self.settings['mri']['scanner']==True else self.settings['mri']['TR']
+
+        # append all trials
+        self.all_trials = []
+        for i in range(self.trial_number):
+
+            self.all_trials.append(FeatureTrial(session = self,
+                                                trial_nr = i, 
+                                                phase_durations = np.array([max_trial_time]),
+                                                attend_block_conditions = self.attend_block_conditions, 
+                                                bar_pass_direction_at_TR = self.bar_pass_direction_all[i],
+                                                bar_midpoint_at_TR = self.bar_midpoint_all[i],
+                                                trial_type_at_TR = self.trial_type_all[i],
+                                                ))
+
+
+        # total experiment time (in seconds)
+        self.total_time = self.trial_number * max_trial_time 
+
+        # define time points for element orientation to change
+        # switch orientation time points
+        if self.settings['stimuli']['ori_shift_rate'] == 'TR':
+            ori_shift_rate = 1/self.bar_step 
+        else:
+            ori_shift_rate = self.settings['stimuli']['ori_shift_rate']
+        self.ori_switch_times = np.arange(0,self.total_time,1/ori_shift_rate)
+        # counter for orientation switches
+        self.ori_counter = 0
+        # index for orientation
+        self.ori_ind = 0
+
+
+        # print window size just to check, not actually needed
+        print(self.screen)
+
+
+    def run(self):
+        """ Loops over trials and runs them """
+
+        # update color of settings
+        self.settings = get_average_color(self.output_dir, self.settings, task = 'practice_feature')
+
+        # create trials before running!
+        self.create_stimuli()
+        self.create_trials() 
+
+        # if eyetracking then calibrate
+        if self.eyetracker_on:
+            self.calibrate_eyetracker()
+
+        # draw instructions wait a few seconds
+        this_instruction_string = ('During the experiment\nyou will see green and red bars\n'
+                                'oriented vertically or horizontally\n'
+                                'throughout the screen\n\n\n'
+                                '[Press middle finger to continue]\n\n'
+                                '[Press index finger to skip]\n\n')
+
+        key_pressed = draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['index']+self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
+
+        if key_pressed[0] not in self.settings['keys']['index']: #if instructions not skipped
+
+            # draw instructions wait a few seconds
+            this_instruction_string = ('These bars can be\n'
+                                        'on the right/left side\n'
+                                        'or above/below the\n'
+                                        'central fixation cross\n\n\n'
+                                        '[Press middle finger to continue]\n\n')
+            
+
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
+
+            this_instruction_string = ('Your task is to fixate\n'
+                                        'at the center of the screen,\n'
+                                        'and indicate if one of the bars\n'
+                                        'is on the SAME side of the dot\n'
+                                        'relative to the PREVIOUS trial\n\n\n'
+                                        '[Press middle finger to continue]\n\n')
+            
+
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
+
+            this_instruction_string = ('The experiment is divided\n'
+                                        'into different mini-blocks.\n\n'
+                                        'At the beggining of each\n'
+                                        'you will see a single bar,\n'
+                                        'at the center of the screen.\n\n\n'
+                                        '[Press middle finger to continue]\n\n')
+            
+
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
+
+
+            this_instruction_string = ('This bar will be\n'
+                                        'vertical/horizontal and\n'
+                                        'green/red\n\n'
+                                        'That will be the bar\n'
+                                        'that you have to search for.\n\n\n'
+                                        '[Press middle finger to continue]\n\n')
+            
+
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
+
+
+            # draw instructions wait a few seconds
+            this_instruction_string = ('Do NOT look at the bars!\n'
+                                        'Please fixate at the center,\n'
+                                        'and do not move your eyes\n\n\n'
+                                        '[Press middle finger to continue]\n\n')
+            
+
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
+
+        # draw instructions wait for scanner t trigger
+        this_instruction_string = ('Index finger - same side\n\n'
+                                    'Middle finger - different side\n\n\n'
+                                    '          [waiting for scanner]')
+        
+        draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
+
+        # start recording gaze
+        if self.eyetracker_on:
+            self.start_recording_eyetracker()
+
+        self.start_experiment()
+        
+        # cycle through trials
+        for trl in self.all_trials: 
+            trl.run() # run forrest run
+
+        print('Expected number of responses: %d'%(len(self.true_responses)-self.settings['stimuli']['feature']['mini_blocks']))
+        print('Total subject responses: %d'%self.total_responses)
+        print('Correct responses: %d'%self.correct_responses)
+          
+
+        self.close() # close session
 

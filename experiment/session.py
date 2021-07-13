@@ -604,11 +604,7 @@ class FeatureSession(ExpSession):
                                 '[Press middle finger to continue]\n\n'
                                 '[Press index finger to skip]\n\n')
 
-<<<<<<< HEAD
         key_pressed = draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['index']+self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
-=======
-        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['b','left','y','right','3','1'], visual_obj = [self.rect_left,self.rect_right])
->>>>>>> dcc10aca7de51eec6d18615ff7710476c1910c13
 
         if key_pressed[0] not in self.settings['keys']['index']: #if instructions not skipped
 
@@ -619,11 +615,8 @@ class FeatureSession(ExpSession):
                                         'central fixation cross\n\n\n'
                                         '[Press middle finger to continue]\n\n')
             
-<<<<<<< HEAD
+
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
-=======
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right','1'], visual_obj = [self.rect_left,self.rect_right])
->>>>>>> dcc10aca7de51eec6d18615ff7710476c1910c13
 
             this_instruction_string = ('Your task is to fixate\n'
                                         'at the center of the screen,\n'
@@ -632,11 +625,8 @@ class FeatureSession(ExpSession):
                                         'relative to the PREVIOUS trial\n\n\n'
                                         '[Press middle finger to continue]\n\n')
             
-<<<<<<< HEAD
+
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
-=======
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right','1'], visual_obj = [self.rect_left,self.rect_right])
->>>>>>> dcc10aca7de51eec6d18615ff7710476c1910c13
 
             this_instruction_string = ('The experiment is divided\n'
                                         'into different mini-blocks.\n\n'
@@ -645,11 +635,9 @@ class FeatureSession(ExpSession):
                                         'at the center of the screen.\n\n\n'
                                         '[Press middle finger to continue]\n\n')
             
-<<<<<<< HEAD
+
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
-=======
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right','1'], visual_obj = [self.rect_left,self.rect_right])
->>>>>>> dcc10aca7de51eec6d18615ff7710476c1910c13
+
 
             this_instruction_string = ('This bar will be\n'
                                         'vertical/horizontal and\n'
@@ -658,11 +646,8 @@ class FeatureSession(ExpSession):
                                         'that you have to search for.\n\n\n'
                                         '[Press middle finger to continue]\n\n')
             
-<<<<<<< HEAD
+
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
-=======
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right','1'], visual_obj = [self.rect_left,self.rect_right])
->>>>>>> dcc10aca7de51eec6d18615ff7710476c1910c13
 
 
             # draw instructions wait a few seconds
@@ -671,11 +656,8 @@ class FeatureSession(ExpSession):
                                         'and do not move your eyes\n\n\n'
                                         '[Press middle finger to continue]\n\n')
             
-<<<<<<< HEAD
+
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
-=======
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right','1'], visual_obj = [self.rect_left,self.rect_right])
->>>>>>> dcc10aca7de51eec6d18615ff7710476c1910c13
 
         # draw instructions wait for scanner t trigger
         this_instruction_string = ('Index finger - same side\n\n'
@@ -856,15 +838,9 @@ class FlickerSession(ExpSession):
                                 '[Press middle finger to continue]\n\n'
                                 '[Press index finger to skip]\n\n')
 
-<<<<<<< HEAD
         key_pressed = draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['index']+self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
         if key_pressed[0] not in self.settings['keys']['index']: #if instructions not skipped
-=======
-        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['right','y','left','b','3','1'], visual_obj = [self.rect_left,self.rect_right])
-
-        if key_pressed[0] not in ['left','b','3']: #if instructions not skipped
->>>>>>> dcc10aca7de51eec6d18615ff7710476c1910c13
 
             this_instruction_string = ('If you press the buttons\n'
                                         'with your index/middle finger\n'
@@ -872,11 +848,7 @@ class FlickerSession(ExpSession):
                                         'the flickering changes\n\n\n'
                                         '[Press middle finger to continue]\n\n')
         
-<<<<<<< HEAD
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
-=======
-            draw_instructions(self.win, this_instruction_string, keys = ['right','y','1'], visual_obj = [self.rect_left,self.rect_right])
->>>>>>> dcc10aca7de51eec6d18615ff7710476c1910c13
 
 
             this_instruction_string = ('Your task is to fixate\n'
@@ -886,11 +858,7 @@ class FlickerSession(ExpSession):
                                         'flicker anymore\n\n\n'
                                         '[Press middle finger to continue]\n\n')
             
-<<<<<<< HEAD
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
-=======
-            draw_instructions(self.win, this_instruction_string, keys = ['right','y','1'], visual_obj = [self.rect_left,self.rect_right])
->>>>>>> dcc10aca7de51eec6d18615ff7710476c1910c13
 
 
             # draw instructions wait a few seconds
@@ -899,11 +867,8 @@ class FlickerSession(ExpSession):
                                         'and do not move your eyes\n\n\n'
                                         '[Press middle finger to continue]\n\n')
             
-<<<<<<< HEAD
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
-=======
-            draw_instructions(self.win, this_instruction_string, keys = ['right','y','1'], visual_obj = [self.rect_left,self.rect_right])
->>>>>>> dcc10aca7de51eec6d18615ff7710476c1910c13
+
 
         # draw instructions wait for scanner t trigger
         this_instruction_string = ('When you are certain the square\n'
@@ -913,11 +878,8 @@ class FlickerSession(ExpSession):
                                     'Ready when you are!\n\n\n'
                                     '[Press index finger to start]\n\n')
         
-<<<<<<< HEAD
+
         draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['index'], visual_obj = [self.rect_left,self.rect_right])
-=======
-        draw_instructions(self.win, this_instruction_string, keys = ['left','b','3'], visual_obj = [self.rect_left,self.rect_right])
->>>>>>> dcc10aca7de51eec6d18615ff7710476c1910c13
 
         # start recording gaze
         if self.eyetracker_on:

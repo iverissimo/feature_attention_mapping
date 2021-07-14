@@ -433,7 +433,8 @@ class FeatureSession(ExpSession):
         #
         # counter for responses
         self.total_responses = 0
-        #self.correct_responses = 0
+        self.correct_responses = 0
+        self.bar_counter = 0
 
         ## get condition names and randomize them 
         ## setting order for what condition to attend per mini block 
@@ -579,6 +580,16 @@ class FeatureSession(ExpSession):
         # index for orientation
         self.ori_ind = 0
 
+        # make boolean array to see which trials are stim trials
+        hemi_bool = [True if type(x)==str else False for _,x in enumerate(self.hemifield)]
+        # time in seconds for when bar trial on screen
+        bar_timing = [x*self.settings['mri']['TR'] for _,x in enumerate(np.where(hemi_bool)[0])]
+        self.bar_timing = np.array([x for _,x in enumerate(bar_timing) if x not in bar_timing[0::mini_block_TR]])
+
+        self.true_responses = get_true_responses(np.array(self.hemifield)[hemi_bool],
+                                                self.settings['stimuli']['feature']['mini_blocks'],
+                                                drop_nan=True)
+
         # print window size just to check, not actually needed
         print(self.screen)
 
@@ -676,9 +687,9 @@ class FeatureSession(ExpSession):
         for trl in self.all_trials: 
             trl.run() # run forrest run
 
-
+        print('Expected number of responses: %d'%(len(self.true_responses)))
         print('Total subject responses: %d'%self.total_responses)
-          
+        print('Correct responses: %d'%self.correct_responses)
 
         self.close() # close session
 
@@ -890,7 +901,6 @@ class FlickerSession(ExpSession):
         # cycle through trials
         for trl in self.all_trials: 
             trl.run() # run forrest run
-          
 
         self.close() # close session
 
@@ -941,6 +951,7 @@ class PracticeFeatureSession(ExpSession):
         # counter for responses
         self.total_responses = 0
         self.correct_responses = 0
+        self.bar_counter = 0
 
         ## get condition names and randomize them 
         ## setting order for what condition to attend per mini block 
@@ -1032,7 +1043,6 @@ class PracticeFeatureSession(ExpSession):
                         self.hemifield.append('left')
                     
                     else:
-
                         self.hemifield.append('right')
 
                 elif self.bar_pass_direction_all[indx][0] == 'vertical': # if attended bar horizontal (vertical bar pass)
@@ -1042,10 +1052,8 @@ class PracticeFeatureSession(ExpSession):
                         self.hemifield.append('down')
                     
                     else:
-                        
                         self.hemifield.append('up')
-                    
-                
+                                    
             else: # if not in miniblock, these are nan
                 self.drawing_ind.append([np.nan])
                 self.hemifield.append(np.nan)
@@ -1055,29 +1063,6 @@ class PracticeFeatureSession(ExpSession):
         save_all_TR_info(self.all_bar_pos, self.trial_type_all, self.attend_block_conditions, 
                         self.hemifield, self.drawing_ind, os.path.join(self.output_dir, self.output_str+'_trial_info.csv'))
 
-        # make boolean array to see which trials are stim trials
-        hemi_bool = [True if type(x)==str else False for _,x in enumerate(self.hemifield)]
-        # time in seconds for when bar trial on screen
-        self.bar_timing = [x*self.settings['mri']['TR'] for _,x in enumerate(np.where(hemi_bool)[0])]
-        
-        # set true responses
-        bar_responses = np.array(self.hemifield)[hemi_bool]
-
-        true_responses = []
-        for i in range(len(bar_responses)):
-          
-            if i in np.linspace(0, len(bar_responses), num = self.settings['stimuli']['feature']['mini_blocks']+1):
-                true_responses.append(np.nan)
-                
-            elif bar_responses[i] == bar_responses[i-1]:
-                true_responses.append('same')
-                
-            elif bar_responses[i] != bar_responses[i-1]:
-                true_responses.append('different')
-        self.true_responses = np.array(true_responses)
-
-        # bar timing counter
-        self.bar_timing_counter = 0            
 
         # if in scanner, we want it to be synced to trigger, so lets increase trial time (in seconds, like TR)
         max_trial_time = 5 if self.settings['mri']['scanner']==True else self.settings['mri']['TR']
@@ -1111,6 +1096,15 @@ class PracticeFeatureSession(ExpSession):
         # index for orientation
         self.ori_ind = 0
 
+        # make boolean array to see which trials are stim trials
+        hemi_bool = [True if type(x)==str else False for _,x in enumerate(self.hemifield)]
+        # time in seconds for when bar trial on screen
+        bar_timing = [x*self.settings['mri']['TR'] for _,x in enumerate(np.where(hemi_bool)[0])]
+        self.bar_timing = np.array([x for _,x in enumerate(bar_timing) if x not in bar_timing[0::mini_block_TR]])
+
+        self.true_responses = get_true_responses(np.array(self.hemifield)[hemi_bool],
+                                                self.settings['stimuli']['feature']['mini_blocks'],
+                                                drop_nan=True)
 
         # print window size just to check, not actually needed
         print(self.screen)
@@ -1209,7 +1203,7 @@ class PracticeFeatureSession(ExpSession):
         for trl in self.all_trials: 
             trl.run() # run forrest run
 
-        print('Expected number of responses: %d'%(len(self.true_responses)-self.settings['stimuli']['feature']['mini_blocks']))
+        print('Expected number of responses: %d'%(len(self.true_responses)))
         print('Total subject responses: %d'%self.total_responses)
         print('Correct responses: %d'%self.correct_responses)
           

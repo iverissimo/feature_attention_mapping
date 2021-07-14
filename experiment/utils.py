@@ -904,4 +904,26 @@ def get_average_color(filedir,settings,task='standard'):
     return(settings)
 
 
+def get_true_responses(bar_responses,num_miniblk,drop_nan=False):
+    
+    """
+    given array of trial position of attended bar
+    output array of true responses for run
+    (same vs dif, nan for first trial if drop_nan=False)
+    """
+    
+    true_responses = []
+    for i in range(len(bar_responses)):
 
+        if i in np.linspace(0, len(bar_responses), num = num_miniblk+1):
+            if drop_nan == False:
+                true_responses.append(np.nan)
+
+        elif bar_responses[i] == bar_responses[i-1]:
+            true_responses.append('same')
+
+        elif bar_responses[i] != bar_responses[i-1]:
+            true_responses.append('different')
+    true_responses = np.array(true_responses)
+    
+    return true_responses

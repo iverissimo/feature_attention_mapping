@@ -206,10 +206,10 @@ class FeatureTrial(Trial):
                 self.session.ori_bool = True
                 self.session.ori_counter += 1
 
-        # response times
-        if self.session.bar_timing_counter<(len(self.session.bar_timing)-1):
-            if current_time >= self.session.bar_timing[self.session.bar_timing_counter]: # when switch time reached, increment counter
-                self.session.bar_timing_counter += 1
+        if self.session.bar_counter<len(self.session.true_responses):
+            if current_time >= (self.session.bar_timing[self.session.bar_counter] + self.session.settings['mri']['TR']): # if no valid reply in this window, increment
+                self.session.bar_counter += 1 
+
 
         ## draw stim
         if 'cue' in self.trial_type_at_TR: # if cue at TR, draw background and word cue
@@ -249,7 +249,7 @@ class FeatureTrial(Trial):
         # if feedback trial, show score
         elif 'feedback' in self.trial_type_at_TR:
 
-            feed_str = 'Accuracy = %.2f %%'%((self.session.correct_responses/self.session.bar_timing_counter)*100)
+            feed_str = 'Accuracy = %.2f %%'%((self.session.correct_responses/self.session.bar_counter)*100)
 
             self.feed_stim = visual.TextStim(win = self.session.win,
                                         text = feed_str,
@@ -317,16 +317,17 @@ class FeatureTrial(Trial):
                     event_type = 'response'
                     self.session.total_responses += 1
 
-                    #track percentage of correct responses per session (only correct if reply 2*TR)
-                    if t < (self.session.bar_timing[self.session.bar_timing_counter]+self.session.settings['mri']['TR']*1.9):
+                    if t >= self.session.bar_timing[self.session.bar_counter]:
 
-                        if ev in self.session.settings['keys']['index']:
-                            if self.session.true_responses[self.session.bar_timing_counter] == 'same':
-                                self.session.correct_responses += 1
-                        elif ev in self.session.settings['keys']['middle']:
-                            if self.session.true_responses[self.session.bar_timing_counter] == 'different':
-                                self.session.correct_responses += 1
-                        
+                        if (ev in self.session.settings['keys']['index']) and (self.session.true_responses[self.session.bar_counter] == 'same'):
+                            self.session.correct_responses += 1
+                            if self.session.bar_counter<len(self.session.true_responses):
+                                self.session.bar_counter += 1 
+                        elif (ev in self.session.settings['keys']['middle']) and (self.session.true_responses[self.session.bar_counter] == 'different'): 
+                            self.session.correct_responses += 1
+                            if self.session.bar_counter<len(self.session.true_responses):
+                                self.session.bar_counter += 1 
+
 
                 # log everything into session data frame
                 idx = self.session.global_log.shape[0]
@@ -448,9 +449,9 @@ class FlickerTrial(Trial):
                 else: # any other key pressed will be response to color change
                     event_type = 'response'
                     
-                    if ev in ['right','y','1']:
+                    if ev in self.session.settings['keys']['index']:
                         self.session.lum_responses += self.session.settings['stimuli']['flicker']['increment']
-                    elif ev in ['left','b','3']:
+                    elif ev in self.session.settings['keys']['index']:
                         self.session.lum_responses -= self.session.settings['stimuli']['flicker']['increment']
 
                     # clip it so participants don't endup with humongous values

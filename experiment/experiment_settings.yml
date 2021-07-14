@@ -104,7 +104,7 @@ stimuli:
 
   practice:
     feature:
-      num_bars: [2,2] #[6,6] # number of bars per direction
+      num_bars: [6,6] #[2,2] # number of bars per direction
       empty_TR: 4
       cue_TR: 3
       feedback_TR: 3

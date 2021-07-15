@@ -1,0 +1,117 @@
+
+general:
+  acq_type: ['ORIG','ORIGPF','ORIGPFFA59']
+  session: '01'
+  runs: ['run-1','run-2']
+
+window: # refers to the parameters for the Psychopy Window class
+  size: [1920, 1080] #[1680, 1050]
+  display: 'square' # or 'rectangle', defines if square [vRes vRes] or rectangle [hRes vRes] display
+
+monitor:
+  name: default
+  width: 69.8 #69  # width of monitor (in cm)
+  distance: 210 #225  # distance of participant from monitor (in cm)
+
+stimuli:
+  gab_ratio: 0.66 #0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid
+  element_size: 0.5 #1.1 #0.55 #0.4 #0.2 # degrees
+
+  ori_shift_rate: 5 #'TR' #0.83 #.25 #5 # Hz, rate of element orientation change
+
+  pos_jitter: 0.03 #0.06 #degrees, x,y position jiter to add to gabor center 
+
+
+feature:
+    bar_width_ratio: 0.125 # ratio of the screen res
+    mini_blocks: 4
+
+    empty_TR: 20 #5
+    cue_TR: 3
+
+    cue_width: .2 #.55
+    cue_height: .5 #1.1
+    cue_contrast: 0.6
+
+    num_bars: 4
+
+    conditions: ['red_vertical','red_horizontal','green_vertical','green_horizontal'] # all conditions to be attended during feature trial
+
+    bar_pass_direction: ['cue_0','empty','mini_block_0','empty',
+                    'cue_1','empty','mini_block_1','empty',
+                    'cue_2','empty','mini_block_2','empty',
+                    'cue_3','empty','mini_block_3','empty']
+
+flicker:
+    bar_width_ratio: 0.125 # ratio of the screen res
+
+    bar_ecc_index: [1,2,2,1,1,2,1,2] # eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
+
+    flick_rate: 30 # Hz, flicker rate of color for square
+
+    max_trial_time: 5 # max trial time (in minutes)
+
+    backgr_contrast: 0 # contrast for elements, 0 = no background elements shown
+    increment: 0.025 # increment value for luminance per button press
+
+    modulated_condition: ['color_green'] # color condition modulated by flicker task
+
+
+mri: # refers to the Psychopy SyncGenerator class
+  TR: 1.2  # seconds between volume acquisitions
+  sync: 't'  # character used as flag for sync timing, default=‘5’
+
+  filtering:
+    type: 'HPgauss' # None
+
+    HPgauss:
+      cut_off_hz: 0.014
+      file_extension: '_HPgauss.nii.gz'
+
+  psc:
+    file_extension: '_psc.nii.gz'
+
+  paths:
+    sourcedata: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/full_processing_submm/sourcedata'
+    
+    derivatives: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/full_processing_submm/derivatives'
+
+    output: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/full_processing_submm/derivatives/post_fmriprep'
+
+    nordic:
+      derivatives: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/nordic/derivatives'
+      
+      sourcedata: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/nordic/sourcedata'
+
+      output: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/nordic/derivatives/post_fmriprep'
+
+
+eyetracking:
+
+  HP_pupil_f: 0.01
+  LP_pupil_f: 6.0
+  sampling_freq: 1000
+
+  downsampling: 10 # downsampling rate
+
+  sacc_thresh : 6 # 5 # lambda, median-based standard deviations from the median estimator
+  minimum_saccade_duration: 0.006 # 0.016 # minimum duration to consider saccade (ms)
+
+  tasks: ['PRFfeature'] # task names with eyetracking data to analyse
+
+keys: # keys to press, valid for laptop, scanner and behav lab
+  index: ['left','b',3]
+  middle: ['right','y',1]
+  
+
+plotting:
+  # define costum palette
+  cond_colors : 
+    green_horizontal : (0,1,0), #(0,0.5412,0),
+    green_vertical : (0,1,0), #(0,0.5412,0),
+    red_horizontal : (1,0,0), #(0.6588,0,0),
+    red_vertical : (1,0,0)} #(0.6588,0,0)}
+
+
+
+

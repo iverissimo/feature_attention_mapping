@@ -29,7 +29,7 @@ echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
 conda activate i36
 
-rsync -rv $ORIGDIR $BASE_DIR
+rsync -rv $ORIGDIR $TMPDIR/$PREPROC
 
 python post_fmriprep.py $SJ_NR $BASE_DIR $PREPROC
 
@@ -39,7 +39,7 @@ python pRF_fitting.py $SJ_NR $BASE_DIR $PREPROC $ACQ $SLICE
 
 wait          # wait until programs are finished
 
-rsync -rv $BASE_DIR $ORIGDIR
+rsync -rv $TMPDIR/$PREPROC $ORIGDIR
 
 wait          # wait until programs are finished
 

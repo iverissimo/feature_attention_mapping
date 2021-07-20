@@ -89,9 +89,9 @@ mri: # refers to the Psychopy SyncGenerator class
     lisa:
       standard_orig: '/home/inesv/FAM/sequence_pilot/full_processing_submm' # original location of files, definitive storage
       nordic_orig: '/home/inesv/FAM/sequence_pilot/full_processing_submm/nordic'
-      
-      standard: '/scratch/FAM/full_processing_submm' # where nodes will get data
-      nordic: 'scratch/FAM/nordic'
+
+      standard: '/scratch/standard' # where nodes will get data
+      nordic: '/scratch/nordic'
 
   fitting:
     pRF:

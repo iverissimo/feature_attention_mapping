@@ -87,8 +87,11 @@ mri: # refers to the Psychopy SyncGenerator class
       standard: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/full_processing_submm'
       nordic: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/nordic'
     lisa:
-      standard: '/home/inesv/FAM/sequence_pilot/full_processing_submm'
-      nordic: '/home/inesv/FAM/sequence_pilot/full_processing_submm/nordic'
+      standard_orig: '/home/inesv/FAM/sequence_pilot/full_processing_submm' # original location of files, definitive storage
+      nordic_orig: '/home/inesv/FAM/sequence_pilot/full_processing_submm/nordic'
+      
+      standard: '/scratch/FAM/full_processing_submm' # where nodes will get data
+      nordic: 'scratch/FAM/nordic'
 
   fitting:
     pRF:

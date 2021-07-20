@@ -86,6 +86,9 @@ mri: # refers to the Psychopy SyncGenerator class
     local:
       standard: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/full_processing_submm'
       nordic: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/nordic'
+    lisa:
+      standard: '/home/inesv/FAM/sequence_pilot/full_processing_submm'
+      nordic: '/home/inesv/FAM/sequence_pilot/full_processing_submm/nordic'
 
   fitting:
     pRF:

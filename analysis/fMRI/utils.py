@@ -421,7 +421,7 @@ def save_estimates(filename, estimates, vox_indices, data_filename):
     
     """ 
     # load nifti image to get header and shape
-    data_img = nb.load(data_filename)
+    data_img = nib.load(data_filename)
     data = data_img.get_fdata()
     
     # Re-arrange data
@@ -431,7 +431,7 @@ def save_estimates(filename, estimates, vox_indices, data_filename):
         estimates_mat[vox] = estimates[est]
         
     # Save estimates data
-    new_img = nb.Nifti1Image(dataobj = estimates_mat, affine = data_img.affine, header = data_img.header)
+    new_img = nib.Nifti1Image(dataobj = estimates_mat, affine = data_img.affine, header = data_img.header)
     new_img.to_filename(filename)
     
     return filename

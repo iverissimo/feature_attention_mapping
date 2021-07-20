@@ -42,6 +42,17 @@ feature:
                     'cue_2','empty','mini_block_2','empty',
                     'cue_3','empty','mini_block_3','empty']
 
+prf:
+  bar_width_ratio: 0.125 #0.0625 # ratio of the screen res
+
+  bar_pass_hor_TR: 17 
+  bar_pass_ver_TR: 17 
+  empty_TR: 20 #5
+
+  flick_rate: 'TR' #10 # Hz, rate of change of features in bar
+
+  bar_pass_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty']
+
 flicker:
     bar_width_ratio: 0.125 # ratio of the screen res
 
@@ -72,18 +83,24 @@ mri: # refers to the Psychopy SyncGenerator class
     file_extension: '_psc.nii.gz'
 
   paths:
-    sourcedata: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/full_processing_submm/sourcedata'
-    
-    derivatives: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/full_processing_submm/derivatives'
+    local:
+      standard: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/full_processing_submm'
+      nordic: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/nordic'
 
-    output: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/full_processing_submm/derivatives/post_fmriprep'
+  fitting:
+    pRF:
+      runs: 'run-average' # [1,2]
+      input_file_dir: 'post_fmriprep/average'
+      input_file_ext: 'HPgauss_psc.nii.gz'
+      space: 'T1w'
+      acq_type: ['ORIG','ORIGPF','ORIGPFFA59']
 
-    nordic:
-      derivatives: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/nordic/derivatives'
-      
-      sourcedata: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/nordic/sourcedata'
+      grid_nr: 40 # number of grid steps
+      min_eccen: 0.2
+      max_eccen: 20
 
-      output: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/nordic/derivatives/post_fmriprep'
+      min_size: 0.2
+      max_size: 20
 
 
 eyetracking:

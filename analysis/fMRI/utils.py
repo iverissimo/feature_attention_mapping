@@ -15,6 +15,7 @@ import nilearn
 
 from nilearn import plotting
 import matplotlib.pyplot as plt
+from PIL import Image, ImageDraw
 
 from nilearn.image import mean_img, math_img
 from matplotlib import cm
@@ -285,3 +286,153 @@ def avg_nii(files, outpth):
     return output
 
     
+def make_pRF_DM(output,params,save_imgs=False):
+    
+    """Make design matrix for pRF task
+    
+    Parameters
+    ----------
+    output : string
+       absolute output name for DM
+    params : yml dict
+        with experiment params
+    save_imgs : bool
+       if we want to save images in folder, for sanity check
+    """
+    
+    if not op.exists(output): 
+        print('making %s'%output)
+
+        if not op.exists(op.split(output)[0]): # make base dir to save files
+            os.makedirs(op.split(output)[0])
+        
+        # general infos
+        TR = params['mri']['TR']
+        bar_width = params['prf']['bar_width_ratio'] 
+
+        screen_res = params['window']['size']
+        if params['window']['display'] == 'square': # if square display
+            screen_res = np.array([screen_res[1], screen_res[1]])
+
+        
+        # number TRs per condition
+        TR_conditions = {'L-R': params['prf']['bar_pass_hor_TR'],
+                         'R-L': params['prf']['bar_pass_hor_TR'],
+                         'U-D': params['prf']['bar_pass_ver_TR'],
+                         'D-U': params['prf']['bar_pass_ver_TR'],
+                         'empty': params['prf']['empty_TR']}
+
+        # order of conditions in run
+        bar_pass_direction = params['prf']['bar_pass_direction']
+        
+        # get total number of TRs in run
+        # list of bar orientation at all TRs
+        total_TR = 0
+        for _,bartype in enumerate(bar_pass_direction):
+            total_TR += TR_conditions[bartype]
+
+        # all possible positions in pixels for for midpoint of
+        # y position for vertical bar passes, 
+        ver_y = screen_res[1]*np.linspace(0,1, TR_conditions['U-D'])
+        # x position for horizontal bar passes 
+        hor_x = screen_res[0]*np.linspace(0,1, TR_conditions['L-R'])        
+
+        # coordenates for bar pass, for PIL Image
+        coordenates_bars = {'L-R': {'upLx': hor_x-0.5*bar_width*screen_res[0], 'upLy': np.repeat(screen_res[1],TR_conditions['L-R']),
+                                     'lowRx': hor_x+0.5*bar_width*screen_res[0], 'lowRy': np.repeat(0,TR_conditions['L-R'])},
+                            'R-L': {'upLx': np.array(list(reversed(hor_x-0.5*bar_width*screen_res[0]))), 'upLy': np.repeat(screen_res[1],TR_conditions['R-L']),
+                                     'lowRx': np.array(list(reversed(hor_x+0.5*bar_width*screen_res[0]))), 'lowRy': np.repeat(0,TR_conditions['R-L'])},
+                            'U-D': {'upLx': np.repeat(0,TR_conditions['U-D']), 'upLy': ver_y+0.5*bar_width*screen_res[1],
+                                     'lowRx': np.repeat(screen_res[0],TR_conditions['U-D']), 'lowRy': ver_y-0.5*bar_width*screen_res[1]},
+                            'D-U': {'upLx': np.repeat(0,TR_conditions['D-U']), 'upLy': np.array(list(reversed(ver_y+0.5*bar_width*screen_res[1]))),
+                                     'lowRx': np.repeat(screen_res[0],TR_conditions['D-U']), 'lowRy': np.array(list(reversed(ver_y-0.5*bar_width*screen_res[1])))}
+                             }
+
+        # save screen display for each TR
+        visual_dm_array = np.zeros((total_TR, screen_res[0],screen_res[1]))
+        counter = 0
+        for ind,bartype in enumerate(bar_pass_direction): # loop over bar pass directions
+
+            for i in range(TR_conditions[bartype]):
+
+                img = Image.new('RGB', tuple(screen_res)) # background image
+
+                if bartype not in np.array(['empty']): # if not empty screen
+                    # set draw method for image
+                    draw = ImageDraw.Draw(img)
+                    # add bar, coordinates (upLx, upLy, lowRx, lowRy)
+                    draw.rectangle(tuple([coordenates_bars[bartype]['upLx'][i],coordenates_bars[bartype]['upLy'][i],
+                                        coordenates_bars[bartype]['lowRx'][i],coordenates_bars[bartype]['lowRy'][i]]), 
+                                   fill = (255,255,255),
+                                   outline = (255,255,255))
+
+                visual_dm_array[counter, ...] = np.array(img)[:,:,0][np.newaxis,...]
+                counter += 1
+
+        # swap axis to have time in last axis [x,y,t]
+        visual_dm = visual_dm_array.transpose([1,2,0]) 
+        
+        # save design matrix
+        np.save(output, visual_dm)
+        
+    else:
+        print('already exists, skipping %s'%output)
+        
+        # load
+        visual_dm = np.load(output)
+        
+    #if we want to save the images
+    if save_imgs == True:
+        outfolder = op.split(output)[0]
+
+        visual_dm = visual_dm.astype(np.uint8)
+
+        for w in range(visual_dm.shape[-1]):
+            im = Image.fromarray(visual_dm[...,w])
+            im.save(op.join(outfolder,"DM_TR-%i.png"%w))      
+            
+    return visual_dm
+
+
+def save_estimates(filename, estimates, vox_indices, data_filename):
+    
+    """
+    re-arrange estimates from 2D to 4D
+    and save in folder
+    
+    Parameters
+    ----------
+    filename : str
+        absolute filename of estimates to be saved
+    estimates : arr
+        2d estimates (datapoints,estimates)
+    vox_indices : list
+        list of tuples, with voxel indices 
+        (to reshape estimates according to original data shape)
+    data_filename: str
+        absolute filename of original data fitted
+        
+    Outputs
+    -------
+    out_file: str
+        absolute output filename
+    
+    """ 
+    # load nifti image to get header and shape
+    data_img = nb.load(data_filename)
+    data = data_img.get_fdata()
+    
+    # Re-arrange data
+    estimates_mat = np.zeros((data.shape[0],data.shape[1],data.shape[2],estimates.shape[-1]))
+    
+    for est,vox in enumerate(vox_indices):
+        estimates_mat[vox] = estimates[est]
+        
+    # Save estimates data
+    new_img = nb.Nifti1Image(dataobj = estimates_mat, affine = data_img.affine, header = data_img.header)
+    new_img.to_filename(filename)
+    
+    return filename
+
+    
+  

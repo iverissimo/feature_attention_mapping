@@ -12,22 +12,21 @@ from utils import * #import script to use relevante functions
 
 
 # define participant number, and if looking at nordic or pre-nordic data
-if len(sys.argv)<3: 
+if len(sys.argv)<4: 
     raise NameError('Please add subject number (ex: 001) '
                     'as 1st argument in the command line!')
-elif len(sys.argv)<2: 
-	raise NameError('Please specify data we are looking at (nordic vs standard)'
+elif len(sys.argv)<3: 
+	raise NameError('Please specify where running data (local vs lisa)'
                     'as 2nd argument in the command line!')
+
+elif len(sys.argv)<2: 
+    raise NameError('Please specify data we are looking at (nordic vs standard)'
+                    'as 3rd argument in the command line!')
 
 else:
     sj = str(sys.argv[1]).zfill(3) #fill subject number with 00 in case user forgets
-
-    if str(sys.argv[2]) == 'nordic':
-    	NORDIC = True
-    elif str(sys.argv[2]) == 'standard':
-    	NORDIC = False
-    else:
-    	raise NameError('Option not valid')
+    base_dir = str(sys.argv[2]) # which machine we run the data
+    preproc = str(sys.argv[3]) # if using standard files or nordic files
 
 
 # load settings from yaml
@@ -35,15 +34,9 @@ with open(op.join(op.split(os.getcwd())[0],'exp_params.yml'), 'r') as f_in:
             params = yaml.safe_load(f_in)
 
 
-if NORDIC:
-    sourcedata_pth = params['mri']['paths']['nordic']['sourcedata']
-    derivatives_pth = params['mri']['paths']['nordic']['derivatives']
-    output_pth = params['mri']['paths']['nordic']['output']
-
-else:
-    sourcedata_pth = params['mri']['paths']['sourcedata']
-    derivatives_pth = params['mri']['paths']['derivatives']
-    output_pth = params['mri']['paths']['output']
+sourcedata_pth = op.join(params['mri']['paths'][base_dir][preproc],'sourcedata')
+derivatives_pth = op.join(params['mri']['paths'][base_dir][preproc],'derivatives')
+output_pth =  op.join(derivatives_pth,'post_fmriprep')
 
 
 # get func files

@@ -15,8 +15,8 @@ subjects = ['007'] # subjects
 base_dir = 'lisa' # where we are running the scripts
 preproc = ['standard'] # ['standard','nordic'] 
 
-#acq_type = params['mri']['fitting']['pRF']['acq_type'] # type of acquisition
-#slice_num = 89
+acq_type = ['ORIG'] #params['mri']['fitting']['pRF']['acq_type'] # type of acquisition
+slice_num = 50
 
 batch_string = """#!/bin/bash
 #SBATCH -t 96:00:00
@@ -31,6 +31,10 @@ python post_fmriprep.py $SJ_NR $BASE_DIR $PREPROC
 
 wait          # wait until programs are finished
 
+python pRF_fitting.py $SJ_NR $BASE_DIR $PREPROC $ACQ $SLICE
+
+wait          # wait until programs are finished
+
 echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 """
 
@@ -41,16 +45,20 @@ for subject in subjects:
 
         for proc in preproc:
 
-                working_string = batch_string.replace('$SJ_NR', str(subject).zfill(3))
-                working_string = working_string.replace('$BASE_DIR', base_dir)
-                working_string = working_string.replace('$PREPROC', proc)
+                for acq in acq_type:
 
-                js_name = os.path.join(batch_dir, 'pRF_sub-' + str(subject).zfill(2) + '_pRFfit.sh')
-                of = open(js_name, 'w')
-                of.write(working_string)
-                of.close()
+                        working_string = batch_string.replace('$SJ_NR', str(subject).zfill(3))
+                        working_string = working_string.replace('$BASE_DIR', base_dir)
+                        working_string = working_string.replace('$PREPROC', proc)
+                        working_string = working_string.replace('$ACQ', acq)
+                        working_string = working_string.replace('$SLICE', slice_num)
 
-                print('submitting ' + js_name + ' to queue')
-                print(working_string)
-                os.system('sbatch ' + js_name)
+                        js_name = os.path.join(batch_dir, 'pRF_sub-' + str(subject).zfill(2) + '_pRFfit.sh')
+                        of = open(js_name, 'w')
+                        of.write(working_string)
+                        of.close()
+
+                        print('submitting ' + js_name + ' to queue')
+                        print(working_string)
+                        os.system('sbatch ' + js_name)
 

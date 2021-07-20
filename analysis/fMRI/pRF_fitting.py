@@ -56,7 +56,7 @@ start_time = datetime.datetime.now()
 # define paths
 derivatives_pth = op.join(params['mri']['paths'][base_dir][preproc],'derivatives')
 input_pth = op.join(derivatives_pth, params['mri']['fitting']['pRF']['input_file_dir']) # for input files to fit model
-output_pth =  op.join(derivatives_pth,'prF_fitting') # for estimates output
+output_pth =  op.join(derivatives_pth,'pRF_fitting') # for estimates output
 
 DM_pth = op.join(output_pth,'DM') # design matrix
 
@@ -92,7 +92,7 @@ print("z-Slice {slice_num} containing {not_nan}/{n_voxels} non-nan voxels".forma
                                                                                  not_nan = not_nan_vox))
 
 # define design matrix 
-visual_dm = make_pRF_DM(op.join(DM_pth, 'DMprf.npy'), params, save_imgs=False)
+visual_dm = make_pRF_DM(op.join(DM_pth, 'DMprf.npy'), params, save_imgs=False, downsample=0.1)
 
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['width'],
                          screen_distance_cm = params['monitor']['distance'],

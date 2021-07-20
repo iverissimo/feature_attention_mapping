@@ -286,7 +286,7 @@ def avg_nii(files, outpth):
     return output
 
     
-def make_pRF_DM(output,params,save_imgs=False):
+def make_pRF_DM(output,params,save_imgs=False,downsample=None):
     
     """Make design matrix for pRF task
     
@@ -314,7 +314,9 @@ def make_pRF_DM(output,params,save_imgs=False):
         if params['window']['display'] == 'square': # if square display
             screen_res = np.array([screen_res[1], screen_res[1]])
 
-        
+        if downsample != None: # if we want to downsample screen res
+            screen_res = (screen_res*downsample).astype(int)
+
         # number TRs per condition
         TR_conditions = {'L-R': params['prf']['bar_pass_hor_TR'],
                          'R-L': params['prf']['bar_pass_hor_TR'],

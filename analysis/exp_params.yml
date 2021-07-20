@@ -70,7 +70,7 @@ flicker:
 
 mri: # refers to the Psychopy SyncGenerator class
   TR: 1.2  # seconds between volume acquisitions
-  sync: 't'  # character used as flag for sync timing, default=‘5’
+  sync: 't'  # character used as flag for sync timing
 
   filtering:
     type: 'HPgauss' # None

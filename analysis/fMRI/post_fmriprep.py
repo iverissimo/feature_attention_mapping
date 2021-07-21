@@ -34,8 +34,7 @@ with open(op.join(op.split(os.getcwd())[0],'exp_params.yml'), 'r') as f_in:
             params = yaml.safe_load(f_in)
 
 
-sourcedata_pth = op.join(params['mri']['paths'][base_dir][preproc],'sourcedata')
-derivatives_pth = op.join(params['mri']['paths'][base_dir][preproc],'derivatives')
+derivatives_pth = params['mri']['paths'][base_dir][preproc]
 output_pth =  op.join(derivatives_pth,'post_fmriprep')
 
 

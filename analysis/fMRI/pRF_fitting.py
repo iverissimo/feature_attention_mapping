@@ -54,7 +54,7 @@ else:
 start_time = datetime.datetime.now()
 
 # define paths
-derivatives_pth = op.join(params['mri']['paths'][base_dir][preproc],'derivatives')
+derivatives_pth = params['mri']['paths'][base_dir][preproc]
 input_pth = op.join(derivatives_pth, params['mri']['fitting']['pRF']['input_file_dir']) # for input files to fit model
 output_pth =  op.join(derivatives_pth,'pRF_fitting') # for estimates output
 
@@ -101,81 +101,85 @@ grid_estimates_filename = op.join(output_pth,grid_estimates_filename)
 it_estimates_filename = op.split(input_file)[-1].replace('.nii.gz','_estimates-gaussit_slice-{slice_num}.nii.gz'.format(slice_num=slice_num))
 it_estimates_filename = op.join(output_pth,grid_estimates_filename)
 
-# if all voxels in slice nan, skip fitting, output zeros for all estimates
-if not_nan_vox == 0:
-
-    estimates_grid = np.zeros((n_voxels,6))
-    estimates_it = np.zeros((n_voxels,6))
+if op.exists(it_estimates_filename): # if file exists, skip
+    print('already exists %s'%it_estimates_filename)
 
 else:
+    # if all voxels in slice nan, skip fitting, output zeros for all estimates
+    if not_nan_vox == 0:
 
-    # define design matrix 
-    visual_dm = make_pRF_DM(op.join(DM_pth, 'DMprf.npy'), params, save_imgs=False, downsample=0.1)
+        estimates_grid = np.zeros((n_voxels,6))
+        estimates_it = np.zeros((n_voxels,6))
 
-    prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['width'],
-                             screen_distance_cm = params['monitor']['distance'],
-                             design_matrix = visual_dm,
-                             TR = params['mri']['TR'])
+    else:
 
+        # define design matrix 
+        visual_dm = make_pRF_DM(op.join(DM_pth, 'DMprf.npy'), params, save_imgs=False, downsample=0.1)
 
-    # define model 
-    gauss_model = Iso2DGaussianModel(stimulus = prf_stim)
-    # and parameters
-    grid_nr = params['mri']['fitting']['pRF']['grid_nr']
-    sizes = params['mri']['fitting']['pRF']['max_size'] * \
-        np.linspace(np.sqrt(params['mri']['fitting']['pRF']['min_size']/params['mri']['fitting']['pRF']['max_size']),1,grid_nr)**2
-    eccs = params['mri']['fitting']['pRF']['max_eccen'] * \
-        np.linspace(np.sqrt(params['mri']['fitting']['pRF']['min_eccen']/params['mri']['fitting']['pRF']['max_eccen']),1,grid_nr)**2
-    polars = np.linspace(0, 2*np.pi, grid_nr)
+        prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['width'],
+                                 screen_distance_cm = params['monitor']['distance'],
+                                 design_matrix = visual_dm,
+                                 TR = params['mri']['TR'])
 
 
-    ## GRID FIT
-    print("Grid fit")
-    gauss_fitter = Iso2DGaussianFitter(data = data_2d, 
-                                       model = gauss_model, 
-                                       n_jobs = 16)
-                                       
-    gauss_fitter.grid_fit(ecc_grid = eccs, 
-                          polar_grid = polars, 
-                          size_grid = sizes, 
-                          pos_prfs_only = True)
+        # define model 
+        gauss_model = Iso2DGaussianModel(stimulus = prf_stim)
+        # and parameters
+        grid_nr = params['mri']['fitting']['pRF']['grid_nr']
+        sizes = params['mri']['fitting']['pRF']['max_size'] * \
+            np.linspace(np.sqrt(params['mri']['fitting']['pRF']['min_size']/params['mri']['fitting']['pRF']['max_size']),1,grid_nr)**2
+        eccs = params['mri']['fitting']['pRF']['max_eccen'] * \
+            np.linspace(np.sqrt(params['mri']['fitting']['pRF']['min_eccen']/params['mri']['fitting']['pRF']['max_eccen']),1,grid_nr)**2
+        polars = np.linspace(0, 2*np.pi, grid_nr)
 
 
-    estimates_grid = gauss_fitter.gridsearch_params
+        ## GRID FIT
+        print("Grid fit")
+        gauss_fitter = Iso2DGaussianFitter(data = data_2d, 
+                                           model = gauss_model, 
+                                           n_jobs = 16)
+                                           
+        gauss_fitter.grid_fit(ecc_grid = eccs, 
+                              polar_grid = polars, 
+                              size_grid = sizes, 
+                              pos_prfs_only = True)
 
 
-    ## ITERATIVE FIT
-    # to set up parameter bounds in iterfit
-    inf = np.inf
-    eps = 1e-1
-    ss = prf_stim.screen_size_degrees
-    xtol = 1e-7
-    ftol = 1e-6
-
-    # model parameter bounds
-    gauss_bounds = [(-2*ss, 2*ss),  # x
-                    (-2*ss, 2*ss),  # y
-                    (eps, 2*ss),  # prf size
-                    (0, +inf),  # prf amplitude
-                    (-5, +inf)]  # bold baseline
+        estimates_grid = gauss_fitter.gridsearch_params
 
 
-    # iterative fit
-    print("Iterative fit")
-    gauss_fitter.iterative_fit(rsq_threshold = 0.05, 
-                               verbose = False,
-                               bounds=gauss_bounds,
-                               xtol = xtol,
-                               ftol = ftol)
+        ## ITERATIVE FIT
+        # to set up parameter bounds in iterfit
+        inf = np.inf
+        eps = 1e-1
+        ss = prf_stim.screen_size_degrees
+        xtol = 1e-7
+        ftol = 1e-6
+
+        # model parameter bounds
+        gauss_bounds = [(-2*ss, 2*ss),  # x
+                        (-2*ss, 2*ss),  # y
+                        (eps, 2*ss),  # prf size
+                        (0, +inf),  # prf amplitude
+                        (-5, +inf)]  # bold baseline
 
 
-    estimates_it = gauss_fitter.iterative_search_params
+        # iterative fit
+        print("Iterative fit")
+        gauss_fitter.iterative_fit(rsq_threshold = 0.05, 
+                                   verbose = False,
+                                   bounds=gauss_bounds,
+                                   xtol = xtol,
+                                   ftol = ftol)
 
-# save estimates
-# for grid
-save_estimates(grid_estimates_filename, estimates_grid, vox_indices, input_file)
-# for it
-save_estimates(it_estimates_filename, estimates_it, vox_indices, input_file)
+
+        estimates_it = gauss_fitter.iterative_search_params
+
+    # save estimates
+    # for grid
+    save_estimates(grid_estimates_filename, estimates_grid, vox_indices, input_file)
+    # for it
+    save_estimates(it_estimates_filename, estimates_it, vox_indices, input_file)
 
 
 # Print duration

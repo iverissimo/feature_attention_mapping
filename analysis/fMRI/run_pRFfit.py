@@ -45,7 +45,7 @@ python pRF_fitting.py $SJ_NR $BASE_DIR $PREPROC $ACQ $SLICE
 
 wait          # wait until programs are finished
 
-rsync -rv $TMPDIR/$PREPROC/ $ORIGDIR
+cp $TMPDIR/$PREPROC/pRF_fitting/*.nii.gz $ORIGDIR/pRF_fitting/
 
 wait          # wait until programs are finished
 

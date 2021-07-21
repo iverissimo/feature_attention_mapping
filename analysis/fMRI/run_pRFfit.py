@@ -14,9 +14,9 @@ with open(os.path.join(os.path.split(os.getcwd())[0],'exp_params.yml'), 'r') as 
 
 subjects = ['007'] # subjects
 base_dir = 'lisa' # where we are running the scripts
-preproc = ['standard'] # ['standard','nordic'] 
+preproc = ['standard','nordic'] 
 
-acq_type = ['ORIG'] #params['mri']['fitting']['pRF']['acq_type'] # type of acquisition
+acq_type = params['mri']['fitting']['pRF']['acq_type'] # type of acquisition
 
 # number of slices to split data in (makes fitting faster)
 total_slices = 89 # slice in z direction
@@ -34,6 +34,8 @@ echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 conda activate i36
 
 rsync -rv $ORIGDIR/ $TMPDIR/$PREPROC
+
+wait
 
 python post_fmriprep.py $SJ_NR $BASE_DIR $PREPROC
 

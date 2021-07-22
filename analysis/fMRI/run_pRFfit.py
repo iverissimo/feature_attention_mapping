@@ -33,7 +33,7 @@ echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
 conda activate i36
 
-rsync -rv $ORIGDIR/ $TMPDIR/$PREPROC
+rsync -chavzP $ORIGDIR/ $TMPDIR/$PREPROC
 
 wait
 

@@ -426,6 +426,7 @@ def save_estimates(filename, estimates, vox_indices, data_filename):
     
     # Re-arrange data
     estimates_mat = np.zeros((data.shape[0],data.shape[1],data.shape[2],estimates.shape[-1]))
+    estimates_mat[:] = np.nan
     
     for est,vox in enumerate(vox_indices):
         estimates_mat[vox] = estimates[est]

@@ -111,7 +111,7 @@ grid_estimates_filename = op.join(output_pth,grid_estimates_filename)
 
 #filename the estimates of the iterative fit
 it_estimates_filename = op.split(input_file)[-1].replace('.nii.gz','_estimates-gaussit_slice-{slice_num}.nii.gz'.format(slice_num=slice_num))
-it_estimates_filename = op.join(output_pth,grid_estimates_filename)
+it_estimates_filename = op.join(output_pth,it_estimates_filename)
 
 if op.exists(it_estimates_filename): # if file exists, skip
     print('already exists %s'%it_estimates_filename)

@@ -437,5 +437,57 @@ def save_estimates(filename, estimates, vox_indices, data_filename):
     
     return filename
 
+
+
+def combine_slices(file_list,outdir,num_slices=89, ax=2):
     
+    """ High pass filter NIFTI run with gaussian kernel
+    
+    Parameters
+    ----------
+    file_list : list
+        list of absolute filenames of all volumes to combine
+    outdir : str
+        path to save new file
+    num_slices : int
+        number of slices to combine
+    ax: int
+        which ax to stack slices
+    
+    Outputs
+    -------
+    out_file: str
+        absolute output filename
+    
+    """
+    
+
+    for num in np.arange(num_slices):
+        
+        vol = [x for _,x in enumerate(file_list) if '_slice-{num}.nii.gz'.format(num = str(num).zfill(2)) in x]
+        
+        if len(vol)==0: # if empty
+            raise NameError('Slice %s doesnt exist!'%str(num).zfill(2)) 
+        
+        else:
+            nibber = nib.load(vol[0])
+            data = np.array(nibber.dataobj)
+            data = np.take(data, indices = num, axis=ax)
+            
+            if num == 0: # for first slice    
+                outdata = data[np.newaxis,...] 
+            else:
+                outdata = np.vstack((outdata,data[np.newaxis,...] ))
+                
+    outdata = np.moveaxis(outdata,0,ax)
+    
+    out_file = op.split(vol[0])[-1].replace('_slice-{num}.nii.gz'.format(num = str(num).zfill(2)),'.nii.gz')
+    out_file = op.join(outdir,out_file)
+    
+    # Save estimates data
+    new_img = nib.Nifti1Image(dataobj = outdata, affine = nibber.affine, header = nibber.header)
+    new_img.to_filename(out_file)
+    
+    return out_file
+
   

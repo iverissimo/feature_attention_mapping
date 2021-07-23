@@ -58,6 +58,10 @@ derivatives_pth = params['mri']['paths'][base_dir][preproc]
 input_pth = op.join(derivatives_pth, params['mri']['fitting']['pRF']['input_file_dir']) # for input files to fit model
 output_pth =  op.join(derivatives_pth,'pRF_fitting') # for estimates output
 
+if not op.exists(output_pth):
+    print('output dir does not existing, saving files in %s'%output_pth)
+    os.makedirs(output_pth)
+
 DM_pth = op.join(output_pth,'DM') # design matrix
 
 

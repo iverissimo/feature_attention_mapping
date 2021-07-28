@@ -425,18 +425,6 @@ class FeatureSession(ExpSession):
                                         bar_width_ratio = self.settings['stimuli']['feature']['bar_width_ratio'], 
                                         grid_pos = self.grid_pos
                                         )
-        
-        # Convert fixation dot radius in degrees to pixels for a given Monitor object
-        fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fix_dot_size_deg'], 
-                                                        self.monitor)/2 
-        
-        # create black fixation circle
-        self.fixation = visual.Circle(self.win, units = 'pix', radius = fixation_rad_pix, 
-                                            fillColor = self.settings['stimuli']['fix_dot_color'], 
-                                            lineColor = self.settings['stimuli']['fix_line_color'],
-                                            fillColorSpace = self.settings['stimuli']['colorSpace'],
-                                            lineColorSpace = self.settings['stimuli']['colorSpace'])  
-
 
 
     def create_trials(self):
@@ -446,7 +434,8 @@ class FeatureSession(ExpSession):
         #
         # counter for responses
         self.total_responses = 0
-        #self.correct_responses = 0
+        self.correct_responses = 0
+        self.bar_counter = 0
 
         ## get condition names and randomize them 
         ## setting order for what condition to attend per mini block 
@@ -589,6 +578,16 @@ class FeatureSession(ExpSession):
         # index for orientation
         self.ori_ind = 0
 
+        # make boolean array to see which trials are stim trials
+        hemi_bool = [True if type(x)==str else False for _,x in enumerate(self.hemifield)]
+        # time in seconds for when bar trial on screen
+        bar_timing = [x*self.settings['mri']['TR'] for _,x in enumerate(np.where(hemi_bool)[0])]
+        self.bar_timing = np.array([x for _,x in enumerate(bar_timing) if x not in bar_timing[0::mini_block_TR]])
+
+        self.true_responses = get_true_responses(np.array(self.hemifield)[hemi_bool],
+                                                self.settings['stimuli']['feature']['mini_blocks'],
+                                                drop_nan=True)
+
         # print window size just to check, not actually needed
         print(self.screen)
 
@@ -611,70 +610,67 @@ class FeatureSession(ExpSession):
         this_instruction_string = ('During the experiment\nyou will see green and red bars\n'
                                 'oriented vertically or horizontally\n'
                                 'throughout the screen\n\n\n'
-                                '[Press right arrow key or\n'
-                                'middle finger to continue]\n\n'
-                                '[Press left arrow key or\n'
-                                'index finger to skip]\n\n')
+                                '[Press middle finger to continue]\n\n'
+                                '[Press index finger to skip]\n\n')
 
-        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['b','left','y','right'], visual_obj = [self.rect_left,self.rect_right])
+        key_pressed = draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['index']+self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
-        if key_pressed[0] not in ['left','b']: #if instructions not skipped
+        if key_pressed[0] not in self.settings['keys']['index']: #if instructions not skipped
 
             # draw instructions wait a few seconds
             this_instruction_string = ('These bars can be\n'
                                         'on the right/left side\n'
                                         'or above/below the\n'
-                                        'central fixation dot\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        'central fixation cross\n\n\n'
+                                        '[Press middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
             this_instruction_string = ('Your task is to fixate\n'
                                         'at the center of the screen,\n'
                                         'and indicate if one of the bars\n'
                                         'is on the SAME side of the dot\n'
                                         'relative to the PREVIOUS trial\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        '[Press middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
             this_instruction_string = ('The experiment is divided\n'
                                         'into different mini-blocks.\n\n'
                                         'At the beggining of each\n'
                                         'you will see a single bar,\n'
                                         'at the center of the screen.\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        '[Press middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
+
 
             this_instruction_string = ('This bar will be\n'
                                         'vertical/horizontal and\n'
                                         'green/red\n\n'
                                         'That will be the bar\n'
                                         'that you have to search for.\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        '[Press middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
 
             # draw instructions wait a few seconds
             this_instruction_string = ('Do NOT look at the bars!\n'
                                         'Please fixate at the center,\n'
                                         'and do not move your eyes\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        '[Press middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y','right'], visual_obj = [self.rect_left,self.rect_right])
+
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = ('Index finger or\n'
-                                    'left arrow key - same side\n\n'
-                                    'Middle finger or\n'
-                                    'right arrow key - different side\n\n\n'
+        this_instruction_string = ('Index finger - same side\n\n'
+                                    'Middle finger - different side\n\n\n'
                                     '          [waiting for scanner]')
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
@@ -690,7 +686,9 @@ class FeatureSession(ExpSession):
             trl.run() # run forrest run
 
 
+        print('Expected number of responses: %d'%(len(self.true_responses)))
         print('Total subject responses: %d'%self.total_responses)
+        print('Correct responses: %d'%self.correct_responses)
           
 
         self.close() # close session

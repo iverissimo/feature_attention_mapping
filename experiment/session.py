@@ -473,20 +473,18 @@ class FeatureSession(ExpSession):
         self.bar_width_pix = self.screen * bar_width_ratio
 
         # define number of bars per direction
-        num_bars = np.array(self.screen)/self.bar_width_pix; num_bars = np.array(num_bars,dtype=int)
+        num_bars = np.array(self.settings['stimuli']['feature']['num_bar_position']) 
 
-        # all possible positions in pixels [x,y] for for midpoint of
+        # all possible positions in pixels [x,y] for midpoint of
         # vertical bar passes, 
-        ver_y = np.linspace((-self.screen[1]/2 + self.bar_width_pix[1]/2),
-                            (self.screen[1]/2 - self.bar_width_pix[1]/2),
-                            num_bars[1])
+        ver_y = np.sort(np.concatenate((-np.arange(self.bar_width_pix[1]/2,self.screen[1]/2,self.bar_width_pix[1])[0:int(num_bars[1]/2)],
+                                        np.arange(self.bar_width_pix[1]/2,self.screen[1]/2,self.bar_width_pix[1])[0:int(num_bars[1]/2)])))
 
         ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(ver_y)])
 
         # horizontal bar passes 
-        hor_x = np.linspace((-self.screen[0]/2 + self.bar_width_pix[0]/2),
-                            (self.screen[0]/2 - self.bar_width_pix[0]/2),
-                            num_bars[0])
+        hor_x = np.sort(np.concatenate((-np.arange(self.bar_width_pix[0]/2,self.screen[0]/2,self.bar_width_pix[0])[0:int(num_bars[0]/2)],
+                                        np.arange(self.bar_width_pix[0]/2,self.screen[0]/2,self.bar_width_pix[0])[0:int(num_bars[0]/2)])))
 
         hor_bar_pos_pix = np.array([np.array([x,0]) for _,x in enumerate(hor_x)])
 

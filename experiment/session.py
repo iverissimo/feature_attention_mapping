@@ -155,26 +155,13 @@ class PRFSession(ExpSession):
 
     def create_stimuli(self):
 
-        """ Create Stimuli - pRF bar and fixation dot """
+        """ Create Stimuli - pRF bar """
         
         #generate PRF stimulus
         self.prf_stim = PRFStim(session = self, 
                                 bar_width_ratio = self.settings['stimuli']['prf']['bar_width_ratio'], 
                                 grid_pos = self.grid_pos
                                 )
-        
-        # Convert fixation dot radius in degrees to pixels for a given Monitor object
-        fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fix_dot_size_deg'], 
-                                                        self.monitor)/2 
-        
-        # create black fixation circle
-        # note - fixation dot will change color during task
-        self.fixation = visual.Circle(self.win, units = 'pix', radius = fixation_rad_pix, 
-                                            fillColor = self.settings['stimuli']['fix_dot_color'], 
-                                            lineColor = self.settings['stimuli']['fix_line_color'],
-                                            fillColorSpace = self.settings['stimuli']['colorSpace'],
-                                            lineColorSpace = self.settings['stimuli']['colorSpace'])  
-
 
 
     def create_trials(self):
@@ -184,6 +171,7 @@ class PRFSession(ExpSession):
         #
         # counter for responses
         self.total_responses = 0
+        self.expected_responses = 0
         self.correct_responses = 0
 
         # define bar width 
@@ -224,6 +212,7 @@ class PRFSession(ExpSession):
 
             elif bartype in np.array(['U-D','D-U']): # vertical bar pass
                 trial_number += bar_pass_ver_TR
+                self.expected_responses += bar_pass_ver_TR
                 bar_pass_direction_all =  bar_pass_direction_all + np.repeat(bartype,bar_pass_ver_TR).tolist()
                 
                 # order depending on starting point for bar pass, and append to list
@@ -232,6 +221,7 @@ class PRFSession(ExpSession):
 
             elif bartype in np.array(['L-R','R-L']): # horizontal bar pass
                 trial_number += bar_pass_hor_TR
+                self.expected_responses += bar_pass_hor_TR
                 bar_pass_direction_all =  bar_pass_direction_all + np.repeat(bartype,bar_pass_hor_TR).tolist()
                 
                 # order depending on starting point for bar pass, and append to list
@@ -252,6 +242,7 @@ class PRFSession(ExpSession):
             if key != 'background': # we don't want to show background gabors in background
                 key_list.append(key)
 
+
         # if in scanner, we want it to be synced to trigger, so lets increase trial time (in seconds, like TR)
         max_trial_time = 5 if self.settings['mri']['scanner']==True else self.settings['mri']['TR']
 
@@ -262,11 +253,11 @@ class PRFSession(ExpSession):
             phase_conditions = np.repeat(key_list, self.trial_number/len(key_list))
             np.random.shuffle(phase_conditions) # randomized conditions, for attention to bar task
 
-            phase_conditions = np.array([[val] for _,val in enumerate(phase_conditions)])
+            self.phase_conditions = np.array([[val] for _,val in enumerate(phase_conditions)])
 
             # define list with number of phases and their duration (duration of each must be the same)
             # in this case we want one color per trial
-            self.phase_durations = np.repeat(max_trial_time,phase_conditions.shape[-1])
+            self.phase_durations = np.repeat(max_trial_time,self.phase_conditions.shape[-1])
             
         else:
 
@@ -284,13 +275,15 @@ class PRFSession(ExpSession):
             for r in range(self.trial_number-1):            
                 phase_conditions = np.vstack((phase_conditions,key_list))
                 
+            self.phase_conditions = phase_conditions
+
             # define list with number of phases and their duration (duration of each must be the same)
             self.phase_durations = np.repeat(1/flick_rate,phase_conditions.shape[-1])
 
 
         # total experiment time (in seconds)
-        self.total_time = self.trial_number * max_trial_time 
-        
+        self.total_time = self.trial_number * max_trial_time  
+
         # append all trials
         self.all_trials = []
         for i in range(self.trial_number):
@@ -298,18 +291,10 @@ class PRFSession(ExpSession):
             self.all_trials.append(PRFTrial(session =self ,
                                             trial_nr = i,  
                                             phase_durations = self.phase_durations,
-                                            phase_names = phase_conditions[i],
+                                            phase_names = self.phase_conditions[i],
                                             bar_pass_direction_at_TR = self.bar_pass_direction_all[i],
                                             bar_midpoint_at_TR = self.bar_midpoint_all[i]
                                             ))
-
-
-        ## define timepoints for fixation dot to change color
-        # switch time points (around 4 s between switches + jitter to avoid expectation effects)
-        self.fixation_switch_times = np.arange(1,self.total_time,1/self.settings['stimuli']['fix_dot_shift_rate'])
-        self.fixation_switch_times += 2*np.random.random_sample((len(self.fixation_switch_times),)) 
-        # counter for fixation dot switches
-        self.fix_counter = 0
 
         # define time points for element orientation to change
         # switch orientation time points
@@ -349,34 +334,36 @@ class PRFSession(ExpSession):
                                     'you will see a flickering bar pass\n'
                                     'in different directions\n'
                                     'throughout the screen\n\n\n'
-                                    '[Press y/middle finger to continue]\n'
-                                    '[Press b/index finger to skip]')
+                                    '[Press middle finger to continue]\n'
+                                    '[Press index finger to skip]')
 
-        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['b','y'], visual_obj = [self.rect_left,self.rect_right])
+        key_pressed = draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['index']+self.settings['keys']['middle'], 
+            visual_obj = [self.rect_left,self.rect_right])
 
-        if key_pressed[0] != 'b': #if instructions not skipped
+        if key_pressed[0] not in self.settings['keys']['index']: #if instructions not skipped
 
             # draw instructions wait a few seconds
             this_instruction_string = ('Your task is to fixate\n'
                                         'at the center of the screen,\n'
-                                        'and indicate when\n'
-                                        'the central dot changes color\n\n\n'
-                                        '[Press y/middle finger to continue]')
+                                        'and indicate the\n'
+                                        'bar color\n'
+                                        'every time the bar moves\n\n\n'
+                                        '[Press middle finger to continue]')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
             
             # draw instructions wait a few seconds
             this_instruction_string = ('Do NOT look at the bars!\n'
                                         'Please fixate at the center,\n'
                                         'and do not move your eyes\n\n\n'
-                                        '[Press y/middle finger to continue]')
+                                        '[Press middle finger to continue]')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['y'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = ('Index finger/b key - Black dot\n'
-                                    'Middle finger/y key - White dot\n\n\n'
+        this_instruction_string = ('Index finger - Red color\n'
+                                    'Middle finger - Green color\n\n\n'
                                     '          [waiting for scanner]')
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
@@ -393,9 +380,10 @@ class PRFSession(ExpSession):
             trl.run() # run forrest run
 
 
-        print('Expected number of responses: %d'%(len(self.fixation_switch_times)+1))
+        print('Expected number of responses: %d'%(self.expected_responses))
         print('Total subject responses: %d'%self.total_responses)
-        print('Correct responses (within 0.8s of dot color change): %d'%self.correct_responses)
+        print('Correct responses: %d'%self.correct_responses)
+        print('Accuracy %.2f %%'%(self.correct_responses/self.expected_responses*100))
           
 
         self.close() # close session

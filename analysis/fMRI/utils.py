@@ -19,6 +19,7 @@ from PIL import Image, ImageDraw
 
 from nilearn.image import mean_img, math_img
 from matplotlib import cm
+import matplotlib.colors
 
 from nipype.interfaces.freesurfer import BBRegister
 
@@ -491,3 +492,77 @@ def combine_slices(file_list,outdir,num_slices=89, ax=2):
     return out_file
 
   
+def add_alpha2colormap(colormap = 'rainbow_r', bins = 256, invert_alpha = False, cmap_name = 'costum',
+                      discrete = False):
+
+    """ add alpha channel to colormap,
+    and save to pycortex filestore
+    Parameters
+    ----------
+    colormap : str or List/arr
+        if string then has to be a matplolib existent colormap
+        if list/array then contains strings with color names, to create linear segmented cmap
+    bins : int
+        number of bins for colormap
+    invert_alpha : bool
+        if we want to invert direction of alpha channel
+        (y can be from 0 to 1 or 1 to 0)
+    cmap_name : str
+        new cmap filename, final one will have _alpha_#-bins added to it
+    discrete : bool
+        if we want a discrete colormap or not (then will be continuous)
+    Outputs
+    -------
+    rgb_fn : str
+        absolute path to new colormap
+    """
+    
+    if isinstance(colormap, str): # if input is string (so existent colormap)
+
+        # get colormap
+        cmap = cm.get_cmap(colormap)
+
+    else: # is list of strings
+        cvals  = np.arange(len(colormap))
+        norm = plt.Normalize(min(cvals),max(cvals))
+        tuples = list(zip(map(norm,cvals), colormap))
+        cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", tuples)
+        
+        if discrete == True: # if we want a discrete colormap from list
+            cmap = matplotlib.colors.ListedColormap(colormap)
+            bins = int(len(colormap))
+
+    # convert into array
+    cmap_array = cmap(range(bins))
+    
+    # make alpha array
+    if invert_alpha == True: # in case we want to invert alpha (y from 1 to 0 instead pf 0 to 1)
+        _, alpha = np.meshgrid(np.linspace(0, 1, bins, endpoint=False), 1-np.linspace(0, 1, bins))
+    else:
+        _, alpha = np.meshgrid(np.linspace(0, 1, bins, endpoint=False), np.linspace(0, 1, bins, endpoint=False))
+    
+    # reshape array for map
+    new_map = []
+    for i in range(cmap_array.shape[-1]):
+        new_map.append(np.tile(cmap_array[...,i],(bins,1)))
+
+    new_map = np.moveaxis(np.array(new_map), 0, -1)
+
+    # add alpha channel
+    new_map[...,-1] = alpha
+    
+    fig = plt.figure(figsize=(1,1))
+    ax = fig.add_axes([0,0,1,1])
+    # plot 
+    plt.imshow(new_map,
+    extent = (0,1,0,1),
+    origin = 'lower')
+    ax.axis('off')
+
+    rgb_fn = os.path.join(os.path.split(cortex.database.default_filestore)[
+                          0], 'colormaps', cmap_name+'_alpha_bins_%d.png'%bins)
+
+    #misc.imsave(rgb_fn, new_map)
+    plt.savefig(rgb_fn, dpi = 200,transparent=True)
+       
+    return rgb_fn  

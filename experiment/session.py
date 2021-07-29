@@ -181,8 +181,6 @@ class PRFSession(ExpSession):
         # number of TRs per "type of stimuli"
         bar_pass_hor_TR = self.settings['stimuli']['prf']['bar_pass_hor_TR'] 
         bar_pass_ver_TR = self.settings['stimuli']['prf']['bar_pass_ver_TR']
-        empty_TR = self.settings['stimuli']['prf']['empty_TR']
-        switch_bckg_TR = self.settings['stimuli']['prf']['switch_bckg_TR']
 
         # list with order of bar orientations throught experiment
         bar_pass_direction = self.settings['stimuli']['prf']['bar_pass_direction'] 
@@ -205,10 +203,10 @@ class PRFSession(ExpSession):
         bar_pos_array = [] # list with bar midpoint (x,y) for all TRs (if nan, then empty screen)
 
         for _,bartype in enumerate(bar_pass_direction):
-            if bartype in np.array(['empty']): # empty screen
-                trial_number += empty_TR
-                bar_pass_direction_all = bar_pass_direction_all + np.repeat(bartype,empty_TR).tolist()
-                bar_pos_array.append([np.array([np.nan,np.nan]) for i in range(empty_TR)])
+            if 'empty' in bartype: # empty screen
+                trial_number += self.settings['stimuli']['prf'][bartype+'_TR']
+                bar_pass_direction_all = bar_pass_direction_all + np.repeat('empty',self.settings['stimuli']['prf'][bartype+'_TR']).tolist()
+                bar_pos_array.append([np.array([np.nan,np.nan]) for i in range(self.settings['stimuli']['prf'][bartype+'_TR'])])
 
             elif bartype in np.array(['U-D','D-U']): # vertical bar pass
                 trial_number += bar_pass_ver_TR

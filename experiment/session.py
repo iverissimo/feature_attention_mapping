@@ -484,7 +484,7 @@ class FeatureSession(ExpSession):
         empty_TR = self.settings['stimuli']['feature']['empty_TR']
         # get info from first block, to know how many trials in a mini block (all miniblocks have same length)
         dict_blk0 = self.all_bar_pos['mini_block_0'][list(self.all_bar_pos['mini_block_0'].keys())[0]]
-        mini_block_TR = np.array(dict_blk0[list(dict_blk0.keys())[0]]).shape[0]
+        mini_block_trials = np.array(dict_blk0[list(dict_blk0.keys())[0]]).shape[0]
 
         # list with order of "type of stimuli" throught experiment (called bar direction to make analogous with other class)
         bar_pass_direction = self.settings['stimuli']['feature']['bar_pass_direction'] 
@@ -497,7 +497,7 @@ class FeatureSession(ExpSession):
                                                                                                                       self.all_bar_pos, 
                                                                                                                       empty_TR = empty_TR, 
                                                                                                                       cue_TR = cue_TR, 
-                                                                                                                      mini_block_TR = mini_block_TR)
+                                                                                                                      mini_block_trials = mini_block_trials)
                 
         print("Total number of (expected) TRs: %d"%self.trial_number)
 
@@ -547,13 +547,25 @@ class FeatureSession(ExpSession):
         # if in scanner, we want it to be synced to trigger, so lets increase trial time (in seconds, like TR)
         max_trial_time = 5 if self.settings['mri']['scanner']==True else self.settings['mri']['TR']
 
+
         # append all trials
         self.all_trials = []
         for i in range(self.trial_number):
 
+            # set phase conditions (for logging) and durations
+            if 'mini_block' in self.trial_type_all[i]:
+                phase_cond = tuple(['stim','background'])
+                phase_dur = tuple([self.settings['stimuli']['feature']['bars_phase_dur'],
+                                    max_trial_time-self.settings['stimuli']['feature']['bars_phase_dur']])
+            else:
+                phase_cond = tuple([self.trial_type_all[i]])
+                phase_dur = tuple([max_trial_time])
+
+
             self.all_trials.append(FeatureTrial(session = self,
                                                 trial_nr = i, 
-                                                phase_durations = np.array([max_trial_time]),
+                                                phase_durations = phase_dur,
+                                                phase_names = phase_cond,
                                                 attend_block_conditions = self.attend_block_conditions, 
                                                 bar_pass_direction_at_TR = self.bar_pass_direction_all[i],
                                                 bar_midpoint_at_TR = self.bar_midpoint_all[i],
@@ -580,7 +592,7 @@ class FeatureSession(ExpSession):
         hemi_bool = [True if type(x)==str else False for _,x in enumerate(self.hemifield)]
         # time in seconds for when bar trial on screen
         bar_timing = [x*self.settings['mri']['TR'] for _,x in enumerate(np.where(hemi_bool)[0])]
-        self.bar_timing = np.array([x for _,x in enumerate(bar_timing) if x not in bar_timing[0::mini_block_TR]])
+        self.bar_timing = np.array([x for _,x in enumerate(bar_timing) if x not in bar_timing[0::mini_block_trials]])
 
         self.true_responses = get_true_responses(np.array(self.hemifield)[hemi_bool],
                                                 self.settings['stimuli']['feature']['mini_blocks'],

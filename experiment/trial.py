@@ -85,6 +85,7 @@ class PRFTrial(Trial):
 
         else: # if bar pass at TR, then draw bar
 
+
             self.session.prf_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
                                        bar_pass_direction_at_TR = self.bar_pass_direction_at_TR,
                                        this_phase = self.phase_names[int(self.phase)],
@@ -144,7 +145,7 @@ class PRFTrial(Trial):
 
 class FeatureTrial(Trial):
 
-    def __init__(self, session, trial_nr, phase_durations, 
+    def __init__(self, session, trial_nr, phase_durations, phase_names,
         attend_block_conditions, bar_pass_direction_at_TR, bar_midpoint_at_TR, trial_type_at_TR, timing='seconds', *args, **kwargs):
 
 
@@ -183,9 +184,10 @@ class FeatureTrial(Trial):
 
         # phase durations for each condition 
         self.phase_durations = phase_durations
+        self.phase_names = phase_names
 
 
-        super().__init__(session, trial_nr, phase_durations, verbose=False, *args, **kwargs)
+        super().__init__(session, trial_nr, phase_durations, phase_names, verbose=False, *args, **kwargs)
 
         # get bar and background positions for this trial
         self.position_dictionary = get_object_positions(self.session.grid_pos, self.bar_midpoint_at_TR, self.bar_pass_direction_at_TR,
@@ -247,26 +249,25 @@ class FeatureTrial(Trial):
 
             print('cue '+attend_cond)
                     
-        elif self.bar_pass_direction_at_TR == 'empty': # if empty trial, show background
 
-            print('background')
+        elif 'mini_block' in self.trial_type_at_TR: # if cue at TR, draw background and word cue: # if bar pass at TR, then draw bar
 
-        # bar pass
+            if self.phase_names[int(self.phase)] == 'stim': 
 
-        else: # if bar pass at TR, then draw bar
+                # get list of condition names (as defined in yml) for this phase
+                this_phase = list(self.session.all_bar_pos[self.trial_type_at_TR].keys())
+                this_phase = ['color_red' if 'red' in p else 'color_green' for _,p in enumerate(this_phase)]
 
-            # get list of condition names (as defined in yml) for this phase
-            this_phase = list(self.session.all_bar_pos[self.trial_type_at_TR].keys())
-            this_phase = ['color_red' if 'red' in p else 'color_green' for _,p in enumerate(this_phase)]
+                self.session.feature_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
+                                               bar_pass_direction_at_TR = self.bar_pass_direction_at_TR,
+                                               this_phase = this_phase,
+                                               position_dictionary = self.position_dictionary,
+                                               orientation = self.session.ori_bool,
+                                               drawing_ind = self.session.drawing_ind[self.ID]) 
 
-            self.session.feature_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
-                                           bar_pass_direction_at_TR = self.bar_pass_direction_at_TR,
-                                           this_phase = this_phase,
-                                           position_dictionary = self.position_dictionary,
-                                           orientation = self.session.ori_bool,
-                                           drawing_ind = self.session.drawing_ind[self.ID]) 
-            
-            print('bar stim') 
+
+        print(self.phase_names[int(self.phase)]) #print(self.phase_names[int(self.phase)])
+                
 
         # set orientation bool counter to false
         self.session.ori_bool = False

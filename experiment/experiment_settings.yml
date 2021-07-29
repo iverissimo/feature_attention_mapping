@@ -61,10 +61,6 @@ stimuli:
     empty_TR: 12 #5
     empty_long_TR: 20
 
-    switch_bckg_TR: 15 #10 #15
-    switch_step: 0.25 # seconds, time step to update background contrast
-    switch_slope: .65 #1 # absolute slope value for switch function
-
     flick_rate: 'TR' #10 # Hz, rate of change of features in bar
 
     bar_pass_direction: ['empty_long','L-R','U-D','empty','R-L','D-U','empty_long','D-U','R-L','empty','U-D','L-R','empty_long'] 
@@ -75,6 +71,11 @@ stimuli:
 
     empty_TR: 12 #5
     cue_TR: 3
+
+    #display_bar_TR: 0.5
+    #ITI_TR: 1.5
+    #trial_TR: 2 # number of TRs for a trial in the miniblock
+    bars_phase_dur: 0.6 # phase duration for displaying bars (in seconds) 
 
     cue_width: .2 #.55
     cue_height: .5 #1.1
@@ -140,7 +141,7 @@ eyetracker:
     sample_rate: 1000
 
 mri: # refers to the Psychopy SyncGenerator class
-  scanner: False #True
+  scanner: True #False #True
   simulate: False
   TR: 1.2  # seconds between volume acquisitions
   #TA: 2.0  # seconds to acquire one slice (?)

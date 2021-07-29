@@ -658,7 +658,7 @@ def save_bar_position(bar_dict,num_miniblock, output_path):
 
 
 
-def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, cue_TR = 3, mini_block_TR = 64):
+def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, cue_TR = 3, mini_block_trials = 64):
     
     """ create feature trials based on order of "type of stimuli" throught experiment  
     and bar positions in run. Outputs number and type of trials, and bar direction and midpoint position
@@ -674,8 +674,8 @@ def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, cue_TR = 
         number of TRs for empty intervals of experiment
     cue_TR: int
         number of TRs for cue intervals of experiment
-    mini_block_TR: int
-        number of TRs for miniblocks of experiment
+    mini_block_trials: int
+        number of trials for a miniblock of experiment
         
     """
     
@@ -703,13 +703,13 @@ def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, cue_TR = 
                 bar_pos_array.append(np.array([np.nan,np.nan]))
 
         elif 'mini_block' in bartype: # bars on screen
-            trial_number += 2*mini_block_TR  # NOTE one feature trial is 1TR of bar display + 1TR of empty screen
-            trial_type_all = trial_type_all + list([bartype,'empty'])*mini_block_TR
+            trial_number += 2*mini_block_trials  # NOTE one feature trial is 1TR of bar display + 1TR of empty screen
+            trial_type_all = trial_type_all + list([bartype,'empty'])*mini_block_trials
 
             # get mini block condition keys
             miniblock_cond_keys = list(bar_dict[bartype].keys())
 
-            for t in range(mini_block_TR):
+            for t in range(mini_block_trials):
 
                 temp_dir_list = [] # temporary helper lists
                 temp_pos_list = [] 

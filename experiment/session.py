@@ -740,18 +740,7 @@ class FlickerSession(ExpSession):
                                         bar_width_ratio = self.settings['stimuli']['flicker']['bar_width_ratio'], 
                                         grid_pos = self.grid_pos
                                         )
-        
-        # Convert fixation dot radius in degrees to pixels for a given Monitor object
-        fixation_rad_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['fix_dot_size_deg'], 
-                                                        self.monitor)/2 
-        
-        # create black fixation circle
-        self.fixation = visual.Circle(self.win, units = 'pix', radius = fixation_rad_pix, 
-                                            fillColor = self.settings['stimuli']['fix_dot_color'], 
-                                            lineColor = self.settings['stimuli']['fix_line_color'],
-                                            fillColorSpace = self.settings['stimuli']['colorSpace'],
-                                            lineColorSpace = self.settings['stimuli']['colorSpace'])  
-
+    
 
 
     def create_trials(self):
@@ -868,58 +857,51 @@ class FlickerSession(ExpSession):
         this_instruction_string = ('Welcome to this experiment!\n\n'
                                 'In the first task, you will see a\n'
                                 'flickering red/green square\n\n\n'
-                                '[Press right arrow key or\n'
-                                'middle finger to continue]\n\n'
-                                '[Press left arrow key or\n'
-                                'index finger to skip]\n\n')
+                                '[Press middle finger to continue]\n\n'
+                                '[Press index finger to skip]\n\n')
 
-        key_pressed = draw_instructions(self.win, this_instruction_string, keys = ['right','y','left','b'], visual_obj = [self.rect_left,self.rect_right])
+        key_pressed = draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['index']+self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
-        if key_pressed[0] not in ['left','b']: #if instructions not skipped
+        if key_pressed[0] not in self.settings['keys']['index']: #if instructions not skipped
 
-            this_instruction_string = ('If you press the\n'
-                                        'right arrow key/middle finger OR\n'
-                                        'left arrow key/index finger,\n'
+            this_instruction_string = ('If you press the buttons\n'
+                                        'with your index/middle finger\n'
                                         'you will realize that\n'
                                         'the flickering changes\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
-            
-            draw_instructions(self.win, this_instruction_string, keys = ['right','y'], visual_obj = [self.rect_left,self.rect_right])
+                                        '[Press middle finger to continue]\n\n')
+        
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
 
             this_instruction_string = ('Your task is to fixate\n'
                                         'at the center of the screen,\n'
-                                        'and press the\n'
-                                        'right arrow key/middle finger OR\n'
-                                        'left arrow key/index finger,\n'
+                                        'and press the buttons\n'
                                         'until the square does not\n'
                                         'flicker anymore\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        '[Press middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['right','y'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
 
 
             # draw instructions wait a few seconds
             this_instruction_string = ('Do NOT look at the square!\n\n'
                                         'Please fixate at the center,\n'
                                         'and do not move your eyes\n\n\n'
-                                        '[Press right arrow key or\n'
-                                        'middle finger to continue]\n\n')
+                                        '[Press middle finger to continue]\n\n')
             
-            draw_instructions(self.win, this_instruction_string, keys = ['right','y'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['middle'], visual_obj = [self.rect_left,self.rect_right])
+
 
         # draw instructions wait for scanner t trigger
         this_instruction_string = ('When you are certain the square\n'
                                     'does not flicker anymore,\n'
-                                    'press the space bar\n'
+                                    'press the enter button\n'
                                     '(or pinky finger if in the scanner)\n\n'
                                     'Ready when you are!\n\n\n'
-                                    '[Press left arrow key or\n'
-                                    'index finger to start]\n\n')
+                                    '[Press index finger to start]\n\n')
         
-        draw_instructions(self.win, this_instruction_string, keys = ['left','b'], visual_obj = [self.rect_left,self.rect_right])
+
+        draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['index'], visual_obj = [self.rect_left,self.rect_right])
 
         # start recording gaze
         if self.eyetracker_on:

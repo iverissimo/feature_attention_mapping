@@ -680,7 +680,7 @@ class FeatureSession(ExpSession):
                                         '[Press right index finger to continue]\n\n')
             
 
-            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right index'], visual_obj = [self.rect_left,self.rect_right])
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
         this_instruction_string = ('Left index finger - same side\n\n'

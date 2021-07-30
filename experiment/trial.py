@@ -125,10 +125,16 @@ class PRFTrial(Trial):
                     event_type = 'response'
                     self.session.total_responses += 1
 
-                    if (ev in self.session.settings['keys']['middle']) and (self.phase_names == 'color_green'):
-                        self.session.correct_responses += 1
-                    elif (ev in self.session.settings['keys']['index']) and (self.phase_names == 'color_red'):
-                        self.session.correct_responses += 1
+                    if t >= self.session.bar_timing[self.session.bar_counter]:
+
+                        if (ev in self.session.settings['keys']['right_index']) and (self.phase_names == 'color_green'):
+                            self.session.correct_responses += 1
+
+                        elif (ev in self.session.settings['keys']['left_index']) and (self.phase_names == 'color_red'):
+                            self.session.correct_responses += 1
+                        
+                        if self.session.bar_counter<len(self.session.bar_timing)-1:
+                            self.session.bar_counter +=1
 
                 # log everything into session data frame
                 idx = self.session.global_log.shape[0]
@@ -302,11 +308,11 @@ class FeatureTrial(Trial):
 
                     if t >= self.session.bar_timing[self.session.bar_counter]:
 
-                        if (ev in self.session.settings['keys']['index']) and (self.session.true_responses[self.session.bar_counter] == 'same'):
+                        if (ev in self.session.settings['keys']['left_index']) and (self.session.true_responses[self.session.bar_counter] == 'same'):
                             self.session.correct_responses += 1
                             if self.session.bar_counter<len(self.session.true_responses):
                                 self.session.bar_counter += 1 
-                        elif (ev in self.session.settings['keys']['middle']) and (self.session.true_responses[self.session.bar_counter] == 'different'): 
+                        elif (ev in self.session.settings['keys']['right_index']) and (self.session.true_responses[self.session.bar_counter] == 'different'): 
                             self.session.correct_responses += 1
                             if self.session.bar_counter<len(self.session.true_responses):
                                 self.session.bar_counter += 1 
@@ -378,7 +384,7 @@ class FlickerTrial(Trial):
 
     def draw(self): 
 
-        """ Draw stimuli - pRF bars and fixation dot - for each trial """
+        """ Draw stimuli - pRF bars - for each trial """
         
         ## draw stim
 
@@ -398,9 +404,6 @@ class FlickerTrial(Trial):
         # fixation lines
         self.session.line1.draw() 
         self.session.line2.draw() 
-            
-        # fixation dot
-        self.session.fixation.draw() # just draw
 
 
 

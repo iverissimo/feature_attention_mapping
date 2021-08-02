@@ -3,6 +3,7 @@
 # import relevant packages
 import sys
 import os
+import os.path as op
 #import appnope
 from session import PRFSession, FeatureSession, FlickerSession, PylinkEyetrackerSession
 
@@ -34,16 +35,29 @@ def main():
 
     
     # make output dir
-    base_dir = os.path.split(os.getcwd())[0] # main path for all folders of project
-    output_dir = os.path.join(base_dir,'output','PRF'+exp_type,'data','sub-{sj}'.format(sj=sj_num))
+    base_dir = op.split(os.getcwd())[0] # main path for all folders of project
+    output_dir = op.join(base_dir,'output','PRF'+exp_type,'data','sub-{sj}'.format(sj=sj_num))
 
     # if output path doesn't exist, create it
-    if not os.path.isdir(output_dir): 
+    if not op.isdir(output_dir): 
         os.makedirs(output_dir)
     print('saving files in %s'%output_dir)
 
     # string for output data
     output_str = 'sub-{sj}_ses-01_task-PRF{task}_run-{run}'.format(sj=sj_num,run=run_num,task=exp_type)
+
+    # if file already exists
+    behav_file = op.join(output_dir,'{behav}_events.tsv'.format(behav=output_str))
+    if op.exists(behav_file): 
+        print('file already exists!')
+
+        overwrite = ''
+        while overwrite not in ('y','yes','n','no'):
+            overwrite = input('overwrite %s\n(y/yes/n/no)?: '%behav_file)
+
+        if overwrite in ['no','n']:
+            raise NameError('Run %s already in directory\nstopping experiment!'%behav_file)
+
 
     # load approriate class object to be run
     if exp_type == 'standard': # run standard pRF mapper

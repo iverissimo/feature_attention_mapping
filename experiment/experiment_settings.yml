@@ -42,9 +42,9 @@ stimuli:
 
   fix_dot_shift_rate: .25 #Hz, rate of fixation dot color switch
 
-  fix_line_width: 1
+  fix_line_width: 1.2
   fix_line_color: [-1,-1,-1] # psychopy rgb
-  fix_line_contrast: 0.15
+  fix_line_contrast: 0.3
 
   rect_fill_color: [-1,-1,-1] # psychopy rgb
   rect_line_color: [-1,-1,-1] # psychopy rgb

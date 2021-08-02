@@ -415,7 +415,7 @@ class FlickerTrial(Trial):
                     self.session.close()
                     self.session.quit()
 
-                elif ev in ['space','r', 3]: # end trial
+                elif ev in self.session.settings['keys']['flicker_continue']: # end trial
                     print('trial ended by user')  
                     event_type = 'end_trial'
 

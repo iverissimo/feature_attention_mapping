@@ -16,6 +16,7 @@ window: # refers to the parameters for the Psychopy Window class
   colorSpace: 'rgb' #'hsv' #'rgb255'
   #units: pix
   display: 'square' # or 'rectangle', defines if square [vRes vRes] or rectangle [hRes vRes] display
+  mac_bool: False
 
 monitor:
   name: default
@@ -27,10 +28,8 @@ mouse:
   visible: False
 
 keys: # keys to press, valid for laptop, scanner and behav lab
-  right_index: ['right','b']
-  left_index: ['left','e']
-  #middle: ['right','y',1]
-
+  right_index: ['right','b',2]
+  left_index: ['left','e',1]
 
 
 stimuli:
@@ -75,9 +74,6 @@ stimuli:
     empty_TR: 12 #5
     cue_TR: 3
 
-    #display_bar_TR: 0.5
-    #ITI_TR: 1.5
-    #trial_TR: 2 # number of TRs for a trial in the miniblock
     bars_phase_dur: 0.6 # phase duration for displaying bars (in seconds) 
 
     cue_width: .2 #.55
@@ -89,10 +85,10 @@ stimuli:
 
     conditions: ['red_vertical','red_horizontal','green_vertical','green_horizontal'] # all conditions to be attended during feature trial
 
-    bar_pass_direction: ['cue_0','empty','mini_block_0','empty',
-                    'cue_1','empty','mini_block_1','empty',
-                    'cue_2','empty','mini_block_2','empty',
-                    'cue_3','empty','mini_block_3','empty']
+    bar_pass_direction: ['empty','cue_0','empty','mini_block_0',
+                         'empty','cue_1','empty','mini_block_1',
+                         'empty','cue_2','empty','mini_block_2',
+                         'empty','cue_3','empty','mini_block_3','empty']
 
   flicker:
     bar_width_ratio: 0.125 # ratio of the screen res

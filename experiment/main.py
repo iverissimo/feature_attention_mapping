@@ -26,15 +26,6 @@ def main():
     
     print('Running experiment for subject-%s, run-%s'%(sj_num,run_num))
 
-    mac_bool = '' # check if running on mac or not, workaround retina display issue
-    while mac_bool not in ('y','yes','n','no'):
-        mac_bool = input('Running experiment on macbook (y/n)?: ')
-
-    mac_bool = True if (mac_bool=='y' or mac_bool=='yes') else False
-    if mac_bool:
-        print('Running experiment on macbook, defining display accordingly')
-
-
     exp_type = ''
     while exp_type not in ('standard','feature','flicker'):
         exp_type = input('Standard pRF mapping or Feature mapping (standard/feature/flicker)?: ')
@@ -60,21 +51,18 @@ def main():
         exp_sess = PRFSession(output_str = output_str,
                               output_dir = output_dir,
                               settings_file = 'experiment_settings.yml',
-                              macbook_bool = mac_bool,
                               eyetracker_on = False)
 
     elif exp_type == 'feature': # run feature pRF mapper
          exp_sess = FeatureSession(output_str = output_str,
                                   output_dir = output_dir,
                                   settings_file = 'experiment_settings.yml',
-                                  macbook_bool = mac_bool,
                                   eyetracker_on = False)
 
     elif exp_type == 'flicker': # run feature pRF mapper
          exp_sess = FlickerSession(output_str = output_str,
                                   output_dir = output_dir,
                                   settings_file = 'experiment_settings.yml',
-                                  macbook_bool = mac_bool,
                                   eyetracker_on = False)
    	                            
     exp_sess.run()

@@ -16,7 +16,7 @@ from utils import *
 
 class ExpSession(PylinkEyetrackerSession):
 
-    def __init__(self, output_str, output_dir, settings_file, macbook_bool, eyetracker_on = True):  # initialize child class
+    def __init__(self, output_str, output_dir, settings_file, eyetracker_on = True):  # initialize child class
 
             """ Initializes ExpSession object. 
           
@@ -29,8 +29,6 @@ class ExpSession(PylinkEyetrackerSession):
             settings_file : str
                 Path to yaml-file with settings (default: None, which results in the package's
                 default settings file (in data/default_settings.yml)
-            macbook_bool: bool
-                variable to know if using macbook for running experiment or not
             """
 
             # need to initialize parent class (Session), indicating output infos
@@ -45,8 +43,9 @@ class ExpSession(PylinkEyetrackerSession):
                 self.screen = np.array([self.win.size[0], self.win.size[1]])
                 rect_contrast = 0 # then rectangles will be hidden
 
-            if macbook_bool: # to compensate for macbook retina display
+            if self.settings['window']['mac_bool']: # to compensate for macbook retina display
                 self.screen = self.screen/2
+                print('Running experiment on macbook, defining display accordingly')
 
             # some MRI params
             self.bar_step = self.settings['mri']['TR'] # in seconds
@@ -130,7 +129,7 @@ class ExpSession(PylinkEyetrackerSession):
 
 class PRFSession(ExpSession):
    
-    def __init__(self, output_str, output_dir, settings_file, macbook_bool, eyetracker_on):  # initialize child class
+    def __init__(self, output_str, output_dir, settings_file, eyetracker_on):  # initialize child class
 
         """ Initializes PRFSession object. 
       
@@ -143,13 +142,11 @@ class PRFSession(ExpSession):
         settings_file : str
             Path to yaml-file with settings (default: None, which results in the package's
             default settings file (in data/default_settings.yml)
-        macbook_bool: bool
-            variable to know if using macbook for running experiment or not
         """
 
         # need to initialize parent class (ExpSession), indicating output infos
         super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, 
-                        macbook_bool = macbook_bool, eyetracker_on = eyetracker_on)
+                        eyetracker_on = eyetracker_on)
 
         
 
@@ -336,8 +333,8 @@ class PRFSession(ExpSession):
                                     'you will see a flickering bar pass\n'
                                     'in different directions\n'
                                     'throughout the screen\n\n\n'
-                                    '[Press right index finger to continue]\n'
-                                    '[Press left index finger to skip]')
+                                    '[Press right index finger\nto continue]\n'
+                                    '[Press left index finger\nto skip]')
 
         key_pressed = draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['left_index']+self.settings['keys']['right_index'], 
             visual_obj = [self.rect_left,self.rect_right])
@@ -350,7 +347,7 @@ class PRFSession(ExpSession):
                                         'and indicate the\n'
                                         'bar color\n'
                                         'every time the bar moves\n\n\n'
-                                        '[Press right index finger to continue]')
+                                        '[Press right index finger\nto continue]')
             
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
 
@@ -359,14 +356,14 @@ class PRFSession(ExpSession):
             this_instruction_string = ('Do NOT look at the bars!\n'
                                         'Please fixate at the center,\n'
                                         'and do not move your eyes\n\n\n'
-                                        '[Press right index finger to continue]')
+                                        '[Press right index finger\nto continue]')
             
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
         this_instruction_string = ('Left index finger - Red color\n'
                                     'Right index finger - Green color\n\n\n'
-                                    '          [waiting for scanner]')
+                                    '[waiting for scanner]')
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
 
@@ -394,7 +391,7 @@ class PRFSession(ExpSession):
 
 class FeatureSession(ExpSession):
     
-    def __init__(self, output_str, output_dir, settings_file, eyetracker_on, macbook_bool): # initialize child class
+    def __init__(self, output_str, output_dir, settings_file, eyetracker_on): # initialize child class
 
         """ Initializes FeatureSession object. 
       
@@ -407,14 +404,12 @@ class FeatureSession(ExpSession):
         settings_file : str
             Path to yaml-file with settings (default: None, which results in the package's
             default settings file (in data/default_settings.yml)
-        macbook_bool: bool
-                variable to know if using macbook for running experiment or not
         """
 
 
         # need to initialize parent class (ExpSession), indicating output infos
         super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, 
-                        macbook_bool = macbook_bool, eyetracker_on = eyetracker_on)
+                        eyetracker_on = eyetracker_on)
         
 
     
@@ -624,8 +619,8 @@ class FeatureSession(ExpSession):
         this_instruction_string = ('During the experiment\nyou will see green and red bars\n'
                                 'oriented vertically or horizontally\n'
                                 'throughout the screen\n\n\n'
-                                '[Press right index finger to continue]\n\n'
-                                '[Press left index finger to skip]\n\n')
+                                '[Press right index finger\nto continue]\n\n'
+                                '[Press left index finger\nto skip]\n\n')
 
         key_pressed = draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['left_index']+self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
 
@@ -636,7 +631,7 @@ class FeatureSession(ExpSession):
                                         'on the right/left side\n'
                                         'or above/below the\n'
                                         'central fixation cross\n\n\n'
-                                        '[Press right index finger to continue]\n\n')
+                                        '[Press right index finger\nto continue]\n\n')
             
 
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
@@ -646,7 +641,7 @@ class FeatureSession(ExpSession):
                                         'and indicate if one of the bars\n'
                                         'is on the SAME side of the dot\n'
                                         'relative to the PREVIOUS trial\n\n\n'
-                                        '[Press right index finger to continue]\n\n')
+                                        '[Press right index finger\nto continue]\n\n')
             
 
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
@@ -656,7 +651,7 @@ class FeatureSession(ExpSession):
                                         'At the beggining of each\n'
                                         'you will see a single bar,\n'
                                         'at the center of the screen.\n\n\n'
-                                        '[Press right index finger to continue]\n\n')
+                                        '[Press right index finger\nto continue]\n\n')
             
 
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
@@ -667,7 +662,7 @@ class FeatureSession(ExpSession):
                                         'green/red\n\n'
                                         'That will be the bar\n'
                                         'that you have to search for.\n\n\n'
-                                        '[Press right index finger to continue]\n\n')
+                                        '[Press right index finger\nto continue]\n\n')
             
 
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
@@ -677,7 +672,7 @@ class FeatureSession(ExpSession):
             this_instruction_string = ('Do NOT look at the bars!\n'
                                         'Please fixate at the center,\n'
                                         'and do not move your eyes\n\n\n'
-                                        '[Press right index finger to continue]\n\n')
+                                        '[Press right index finger\nto continue]\n\n')
             
 
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
@@ -685,7 +680,7 @@ class FeatureSession(ExpSession):
         # draw instructions wait for scanner t trigger
         this_instruction_string = ('Left index finger - same side\n\n'
                                     'Right index finger - different side\n\n\n'
-                                    '          [waiting for scanner]')
+                                    '[waiting for scanner]')
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
 
@@ -711,7 +706,7 @@ class FeatureSession(ExpSession):
 
 class FlickerSession(ExpSession):
     
-    def __init__(self, output_str, output_dir, settings_file, eyetracker_on, macbook_bool): # initialize child class
+    def __init__(self, output_str, output_dir, settings_file, eyetracker_on): # initialize child class
 
         """ Initializes FlickerSession object. 
       
@@ -724,14 +719,12 @@ class FlickerSession(ExpSession):
         settings_file : str
             Path to yaml-file with settings (default: None, which results in the package's
             default settings file (in data/default_settings.yml)
-        macbook_bool: bool
-                variable to know if using macbook for running experiment or not
         """
 
 
         # need to initialize parent class (ExpSession), indicating output infos
         super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, 
-                        macbook_bool = macbook_bool, eyetracker_on = eyetracker_on)
+                        eyetracker_on = eyetracker_on)
         
 
     
@@ -861,8 +854,8 @@ class FlickerSession(ExpSession):
         this_instruction_string = ('Welcome to this experiment!\n\n'
                                 'In the first task, you will see a\n'
                                 'flickering red/green square\n\n\n'
-                                '[Press right index finger to continue]\n\n'
-                                '[Press left index finger to skip]\n\n')
+                                '[Press right index finger\nto continue]\n\n'
+                                '[Press left index finger\nto skip]\n\n')
 
         key_pressed = draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['left_index']+self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
 
@@ -872,7 +865,7 @@ class FlickerSession(ExpSession):
                                         'with your left/right index finger\n'
                                         'you will realize that\n'
                                         'the flickering changes\n\n\n'
-                                        '[Press right index finger to continue]\n\n')
+                                        '[Press right index finger\nto continue]\n\n')
         
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
 
@@ -882,7 +875,7 @@ class FlickerSession(ExpSession):
                                         'and press the buttons\n'
                                         'until the square does not\n'
                                         'flicker anymore\n\n\n'
-                                        '[Press right index finger to continue]\n\n')
+                                        '[Press right index finger\nto continue]\n\n')
             
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
 
@@ -891,7 +884,7 @@ class FlickerSession(ExpSession):
             this_instruction_string = ('Do NOT look at the square!\n\n'
                                         'Please fixate at the center,\n'
                                         'and do not move your eyes\n\n\n'
-                                        '[Press right index finger to continue]\n\n')
+                                        '[Press right index finger\nto continue]\n\n')
             
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
 
@@ -899,10 +892,10 @@ class FlickerSession(ExpSession):
         # draw instructions wait for scanner t trigger
         this_instruction_string = ('When you are certain the square\n'
                                     'does not flicker anymore,\n'
-                                    'press the enter button\n'
+                                    'press the space button\n'
                                     '(or pinky finger if in the scanner)\n\n'
                                     'Ready when you are!\n\n\n'
-                                    '[Press left index finger to start]\n\n')
+                                    '[Press left index finger\nto start]\n\n')
         
 
         draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['left_index'], visual_obj = [self.rect_left,self.rect_right])

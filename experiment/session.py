@@ -858,7 +858,7 @@ class FlickerSession(ExpSession):
                                 '[Press left index finger\nto skip]\n\n')
 
         key_pressed = draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['left_index']+self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
-
+        print(self.settings['keys']['left_index']+self.settings['keys']['right_index'])
         if key_pressed[0] not in self.settings['keys']['left_index']: #if instructions not skipped
 
             this_instruction_string = ('If you press the buttons\n'
@@ -893,7 +893,7 @@ class FlickerSession(ExpSession):
         this_instruction_string = ('When you are certain the square\n'
                                     'does not flicker anymore,\n'
                                     'press the space button\n'
-                                    '(or pinky finger if in the scanner)\n\n'
+                                    '(or right pinky finger\nif in the scanner)\n\n'
                                     'Ready when you are!\n\n\n'
                                     '[Press left index finger\nto start]\n\n')
         

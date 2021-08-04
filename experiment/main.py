@@ -24,6 +24,9 @@ def main():
     
     sj_num = str(sys.argv[1]).zfill(3) # subject number
     run_num = str(sys.argv[2]) # run number
+
+    # task name dictionary
+    tasks = {'standard': 'pRF', 'feature': 'FA', 'flicker': 'flicker'}
     
     print('Running experiment for subject-%s, run-%s'%(sj_num,run_num))
 
@@ -36,7 +39,7 @@ def main():
     
     # make output dir
     base_dir = op.split(os.getcwd())[0] # main path for all folders of project
-    output_dir = op.join(base_dir,'output','PRF'+exp_type,'data','sub-{sj}'.format(sj=sj_num))
+    output_dir = op.join(base_dir,'output','data', 'sub-{sj}'.format(sj=sj_num), tasks[exp_type])
 
     # if output path doesn't exist, create it
     if not op.isdir(output_dir): 
@@ -44,7 +47,7 @@ def main():
     print('saving files in %s'%output_dir)
 
     # string for output data
-    output_str = 'sub-{sj}_ses-1_task-PRF{task}_run-{run}'.format(sj=sj_num,run=run_num,task=exp_type)
+    output_str = 'sub-{sj}_ses-1_task-{task}_run-{run}'.format(sj=sj_num,run=run_num,task=tasks[exp_type])
 
     # if file already exists
     behav_file = op.join(output_dir,'{behav}_events.tsv'.format(behav=output_str))

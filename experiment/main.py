@@ -23,7 +23,7 @@ def main():
                         'as 2nd argument in the command line!')
     
     sj_num = str(sys.argv[1]).zfill(3) # subject number
-    run_num = str(sys.argv[2]).zfill(2) # run number
+    run_num = str(sys.argv[2]) # run number
     
     print('Running experiment for subject-%s, run-%s'%(sj_num,run_num))
 
@@ -44,7 +44,7 @@ def main():
     print('saving files in %s'%output_dir)
 
     # string for output data
-    output_str = 'sub-{sj}_ses-01_task-PRF{task}_run-{run}'.format(sj=sj_num,run=run_num,task=exp_type)
+    output_str = 'sub-{sj}_ses-1_task-PRF{task}_run-{run}'.format(sj=sj_num,run=run_num,task=exp_type)
 
     # if file already exists
     behav_file = op.join(output_dir,'{behav}_events.tsv'.format(behav=output_str))

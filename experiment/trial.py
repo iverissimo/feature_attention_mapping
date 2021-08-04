@@ -422,7 +422,7 @@ class FlickerTrial(Trial):
                     # save updated condition settings per trial
                     # so color is used for other tasks
                     settings_out = os.path.join(self.session.output_dir, self.session.output_str + '_updated_settings.yml')
-                    settings_out = re.sub(r'run-.+?,?(\_|$)', "trial-{ID}_".format(ID = str(self.ID).zfill(2)), settings_out)
+                    settings_out = re.sub(r'run-.+?,?(\_|$)', "trial-{ID}_".format(ID = str(self.ID)), settings_out)
                     
 
                     with open(settings_out, 'w') as f_out:  # write settings to disk

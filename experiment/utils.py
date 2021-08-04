@@ -855,7 +855,7 @@ def get_square_positions(grid_pos, ecc_midpoint_at_trial, bar_width_pix, screen=
 
 
 
-def get_average_color(filedir,settings,task='standard'):
+def get_average_color(filedir,settings,task='pRF'):
     
     """ get average color 
     
@@ -871,7 +871,7 @@ def get_average_color(filedir,settings,task='standard'):
     """
     
     # get settings files for all trials of flicker task  
-    updt_color_files = [os.path.join(filedir.replace('PRF{task}'.format(task = task),'PRFflicker'),x) for _,x in enumerate(os.listdir(filedir.replace('PRF{task}'.format(task = task),'PRFflicker'))) if 'trial' in x and x.endswith('_updated_settings.yml')]
+    updt_color_files = [os.path.join(filedir.replace('{task}'.format(task = task),'flicker'),x) for _,x in enumerate(os.listdir(filedir.replace('{task}'.format(task = task),'flicker'))) if 'trial' in x and x.endswith('_updated_settings.yml')]
     updt_color_files.sort()
     
     # for each updated color

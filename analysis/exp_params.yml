@@ -1,7 +1,8 @@
 
 general:
+  session: '1'
+  tasks: ['pRF','FA']
   acq_type: ['ORIG','ORIGPF','ORIGPFFA59']
-  session: '01'
   runs: ['run-1','run-2']
 
 window: # refers to the parameters for the Psychopy Window class
@@ -83,9 +84,8 @@ mri: # refers to the Psychopy SyncGenerator class
     file_extension: '_psc.nii.gz'
 
   paths:
-    local:
-      standard: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/full_processing_submm/derivatives'
-      nordic: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/sequence_pilot/nordic/derivatives'
+    local: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/PILOT'
+    
     lisa:
       standard_orig: '/home/inesv/FAM/sequence_pilot/full_processing_submm/derivatives' # original location of files, definitive storage
       nordic_orig: '/home/inesv/FAM/sequence_pilot/nordic/derivatives'
@@ -123,8 +123,10 @@ eyetracking:
   tasks: ['PRFfeature'] # task names with eyetracking data to analyse
 
 keys: # keys to press, valid for laptop, scanner and behav lab
-  index: ['left','b',3]
-  middle: ['right','y',1]
+  right_index: ['right','b', 2, '2','num_2']
+  left_index: ['left','e', 1, '1','num_1']
+  flicker_continue: ['space','r', '4', 4, 'num_4']
+
   
 
 plotting:

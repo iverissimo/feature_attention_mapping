@@ -24,49 +24,53 @@ stimuli:
 
 
 feature:
-    bar_width_ratio: 0.125 # ratio of the screen res
-    mini_blocks: 4
+  bar_width_ratio: 0.125 # ratio of the screen res
+  mini_blocks: 4
 
-    empty_TR: 20 #5
-    cue_TR: 3
+  empty_TR: 12 #5
+  cue_TR: 3
 
-    cue_width: .2 #.55
-    cue_height: .5 #1.1
-    cue_contrast: 0.6
+  bars_phase_dur: 0.6 # phase duration for displaying bars (in seconds) 
 
-    num_bars: 4
+  cue_width: .2 #.55
+  cue_height: .5 #1.1
+  cue_contrast: 0.6
 
-    conditions: ['red_vertical','red_horizontal','green_vertical','green_horizontal'] # all conditions to be attended during feature trial
+  num_bars: 4
+  num_bar_position: [6,6] #[8,8]
 
-    bar_pass_direction: ['cue_0','empty','mini_block_0','empty',
-                    'cue_1','empty','mini_block_1','empty',
-                    'cue_2','empty','mini_block_2','empty',
-                    'cue_3','empty','mini_block_3','empty']
+  conditions: ['red_vertical','red_horizontal','green_vertical','green_horizontal'] # all conditions to be attended during feature trial
+
+  bar_pass_direction: ['empty','cue_0','empty','mini_block_0',
+                       'empty','cue_1','empty','mini_block_1',
+                       'empty','cue_2','empty','mini_block_2',
+                       'empty','cue_3','empty','mini_block_3','empty']
 
 prf:
   bar_width_ratio: 0.125 #0.0625 # ratio of the screen res
 
   bar_pass_hor_TR: 17 
   bar_pass_ver_TR: 17 
-  empty_TR: 20 #5
+  empty_TR: 12 #5
+  empty_long_TR: 20
 
   flick_rate: 'TR' #10 # Hz, rate of change of features in bar
 
-  bar_pass_direction: ['empty','L-R','U-D','empty','R-L','D-U','empty']
+  bar_pass_direction: ['empty_long','L-R','U-D','empty','R-L','D-U','empty_long','D-U','R-L','empty','U-D','L-R','empty_long'] 
 
 flicker:
-    bar_width_ratio: 0.125 # ratio of the screen res
+  bar_width_ratio: 0.125 # ratio of the screen res
 
-    bar_ecc_index: [1,2,2,1,1,2,1,2] # eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
+  bar_ecc_index: [1,2,2,1,1,2,1,2] # eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
 
-    flick_rate: 30 # Hz, flicker rate of color for square
+  flick_rate: 30 # Hz, flicker rate of color for square
 
-    max_trial_time: 5 # max trial time (in minutes)
+  max_trial_time: 5 # max trial time (in minutes)
 
-    backgr_contrast: 0 # contrast for elements, 0 = no background elements shown
-    increment: 0.025 # increment value for luminance per button press
+  backgr_contrast: 0 # contrast for elements, 0 = no background elements shown
+  increment: 0.025 # increment value for luminance per button press
 
-    modulated_condition: ['color_green'] # color condition modulated by flicker task
+  modulated_condition: ['color_green'] # color condition modulated by flicker task
 
 
 mri: # refers to the Psychopy SyncGenerator class
@@ -120,7 +124,7 @@ eyetracking:
   sacc_thresh : 6 # 5 # lambda, median-based standard deviations from the median estimator
   minimum_saccade_duration: 0.006 # 0.016 # minimum duration to consider saccade (ms)
 
-  tasks: ['PRFfeature'] # task names with eyetracking data to analyse
+  tasks: ['FA'] # task names with eyetracking data to analyse
 
 keys: # keys to press, valid for laptop, scanner and behav lab
   right_index: ['right','b', 2, '2','num_2']

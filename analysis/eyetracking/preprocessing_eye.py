@@ -1,6 +1,7 @@
 
 import numpy as np
 import os, sys
+import os.path as op
 import yaml
 import pandas as pd
 import hedfpy
@@ -21,17 +22,24 @@ if len(sys.argv)<2:
 else:
     sj = str(sys.argv[1]).zfill(3) #fill subject number with 00 in case user forgets
 
+base_dir = 'local'
+ses = params['general']['session']
 
 # select task to analyse
 for _,task in enumerate(params['eyetracking']['tasks']):
     
     # path where I'm storing pilot behavioral data
-    data_dir = '/Users/verissimo/Documents/Projects/Feature_based_attention_mapping/behavioral_pilot/data'
-    data_dir = os.path.join(data_dir,'{task}'.format(task=task),'sub-{sj}'.format(sj=sj))
+    #data_dir = '/Users/verissimo/Documents/Projects/Feature_based_attention_mapping/behavioral_pilot/data'
+    #data_dir = os.path.join(data_dir,'{task}'.format(task=task),'sub-{sj}'.format(sj=sj))
+    data_dir = op.join(params['mri']['paths'][base_dir], 'sourcedata','sub-{sj}'.format(sj=sj),
+                        'ses-{ses}'.format(ses=ses),'func')
 
     # path to output for processed eye tracking files
-    eye_dir = '/Users/verissimo/Documents/Projects/Feature_based_attention_mapping/behavioral_pilot/outputs'
-    eye_dir = os.path.join(eye_dir,'{task}'.format(task=task),'eyetracking','preprocessing','sub-{sj}'.format(sj=sj))
+    #eye_dir = '/Users/verissimo/Documents/Projects/Feature_based_attention_mapping/behavioral_pilot/outputs'
+    #eye_dir = os.path.join(eye_dir,'{task}'.format(task=task),'eyetracking','preprocessing','sub-{sj}'.format(sj=sj))
+    eye_dir = op.join(params['mri']['paths'][base_dir],'derivatives','eyetracking','{task}'.format(task=task),
+                        'sub-{sj}'.format(sj=sj),'ses-{ses}'.format(ses=ses))
+
     # if output path doesn't exist, create it
     if not os.path.isdir(eye_dir): 
         os.makedirs(eye_dir)
@@ -39,7 +47,8 @@ for _,task in enumerate(params['eyetracking']['tasks']):
     
     
     # select edf files for all runs
-    edf_files = [os.path.join(data_dir,run) for _,run in enumerate(os.listdir(data_dir)) if run.endswith('.edf')]
+    edf_files = [os.path.join(data_dir,run) for _,run in enumerate(os.listdir(data_dir)) if run.endswith('.edf')
+                and 'task-{task}'.format(task=task) in run]
     edf_files.sort()
     
     
@@ -109,7 +118,7 @@ for _,task in enumerate(params['eyetracking']['tasks']):
         TR = params['mri']['TR']
         empty_TR = params['feature']['empty_TR']
         cue_TR = params['feature']['cue_TR']
-        mini_blk_TR = 64*2
+        mini_blk_TR = params['feature']['num_bar_position'][0]*params['feature']['num_bar_position'][1]*2
 
         # sample rate eyetracking
         sample_rate = timestamps_pd['sample_rate'].values[0]

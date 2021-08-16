@@ -69,9 +69,6 @@ if base_dir == 'local': # for local machine
     
     $MATLAB -nodesktop -nosplash -r "Bias_field_script_job" # execute the SPM script in matlab
     
-    # afni command to convert output to short (instead of original double, more space consuming)
-    3dcalc -a muncorr.nii -prefix muncorr.nii -overwrite -expr 'a' -datum short
-    
     mv muncorr.nii bico_$INPUT # rename output file
 
     rm uncorr.nii
@@ -124,9 +121,6 @@ else: # assumes slurm systems
     cp $REPO/Bias_field_script_job.m ./Bias_field_script_job.m # copy matlab script to here
     
     $MATLAB -nodesktop -nosplash -r "Bias_field_script_job" # execute the SPM script in matlab
-    
-    # afni command to convert output to short (instead of original double, more space consuming)
-    3dcalc -a muncorr.nii -prefix muncorr.nii -overwrite -expr 'a' -datum short
     
     mv muncorr.nii bico_$INPUT # rename output file
 

@@ -147,7 +147,7 @@ else: # assumes slurm systems
     batch_dir = '/home/inesv/batch/'
     
 # loop over files we want to bias field correct
-for orig in [orig_files[0]]:#orig_files:  
+for orig in orig_files:  
     
     # check if outfolder exists
     outfolder = op.join(out_pth,op.split(orig)[-1].replace('.nii.gz',''))

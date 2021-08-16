@@ -41,7 +41,8 @@ tSNR_list = []
 
 sourcedata_pth = op.join(params['mri']['paths'][base_dir], 'sourcedata','sub-{sj}'.format(sj=sj),
                         'ses-{ses}'.format(ses=ses),'func') 
-output_pth = op.join(params['mri']['paths'][base_dir],'derivatives','pre_fmriprep') 
+output_pth = op.join(params['mri']['paths'][base_dir],'derivatives','pre_fmriprep','sub-{sj}'.format(sj=sj),
+                        'ses-{ses}'.format(ses=ses)) 
 
 # make output dir
 if not op.exists(output_pth):

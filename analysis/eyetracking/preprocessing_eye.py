@@ -124,7 +124,7 @@ for _,task in enumerate(params['eyetracking']['tasks']):
         sample_rate = timestamps_pd['sample_rate'].values[0]
 
         # make plots for each miniblock
-        # so cue, empty, miniblock, empty
+        # so empty, cue, empty, miniblock
 
         # duration of miniblock, in seconds
         mini_blk_dur = (cue_TR + 2*empty_TR + mini_blk_TR)*TR
@@ -150,10 +150,40 @@ for _,task in enumerate(params['eyetracking']['tasks']):
             axs[i].set_ylabel('Position',fontsize=18)
             axs[i].legend(['xgaze','ygaze'], fontsize=10)
             axs[i].set_title('Gaze run-%s miniblock-%s' %(str(ind).zfill(2),str(i)), fontsize=20)
-            axs[i].axvline(x = ((cue_TR + empty_TR)*TR*sample_rate),c='green',linestyle='--',alpha=0.5) #trial start
-            axs[i].axvline(x = ((cue_TR + empty_TR + mini_blk_TR)*TR*sample_rate),c='green',linestyle='--',alpha=0.5) #trial end
+            axs[i].axvline(x = ((empty_TR)*TR*sample_rate),c='blue',linestyle='--',alpha=0.5) #cue start
+            axs[i].axvline(x = ((cue_TR + 2*empty_TR)*TR*sample_rate),c='green',linestyle='--',alpha=0.5) #trial start
+            axs[i].axvline(x = ((cue_TR + 2*empty_TR + mini_blk_TR)*TR*sample_rate),c='green',linestyle='--',alpha=0.5) #trial end
 
 
         fig.savefig(os.path.join(eye_dir,'gaze_xydata_run-%s.png' %str(ind).zfill(2)))
+
+        # same figure but with raw data, for comparison
+
+        fig, axs = plt.subplots(4,1, figsize=(15, 20), facecolor='w', edgecolor='k')
+        fig.subplots_adjust(hspace = .5, wspace=.001)
+
+        axs = axs.ravel()
+
+        for i in range(params['feature']['mini_blocks']): # 4 miniblocks
+
+            mini_blk_gaze = run_gaze.loc[(run_gaze['time']>=(run_start+(mini_blk_dur*sample_rate*i)))
+                     &(run_gaze['time']<=(run_start+(mini_blk_dur*sample_rate*(i+1))))]
+
+            mini_blk_x_pos = mini_blk_gaze['L_gaze_x'].values
+            mini_blk_y_pos = mini_blk_gaze['L_gaze_y'].values
+
+            axs[i].plot(mini_blk_x_pos,c='k')
+            axs[i].plot(mini_blk_y_pos,c='orange')
+
+            axs[i].set_xlabel('Samples',fontsize=18)
+            axs[i].set_ylabel('Position',fontsize=18)
+            axs[i].legend(['xgaze','ygaze'], fontsize=10)
+            axs[i].set_title('Gaze raw run-%s miniblock-%s' %(str(ind).zfill(2),str(i)), fontsize=20)
+            axs[i].axvline(x = ((empty_TR)*TR*sample_rate),c='blue',linestyle='--',alpha=0.5) #cue start
+            axs[i].axvline(x = ((cue_TR + 2*empty_TR)*TR*sample_rate),c='green',linestyle='--',alpha=0.5) #trial start
+            axs[i].axvline(x = ((cue_TR + 2*empty_TR + mini_blk_TR)*TR*sample_rate),c='green',linestyle='--',alpha=0.5) #trial end
+
+
+        fig.savefig(os.path.join(eye_dir,'gaze_xydata_raw_run-%s.png' %str(ind).zfill(2)))
 
 

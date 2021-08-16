@@ -185,7 +185,7 @@ for orig in [orig_files[0]]:#orig_files:
 
         print('submitting ' + js_name + ' to queue')
         print(batch_string)
-        os.system('sbatch ' + js_name)
+        os.system('sh ' + js_name) if base_dir == 'local' else os.system('sbatch ' + js_name)
 
 
 

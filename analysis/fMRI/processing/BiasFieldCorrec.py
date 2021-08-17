@@ -76,7 +76,8 @@ if base_dir == 'local': # for local machine
     pigz bico_$INPUT
     
     echo "moving corrected $INPUT to original folder"
-    cp bico_$INPUT.gz $ORIG # move to sourcedata again
+    cp bico_$INPUT.gz new_$INPUT.gz
+    mv new_$INPUT.gz $ORIG # move to sourcedata again
     
     echo SUCCESS
     
@@ -129,7 +130,8 @@ else: # assumes slurm systems
     pigz bico_$INPUT
     
     echo "moving corrected $INPUT to original folder"
-    cp bico_$INPUT.gz ${$ORIG/$ROOTFOLDER/$TMPDIR} # move to sourcedata again
+    cp bico_$INPUT.gz new_$INPUT.gz
+    mv new_$INPUT.gz ${$ORIG/$ROOTFOLDER/$TMPDIR} # move to sourcedata again
     
     echo SUCCESS
     

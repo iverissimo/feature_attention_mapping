@@ -60,7 +60,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 batch_dir = '/home/inesv/batch/'
 os.chdir(batch_dir)
 
-keys2replace = {'$SJ_NR': str(sj).zfill(3),
+keys2replace = {'$SJ_NR': 'sub-'+str(sj).zfill(3),
                 '$DATADIR': op.join(params['mri']['paths'][base_dir]['root'],'derivatives','freesurfer')
                  }
 

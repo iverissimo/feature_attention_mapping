@@ -75,8 +75,7 @@ else: # assumes slurm systems
     PYTHONPATH="" singularity run --cleanenv -B /project/k_lab \
     $SINGIMG \
     $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR participant \
-    --participant-label sub-$SJ_NR --n_procs 15 -m bold --verbose-reports --mem_gb 64 --ants-nthreads 15
-    -w /scratch
+    --participant-label $SJ_NR --n_procs 15 -m bold --verbose-reports --mem_gb 64 --ants-nthreads 15 -w $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR
 
     wait          # wait until programs are finished
 

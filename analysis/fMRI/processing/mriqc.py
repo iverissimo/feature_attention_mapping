@@ -72,12 +72,14 @@ else: # assumes slurm systems
 
     wait
 
-    singularity run --cleanenv $SINGIMG \
-      $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR \
-      participant \
-      --hmc-fsl \
-      --float32 \
-      -w $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR
+    PYTHONPATH="" singularity run --cleanenv -B /project/k_lab \
+    $SINGIMG \
+    $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR \
+    participant \
+    --participant-label sub-$SJ_NR
+    --hmc-fsl \
+    --float32 \
+    -w $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR
 
     wait          # wait until programs are finished
 

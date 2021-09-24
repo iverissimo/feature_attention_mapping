@@ -67,15 +67,32 @@ else: # assumes slurm systems
 
     wait
 
+    #Make mriqc directory and participant directory in derivatives folder
+    if [ ! -d $ROOTFOLDER/derivatives ]; then
+    mkdir $ROOTFOLDER/derivatives
+    fi
+
+    if [ ! -d $ROOTFOLDER/derivatives/mriqc ]; then
+    mkdir $ROOTFOLDER/derivatives/mriqc
+    fi
+
+    if [ ! -d $ROOTFOLDER/derivatives/mriqc/$SJ_NR ]; then
+    mkdir $ROOTFOLDER/derivatives/mriqc/$SJ_NR
+    fi
+
     #Run MRIQC
+    echo ""
     echo "Running MRIQC on participant $SJ_NR"
+    echo ""
 
     wait
 
-    PYTHONPATH="" singularity run --cleanenv -B /project/k_lab \
-    $SINGIMG \
-    $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR participant \
-    --participant-label $SJ_NR --n_procs 15 -m bold --verbose-reports --mem_gb 64 --ants-nthreads 15 -w $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR
+    singularity run --cleanenv $SINGIMG \
+      $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/mriqc/$SJ_NR \
+      participant \
+      --hmc-fsl \
+      --float32 \
+      -w $ROOTFOLDER/derivatives/mriqc/$SJ_NR
 
     wait          # wait until programs are finished
 
@@ -86,7 +103,7 @@ else: # assumes slurm systems
 
 os.chdir(batch_dir)
 
-keys2replace = {'$SJ_NR': str(sj).zfill(3),
+keys2replace = {'$SJ_NR': 'sub-{sj}'.format(sj=sj),
                 '$SINGIMG': sing_img,
                 '$ROOTFOLDER': params['mri']['paths'][base_dir]['root'] 
                  }

@@ -41,7 +41,11 @@ cp -r $DATADIR/ $TMPDIR
 
 wait
 
-export SUBJECTS_DIR=$TMPDIR/$SJ_NR
+export SUBJECTS_DIR=$TMPDIR/pre_fmriprep/$SJ_NR
+
+wait
+
+cd $SUBJECTS_DIR
 
 wait
 
@@ -52,7 +56,7 @@ recon-all -s $SJ_NR -i $SUBJECTS_DIR/orig_anat/$SJ_NR_ses-1_run-1_T1w.nii.gz \
 
 wait
 
-rsync -chavzP $TMPDIR/$SJ_NR/ $DATADIR
+rsync -chavzP $TMPDIR/pre_fmriprep/$SJ_NR/ $DATADIR
 
 wait          # wait until programs are finished
 

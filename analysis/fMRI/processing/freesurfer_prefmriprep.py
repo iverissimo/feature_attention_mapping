@@ -49,6 +49,10 @@ cd $SUBJECTS_DIR
 
 wait
 
+cd $SUBJECTS_DIR
+
+wait
+
 recon-all -s $SJ_NR -hires -i $SUBJECTS_DIR/orig_anat/$SJ_NR_ses-1_run-1_T1w.nii.gz \
     -i $SUBJECTS_DIR/orig_anat/$SJ_NR_ses-1_run-2_T1w.nii.gz \
     -i $SUBJECTS_DIR/orig_anat/$SJ_NR_ses-1_run-3_T1w.nii.gz \

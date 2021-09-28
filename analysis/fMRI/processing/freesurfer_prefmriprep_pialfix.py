@@ -53,7 +53,7 @@ recon-all -s $SJ_NR -hires -autorecon-pial
 
 wait
 
-rsync -chavzP $TMPDIR/pre_fmriprep/$SJ_NR/ $DATADIR
+rsync -chavzP $TMPDIR/pre_fmriprep/$SJ_NR/ $DATADIR/$SJ_NR
 
 wait          # wait until programs are finished
 

@@ -29,24 +29,29 @@ else:
     base_dir = str(sys.argv[3]) # which machine we run the data
 
 # path to singularity image
-sing_img = '/home/inesv/my_images/fmriprep.20.2.1.simg'
+sing_img = '/home/inesv/my_images/fmriprep.20.2.3.simg' #fmriprep.20.2.1.simg'
 
 
 if file_type == 'anat':
 
     batch_string = """#!/bin/bash
-    #SBATCH -t 96:00:00
+    #SBATCH --time=40:30:00
     #SBATCH -N 1 --mem=60G
 
     # call the programs
     echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
+
+    # make working directory in node
+    mkdir $TMPDIR/FAM_wf
+    
+    wait
 
     PYTHONPATH="" singularity run --cleanenv -B /project/k_lab \
     $SINGIMG \
     $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/ participant \
     --participant-label sub-$SJ_NR --output-space T1w  \
     --nthreads 30 --omp-nthreads 30 --low-mem --fs-license-file $FREESURFER/license.txt \
-    --anat-only -w /scratch/FAM_wf
+    --anat-only -w $TMPDIR/FAM_wf
 
     wait          # wait until programs are finished
 
@@ -55,13 +60,18 @@ if file_type == 'anat':
 
 else:
     batch_string = """#!/bin/bash
-    #SBATCH -t 96:00:00
+    #SBATCH --time=40:30:00
     #SBATCH -N 1 --mem=60G
 
     # call the programs
     echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
-    PYTHONPATH="" singularity run --cleanenv -B /project/k_lab -B /scratch/FAM_wf \
+    # make working directory in node
+    mkdir $TMPDIR/FAM_wf
+
+    wait
+
+    PYTHONPATH="" singularity run --cleanenv -B /project/k_lab -B $TMPDIR/FAM_wf \
     $SINGIMG \
     $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/ participant \
     --participant-label sub-$SJ_NR --output-space T1w fsnative fsaverage MNI152NLin2009cAsym --cifti-output 170k \

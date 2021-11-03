@@ -1,9 +1,7 @@
 
 general:
-  session: '1'
-  tasks: ['pRF','FA']
-  acq_type: ['ORIG','ORIGPF','ORIGPFFA59']
-  runs: ['run-1','run-2']
+  tasks: ['pRF','FA', 'flicker']
+  colors: ['color_green', 'color_red']
 
 window: # refers to the parameters for the Psychopy Window class
   size: [1920, 1080] #[1680, 1050]
@@ -49,10 +47,13 @@ feature:
 prf:
   bar_width_ratio: 0.125 #0.0625 # ratio of the screen res
 
-  bar_pass_hor_TR: 17 
-  bar_pass_ver_TR: 17 
-  empty_TR: 12 #5
-  empty_long_TR: 20
+  num_TRs:
+    empty_long: 20
+    empty: 12
+    L-R: 17
+    R-L: 17
+    U-D: 17
+    D-U: 17
 
   flick_rate: 'TR' #10 # Hz, rate of change of features in bar
 

@@ -3,7 +3,7 @@ import numpy as np
 import os, sys
 import yaml
 import pandas as pd
-import hedfpy
+import os.path as op
 
 from scipy.stats import gaussian_kde
 
@@ -14,7 +14,6 @@ from hedfpy.EyeSignalOperator import detect_saccade_from_data
 
 from utils import * #import script to use relevante functions
 
-
 # load settings from yaml
 with open(os.path.join(os.path.split(os.getcwd())[0],'exp_params.yml'), 'r') as f_in:
             params = yaml.safe_load(f_in)
@@ -24,11 +23,14 @@ if len(sys.argv)<2:
     raise NameError('Please add subject number (ex: 100)'
                     'as 1st argument in the command line!')
 
+elif len(sys.argv)<3:  
+    raise NameError('Please add task to process (ex: FA or pRF)'
+                        'as 2nd argument in the command line!')
 else:
     sj = str(sys.argv[1]).zfill(3) #fill subject number with 00 in case user forgets
+    task = str(sys.argv[2]) 
 
 
-task = 'PRFfeature'
 
 # path to get processed eyetracking files
 eye_dir = '/Users/verissimo/Documents/Projects/Feature_based_attention_mapping/behavioral_pilot/outputs'
@@ -75,7 +77,6 @@ behav_pd = pd.read_csv(behav_filenames[0])
 
 
 # check if gaze dataframe already in dir
-
 gazeDFname = os.path.join(out_dir,'sub-{sj}_task-{task}_gaze_summary.csv'.format(sj=sj, task=task))
 
 if os.path.exists(gazeDFname):

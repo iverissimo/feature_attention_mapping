@@ -25,8 +25,8 @@ else:
     sj = str(sys.argv[1]).zfill(3) #fill subject number with 00 in case user forgets
 
 task = 'pRF'
-base_dir = 'local'
-ses_type = ['beh','func']
+base_dir = params['general']['current_dir']
+ses_type = ['beh','func'] if base_dir == 'local' else ['beh']
 
 out_dir = op.join(params['mri']['paths'][base_dir]['root'],'derivatives',
                   'behavioral','{task}'.format(task=task),
@@ -49,8 +49,10 @@ for bar_pass_type in params['prf']['bar_pass_direction']:
 for _,ses in enumerate(ses_type):
     
     # set data dir
-    data_dir = glob.glob(op.join(params['mri']['paths'][base_dir]['root'], 'sourcedata', 
-                                 'sub-{sj}'.format(sj=sj), 'ses-*', ses))[0]
+    data_dir = op.join(params['mri']['paths'][base_dir]['root'], 'sourcedata', 'sub-{sj}'.format(sj=sj))
+
+    if base_dir == 'local': 
+        data_dir = glob.glob(op.join(data_dir, 'ses-*', ses))[0]
     
     # if session type doesn't exist
     if not op.exists(data_dir) or not os.listdir(data_dir):

@@ -2,6 +2,7 @@
 general:
   tasks: ['pRF','FA', 'flicker']
   colors: ['color_green', 'color_red']
+  current_dir: 'behav_lab' #local'
 
 window: # refers to the parameters for the Psychopy Window class
   size: [1920, 1080] #[1680, 1050]
@@ -97,6 +98,8 @@ mri: # refers to the Psychopy SyncGenerator class
       root: '/home/inesv/FAM/PILOT'
       matlab: ''
       
+    behav_lab:
+      root: '/home/verissimo/Experiments/FAM/feature_attention_mapping/output'
       #standard_orig: '/home/inesv/FAM/sequence_pilot/full_processing_submm/derivatives' # original location of files, definitive storage
       #nordic_orig: '/home/inesv/FAM/sequence_pilot/nordic/derivatives'
 

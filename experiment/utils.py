@@ -1,6 +1,7 @@
 
 import numpy as np
 import os, sys
+import os.path as op
 import math
 import random
 import pandas as pd
@@ -870,8 +871,10 @@ def get_average_color(filedir,settings,task='pRF'):
             
     """
     
-    # get settings files for all trials of flicker task  
-    updt_color_files = [os.path.join(filedir.replace('{task}'.format(task = task),'flicker'),x) for _,x in enumerate(os.listdir(filedir.replace('{task}'.format(task = task),'flicker'))) if 'trial' in x and x.endswith('_updated_settings.yml')]
+    # get settings files for all trials of flicker task
+    flicker_path = op.join(op.split(filedir)[0],op.join(op.split(filedir)[-1].replace('{task}'.format(task = task),'flicker')))
+
+    updt_color_files = [op.join(flicker_path,x) for _,x in enumerate(os.listdir(flicker_path)) if 'trial' in x and x.endswith('_updated_settings.yml')]
     updt_color_files.sort()
     
     # for each updated color

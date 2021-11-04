@@ -39,7 +39,7 @@ def main():
     
     # make output dir
     base_dir = op.split(os.getcwd())[0] # main path for all folders of project
-    output_dir = op.join(base_dir,'output','data', 'sub-{sj}'.format(sj=sj_num), tasks[exp_type])
+    output_dir = op.join(base_dir,'output','sourcedata', 'sub-{sj}'.format(sj=sj_num))#, tasks[exp_type])
 
     # if output path doesn't exist, create it
     if not op.isdir(output_dir): 

@@ -313,7 +313,7 @@ class FeatureTrial(Trial):
                                 self.session.bar_counter += 1 
                         elif (ev in self.session.settings['keys']['right_index']) and (self.session.true_responses[self.session.bar_counter] == 'different'): 
                             self.session.correct_responses += 1
-                            if self.session.bar_counter<len(self.session.true_responses):
+                            if self.session.bar_counter<len(self.session.true_responses)-1:
                                 self.session.bar_counter += 1 
 
 

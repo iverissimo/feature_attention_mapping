@@ -2,6 +2,7 @@
 # useful functions to use in other scripts
 
 import os
+import os.path as op
 import hedfpy
 import numpy as np
 
@@ -33,7 +34,7 @@ def edf2h5(edf_files, hdf_file, pupil_hp = 0.01, pupil_lp = 6.0):
     if os.path.isfile(hdf_file):
         print('The file %s already exists, skipping'%hdf_file)
         
-        all_alias = [os.path.split(ef)[-1].replace('.edf','') for _,ef in enumerate(edf_files)]
+        all_alias = [op.split(ef)[-1].replace('.edf','') for _,ef in enumerate(edf_files)]
         
     else:
         ho = hedfpy.HDFEyeOperator(input_object=hdf_file)
@@ -41,7 +42,7 @@ def edf2h5(edf_files, hdf_file, pupil_hp = 0.01, pupil_lp = 6.0):
         all_alias = []
 
         for ef in edf_files:
-            alias = os.path.splitext(os.path.split(ef)[1])[0] #name of data for that run
+            alias = op.splitext(os.path.split(ef)[1])[0] #name of data for that run
             ho.add_edf_file(ef)
             ho.edf_message_data_to_hdf(alias = alias) #write messages ex_events to hdf5
             ho.edf_gaze_data_to_hdf(alias = alias, pupil_hp = pupil_hp, pupil_lp = pupil_lp) #add raw and preprocessed data to hdf5   
@@ -129,7 +130,8 @@ def mean_dist_deg(xx, yy, origin = [None], screen_res = [1920,1080], screen_widt
     return mean_dist_deg, std_dist_deg
 
 
-def plot_gaze_kde(df_gaze, outpath, run = 0, conditions = ['green_horizontal','green_vertical','red_horizontal','red_vertical'],
+def plot_gaze_kde(df_gaze, filename, run = 1, task = 'FA',
+                conditions = ['green_horizontal','green_vertical','red_horizontal','red_vertical'],
                  screen = [1920,1080], downsample = 10, color = {'green_horizontal':(0,1,0),'green_vertical':(0,1,0),
                                                                'red_horizontal':(1,0,0),'red_vertical': (1,0,0)}):
     
@@ -139,7 +141,7 @@ def plot_gaze_kde(df_gaze, outpath, run = 0, conditions = ['green_horizontal','g
     ----------
     df_gaze : pd dataframe
         with gaze data
-    outpath : str
+    filename : str
         absolute path to save plot
     run : int
         run to plot
@@ -149,57 +151,64 @@ def plot_gaze_kde(df_gaze, outpath, run = 0, conditions = ['green_horizontal','g
     """
     # plot gaze density
 
-    fig, axs = plt.subplots(2, 2, sharex=True, figsize=(30,15))
-    #fig.subplots_adjust(hspace = .25, wspace=.001)
+    if task=='FA':
 
-    plt_counter = 0
+        fig, axs = plt.subplots(2, 2, sharex=True, figsize=(30,15))
+        #fig.subplots_adjust(hspace = .25, wspace=.001)
 
-    for i in range(2):
+        plt_counter = 0
 
-        for w in range(2):
+        for i in range(2):
 
-            data_x = df_gaze.loc[(df_gaze['run'] == run) &
-                                        (df_gaze['attend_condition'] == conditions[plt_counter])]['gaze_x'].values[0]
-            data_y = df_gaze.loc[(df_gaze['run'] == run) &
-                                        (df_gaze['attend_condition'] == conditions[plt_counter])]['gaze_y'].values[0]
+            for w in range(2):
 
-            # turn string list to actual list (workaround for pandas)
-            if type(data_x) != list:
+                data_x = df_gaze.loc[(df_gaze['run'] == run) &
+                                            (df_gaze['attend_condition'] == conditions[plt_counter])]['gaze_x'].values[0]
+                data_y = df_gaze.loc[(df_gaze['run'] == run) &
+                                            (df_gaze['attend_condition'] == conditions[plt_counter])]['gaze_y'].values[0]
 
-                data_x = literal_eval(data_x)[::downsample] 
-                data_y = literal_eval(data_y)[::downsample]
-            
-            else:
-                data_x = data_x[::downsample]
-                data_y = data_y[::downsample]
+                # turn string list to actual list (workaround for pandas)
+                if type(data_x) != list:
 
-            # get mean gaze and std
-            mean_gaze, mean_std = mean_dist_deg(data_x, data_y)
-            
-            # downsample data to make kde faster
-            a = sns.kdeplot(ax = axs[i,w], x = data_x, y = data_y, fill = True, color = color[conditions[plt_counter]])
-            a.tick_params(labelsize=15)
+                    data_x = literal_eval(data_x)[::downsample] 
+                    data_y = literal_eval(data_y)[::downsample]
+                
+                else:
+                    data_x = data_x[::downsample]
+                    data_y = data_y[::downsample]
 
-            axs[i][w].set_title(conditions[plt_counter],fontsize=18)
-            axs[i][w].text(10, 10, 'mean gaze distance from center = %.2f +/- %.2f dva'%(mean_gaze, mean_std),
-                          fontsize = 15)
+                # get mean gaze and std
+                mean_gaze, mean_std = mean_dist_deg(data_x, data_y)
+                
+                # downsample data to make kde faster
+                a = sns.kdeplot(ax = axs[i,w], x = data_x, y = data_y, fill = True, color = color[conditions[plt_counter]])
+                a.tick_params(labelsize=15)
 
-            axs[i][w].set_ylim(0, screen[1])
-            axs[i][w].set_xlim(0, screen[0])
+                axs[i][w].set_title(conditions[plt_counter],fontsize=18)
+                axs[i][w].text(10, 10, 'mean gaze distance from center = %.2f +/- %.2f dva'%(mean_gaze, mean_std),
+                              fontsize = 15)
 
-            axs[i][w].axvline(screen[0]/2, lw=0.5, color='k',alpha=0.5)
-            axs[i][w].axhline(screen[1]/2, lw=0.5, color='k',alpha=0.5)
+                axs[i][w].set_ylim(0, screen[1])
+                axs[i][w].set_xlim(0, screen[0])
 
-            axs[i][w].add_artist(plt.Circle((screen[0]/2, screen[1]/2), radius=102, color='grey',alpha=0.5 , fill=False)) # add circle of 1dva radius, for reference 
+                axs[i][w].axvline(screen[0]/2, lw=0.5, color='k',alpha=0.5)
+                axs[i][w].axhline(screen[1]/2, lw=0.5, color='k',alpha=0.5)
 
-            plt_counter += 1
-            
-            
-    fig.savefig(os.path.join(outpath,'gaze_KDE_run-%s.png' %str(run).zfill(2)))
+                axs[i][w].add_artist(plt.Circle((screen[0]/2, screen[1]/2), radius=102, color='grey',alpha=0.5 , fill=False)) # add circle of 1dva radius, for reference 
+
+                plt_counter += 1
+                
+    elif task=='pRF':
+
+        print('not implemented')
+
+        fig, axs = plt.subplots(1, 1, sharex=True, figsize=(30,15))
+
+    fig.savefig(filename)
 
 
 
-def plot_sacc_hist(df_sacc, outpath, run = 0, conditions = ['green_horizontal','green_vertical','red_horizontal','red_vertical'],
+def plot_sacc_hist(df_sacc, filename, run = 1, task = 'FA', conditions = ['green_horizontal','green_vertical','red_horizontal','red_vertical'],
                  color = {'green_horizontal':(0,1,0),'green_vertical':(0,1,0),'red_horizontal':(1,0,0),'red_vertical': (1,0,0)}):
     
     
@@ -209,7 +218,7 @@ def plot_sacc_hist(df_sacc, outpath, run = 0, conditions = ['green_horizontal','
     ----------
     df_sacc : pd dataframe
         with saccade data
-    outpath : str
+    filename : str
         absolute path to save plot
     run : int
         run to plot
@@ -217,41 +226,50 @@ def plot_sacc_hist(df_sacc, outpath, run = 0, conditions = ['green_horizontal','
     """
     # plot gaze density
 
-    fig, axs = plt.subplots(2, 2, sharex=True, figsize=(30,15))
-    #fig.subplots_adjust(hspace = .25, wspace=.001)
+    if task=='FA':
 
-    plt_counter = 0
+        fig, axs = plt.subplots(2, 2, sharex=True, figsize=(30,15))
+        #fig.subplots_adjust(hspace = .25, wspace=.001)
 
-    for i in range(2):
+        plt_counter = 0
 
-        for w in range(2):
+        for i in range(2):
 
-            amp = df_sacc.loc[(df_sacc['run'] == run) &
-                                (df_sacc['attend_condition'] == conditions[plt_counter])]['expanded_amplitude'].values[0]
+            for w in range(2):
 
-            if amp == [0]: # if 0, then no saccade
+                amp = df_sacc.loc[(df_sacc['run'] == run) &
+                                    (df_sacc['attend_condition'] == conditions[plt_counter])]['expanded_amplitude'].values[0]
 
-                amp = [np.nan]
+                if amp == [0]: # if 0, then no saccade
 
-            a = sns.histplot(ax = axs[i,w], 
-                            x = amp,
-                            color = color[conditions[plt_counter]])
-            a.tick_params(labelsize=15)
-            a.set_xlabel('Amplitude (degrees)',fontsize=15, labelpad = 15)
+                    amp = [np.nan]
 
-            axs[i][w].set_title(conditions[plt_counter],fontsize=18)
-            axs[i][w].axvline(0.5, lw=0.5, color='k',alpha=0.5,linestyle='--')
+                a = sns.histplot(ax = axs[i,w], 
+                                x = amp,
+                                color = color[conditions[plt_counter]])
+                a.tick_params(labelsize=15)
+                a.set_xlabel('Amplitude (degrees)',fontsize=15, labelpad = 15)
+
+                axs[i][w].set_title(conditions[plt_counter],fontsize=18)
+                axs[i][w].axvline(0.5, lw=0.5, color='k',alpha=0.5,linestyle='--')
+                
+                # count number of saccades with amplitude bigger than 0.5 deg
+                sac_count = len(np.where(np.array(amp) >= 0.5)[0])
+                axs[i][w].text(0.7, 0.9,'%i saccades > 0.5deg'%(sac_count), 
+                               ha='center', va='center', transform=axs[i][w].transAxes,
+                              fontsize = 15)
+
+                plt_counter += 1
+                
             
-            # count number of saccades with amplitude bigger than 0.5 deg
-            sac_count = len(np.where(np.array(amp) >= 0.5)[0])
-            axs[i][w].text(0.7, 0.9,'%i saccades > 0.5deg'%(sac_count), 
-                           ha='center', va='center', transform=axs[i][w].transAxes,
-                          fontsize = 15)
+    elif task=='pRF':
 
-            plt_counter += 1
-            
-            
-    fig.savefig(os.path.join(outpath,'sacc_hist_run-%s.png' %str(run).zfill(2)))
+        print('not implemented')
+
+        fig, axs = plt.subplots(1, 1, sharex=True, figsize=(30,15))
+
+    fig.savefig(filename)
+
 
 
 

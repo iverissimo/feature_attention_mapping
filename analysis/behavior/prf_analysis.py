@@ -120,6 +120,9 @@ for _,ses in enumerate(ses_type):
                                                        sum(corr_responses.values())/sum(total_responses.values())]}),
                                               ignore_index=True)
      
+        # save accuracy and RT values
+        df_summary.to_csv(op.join(out_dir,'sub-{sj}_task-{task}_acc_RT_{ses_type}.csv'.format(sj=sj, task=task, ses_type = ses)), index = False, header=True)
+
         # plot barplot and save
         fig, axs = plt.subplots(1, 1, sharex=True, figsize=(10,7.5))
 

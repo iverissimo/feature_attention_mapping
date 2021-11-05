@@ -81,7 +81,7 @@ for _,ses in enumerate(ses_type):
                                 and x.endswith('.csv')]; timestamps_filenames.sort()
 
     # load behavioral dataframe
-    behav_pd = pd.read_csv('sub-{sj}_task-{task}_acc_RT_{ses_type}.csv'.format(sj=sj, task=task, ses_type = ses))
+    behav_pd = pd.read_csv(op.join(behav_dir,'sub-{sj}_task-{task}_acc_RT_{ses_type}.csv'.format(sj=sj, task=task, ses_type = ses)))
 
     if task == 'FA':  
         # make
@@ -125,11 +125,9 @@ for _,ses in enumerate(ses_type):
                                 }, ignore_index=True) 
 
                 # detect saccades and save in dataframe
-                # workaround for pandas convertion of list to string
-                if type(data_x) != list:
 
-                    data_x = literal_eval(gaze_x_mini_blk)
-                    data_y = literal_eval(gaze_y_mini_blk)
+                data_x = list(gaze_x_mini_blk)
+                data_y = list(gaze_y_mini_blk)
 
                 # detect saccades
                 saccades = detect_saccade_from_data(xy_data = np.array([np.array(data_x).squeeze(),np.array(data_y).squeeze()]).T, 
@@ -155,56 +153,61 @@ for _,ses in enumerate(ses_type):
         print('not implemented yet')
 
     
-    # plot gaze density for run
+    ## actually make the plots
+
     for run in range(len(gaze_filenames)):
+
+        # plot gaze density for run
+
+        filename = op.join(out_dir, 'sub-{sj}_task-{task}_gaze_KDE_run-{run}_{ses_type}.png'.format(sj=sj, run=run+1, task=task, ses_type = ses))
         
-        plot_gaze_kde(df_gaze, out_dir, run = run+1, conditions = ['green_horizontal','green_vertical','red_horizontal','red_vertical'],
+        plot_gaze_kde(df_gaze, filename, task = task, run = run+1, conditions = ['green_horizontal','green_vertical','red_horizontal','red_vertical'],
                     screen = params['window']['size'], downsample = 10)
     
 
-    # plot saccade histogram for run
+        # plot saccade histogram for run
 
-    for run in range(len(gaze_filenames)):
+        filename = op.join(out_dir, 'sub-{sj}_task-{task}_sacc_hist_run-{run}_{ses_type}.png'.format(sj=sj, run=run+1, task=task, ses_type = ses))
         
-        plot_sacc_hist(df_sacc, out_dir, run = run+1, 
+        plot_sacc_hist(df_sacc, filename, task = task, run = run+1, 
                     conditions = ['green_horizontal','green_vertical','red_horizontal','red_vertical'])
         
 
-    # plot saccade polar angle histogram for run
+    # # plot saccade polar angle histogram for run
 
-    # iterate over dataframe to save angles
-    angles = []
-    for i in range(len(df_sacc)):
+    # # iterate over dataframe to save angles
+    # angles = []
+    # for i in range(len(df_sacc)):
         
-        angles.append(get_saccade_angle(df_sacc.iloc[i]['expanded_vector'], angle_unit='radians'))
+    #     angles.append(get_saccade_angle(df_sacc.iloc[i]['expanded_vector'], angle_unit='radians'))
         
-    df_sacc['angle'] = angles
+    # df_sacc['angle'] = angles
 
 
-    for run in range(len(gaze_filenames)):
+    # for run in range(len(gaze_filenames)):
 
-        # Visualise with polar histogram
-        fig, ax = plt.subplots(2, 2, subplot_kw=dict(projection='polar'), figsize=(30,15))
+    #     # Visualise with polar histogram
+    #     fig, ax = plt.subplots(2, 2, subplot_kw=dict(projection='polar'), figsize=(30,15))
 
-        plt_counter = 0
-        conditions = ['green_horizontal','green_vertical','red_horizontal','red_vertical']
-        color = {'green_horizontal':(0,1,0),'green_vertical':(0,1,0),'red_horizontal':(1,0,0),'red_vertical': (1,0,0)}
+    #     plt_counter = 0
+    #     conditions = ['green_horizontal','green_vertical','red_horizontal','red_vertical']
+    #     color = {'green_horizontal':(0,1,0),'green_vertical':(0,1,0),'red_horizontal':(1,0,0),'red_vertical': (1,0,0)}
 
-        for i in range(2):
-            for w in range(2):
+    #     for i in range(2):
+    #         for w in range(2):
 
-                ang = df_sacc.loc[(df_sacc['run'] == run+1) &
-                                        (df_sacc['attend_condition'] == conditions[plt_counter])]['angle'].values[0]
+    #             ang = df_sacc.loc[(df_sacc['run'] == run+1) &
+    #                                     (df_sacc['attend_condition'] == conditions[plt_counter])]['angle'].values[0]
 
-                rose_plot(ax[i][w], np.array(ang),color=color[conditions[plt_counter]])
-                ax[i][w].set_title(conditions[plt_counter],fontsize=18)
-                ax[i][w].text(0.7, 0.9,'total %i saccades'%(sum(~np.isnan(ang))), 
-                                ha='center', va='center', transform=ax[i][w].transAxes,
-                                fontsize = 15)
-                plt_counter += 1
+    #             rose_plot(ax[i][w], np.array(ang),color=color[conditions[plt_counter]])
+    #             ax[i][w].set_title(conditions[plt_counter],fontsize=18)
+    #             ax[i][w].text(0.7, 0.9,'total %i saccades'%(sum(~np.isnan(ang))), 
+    #                             ha='center', va='center', transform=ax[i][w].transAxes,
+    #                             fontsize = 15)
+    #             plt_counter += 1
 
-        fig.tight_layout()
-        fig.savefig(os.path.join(out_dir,'sacc_polar_hist_run-%s.png' %str(run+1).zfill(2)))
+    #     fig.tight_layout()
+    #     fig.savefig(os.path.join(out_dir,'sacc_polar_hist_run-%s.png' %str(run+1).zfill(2)))
 
 
 

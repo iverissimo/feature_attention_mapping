@@ -80,9 +80,8 @@ for _,ses in enumerate(ses_type):
             # to save number of participant responses, differentiating by color to check
             corr_responses = {'color_green': 0, 'color_red': 0}
             total_responses = {'color_green': 0, 'color_red': 0}
-            
-            counter = 0
-            
+            incorr_responses = {'color_green': [], 'color_red': []}
+                        
             for t in range(total_trials):
                 
                 if 'empty' not in (bar_pass_all[t]):
@@ -90,20 +89,29 @@ for _,ses in enumerate(ses_type):
                     # find bar color in that trial
                     bar_color = [x for _,x in enumerate(df_run[df_run['trial_nr']==t]['event_type'].values) if x!='pulse' and x!='response'][0]
 
-                    # update total number of responses
+                    # update total number of (potential) responses 
                     total_responses[bar_color]+=1
 
-                    # if participant responded
-                    if t<len(sub_response_trials) and t == sub_response_trials[counter]:
+                    # save actual participant response
+                    response_df = df_run[(df_run['trial_nr']==t)&(df_run['event_type']=='response')]
 
+                    if len(response_df.values)==0: # save incorrected response trial numbers, to check later
+                        incorr_responses[bar_color].append(t) 
+                    else:
                         # participant response key
-                        sub_response = df_run[(df_run['trial_nr']==t)&(df_run['event_type']=='response')]['response'].values[0]
+                        sub_response = response_df['response'].values[0]
 
-                        if ((bar_color == 'color_red') and (sub_response in params['keys']['left_index'])) \
-                           or ((bar_color == 'color_green') and (sub_response in params['keys']['right_index'])):
-                            corr_responses[bar_color]+=1
-
-                        counter+=1
+                        if sub_response in params['keys']['left_index']:
+                            if bar_color == 'color_red':
+                                corr_responses[bar_color]+=1
+                            else:
+                                incorr_responses[bar_color].append(t) 
+                                
+                        elif sub_response in params['keys']['right_index']:
+                            if bar_color == 'color_green':
+                                corr_responses[bar_color]+=1
+                            else:
+                                incorr_responses[bar_color].append(t) 
 
             # summarize results, for later plotting
             if i==0:

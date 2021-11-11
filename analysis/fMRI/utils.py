@@ -9,6 +9,11 @@ from os import path as op
 import nibabel as nib
 
 from scipy.ndimage import gaussian_filter
+from scipy.signal import savgol_filter
+
+from nilearn.glm.first_level.design_matrix import _cosine_drift as dct_set
+from nilearn import signal
+
 from joblib import Parallel, delayed
 
 import matplotlib.pyplot as plt
@@ -20,6 +25,7 @@ from PIL import Image, ImageDraw
 
 from matplotlib import cm
 import matplotlib.colors
+
 
 
 
@@ -195,10 +201,12 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False, **kwargs
 
                 data_filt = gausskernel_data(data, **kwargs)
                 
-            #elif filter_type == 'sg':
+            elif filter_type == 'sg':
                 
-            elif filter_type == 'dc':
-                raise NameError('Not implemented')
+                data_filt = savgol_data(data, **kwargs)
+
+            elif filter_type == 'dc': 
+                data_filt = dc_data(data, **kwargs) 
                 
             else:
                 raise NameError('Not implemented')
@@ -274,9 +282,101 @@ def gausskernel_data(data, TR = 1.2, cut_off_hz = 0.01, **kwargs):
     filtered_signal = np.array(Parallel(n_jobs=2)(delayed(gaussian_filter)(i, sigma=sigma) for _,i in enumerate(data))) 
 
     # add mean image back to avoid distribution around 0
-    data_filt = data - filtered_signal + np.mean(filtered_signal, axis=0)
-    data_filt = data_filt.reshape(*arr_shape)
+    if len(arr_shape)>2:
+        data_filt = data - filtered_signal + filtered_signal.mean(axis=-1)[...,np.newaxis]
+        data_filt = data_filt.reshape(*arr_shape)   
+    else:
+        data_filt = data - filtered_signal + np.mean(filtered_signal, axis=0)
     
+    return data_filt
+
+def savgol_data(data, window_length=201, polyorder=3, **kwargs):
+    
+    """ 
+    High pass savitzky golay filter array
+    
+    Parameters
+    ----------
+    data : arr
+        data array
+    TR : float
+        TR for run
+    window_length : int
+        window length for SG filter (the default is 201, which is ok for prf experiments, and 
+        a bit long for event-related experiments)
+    polyorder: int
+        polynomial order for SG filter (the default is 3, which performs well for fMRI signals
+            when the window length is longer than 2 minutes)
+
+    Outputs
+    -------
+    data_filt: arr
+        filtered array
+    """ 
+        
+    if window_length % 2 != 1:
+        raise ValueError  # window_length should be odd
+            
+    # save shape, for file reshpaing later
+    arr_shape = data.shape
+    
+    # reshape to 2D if necessary
+    if len(arr_shape)>2:
+        data = np.reshape(data, (-1, data.shape[-1])) 
+
+    # filter signal
+    filtered_signal = savgol_filter(data, window_length, polyorder)
+    
+    # add mean image back to avoid distribution around 0
+    if len(arr_shape)>2:
+        data_filt = data - filtered_signal + filtered_signal.mean(axis=-1)[...,np.newaxis]
+        data_filt = data_filt.reshape(*arr_shape)   
+    else:
+        data_filt = data - filtered_signal + np.mean(filtered_signal, axis=0)
+
+    return data_filt
+
+
+def dc_data(data, cut_off_hz = 0.01, **kwargs):
+    
+    """ 
+    High pass discrete cosine filter array
+    
+    Parameters
+    ----------
+    data : arr
+        data array
+    cut_off_hz: float
+        cut off frequency to filter
+
+    Outputs
+    -------
+    data_filt: arr
+        filtered array
+    """ 
+            
+    # save shape, for file reshpaing later
+    arr_shape = data.shape
+
+    # reshape to 2D if necessary, to have shape (time, vertex)
+    if len(arr_shape)>2:
+        data = np.reshape(data, (-1, data.shape[-1])) 
+        data = data.T
+
+    # filter signal
+    ft = np.linspace(0, data.shape[0], data.shape[0], endpoint=False) 
+    hp_set = dct_set(cut_off_hz, ft)
+
+    filtered_signal = signal.clean(data, detrend=False,
+                            standardize=False, confounds=hp_set)
+
+    # add mean image back to avoid distribution around 0
+    data_filt = filtered_signal + np.mean(data, axis=0) 
+
+    # put back in original shape
+    if len(arr_shape)>2:
+        data_filt = data_filt.T.reshape(*arr_shape)
+
     return data_filt
 
 

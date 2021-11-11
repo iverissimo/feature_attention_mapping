@@ -269,26 +269,28 @@ def gausskernel_data(data, TR = 1.2, cut_off_hz = 0.01, **kwargs):
         filtered array
     """ 
         
-    # save shape, for file reshpaing later
+    # save shape, for file reshaping later
     arr_shape = data.shape
     
     sigma = (1/cut_off_hz) / (2 * TR) 
 
-    # reshape to 2D if necessary
+    # reshape to 2D if necessary, to have shape (time, vertex)
     if len(arr_shape)>2:
         data = np.reshape(data, (-1, data.shape[-1])) 
+        data = data.T
 
     # filter signal
     filtered_signal = np.array(Parallel(n_jobs=2)(delayed(gaussian_filter)(i, sigma=sigma) for _,i in enumerate(data))) 
 
     # add mean image back to avoid distribution around 0
+    data_filt = data - filtered_signal + np.mean(filtered_signal, axis=0)
+
+    # put back in original shape
     if len(arr_shape)>2:
-        data_filt = data - filtered_signal + filtered_signal.mean(axis=-1)[...,np.newaxis]
-        data_filt = data_filt.reshape(*arr_shape)   
-    else:
-        data_filt = data - filtered_signal + np.mean(filtered_signal, axis=0)
+        data_filt = data_filt.T.reshape(*arr_shape) 
     
     return data_filt
+    
 
 def savgol_data(data, window_length=201, polyorder=3, **kwargs):
     
@@ -317,22 +319,23 @@ def savgol_data(data, window_length=201, polyorder=3, **kwargs):
     if window_length % 2 != 1:
         raise ValueError  # window_length should be odd
             
-    # save shape, for file reshpaing later
+    # save shape, for file reshaping later
     arr_shape = data.shape
     
-    # reshape to 2D if necessary
+    # reshape to 2D if necessary, to have shape (time, vertex)
     if len(arr_shape)>2:
         data = np.reshape(data, (-1, data.shape[-1])) 
+        data = data.T
 
     # filter signal
     filtered_signal = savgol_filter(data, window_length, polyorder)
     
     # add mean image back to avoid distribution around 0
+    data_filt = data - filtered_signal + np.mean(filtered_signal, axis=0)
+
+   # put back in original shape
     if len(arr_shape)>2:
-        data_filt = data - filtered_signal + filtered_signal.mean(axis=-1)[...,np.newaxis]
-        data_filt = data_filt.reshape(*arr_shape)   
-    else:
-        data_filt = data - filtered_signal + np.mean(filtered_signal, axis=0)
+        data_filt = data_filt.T.reshape(*arr_shape) 
 
     return data_filt
 
@@ -355,7 +358,7 @@ def dc_data(data, cut_off_hz = 0.01, **kwargs):
         filtered array
     """ 
             
-    # save shape, for file reshpaing later
+    # save shape, for file reshaping later
     arr_shape = data.shape
 
     # reshape to 2D if necessary, to have shape (time, vertex)

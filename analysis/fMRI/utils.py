@@ -4,30 +4,23 @@
 
 
 import numpy as np
-import os, sys
+import os
 from os import path as op
+import nibabel as nib
+
+from scipy.ndimage import gaussian_filter
+from joblib import Parallel, delayed
+
+import matplotlib.pyplot as plt
 
 import cortex
 from cortex import fmriprep
 
-import nibabel as nib
-import nilearn
-
-from nilearn import plotting
-import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
 
-from nilearn.image import mean_img, math_img
 from matplotlib import cm
 import matplotlib.colors
 
-from nipype.interfaces.freesurfer import BBRegister
-
-import pandas as pd
-import seaborn as sns
-
-from scipy.ndimage import gaussian_filter
-from joblib import Parallel, delayed
 
 
 def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=None):
@@ -136,14 +129,16 @@ def correlate_vol(data1,data2,outfile):
     return correlations
 
 
-def filter_data(file, outdir, filter_type = 'HPgauss', TR = 1.2, cut_off_hz = 0.01, file_extension = '_HPgauss.nii.gz'):
+def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False, **kwargs):
     
-    """ High pass filter NIFTI run with gaussian kernel
+    """ 
+    Generic filtering function, implemented different types of filters
+    High pass filter NIFTI run with gaussian kernel
     
     Parameters
     ----------
-    file : str
-        absolute filename to be filtered
+    file : str/list/array
+        absolute filename to be filtered (or list of filenames)
     outdir : str
         path to save new file
     filter_type : str
@@ -152,44 +147,137 @@ def filter_data(file, outdir, filter_type = 'HPgauss', TR = 1.2, cut_off_hz = 0.
     Outputs
     -------
     out_file: str
-        absolute output filename
+        absolute output filename (or list of filenames)
     
     """
-
-    if filter_type == 'HPgauss':
     
-        sigma = (1/cut_off_hz) / (2 * TR) 
-        
-        # output filename
-        outfile = op.join(outdir,op.split(file)[-1].replace('.nii.gz',file_extension))
-        
-        if not op.exists(outfile): 
-            print('making %s'%outfile)
-        
-            nibber = nib.load(file)
-            affine = nibber.affine
-            data = np.array(nibber.dataobj)
-            
-            # reshape to 2D
-            data_reshap = np.reshape(data, (-1, data.shape[-1])) 
-            
-            # filter signal
-            filtered_signal = np.array(Parallel(n_jobs=2)(delayed(gaussian_filter)(i, sigma=sigma) for _,i in enumerate(data_reshap))) 
-
-            # add mean image back to avoid distribution around 0
-            data_filt = data_reshap - filtered_signal + filtered_signal.mean(axis = -1)[..., np.newaxis] 
-            data_filt = data_filt.reshape(*data.shape)
-            
-            output_image = nib.nifti1.Nifti1Image(data_filt,affine,header=nibber.header)
-            nib.save(output_image,outfile)
-            
-        else:
-            print('already exists, skipping %s'%outfile)
-
+    # check if single filename or list of filenames
+    
+    if isinstance(file, list) or isinstance(file, np.ndarray): 
+        file_list = file  
     else:
-        raise NameError('Not implemented')
+        file_list = [file]
+      
+    # store output filename in list
+    outfiles = []
+    
+    # for each file, do the same
+    for input_file in file_list:
+        
+        # get file extension
+        file_extension = '.{a}.{b}'.format(a = input_file.rsplit('.', 2)[-2],
+                                   b = input_file.rsplit('.', 2)[-1])
+        # set output filename
+        output_file = op.join(outdir, 
+                    op.split(input_file)[-1].replace(file_extension,'_{filt}{ext}'.format(filt = filter_type,
+                                                                                           ext = file_extension)))
+        # if file already exists, skip
+        if op.exists(output_file): 
+            print('already exists, skipping %s'%output_file)
+        
+        else:
+            print('making %s'%output_file)
+            
+            # load file
+            nibber = nib.load(input_file)
 
-    return outfile
+            # way depends on type of extension
+            if file_extension == '.func.gii':
+                data = np.array([nibber.darrays[i].data for i in range(len(nibber.darrays))]) #load surface data
+            else:
+                affine = nibber.affine
+                data = np.array(nibber.get_fdata())
+
+    
+            ### implement filter types, by calling their specific functions
+
+            if filter_type == 'HPgauss':
+
+                data_filt = gausskernel_data(data, **kwargs)
+                
+            #elif filter_type == 'sg':
+                
+            elif filter_type == 'dc':
+                raise NameError('Not implemented')
+                
+            else:
+                raise NameError('Not implemented')
+                
+            # if plotting true, make figure of voxel with high variance,
+            # to compare the difference
+            if plot_vert == True:
+                
+                ind2plot = np.argwhere(np.std(data, axis=0)==np.max(np.std(data, axis=0)))[0][0]
+                fig = plt.figure()
+                plt.plot(data[...,ind2plot], color='dimgray',label='Original data')
+                plt.plot(data_filt[...,ind2plot], color='mediumseagreen',label='Filtered data')
+
+                plt.xlabel('Time (TR)')
+                plt.ylabel('Signal amplitude (a.u.)')
+                plt.legend(loc = 'upper right')
+
+                fig.savefig(output_file.replace(file_extension,'_vertex_%i.png'%ind2plot))
+            
+
+            ## save filtered file
+            # again, way depends on type of extension
+            if file_extension == '.func.gii':
+                darrays = [nib.gifti.gifti.GiftiDataArray(d) for d in data_filt]
+                output_image = nib.gifti.gifti.GiftiImage(header = nibber.header, 
+                                                                  extra = nibber.extra, 
+                                                                  darrays = darrays)
+            else:
+                output_image = nib.nifti1.Nifti1Image(data_filt, affine, header = nibber.header)
+
+            # actually save
+            nib.save(output_image,output_file)
+
+        # append out files
+        outfiles.append(output_file)
+        
+    # if input file was not list, then return output that is also not list
+    if isinstance(file, list) or isinstance(file, np.ndarray): 
+        outfiles = outfiles[0] 
+    
+    return outfiles
+
+def gausskernel_data(data, TR = 1.2, cut_off_hz = 0.01, **kwargs):
+    
+    """ 
+    High pass filter array with gaussian kernel
+    
+    Parameters
+    ----------
+    data : arr
+        data array
+    TR : float
+        TR for run
+    cut_off_hz : float
+        cut off frequency to filter
+    
+    Outputs
+    -------
+    data_filt: arr
+        filtered array
+    """ 
+        
+    # save shape, for file reshpaing later
+    arr_shape = data.shape
+    
+    sigma = (1/cut_off_hz) / (2 * TR) 
+
+    # reshape to 2D if necessary
+    if len(arr_shape)>2:
+        data = np.reshape(data, (-1, data.shape[-1])) 
+
+    # filter signal
+    filtered_signal = np.array(Parallel(n_jobs=2)(delayed(gaussian_filter)(i, sigma=sigma) for _,i in enumerate(data))) 
+
+    # add mean image back to avoid distribution around 0
+    data_filt = data - filtered_signal + np.mean(filtered_signal, axis=0)
+    data_filt = data_filt.reshape(*arr_shape)
+    
+    return data_filt
 
 
 def psc(file, outpth, file_extension = '_psc.nii.gz'):

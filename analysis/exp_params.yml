@@ -2,7 +2,7 @@
 general:
   tasks: ['pRF','FA', 'flicker']
   colors: ['color_green', 'color_red']
-  current_dir: 'behav_lab' #local'
+  current_dir: 'local' #'behav_lab' #local'
 
 window: # refers to the parameters for the Psychopy Window class
   size: [1920, 1080] #[1680, 1050]
@@ -28,6 +28,9 @@ feature:
 
   empty_TR: 12 #5
   cue_TR: 3
+
+  total_number_TR: 408 # of task
+  dummy_TR: 5 # we used extra 5 TRs in beginning that should be disregarded, so file will be 413
 
   bars_phase_dur: 0.6 # phase duration for displaying bars (in seconds) 
 
@@ -56,6 +59,9 @@ prf:
     U-D: 17
     D-U: 17
 
+  total_number_TR: 220 # of task
+  dummy_TR: 5 # we used extra 5 TRs in beginning that should be disregarded, so file will be 225
+
   flick_rate: 'TR' #10 # Hz, rate of change of features in bar
 
   bar_pass_direction: ['empty_long','L-R','U-D','empty','R-L','D-U','empty_long','D-U','R-L','empty','U-D','L-R','empty_long'] 
@@ -79,12 +85,14 @@ mri: # refers to the Psychopy SyncGenerator class
   TR: 1.2  # seconds between volume acquisitions
   sync: 't'  # character used as flag for sync timing
 
-  filtering:
-    type: 'HPgauss' # None
+  space: 'fsaverage' # space of the files to be used in analysis
+  file_ext: '_bold.func.gii' # file extension
+  acq: 'nordic' # "acquisition" type to use
 
-    HPgauss:
-      cut_off_hz: 0.014
-      file_extension: '_HPgauss.nii.gz'
+  filtering:
+    type: 'dc' #'HPgauss' # None
+    cut_off_hz: 0.01 #0.014
+
 
   psc:
     file_extension: '_psc.nii.gz'
@@ -110,9 +118,9 @@ mri: # refers to the Psychopy SyncGenerator class
     pRF:
       runs: 'run-average' # [1,2]
       input_file_dir: 'post_fmriprep/average'
-      input_file_ext: 'HPgauss_psc.nii.gz'
-      space: 'T1w'
-      acq_type: ['ORIG','ORIGPF','ORIGPFFA59']
+      #input_file_ext: 'HPgauss_psc.nii.gz'
+      #space: 'T1w'
+      #acq_type: ['ORIG','ORIGPF','ORIGPFFA59']
 
       grid_nr: 40 # number of grid steps
       min_eccen: 0.2

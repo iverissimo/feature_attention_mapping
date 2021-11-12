@@ -7,6 +7,7 @@ import numpy as np
 import os
 from os import path as op
 import nibabel as nib
+import re
 
 from scipy.ndimage import gaussian_filter
 from scipy.signal import savgol_filter
@@ -88,7 +89,6 @@ def get_tsnr(data,affine,file_name):
     return tsnr
 
 
-
 def correlate_vol(data1,data2,outfile):
     """
     Compute Pearson correlation between 2 of nifti files
@@ -135,6 +135,105 @@ def correlate_vol(data1,data2,outfile):
     return correlations
 
 
+def crop_epi(file, outdir, num_TR_task=220, num_TR_crop = 5):
+
+    """ crop epi file
+    and thus remove the first recorded "dummy" trials, if such was the case
+    
+    Parameters
+    ----------
+    file : str/list/array
+        absolute filename to be filtered (or list of filenames)
+    outdir : str
+        path to save new file
+    num_TR_task: int
+        number of TRs of task, for safety check
+    num_TR_crop : int
+        number of TRs to remove from beginning of file
+    
+    Outputs
+    -------
+    out_file: str
+        absolute output filename (or list of filenames)
+    
+    """
+    
+    # check if single filename or list of filenames
+    
+    if isinstance(file, list): 
+        file_list = file  
+    else:
+        file_list = [file]
+      
+    # store output filename in list
+    outfiles = []
+    
+    # for each file, do the same
+    for input_file in file_list:
+        
+        # get file extension
+        file_extension = '.{a}.{b}'.format(a = input_file.rsplit('.', 2)[-2],
+                                   b = input_file.rsplit('.', 2)[-1])
+        # set output filename
+        output_file = op.join(outdir, 
+                    op.split(input_file)[-1].replace(file_extension,'_{name}{ext}'.format(name = 'cropped',
+                                                                                           ext = file_extension)))
+        # if file already exists, skip
+        if op.exists(output_file): 
+            print('already exists, skipping %s'%output_file)
+        
+        else:
+            print('making %s'%output_file)
+            
+            # load file
+            nibber = nib.load(input_file)
+
+            # way depends on type of extension
+            if file_extension == '.func.gii':
+                data = np.array([nibber.darrays[i].data for i in range(len(nibber.darrays))]) #load surface data (time, vertex)
+            else:
+                affine = nibber.affine
+                data = np.array(nibber.get_fdata())
+            
+            # check shape
+            # (note: for nifti files, time in last dim)
+            arr_shape = data.shape
+            
+            #
+            if (len(arr_shape)>2 and data.shape[-1]==num_TR_task) or (len(arr_shape)==2 and data.shape[0]==num_TR_task):
+                    raise NameError('Data already has shape of task! Sure we need to crop??')
+            else:
+                # crop initial TRs
+                if len(arr_shape)>2:
+                    crop_data = data[...,num_TR_crop:] 
+                else:
+                    crop_data = data[num_TR_crop:,:] 
+                    
+                print('new file with shape %s' %str(crop_data.shape))
+                
+            ## save cropped file
+            # again, way depends on type of extension
+            if file_extension == '.func.gii':
+                darrays = [nib.gifti.gifti.GiftiDataArray(d) for d in crop_data]
+                output_image = nib.gifti.gifti.GiftiImage(header = nibber.header, 
+                                                                  extra = nibber.extra, 
+                                                                  darrays = darrays)
+            else:
+                output_image = nib.nifti1.Nifti1Image(crop_data, affine, header = nibber.header)
+
+            # actually save
+            nib.save(output_image,output_file)
+
+        # append out files
+        outfiles.append(output_file)
+        
+    # if input file was not list, then return output that is also not list
+    if not isinstance(file, list): 
+        outfiles = outfiles[0] 
+
+    return outfiles
+
+
 def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False, **kwargs):
     
     """ 
@@ -159,7 +258,7 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False, **kwargs
     
     # check if single filename or list of filenames
     
-    if isinstance(file, list) or isinstance(file, np.ndarray): 
+    if isinstance(file, list): 
         file_list = file  
     else:
         file_list = [file]
@@ -193,8 +292,7 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False, **kwargs
             else:
                 affine = nibber.affine
                 data = np.array(nibber.get_fdata())
-
-    
+ 
             ### implement filter types, by calling their specific functions
 
             if filter_type == 'HPgauss':
@@ -202,10 +300,11 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False, **kwargs
                 data_filt = gausskernel_data(data, **kwargs)
                 
             elif filter_type == 'sg':
-                
+
                 data_filt = savgol_data(data, **kwargs)
 
             elif filter_type == 'dc': 
+
                 data_filt = dc_data(data, **kwargs) 
                 
             else:
@@ -244,7 +343,7 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False, **kwargs
         outfiles.append(output_file)
         
     # if input file was not list, then return output that is also not list
-    if isinstance(file, list) or isinstance(file, np.ndarray): 
+    if not isinstance(file, list): 
         outfiles = outfiles[0] 
     
     return outfiles
@@ -290,7 +389,7 @@ def gausskernel_data(data, TR = 1.2, cut_off_hz = 0.01, **kwargs):
         data_filt = data_filt.T.reshape(*arr_shape) 
     
     return data_filt
-    
+
 
 def savgol_data(data, window_length=201, polyorder=3, **kwargs):
     
@@ -383,99 +482,194 @@ def dc_data(data, cut_off_hz = 0.01, **kwargs):
     return data_filt
 
 
-def psc(file, outpth, file_extension = '_psc.nii.gz'):
+def psc_epi(file, outdir):
 
-    """ percent signal change nii file
+    """ percent signal change file
+    
     Parameters
     ----------
-    file : str
-        absolute filename for nifti
-    outpth: str
-        path to save new files
-    extension: str
-        file extension
+    file : str/list/array
+        absolute filename to be psc (or list of filenames)
+    outdir : str
+        path to save new file
+
     Outputs
     -------
-    output: str
-        absolute filename for psc nifti
+    out_file: str
+        absolute output filename (or list of filenames)
     
     """
     
-    # output filename
-    output = op.join(outpth,op.split(file)[-1].replace('.nii.gz',file_extension))
+    # check if single filename or list of filenames
     
-    if not op.exists(output): 
-        print('making %s'%output)
-
-        nibber = nib.load(file)
-        affine = nibber.affine
-        data = np.array(nibber.dataobj)
-        
-        # reshape to 2D
-        data_reshap = np.reshape(data, (-1, data.shape[-1])) 
-        
-        # psc signal
-        mean_signal = data_reshap.mean(axis = -1)[..., np.newaxis] 
-        data_psc = (data_reshap - mean_signal)/np.absolute(mean_signal)
-        data_psc *= 100
-        data_psc = data_psc.reshape(*data.shape)
-
-        output_image = nib.nifti1.Nifti1Image(data_psc,affine,header=nibber.header)
-        nib.save(output_image,output)
-
+    if isinstance(file, list): 
+        file_list = file  
     else:
-        print('already exists, skipping %s'%output)
-
-
-    return output
-
-
-def avg_nii(files, outpth):
-
-    """ percent signal change gii file
-    Parameters
-    ----------
-    files : list
-        list of strings with absolute filename for nifti
-    out_pth: str
-        path to save new files
-    extension: str
-        file extension
-    Outputs
-    -------
-    output: str
-        absolute filename for psc nifti
-    """
+        file_list = [file]
+      
+    # store output filename in list
+    outfiles = []
     
-    # sort files
-    files.sort()
-    # output filename
-    output = op.join(outpth,op.split(files[0])[-1].replace('run-1','run-average'))
-    
-    if not op.exists(output): 
-        print('making %s'%output)
+    # for each file, do the same
+    for input_file in file_list:
         
-        for ind, run in enumerate(files):
-
-            nibber = nib.load(run)
-            affine = nibber.affine
-            data = np.array(nibber.dataobj)
+        # get file extension
+        file_extension = '.{a}.{b}'.format(a = input_file.rsplit('.', 2)[-2],
+                                   b = input_file.rsplit('.', 2)[-1])
+        # set output filename
+        output_file = op.join(outdir, 
+                    op.split(input_file)[-1].replace(file_extension,'_{name}{ext}'.format(name = 'psc',
+                                                                                           ext = file_extension)))
+        # if file already exists, skip
+        if op.exists(output_file): 
+            print('already exists, skipping %s'%output_file)
+        
+        else:
+            print('making %s'%output_file)
             
-            if ind == 0:
-                data_avg = data.copy()[np.newaxis,...] 
+            # load file
+            nibber = nib.load(input_file)
+
+            # way depends on type of extension
+            if file_extension == '.func.gii':
+                data = np.array([nibber.darrays[i].data for i in range(len(nibber.darrays))]) #load surface data (time, vertex)
             else:
-                data_avg = np.vstack((data_avg,data.copy()[np.newaxis,...]))
+                affine = nibber.affine
+                data = np.array(nibber.get_fdata())
+            
+            # check shape
+            # (note: for nifti files, time in last dim)
+            arr_shape = data.shape
+            
+            # reshape nii to 2D
+            if len(arr_shape)>2:
+                data = np.reshape(data, (-1, data.shape[-1])) 
+                
+                mean_signal = data.mean(axis = -1)[..., np.newaxis] 
+                data_psc = (data - mean_signal)/np.absolute(mean_signal)
+                data_psc *= 100
+                data_psc = data_psc.reshape(*arr_shape)
+                
+            else:
+                data_psc = (data - np.mean(data,axis=0))/np.absolute(np.mean(data,axis=0))
+                data_psc *= 100
+                
+            ## save psc file
+            # again, way depends on type of extension
+            if file_extension == '.func.gii':
+                darrays = [nib.gifti.gifti.GiftiDataArray(d) for d in data_psc]
+                output_image = nib.gifti.gifti.GiftiImage(header = nibber.header, 
+                                                                  extra = nibber.extra, 
+                                                                  darrays = darrays)
+            else:
+                output_image = nib.nifti1.Nifti1Image(data_psc, affine, header = nibber.header)
 
-        # average
-        data_avg = np.mean(data_avg,axis=0)
+            # actually save
+            nib.save(output_image,output_file)
 
-        output_image = nib.nifti1.Nifti1Image(data_avg,affine,header=nibber.header)
-        nib.save(output_image,output)
-
-    else:
-        print('already exists, skipping %s'%output)
+        # append out files
+        outfiles.append(output_file)
         
-    return output
+    # if input file was not list, then return output that is also not list
+    if not isinstance(file, list): 
+        outfiles = outfiles[0] 
+    
+    return outfiles
+
+
+def average_epi(file, outdir, method = 'mean'):
+
+    """ average epi files
+    
+    Parameters
+    ----------
+    file : list/array
+         list of absolute filename to be averaged
+    outdir : str
+        path to save new file
+    meathod: str
+        if mean or median
+    Outputs
+    -------
+    output_file: str
+        absolute output filename (or list of filenames)
+    
+    """
+    
+    # check if single filename or list of filenames
+    if not isinstance(file, list): 
+        raise NameError('List of files not provided')
+        
+    file_list = file
+    
+    # get file extension
+    file_extension = '.{a}.{b}'.format(a = file_list[0].rsplit('.', 2)[-2],
+                                       b = file_list[0].rsplit('.', 2)[-1])
+    # set output filename
+    output_file = op.join(outdir, re.sub('run-\d{1}_','run-{mtd}_'.format(mtd = method), op.split(file_list[0])[-1]))
+
+    # if file already exists, skip
+    if op.exists(output_file): 
+        print('already exists, skipping %s'%output_file)
+    
+    else:
+        print('making %s'%output_file)
+
+        # store all run data in list, to average later
+        all_runs = []
+
+        # for each file, do the same
+        for i, input_file in enumerate(file_list):
+            
+            print('loading %s'%input_file)
+            
+            # load file
+            nibber = nib.load(input_file)
+
+            # way depends on type of extension
+            if file_extension == '.func.gii':
+                data = np.array([nibber.darrays[i].data for i in range(len(nibber.darrays))]) #load surface data (time, vertex)
+            else:
+                affine = nibber.affine
+                data = np.array(nibber.get_fdata())
+            
+            # check shape
+            # (note: for nifti files, time in last dim)
+            arr_shape = data.shape
+            
+            # reshape to 2D if necessary, to have shape (time, vertex)
+            if len(arr_shape)>2:
+                data = np.reshape(data, (-1, data.shape[-1])) 
+                data = data.T
+
+            all_runs.append(data)
+          
+        # average all
+        if method == 'median':
+            avg_data = np.median(all_runs, axis = 0)
+            
+        elif method == 'mean':
+            avg_data = np.mean(all_runs, axis = 0)
+            
+        # put back in original shape
+        if len(arr_shape)>2:
+            avg_data = avg_data.T.reshape(*arr_shape) 
+
+        ## save averaged file
+        # again, way depends on type of extension
+        if file_extension == '.func.gii':
+            darrays = [nib.gifti.gifti.GiftiDataArray(d) for d in avg_data]
+            output_image = nib.gifti.gifti.GiftiImage(header = nibber.header, 
+                                                              extra = nibber.extra, 
+                                                              darrays = darrays)
+        else:
+            output_image = nib.nifti1.Nifti1Image(avg_data, affine, header = nibber.header)
+
+        # actually save
+        nib.save(output_image,output_file)
+
+
+    return output_file
 
     
 def make_pRF_DM(output,params,save_imgs=False,downsample=None):

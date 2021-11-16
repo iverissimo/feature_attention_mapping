@@ -67,7 +67,7 @@ recon-all -s $SJ_NR -hires -i $T1_file \
 
 wait
 
-rsync -chavzP $SUBJECTS_DIR $OUTDIR
+rsync -chavzP $SUBJECTS_DIR/ $OUTDIR
 
 wait          # wait until programs are finished
 

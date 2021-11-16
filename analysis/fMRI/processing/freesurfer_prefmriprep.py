@@ -13,10 +13,10 @@ with open(op.join(op.split(op.split(os.getcwd())[0])[0],'exp_params.yml'), 'r') 
             params = yaml.safe_load(f_in)
 
 # define participant number
-if len(sys.argv)<3: 
+if len(sys.argv)<2: 
     raise NameError('Please add subject number (ex: 001) '
                     'as 1st argument in the command line!')
-elif len(sys.argv)<2:
+elif len(sys.argv)<3:
     raise NameError('Please specify where running data (local vs lisa)'
                     'as 2nd argument in the command line!')
 
@@ -48,9 +48,9 @@ echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
 conda activate i36
 
-cp -r $ANATDIR/ $TMPDIR
+cp -r $ANATDIR $TMPDIR
 wait
-cp -r $OUTDIR/ $TMPDIR
+cp -r $OUTDIR $TMPDIR
 
 wait
 
@@ -67,7 +67,7 @@ recon-all -s $SJ_NR -hires -i $T1_file \
 
 wait
 
-rsync -chavzP $TMPDIR/pre_fmriprep/$SJ_NR/ $OUTDIR
+rsync -chavzP $TMPDIR/pre_fmriprep/$SJ_NR $OUTDIR
 
 wait          # wait until programs are finished
 

@@ -54,7 +54,7 @@ cp -r $OUTDIR $TMPDIR
 
 wait
 
-export SUBJECTS_DIR=$TMPDIR/pre_fmriprep/$SJ_NR
+export SUBJECTS_DIR=$TMPDIR/$SJ_NR
 
 wait
 
@@ -67,7 +67,7 @@ recon-all -s $SJ_NR -hires -i $T1_file \
 
 wait
 
-rsync -chavzP $TMPDIR/pre_fmriprep/$SJ_NR $OUTDIR
+rsync -chavzP $SUBJECTS_DIR $OUTDIR
 
 wait          # wait until programs are finished
 

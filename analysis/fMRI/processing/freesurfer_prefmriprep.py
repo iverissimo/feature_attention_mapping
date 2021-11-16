@@ -4,7 +4,7 @@
 
 import os, sys
 import os.path as op
-import numpy as np
+import glob
 
 import yaml
 
@@ -24,6 +24,17 @@ else:
     sj = str(sys.argv[1]).zfill(3) #fill subject number with 00 in case user forgets
     base_dir = str(sys.argv[2]) # which machine we run the data
 
+# path to store freesurfer outputs 
+out_dir = op.join(params['mri']['paths'][base_dir]['root'],'pre_fmriprep')
+
+if not op.exists(out_dir):
+    os.makedirs(out_dir)
+print('saving files in %s'%out_dir)
+
+# T1 and T2 filenames
+anat_dir = glob.glob(op.join(params['mri']['paths'][base_dir]['root'], 'sourcedata','sub-{sj}'.format(sj=sj),'ses-*','anat'))[0]
+t1_filename = [op.join(anat_dir,run) for _,run in enumerate(os.listdir(anat_dir)) if run.endswith('.nii.gz') and 'T1w' in run]
+t2_filename = [op.join(anat_dir,run) for _,run in enumerate(os.listdir(anat_dir)) if run.endswith('.nii.gz') and 'T2w' in run]
 
 batch_string = """#!/bin/bash
 #SBATCH -t 96:00:00
@@ -37,7 +48,9 @@ echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
 conda activate i36
 
-cp -r $DATADIR/ $TMPDIR
+cp -r $ANATDIR/ $TMPDIR
+wait
+cp -r $OUTDIR/ $TMPDIR
 
 wait
 
@@ -49,18 +62,12 @@ cd $SUBJECTS_DIR
 
 wait
 
-cd $SUBJECTS_DIR
+recon-all -s $SJ_NR -hires -i $T1_file \
+    -T2 $T2_file -T2pial -all
 
 wait
 
-recon-all -s $SJ_NR -hires -i $SUBJECTS_DIR/orig_anat/$SJ_NR_ses-1_run-1_T1w.nii.gz \
-    -i $SUBJECTS_DIR/orig_anat/$SJ_NR_ses-1_run-2_T1w.nii.gz \
-    -i $SUBJECTS_DIR/orig_anat/$SJ_NR_ses-1_run-3_T1w.nii.gz \
-    -T2 $SUBJECTS_DIR/orig_anat/$SJ_NR_ses-1_run-1_T2w.nii.gz -T2pial -all
-
-wait
-
-rsync -chavzP $TMPDIR/pre_fmriprep/$SJ_NR/ $DATADIR
+rsync -chavzP $TMPDIR/pre_fmriprep/$SJ_NR/ $OUTDIR
 
 wait          # wait until programs are finished
 
@@ -70,8 +77,11 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 batch_dir = '/home/inesv/batch/'
 os.chdir(batch_dir)
 
-keys2replace = {'$SJ_NR': 'sub-'+str(sj).zfill(3),
-                '$DATADIR': op.join(params['mri']['paths'][base_dir]['root'],'pre_fmriprep')
+keys2replace = {'$SJ_NR': 'sub-{sj}'.format(sj = str(sj).zfill(3)),
+                '$ANATDIR': anat_dir,
+                '$OUTDIR': out_dir,
+                '$T1_file': t1_filename[0].replace(anat_dir,'/scratch/anat'),
+                '$T2_file': t2_filename[0].replace(anat_dir,'/scratch/anat')
                  }
 
 # replace all key-value pairs in batch string
@@ -79,7 +89,7 @@ for key, value in keys2replace.items():
     batch_string = batch_string.replace(key, value)
     
 # run it
-js_name = op.join(batch_dir, 'FREESURFER7-' + str(sj).zfill(3) + '_FAM_recon.sh')
+js_name = op.join(batch_dir, 'FREESURFER7-' + str(sj).zfill(3) + '_FAM_prefmriprep.sh')
 of = open(js_name, 'w')
 of.write(batch_string)
 of.close()

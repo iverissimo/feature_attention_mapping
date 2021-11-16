@@ -5,7 +5,7 @@
 
 import os, sys
 import os.path as op
-import numpy as np
+import glob
 
 import yaml
 
@@ -25,9 +25,6 @@ else:
     sj = str(sys.argv[1]).zfill(3) #fill subject number with 00 in case user forgets
     base_dir = str(sys.argv[2]) # which machine we run the data
 
-# session number 
-ses = '1'
-
 # get current repo path
 repo_pth = os.getcwd()
 
@@ -35,8 +32,7 @@ repo_pth = os.getcwd()
 matlab_pth = params['mri']['paths'][base_dir]['matlab']
   
 # path to source data       
-sourcedata_pth = op.join(params['mri']['paths'][base_dir]['root'], 'sourcedata','sub-{sj}'.format(sj=sj),
-                        'ses-{ses}'.format(ses=ses),'anat')
+sourcedata_pth = glob.glob(op.join(params['mri']['paths'][base_dir]['root'], 'sourcedata','sub-{sj}'.format(sj=sj),'ses-*','anat'))[0]
 
 # list original (uncorrected) files (can be T1 or T2)
 orig_files = [op.join(sourcedata_pth,run) for _,run in enumerate(os.listdir(sourcedata_pth)) 

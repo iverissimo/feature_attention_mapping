@@ -13,7 +13,7 @@ from scipy.ndimage import gaussian_filter
 from scipy.signal import savgol_filter
 
 from nilearn.glm.first_level.design_matrix import _cosine_drift as dct_set
-from nilearn import signal
+from nilearn import signal, surface
 
 from joblib import Parallel, delayed
 
@@ -587,7 +587,7 @@ def average_epi(file, outdir, method = 'mean'):
          list of absolute filename to be averaged
     outdir : str
         path to save new file
-    meathod: str
+    method: str
         if mean or median
     Outputs
     -------
@@ -671,8 +671,67 @@ def average_epi(file, outdir, method = 'mean'):
 
     return output_file
 
+
+def load_and_mask_data(file, chunk_num = 1, total_chunks = 1):
     
-def make_pRF_DM(output,params,save_imgs=False,downsample=None):
+    """ load data, split into chunk/slice and mask nan voxels
+    used to create a 2D array for pRF fitting
+    with only relevant voxels/vertices
+    
+    Parameters
+    ----------
+    file : str
+        absolute filename of the data to be fitted
+
+    Outputs
+    -------
+    masked_data: arr
+        masked data array
+    not_nan_vox: list/arr
+        voxel indices that were NOT masked out
+    orig_shape: tuple
+        shape of original data chunk/slice (for later reshaping)
+    """
+    
+    # get file extension
+    file_extension = '.{a}.{b}'.format(a = file.rsplit('.', 2)[-2],
+                                       b = file.rsplit('.', 2)[-1])
+    
+    # load data array, if necessary convert to 2D (vertex, time)
+    # and select only relevant chunk/slice
+
+    if file_extension == '.func.gii':
+
+        # load surface data
+        data_all = np.array(surface.load_surf_data(file))
+
+        # number of vertices of chunk
+        num_vox_chunk = int(data_all.shape[0]/total_chunks) 
+
+        # new data chunk to fit
+        data = data_all[num_vox_chunk*(int(chunk_num)-1):num_vox_chunk*int(chunk_num),:]
+
+        # store original shape, useful later
+        orig_shape = data_all.shape
+
+        print('fitting chunk %s/%d of data with shape %s'%(chunk_num,total_chunks,str(data.shape)))
+        
+    elif file_extension == '.nii.gz':
+        
+        print('not implemented')  
+
+    # define non nan voxels for sanity check
+    not_nan_vox = np.where(~np.isnan(data[...,0]))[0]
+    print('masked data with shape %s'%(str(data[not_nan_vox].shape)))
+
+    # mask data
+    # to avoid errors in fitting (all nan batches) and make fitting faster
+    masked_data = data[not_nan_vox]
+
+    return masked_data, not_nan_vox, orig_shape
+
+
+def make_pRF_DM(output, params, save_imgs = False, downsample = None):
     
     """Make design matrix for pRF task
     
@@ -693,7 +752,6 @@ def make_pRF_DM(output,params,save_imgs=False,downsample=None):
             os.makedirs(op.split(output)[0])
         
         # general infos
-        TR = params['mri']['TR']
         bar_width = params['prf']['bar_width_ratio'] 
 
         screen_res = params['window']['size']
@@ -704,11 +762,12 @@ def make_pRF_DM(output,params,save_imgs=False,downsample=None):
             screen_res = (screen_res*downsample).astype(int)
 
         # number TRs per condition
-        TR_conditions = {'L-R': params['prf']['bar_pass_hor_TR'],
-                         'R-L': params['prf']['bar_pass_hor_TR'],
-                         'U-D': params['prf']['bar_pass_ver_TR'],
-                         'D-U': params['prf']['bar_pass_ver_TR'],
-                         'empty': params['prf']['empty_TR']}
+        TR_conditions = {'L-R': params['prf']['num_TRs']['L-R'],
+                         'R-L': params['prf']['num_TRs']['R-L'],
+                         'U-D': params['prf']['num_TRs']['U-D'],
+                         'D-U': params['prf']['num_TRs']['D-U'],
+                         'empty': params['prf']['num_TRs']['empty'],
+                         'empty_long': params['prf']['num_TRs']['empty_long']}
 
         # order of conditions in run
         bar_pass_direction = params['prf']['bar_pass_direction']
@@ -739,13 +798,13 @@ def make_pRF_DM(output,params,save_imgs=False,downsample=None):
         # save screen display for each TR
         visual_dm_array = np.zeros((total_TR, screen_res[0],screen_res[1]))
         counter = 0
-        for ind,bartype in enumerate(bar_pass_direction): # loop over bar pass directions
+        for _,bartype in enumerate(bar_pass_direction): # loop over bar pass directions
 
             for i in range(TR_conditions[bartype]):
 
                 img = Image.new('RGB', tuple(screen_res)) # background image
 
-                if bartype not in np.array(['empty']): # if not empty screen
+                if bartype not in np.array(['empty','empty_long']): # if not empty screen
                     # set draw method for image
                     draw = ImageDraw.Draw(img)
                     # add bar, coordinates (upLx, upLy, lowRx, lowRy)
@@ -782,11 +841,13 @@ def make_pRF_DM(output,params,save_imgs=False,downsample=None):
     return visual_dm
 
 
-def save_estimates(filename, estimates, vox_indices, data_filename):
+def save_estimates(filename, estimates, mask_indices, orig_shape, model_type = 'gauss'):
     
     """
-    re-arrange estimates from 2D to 4D
-    and save in folder
+    re-arrange estimates that were masked
+    and save all in numpy file
+    
+    (only works for gii files, should generalize for nii and cifti also)
     
     Parameters
     ----------
@@ -794,34 +855,45 @@ def save_estimates(filename, estimates, vox_indices, data_filename):
         absolute filename of estimates to be saved
     estimates : arr
         2d estimates (datapoints,estimates)
-    vox_indices : list
-        list of tuples, with voxel indices 
-        (to reshape estimates according to original data shape)
-    data_filename: str
-        absolute filename of original data fitted
+    mask_indices : arr
+        array with voxel indices that were NOT masked out
+    orig_shape: tuple
+        orginal data shape 
+    model_type: str
+        model type used for fitting
         
-    Outputs
-    -------
-    out_file: str
-        absolute output filename
     
     """ 
-    # load nifti image to get header and shape
-    data_img = nib.load(data_filename)
-    data = data_img.get_fdata()
+    final_estimates = np.zeros((orig_shape[0], estimates.shape[-1])); final_estimates[:] = np.nan
     
-    # Re-arrange data
-    estimates_mat = np.zeros((data.shape[0],data.shape[1],data.shape[2],estimates.shape[-1]))
-    estimates_mat[:] = np.nan
+    counter = 0
     
-    for est,vox in enumerate(vox_indices):
-        estimates_mat[vox] = estimates[est]
+    for i in range(orig_shape[0]):
+        if i <= mask_indices[-1]:
+            if i == mask_indices[counter]:
+                final_estimates[i] = estimates[counter]
+                counter += 1
+            
+    if model_type == 'gauss':
         
-    # Save estimates data
-    new_img = nib.Nifti1Image(dataobj = estimates_mat, affine = data_img.affine, header = data_img.header)
-    new_img.to_filename(filename)
+        np.savez(filename,
+                 x = final_estimates[..., 0],
+                 y = final_estimates[..., 1],
+                 size = final_estimates[..., 2],
+                 betas = final_estimates[...,3],
+                 baseline = final_estimates[..., 4],
+                 r2 = final_estimates[..., 5])
     
-    return filename
+    elif model_type == 'css':
+        np.savez(filename,
+                 x = final_estimates[..., 0],
+                 y = final_estimates[..., 1],
+                 size = final_estimates[..., 2],
+                 betas = final_estimates[...,3],
+                 baseline = final_estimates[..., 4],
+                 ns = final_estimates[..., 5],
+                 r2 = final_estimates[..., 6])
+    
 
 
 

@@ -93,9 +93,11 @@ mri: # refers to the Psychopy SyncGenerator class
     type: 'dc' #'HPgauss' # None
     cut_off_hz: 0.01 #0.014
 
+    window_length: 201
+    polyorder: 3
+    highpass: True
+    add_mean: True
 
-  psc:
-    file_extension: '_psc.nii.gz'
 
   paths:
     local: 
@@ -116,18 +118,22 @@ mri: # refers to the Psychopy SyncGenerator class
 
   fitting:
     pRF:
-      runs: 'run-average' # [1,2]
-      input_file_dir: 'post_fmriprep/average'
-      #input_file_ext: 'HPgauss_psc.nii.gz'
-      #space: 'T1w'
-      #acq_type: ['ORIG','ORIGPF','ORIGPFFA59']
+      run: 'median' 
+      total_chunks: {'fsaverage': 83, 'T1w': 89} # total number of chunks to split the data, depends on space of files
+
+      fit_model: 'gauss' #'css'
 
       grid_nr: 40 # number of grid steps
       min_eccen: 0.2
-      max_eccen: 20
+      max_eccen: 15
 
       min_size: 0.2
-      max_size: 20
+      max_size: 15
+
+      min_n: 0.01
+      max_n: 1.1
+
+      N_PROCS: 4
 
 
 eyetracking:

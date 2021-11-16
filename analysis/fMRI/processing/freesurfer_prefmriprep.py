@@ -25,7 +25,7 @@ else:
     base_dir = str(sys.argv[2]) # which machine we run the data
 
 # path to store freesurfer outputs 
-out_dir = op.join(params['mri']['paths'][base_dir]['root'],'pre_fmriprep')
+out_dir = op.join(params['mri']['paths'][base_dir]['root'],'pre_fmriprep','sub-{sj}'.format(sj=sj))
 
 if not op.exists(out_dir):
     os.makedirs(out_dir)

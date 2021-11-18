@@ -50,7 +50,7 @@ conda activate i36
 
 cp -r $ANATDIR $TMPDIR
 wait
-cp -r $OUTDIR $TMPDIR
+cp -r $OUTDIR/$SJ_NR $TMPDIR
 
 wait
 
@@ -79,7 +79,7 @@ os.chdir(batch_dir)
 
 keys2replace = {'$SJ_NR': 'sub-{sj}'.format(sj = str(sj).zfill(3)),
                 '$ANATDIR': anat_dir,
-                '$OUTDIR': out_dir,
+                '$OUTDIR': op.split(out_dir)[0], 
                 '$T1_file': t1_filename[0].replace(anat_dir,'/scratch/anat'),
                 '$T2_file': t2_filename[0].replace(anat_dir,'/scratch/anat')
                  }

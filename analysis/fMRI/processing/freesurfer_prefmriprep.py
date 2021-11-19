@@ -50,11 +50,11 @@ conda activate i36
 
 cp -r $ANATDIR $TMPDIR
 wait
-cp -r $OUTDIR $TMPDIR
+cp -r $OUTDIR/$SJ_NR $TMPDIR
 
 wait
 
-export SUBJECTS_DIR=$TMPDIR/$SJ_NR
+export SUBJECTS_DIR=$TMPDIR
 
 wait
 
@@ -67,7 +67,7 @@ recon-all -s $SJ_NR -hires -i $T1_file \
 
 wait
 
-rsync -chavzP $SUBJECTS_DIR/ $OUTDIR
+rsync -chavzP $TMPDIR/$SJ_NR $OUTDIR
 
 wait          # wait until programs are finished
 

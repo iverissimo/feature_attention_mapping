@@ -49,9 +49,7 @@ echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
 conda activate i36
 
-cp -r $ANATDIR $TMPDIR
-wait
-cp -r $OUTDIR/$SJ_NR $TMPDIR
+cp -r $OUTDIR $TMPDIR
 
 wait
 

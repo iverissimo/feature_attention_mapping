@@ -60,10 +60,11 @@ if file_type == 'anat':
 
 else:
     batch_string = """#!/bin/bash
-    #SBATCH -t 96:00:00
+    #SBATCH --time=96:00:00
     #SBATCH -N 1 --mem=65536
     #SBATCH --cpus-per-task=16
     #SBATCH -v
+    #SBATCH --output=/home/inesv/batch/slurm_output_%A.out
 
     # call the programs
     echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"

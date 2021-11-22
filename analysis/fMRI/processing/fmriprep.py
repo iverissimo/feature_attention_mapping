@@ -46,7 +46,7 @@ if file_type == 'anat':
     
     wait
 
-    PYTHONPATH="" singularity run --cleanenv -B /project/k_lab \
+    PYTHONPATH="" singularity run --cleanenv -B /project/projects_verissimo \
     $SINGIMG \
     $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/ participant \
     --participant-label sub-$SJ_NR --output-space T1w  \
@@ -71,7 +71,7 @@ else:
 
     wait
 
-    PYTHONPATH="" singularity run --cleanenv -B /project/k_lab -B $TMPDIR/FAM_wf \
+    PYTHONPATH="" singularity run --cleanenv -B /project/projects_verissimo -B $TMPDIR/FAM_wf \
     $SINGIMG \
     $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/ participant \
     --participant-label sub-$SJ_NR --output-space T1w fsnative fsaverage MNI152NLin2009cAsym --cifti-output 170k \

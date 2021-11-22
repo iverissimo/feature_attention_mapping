@@ -34,7 +34,6 @@ print('saving files in %s'%mriqc_dir)
 sing_img = '/home/inesv/my_images/mriqc-0.15.1.simg'
 
 
-
 if base_dir == 'local': # for local machine
 
     batch_string = """#!/bin/bash
@@ -54,50 +53,50 @@ if base_dir == 'local': # for local machine
 else: # assumes slurm systems
 
     batch_string = """#!/bin/bash
-    #SBATCH -t 96:00:00
-    #SBATCH -N 1 --mem=65536
-    #SBATCH --cpus-per-task=16
-    #SBATCH -v
-    #SBATCH --output=/home/inesv/batch/slurm_output_%A.out
+#SBATCH -t 96:00:00
+#SBATCH -N 1 --mem=65536
+#SBATCH --cpus-per-task=16
+#SBATCH -v
+#SBATCH --output=/home/inesv/batch/slurm_output_%A.out
 
-    # call the programs
-    echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
+# call the programs
+echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
-    conda activate i36
+conda activate i36
 
-    wait
+wait
 
-    #Make mriqc directory and participant directory in derivatives folder
-    if [ ! -d $ROOTFOLDER/derivatives ]; then
-    mkdir $ROOTFOLDER/derivatives
-    fi
+#Make mriqc directory and participant directory in derivatives folder
+if [ ! -d $ROOTFOLDER/derivatives ]; then
+mkdir $ROOTFOLDER/derivatives
+fi
 
-    if [ ! -d $ROOTFOLDER/derivatives/mriqc ]; then
-    mkdir $ROOTFOLDER/derivatives/mriqc
-    fi
+if [ ! -d $ROOTFOLDER/derivatives/mriqc ]; then
+mkdir $ROOTFOLDER/derivatives/mriqc
+fi
 
-    if [ ! -d $ROOTFOLDER/derivatives/mriqc/$SJ_NR ]; then
-    mkdir $ROOTFOLDER/derivatives/mriqc/$SJ_NR
-    fi
+if [ ! -d $ROOTFOLDER/derivatives/mriqc/$SJ_NR ]; then
+mkdir $ROOTFOLDER/derivatives/mriqc/$SJ_NR
+fi
 
-    #Run MRIQC
-    echo ""
-    echo "Running MRIQC on participant $SJ_NR"
-    echo ""
+#Run MRIQC
+echo ""
+echo "Running MRIQC on participant $SJ_NR"
+echo ""
 
-    wait
+wait
 
-    singularity run --cleanenv $SINGIMG \
-      $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/mriqc/$SJ_NR \
-      participant \
-      --hmc-fsl \
-      --float32 \
-      -w $ROOTFOLDER/derivatives/mriqc/$SJ_NR
+singularity run --cleanenv $SINGIMG \
+    $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/mriqc/$SJ_NR \
+    participant \
+    --hmc-fsl \
+    --float32 \
+    -w $ROOTFOLDER/derivatives/mriqc/$SJ_NR
 
-    wait          # wait until programs are finished
+wait          # wait until programs are finished
 
-    echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
-    """
+echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
+"""
 
     batch_dir = '/home/inesv/batch/'
 

@@ -35,56 +35,56 @@ sing_img = '/home/inesv/my_images/fmriprep.20.2.3.simg' #fmriprep.20.2.1.simg'
 if file_type == 'anat':
 
     batch_string = """#!/bin/bash
-    #SBATCH --time=40:30:00
-    #SBATCH -N 1 --mem=60G
+#SBATCH --time=40:30:00
+#SBATCH -N 1 --mem=60G
 
-    # call the programs
-    echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
+# call the programs
+echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
-    # make working directory in node
-    mkdir $TMPDIR/FAM_wf
-    
-    wait
+# make working directory in node
+mkdir $TMPDIR/FAM_wf
 
-    PYTHONPATH="" singularity run --cleanenv -B /project/projects_verissimo \
-    $SINGIMG \
-    $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/ participant \
-    --participant-label sub-$SJ_NR --output-space T1w  \
-    --nthreads 30 --omp-nthreads 30 --low-mem --fs-license-file $FREESURFER/license.txt \
-    --anat-only -w $TMPDIR/FAM_wf
+wait
 
-    wait          # wait until programs are finished
+PYTHONPATH="" singularity run --cleanenv -B /project/projects_verissimo \
+$SINGIMG \
+$ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/ participant \
+--participant-label sub-$SJ_NR --output-space T1w  \
+--nthreads 30 --omp-nthreads 30 --low-mem --fs-license-file $FREESURFER/license.txt \
+--anat-only -w $TMPDIR/FAM_wf
 
-    echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
-    """
+wait          # wait until programs are finished
+
+echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
+"""
 
 else:
     batch_string = """#!/bin/bash
-    #SBATCH -N 1 --mem=65536
-    #SBATCH --cpus-per-task=16
-    #SBATCH -v
-    #SBATCH --output=/home/inesv/batch/slurm_output_%A.out
-    #SBATCH --time=24:00:00
+#SBATCH -t 96:00:00
+#SBATCH -N 1 --mem=65536
+#SBATCH --cpus-per-task=16
+#SBATCH -v
+#SBATCH --output=/home/inesv/batch/slurm_output_%A.out
 
-    # call the programs
-    echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
+# call the programs
+echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
-    # make working directory in node
-    mkdir $TMPDIR/FAM_wf
+# make working directory in node
+mkdir $TMPDIR/FAM_wf
 
-    wait
+wait
 
-    PYTHONPATH="" singularity run --cleanenv -B /project/projects_verissimo -B $TMPDIR/FAM_wf \
-    $SINGIMG \
-    $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/ participant \
-    --participant-label sub-$SJ_NR --output-space T1w fsnative fsaverage MNI152NLin2009cAsym --cifti-output 170k \
-    --bold2t1w-init register --nthreads 30 --omp-nthreads 30 --fs-license-file $FREESURFER/license.txt \
-    --use-syn-sdc --bold2t1w-dof 6 --verbose --ignore slicetiming
+PYTHONPATH="" singularity run --cleanenv -B /project/projects_verissimo -B $TMPDIR/FAM_wf \
+$SINGIMG \
+$ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/ participant \
+--participant-label sub-$SJ_NR --output-space T1w fsnative fsaverage MNI152NLin2009cAsym --cifti-output 170k \
+--bold2t1w-init register --nthreads 30 --omp-nthreads 30 --fs-license-file $FREESURFER/license.txt \
+--use-syn-sdc --bold2t1w-dof 6 --verbose --ignore slicetiming
 
-    wait          # wait until programs are finished
+wait          # wait until programs are finished
 
-    echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
-    """
+echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
+"""
 
 batch_dir = '/home/inesv/batch/'
 os.chdir(batch_dir)

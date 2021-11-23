@@ -5,7 +5,6 @@ import os.path as op
 import yaml
 from pathlib import Path
 
-import nibabel as nb
 
 # requires pfpy to be installed - preferably with python setup.py develop
 from prfpy.rf import *
@@ -67,7 +66,7 @@ file_ext = '_cropped_{filt}_{stand}.{a}.{b}'.format(filt = params['mri']['filter
                                                     b = params['mri']['file_ext'].rsplit('.', 2)[-1])
 
 # set paths
-derivatives_dir = op.join(params['mri']['paths'][base_dir]['root'],'derivatives')
+derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
 postfmriprep_dir = op.join(derivatives_dir,'post_fmriprep','sub-{sj}'.format(sj=sj),space,'processed')
 
 output_dir =  op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), model_type,'run-{run}'.format(run=run_type))

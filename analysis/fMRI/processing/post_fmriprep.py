@@ -33,7 +33,7 @@ file_ext = params['mri']['file_ext'] # file extension
 hemispheres = ['hemi-L','hemi-R'] # only used for gifti files
 
 # set paths
-derivatives_dir = op.join(params['mri']['paths'][base_dir]['root'],'derivatives')
+derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
 output_dir =  op.join(derivatives_dir,'post_fmriprep','sub-{sj}'.format(sj=sj),space)
 
 # if output path doesn't exist, create it

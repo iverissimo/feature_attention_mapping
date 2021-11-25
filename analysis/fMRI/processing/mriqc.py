@@ -52,7 +52,48 @@ poldracklab/mriqc:latest /data /out participant --participant_label $SJ_NR
 
 else: # assumes slurm systems
 
-    batch_string = """#!/bin/bash
+    if sj == 'group':
+
+        batch_string = """#!/bin/bash
+#SBATCH -t 96:00:00
+#SBATCH -N 1 --mem=65536
+#SBATCH --cpus-per-task=16
+#SBATCH -v
+#SBATCH --output=/home/inesv/batch/slurm_output_%A.out
+
+# call the programs
+echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
+
+conda activate i36
+
+wait
+
+echo ""
+echo "Running MRIQC on participant $SJ_NR"
+echo ""
+
+wait
+
+# make working directory in node
+mkdir $TMPDIR/FAM_wf
+
+wait
+
+singularity run --cleanenv -B /project/projects_verissimo -B $TMPDIR/FAM_wf \
+$SINGIMG \
+$ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR \
+group --hmc-fsl --float32 \
+-w $TMPDIR/FAM_wf
+
+wait          # wait until programs are finished
+
+echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
+"""
+
+    # for single subject
+    else:
+
+        batch_string = """#!/bin/bash
 #SBATCH -t 96:00:00
 #SBATCH -N 1 --mem=65536
 #SBATCH --cpus-per-task=16

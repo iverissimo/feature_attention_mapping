@@ -160,12 +160,12 @@ def plot_gaze_kde(df_gaze, filename, run = 1, task = 'FA',
 
         for i in range(2):
 
-            for w in range(2):
+            for w in range(2): 
 
                 data_x = df_gaze.loc[(df_gaze['run'] == run) &
-                                            (df_gaze['attend_condition'] == conditions[plt_counter])]['gaze_x'].values[0]
+                                            (df_gaze['condition'] == conditions[plt_counter])]['gaze_x'].values[0]
                 data_y = df_gaze.loc[(df_gaze['run'] == run) &
-                                            (df_gaze['attend_condition'] == conditions[plt_counter])]['gaze_y'].values[0]
+                                            (df_gaze['condition'] == conditions[plt_counter])]['gaze_y'].values[0]
 
                 # turn string list to actual list (workaround for pandas)
                 if type(data_x) != list:
@@ -200,9 +200,40 @@ def plot_gaze_kde(df_gaze, filename, run = 1, task = 'FA',
                 
     elif task=='pRF':
 
-        print('not implemented')
-
         fig, axs = plt.subplots(1, 1, sharex=True, figsize=(30,15))
+
+        data_x = df_gaze.loc[(df_gaze['run'] == run)]['gaze_x'].values[0]
+        data_y = df_gaze.loc[(df_gaze['run'] == run)]['gaze_y'].values[0]
+
+        # turn string list to actual list (workaround for pandas)
+        if type(data_x) != list:
+
+            data_x = literal_eval(data_x)[::downsample] 
+            data_y = literal_eval(data_y)[::downsample]
+        
+        else:
+            data_x = data_x[::downsample]
+            data_y = data_y[::downsample]
+
+        # get mean gaze and std
+        mean_gaze, mean_std = mean_dist_deg(data_x, data_y)
+        
+        # downsample data to make kde faster
+        a = sns.kdeplot(ax = axs, x = data_x, y = data_y, fill = True, color = 'blue')
+        a.tick_params(labelsize=15)
+
+        axs.set_title('run-%s'%str(run),fontsize=18)
+        axs.text(10, 10, 'mean gaze distance from center = %.2f +/- %.2f dva'%(mean_gaze, mean_std),
+                        fontsize = 15)
+
+        axs.set_ylim(0, screen[1])
+        axs.set_xlim(0, screen[0])
+
+        axs.axvline(screen[0]/2, lw=0.5, color='k',alpha=0.5)
+        axs.axhline(screen[1]/2, lw=0.5, color='k',alpha=0.5)
+
+        axs.add_artist(plt.Circle((screen[0]/2, screen[1]/2), radius=102, color='grey',alpha=0.5 , fill=False)) # add circle of 1dva radius, for reference 
+
 
     fig.savefig(filename)
 
@@ -238,7 +269,7 @@ def plot_sacc_hist(df_sacc, filename, run = 1, task = 'FA', conditions = ['green
             for w in range(2):
 
                 amp = df_sacc.loc[(df_sacc['run'] == run) &
-                                    (df_sacc['attend_condition'] == conditions[plt_counter])]['expanded_amplitude'].values[0]
+                                    (df_sacc['condition'] == conditions[plt_counter])]['expanded_amplitude'].values[0]
 
                 if amp == [0]: # if 0, then no saccade
 
@@ -264,9 +295,29 @@ def plot_sacc_hist(df_sacc, filename, run = 1, task = 'FA', conditions = ['green
             
     elif task=='pRF':
 
-        print('not implemented')
-
         fig, axs = plt.subplots(1, 1, sharex=True, figsize=(30,15))
+
+        amp = df_sacc.loc[(df_sacc['run'] == run)]['expanded_amplitude'].values[0]
+
+        if amp == [0]: # if 0, then no saccade
+
+            amp = [np.nan]
+
+        a = sns.histplot(ax = axs, 
+                        x = amp,
+                        color = 'blue')
+        a.tick_params(labelsize=15)
+        a.set_xlabel('Amplitude (degrees)',fontsize=15, labelpad = 15)
+
+        axs.set_title('run-%s'%str(run),fontsize=18)
+        axs.axvline(0.5, lw=0.5, color='k',alpha=0.5,linestyle='--')
+        
+        # count number of saccades with amplitude bigger than 0.5 deg
+        sac_count = len(np.where(np.array(amp) >= 0.5)[0])
+        axs.text(0.7, 0.9,'%i saccades > 0.5deg'%(sac_count), 
+                        ha='center', va='center', transform=axs.transAxes,
+                        fontsize = 15)
+
 
     fig.savefig(filename)
 

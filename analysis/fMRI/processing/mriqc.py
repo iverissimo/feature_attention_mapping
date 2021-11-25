@@ -81,7 +81,7 @@ wait
 
 singularity run --cleanenv -B /project/projects_verissimo -B $TMPDIR/FAM_wf \
 $SINGIMG \
-$ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR \
+$ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/mriqc \
 group --hmc-fsl --float32 \
 -w $TMPDIR/FAM_wf
 

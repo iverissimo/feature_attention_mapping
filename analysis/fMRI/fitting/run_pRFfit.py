@@ -36,6 +36,7 @@ total_chunks = params['mri']['fitting']['pRF']['total_chunks'][space] # number o
 # number of slices to split data in (makes fitting faster)
 #total_slices = 89 # slice in z direction
 
+code_base_dir = op.split(os.getcwd())[0] #base dir for python code on fMRI analysis
 
 batch_string = """#!/bin/bash
 #SBATCH -t 96:00:00
@@ -53,11 +54,11 @@ cp -r $DERIV_DIR $TMPDIR
 
 wait
 
-python post_fmriprep.py $SJ_NR
+python $CODE_DIR/processing/post_fmriprep.py $SJ_NR
 
 wait          # wait until programs are finished
 
-python pRF_fitting.py $SJ_NR $RUN_TYPE $CHUNK_NR
+python pRF_model.py $SJ_NR $RUN_TYPE $CHUNK_NR
 
 wait          # wait until programs are finished
 
@@ -77,6 +78,7 @@ for _,chu in enumerate(range(total_chunks)): # submit job for each chunk
         working_string = batch_string.replace('$SJ_NR', str(sj).zfill(3))
         working_string = working_string.replace('$RUN_TYPE', run_type)
         working_string = working_string.replace('$CHUNK_NR', str(chu+1).zfill(3))
+        working_string = working_string.replace('$CODE_DIR', code_base_dir)
         working_string = working_string.replace('$DERIV_DIR', op.join(params['mri']['paths'][base_dir]['root'], 'derivatives'))
 
         # run it

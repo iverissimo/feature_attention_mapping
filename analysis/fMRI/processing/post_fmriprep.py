@@ -49,6 +49,10 @@ epi_files = {'pRF':[op.join(fmriprep_dir,run) for _,run in enumerate(os.listdir(
              'FA': [op.join(fmriprep_dir,run) for _,run in enumerate(os.listdir(fmriprep_dir)) 
             if space in run and acq in run and 'FA' in run and run.endswith(file_ext)]}
 
+# exception for this run that could not be nordiced
+if sj == '004':
+   epi_files['FA'].append(op.join(fmriprep_dir,'sub-004_ses-1_task-FA_acq-standard_run-4_bold.nii.gz')) 
+
 # dict to store names of processed files, per task
 proc_files = {'pRF': [],
              'FA': []}

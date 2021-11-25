@@ -38,17 +38,17 @@ if base_dir == 'local': # for local machine
 
     batch_string = """#!/bin/bash
 
-    conda activate i36
+conda activate i36
 
-    wait
+wait
 
-    docker run -it --rm \
-    -v $ROOTFOLDER/sourcedata:/data:ro \
-    -v $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR:/out \
-    poldracklab/mriqc:latest /data /out participant --participant_label $SJ_NR
+docker run -it --rm \
+-v $ROOTFOLDER/sourcedata:/data:ro \
+-v $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR:/out \
+poldracklab/mriqc:latest /data /out participant --participant_label $SJ_NR
 
 
-    """
+"""
 
 else: # assumes slurm systems
 
@@ -66,32 +66,24 @@ conda activate i36
 
 wait
 
-#Make mriqc directory and participant directory in derivatives folder
-if [ ! -d $ROOTFOLDER/derivatives ]; then
-mkdir $ROOTFOLDER/derivatives
-fi
-
-if [ ! -d $ROOTFOLDER/derivatives/mriqc ]; then
-mkdir $ROOTFOLDER/derivatives/mriqc
-fi
-
-if [ ! -d $ROOTFOLDER/derivatives/mriqc/$SJ_NR ]; then
-mkdir $ROOTFOLDER/derivatives/mriqc/$SJ_NR
-fi
-
-#Run MRIQC
 echo ""
 echo "Running MRIQC on participant $SJ_NR"
 echo ""
 
 wait
 
-singularity run --cleanenv $SINGIMG \
-    $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/mriqc/$SJ_NR \
-    participant \
-    --hmc-fsl \
-    --float32 \
-    -w $ROOTFOLDER/derivatives/mriqc/$SJ_NR
+# make working directory in node
+mkdir $TMPDIR/FAM_wf
+
+wait
+
+singularity run --cleanenv -B /project/projects_verissimo -B $TMPDIR/FAM_wf \
+$SINGIMG \
+$ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR \
+--participant-label $SJ_NR \
+--hmc-fsl \
+--float32 \
+-w $TMPDIR/FAM_wf
 
 wait          # wait until programs are finished
 
@@ -102,7 +94,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
 os.chdir(batch_dir)
 
-keys2replace = {'$SJ_NR': 'sub-{sj}'.format(sj=sj),
+keys2replace = {'$SJ_NR': sj,
                 '$SINGIMG': sing_img,
                 '$ROOTFOLDER': params['mri']['paths'][base_dir]['root'] 
                  }

@@ -63,7 +63,7 @@ plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = 'Helvetica'
 
 # some settings
-base_dir = '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/PILOT_OLD'#params['general']['current_dir'] # which machine we run the data
+base_dir = params['general']['current_dir'] # which machine we run the data
 acq = params['mri']['acq'] # if using standard files or nordic files
 space = params['mri']['space'] # subject space
 total_chunks = params['mri']['fitting']['pRF']['total_chunks'][space] # number of chunks that data was split in
@@ -83,7 +83,7 @@ file_ext = '_cropped_{filt}_{stand}.{a}.{b}'.format(filt = params['mri']['filter
                                                     b = params['mri']['file_ext'].rsplit('.', 2)[-1])
 
 # set paths
-derivatives_dir = op.join(base_dir, 'derivatives') #params['mri']['paths'][base_dir]['derivatives']
+derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
 postfmriprep_dir = op.join(derivatives_dir,'post_fmriprep','sub-{sj}'.format(sj=sj),space,'processed')
 
 # path to pRF fits (if they exist)

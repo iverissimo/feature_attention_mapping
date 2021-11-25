@@ -80,6 +80,7 @@ wait
 singularity run --cleanenv -B /project/projects_verissimo -B $TMPDIR/FAM_wf \
 $SINGIMG \
 $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR \
+participant \
 --participant-label $SJ_NR \
 --hmc-fsl \
 --float32 \

@@ -69,7 +69,7 @@ file_ext = '_cropped_{filt}_{stand}.{a}.{b}'.format(filt = params['mri']['filter
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
 postfmriprep_dir = op.join(derivatives_dir,'post_fmriprep','sub-{sj}'.format(sj=sj),space,'processed')
 
-output_dir =  op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), model_type,'run-{run}'.format(run=run_type))
+output_dir =  op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), space, model_type,'run-{run}'.format(run=run_type))
 
 # check if path to save processed files exist
 if not op.exists(output_dir): 

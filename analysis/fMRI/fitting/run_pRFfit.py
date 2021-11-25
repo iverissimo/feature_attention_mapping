@@ -70,7 +70,6 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 """
 
 batch_dir = '/home/inesv/batch/'
-os.chdir(batch_dir)
 
 for _,chu in enumerate(range(total_chunks)): # submit job for each chunk 
 #for slice_num in np.arange(total_slices):

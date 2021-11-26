@@ -244,18 +244,28 @@ if model_type == 'css':
     model_fit = css_model.return_prediction(estimates_css_it[0],estimates_css_it[1],
                                             estimates_css_it[2], estimates_css_it[3],
                                             estimates_css_it[4], estimates_css_it[5])
+    rsquare = estimates_css_it[6]
 else:
     model_fit = gauss_model.return_prediction(estimates_it[0],estimates_it[1],
                                             estimates_it[2], estimates_it[3],
                                             estimates_it[4])   
-    
+    rsquare = estimates_it[5]
+
+# set figure name
+fig_name = 'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_roi-{roi}_vertex-{vert}.png'.format(sj=sj,
+                                                                                        acq=acq,
+                                                                                        space=space,
+                                                                                        run=run_type,
+                                                                                        model=model_type,
+                                                                                        roi=roi,
+                                                                                        vert=vertex) 
 # plot data with model
 fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
 
 # plot data with model
 time_sec = np.linspace(0,len(model_fit[0,...])*TR,num=len(model_fit[0,...])) # array with 90 timepoints, in seconds
     
-axis.plot(time_sec, model_fit[0,...],c='red',lw=3,label='model R$^2$ = %.2f'%estimates_it[5],zorder=1)
+axis.plot(time_sec, model_fit[0,...],c='red',lw=3,label='model R$^2$ = %.2f'%rsquare,zorder=1)
 #axis.scatter(time_sec, data_reshape[ind_max_rsq,:], marker='v',s=15,c='k',label='data')
 axis.plot(time_sec, timeseries[0,...],'k--',label='data')
 axis.set_xlabel('Time (s)',fontsize=20, labelpad=20)
@@ -277,3 +287,5 @@ for h in range(8):
         plt.axvspan(bar_onset[ax_count], bar_onset[ax_count+1]+TR, facecolor='#ff0000', alpha=0.1)
     
     ax_count += 2
+
+fig.savefig(op.join(figures_pth,fig_name))

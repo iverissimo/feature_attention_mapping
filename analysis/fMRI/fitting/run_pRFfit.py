@@ -39,7 +39,7 @@ total_chunks = params['mri']['fitting']['pRF']['total_chunks'][space] # number o
 code_base_dir = op.split(os.getcwd())[0] #base dir for python code on fMRI analysis
 
 batch_string = """#!/bin/bash
-#SBATCH -t 96:00:00
+#SBATCH -t 40:00:00
 #SBATCH -N 1 --mem=65536
 #SBATCH --cpus-per-task=16
 #SBATCH -v
@@ -50,7 +50,10 @@ echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
 conda activate i36
 
-cp -r $DERIV_DIR $TMPDIR
+# make derivatives dir in node
+mkdir $TMPDIR/derivatives
+
+cp -r $DERIV_DIR/fmriprep $TMPDIR
 
 wait
 

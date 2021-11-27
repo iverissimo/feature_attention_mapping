@@ -712,7 +712,7 @@ def load_and_mask_data(file, chunk_num = 1, total_chunks = 1):
         data = data_all[num_vox_chunk*(int(chunk_num)-1):num_vox_chunk*int(chunk_num),:]
 
         # store original shape, useful later
-        orig_shape = data_all.shape
+        orig_shape = data.shape
 
         print('fitting chunk %s/%d of data with shape %s'%(chunk_num,total_chunks,str(data.shape)))
         
@@ -1022,4 +1022,200 @@ def add_alpha2colormap(colormap = 'rainbow_r', bins = 256, invert_alpha = False,
     #misc.imsave(rgb_fn, new_map)
     plt.savefig(rgb_fn, dpi = 200,transparent=True)
        
-    return rgb_fn  
+    return rgb_fn 
+
+def join_chunks(path, out_name, hemi, chunk_num = 83, fit_model = 'css'):
+    """ combine all chunks into one single estimate numpy array (per hemisphere)
+    Parameters
+    ----------
+    path : str
+        absolute path to files
+    out_name: str
+        absolute output name of combined estimates
+    hemi : str
+        'hemi_L' or 'hemi_R' hemisphere
+    chunk_num : int
+        total number of chunks to combine (per hemi)
+    fit_model: str
+        fit model of estimates
+    
+    Outputs
+    -------
+    estimates : npz 
+        numpy array of estimates
+    
+    """
+    print(hemi)
+    
+    for ch in range(chunk_num):
+        
+        chunk_name = [x for _,x in enumerate(os.listdir(path)) if hemi in x and fit_model in x and 'chunk-%s'%str(ch+1).zfill(3) in x][0]
+        print('loading chunk %s'%chunk_name)
+        chunk = np.load(op.join(path, chunk_name)) # load chunk
+        
+        if ch == 0:
+            xx = chunk['x']
+            yy = chunk['y']
+
+            size = chunk['size']
+
+            beta = chunk['betas']
+            baseline = chunk['baseline']
+
+            if 'css' in fit_model: 
+                ns = chunk['ns']
+
+            rsq = chunk['r2']
+        else:
+            xx = np.concatenate((xx,chunk['x']))
+            yy = np.concatenate((yy,chunk['y']))
+
+            size = np.concatenate((size,chunk['size']))
+
+            beta = np.concatenate((beta,chunk['betas']))
+            baseline = np.concatenate((baseline,chunk['baseline']))
+
+            if 'css' in fit_model:
+                ns = np.concatenate((ns,chunk['ns']))
+
+            rsq = np.concatenate((rsq,chunk['r2']))
+    
+    print('shape of estimates for hemifield %s is %s'%(hemi,str(xx.shape)))
+
+    # save file
+    output = op.join(out_name)
+    print('saving %s'%output)
+    
+    if 'css' in fit_model:
+        np.savez(output,
+              x = xx,
+              y = yy,
+              size = size,
+              betas = beta,
+              baseline = baseline,
+              ns = ns,
+              r2 = rsq)
+    else:        
+        np.savez(output,
+              x = xx,
+              y = yy,
+              size = size,
+              betas = beta,
+              baseline = baseline,
+              r2 = rsq)
+     
+            
+    return np.load(output)
+
+def dva_per_pix(height_cm,distance_cm,vert_res_pix):
+
+    """ calculate degrees of visual angle per pixel, 
+    to use for screen boundaries when plotting/masking
+    Parameters
+    ----------
+    height_cm : int
+        screen height
+    distance_cm: float
+        screen distance (same unit as height)
+    vert_res_pix : int
+        vertical resolution of screen
+    
+    Outputs
+    -------
+    deg_per_px : float
+        degree (dva) per pixel
+    
+    """
+
+    # screen size in degrees / vertical resolution
+    deg_per_px = (2.0 * np.degrees(np.arctan(height_cm /(2.0*distance_cm))))/vert_res_pix
+
+    return deg_per_px 
+
+
+def mask_estimates(estimates, ROI = 'None', fit_model = 'css', res = [1920,1080],
+    screen_width = 69.8, screen_distance = 210, max_size = 15, space = 'fsaverage'):
+    
+    """ mask estimates, to be positive RF, within screen limits
+    and for a certain ROI (if the case)
+    Parameters
+    ----------
+    estimates : List/arr
+        list of estimates.npz for both hemispheres
+    ROI : str
+        roi to mask estimates (eg. 'V1', default 'None')
+    fit_model: str
+        fit model of estimates
+    
+    Outputs
+    -------
+    masked_estimates : npz 
+        numpy array of masked estimates
+    
+    """
+    
+    xx = np.concatenate((estimates[0]['x'],estimates[1]['x']))
+    yy = np.concatenate((estimates[0]['y'],estimates[1]['y']))
+       
+    size = np.concatenate((estimates[0]['size'],estimates[1]['size']))
+    
+    beta = np.concatenate((estimates[0]['betas'],estimates[1]['betas']))
+    baseline = np.concatenate((estimates[0]['baseline'],estimates[1]['baseline']))
+    
+    if 'css' in fit_model:
+        ns = np.concatenate((estimates[0]['ns'],estimates[1]['ns'])) # exponent of css
+    else: #if gauss
+        ns = np.ones(xx.shape)
+
+    rsq = np.concatenate((estimates[0]['r2'],estimates[1]['r2']))
+    
+    # set limits for xx and yy, forcing it to be within the screen boundaries
+    # also for max fitting size used and for positive pRFs
+    max_size = max_size
+    
+    vert_lim_dva = (res[-1]/2) * dva_per_pix(screen_width, screen_distance, res[0])
+    hor_lim_dva = (res[0]/2) * dva_per_pix(screen_width, screen_distance, res[0])
+    
+    
+    # make new variables that are masked 
+    masked_xx = np.zeros(xx.shape); masked_xx[:]=np.nan
+    masked_yy = np.zeros(yy.shape); masked_yy[:]=np.nan
+    masked_size = np.zeros(size.shape); masked_size[:]=np.nan
+    masked_beta = np.zeros(beta.shape); masked_beta[:]=np.nan
+    masked_baseline = np.zeros(baseline.shape); masked_baseline[:]=np.nan
+    masked_rsq = np.zeros(rsq.shape); masked_rsq[:]=np.nan
+    masked_ns = np.zeros(ns.shape); masked_ns[:]=np.nan
+
+    for i in range(len(xx)): #for all vertices
+        if xx[i] <= hor_lim_dva and xx[i] >= -hor_lim_dva: # if x within horizontal screen dim
+            if yy[i] <= vert_lim_dva and yy[i] >= -vert_lim_dva: # if y within vertical screen dim
+                if beta[i]>=0: # only account for positive RF
+                    if size[i]<=max_size: # limit size to max size defined in fit
+
+                        # save values
+                        masked_xx[i] = xx[i]
+                        masked_yy[i] = yy[i]
+                        masked_size[i] = size[i]
+                        masked_beta[i] = beta[i]
+                        masked_baseline[i] = baseline[i]
+                        masked_rsq[i] = rsq[i]
+                        masked_ns[i]=ns[i]
+
+    if ROI != 'None':
+        
+        roi_ind = cortex.get_roi_verts(space,ROI) # get indices for that ROI
+        
+        # mask for roi
+        masked_xx = masked_xx[roi_ind[ROI]]
+        masked_yy = masked_yy[roi_ind[ROI]]
+        masked_size = masked_size[roi_ind[ROI]]
+        masked_beta = masked_beta[roi_ind[ROI]]
+        masked_baseline = masked_baseline[roi_ind[ROI]]
+        masked_rsq = masked_rsq[roi_ind[ROI]]
+        masked_ns = masked_ns[roi_ind[ROI]]
+
+    masked_estimates = {'x':masked_xx,'y':masked_yy,'size':masked_size,
+                        'beta':masked_beta,'baseline':masked_baseline,'ns':masked_ns,
+                        'rsq':masked_rsq}
+    
+    return masked_estimates

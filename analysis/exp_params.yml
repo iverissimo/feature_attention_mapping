@@ -2,7 +2,7 @@
 general:
   tasks: ['pRF','FA', 'flicker']
   colors: ['color_green', 'color_red']
-  current_dir: 'lisa' #'local' #'behav_lab' #local'
+  current_dir: 'local' #'local' #'behav_lab' #local'
 
 window: # refers to the parameters for the Psychopy Window class
   size: [1920, 1080] #[1680, 1050]
@@ -109,6 +109,10 @@ mri: # refers to the Psychopy SyncGenerator class
       root: '/project/projects_verissimo/FAM/PILOT_DATA'
       matlab: ''
       derivatives: '/scratch/derivatives'
+
+    aeneas:
+      root: '/home/shared/2021/visual/FAM/PILOT_DATA'
+      derivatives: '/home/shared/2021/visual/FAM/PILOT_DATA/derivatives'
       
     behav_lab:
       root: '/home/verissimo/Experiments/FAM/feature_attention_mapping/output'

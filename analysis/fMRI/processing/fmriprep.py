@@ -79,7 +79,7 @@ $SINGIMG \
 $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/ participant \
 --participant-label sub-$SJ_NR --output-space T1w fsnative fsaverage MNI152NLin2009cAsym --cifti-output 170k \
 --bold2t1w-init register --nthreads 30 --omp-nthreads 30 --fs-license-file $FREESURFER/license.txt \
---use-syn-sdc --force-syn --bold2t1w-dof 6 --use-aroma --verbose --ignore slicetiming -w $TMPDIR/FAM_wf
+--use-syn-sdc --bold2t1w-dof 6 --verbose --ignore slicetiming -w $TMPDIR/FAM_wf
 
 wait          # wait until programs are finished
 

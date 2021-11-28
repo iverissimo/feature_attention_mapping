@@ -48,7 +48,7 @@ elif len(sys.argv)<5:
                     'as 4th argument in the command line!')	
 
 else:
-    sj = str(sys.argv[1]).zfill(2) #fill subject number with 0 in case user forgets	
+    sj = str(sys.argv[1]).zfill(3) #fill subject number with 0 in case user forgets	
 
     roi = str(sys.argv[2]) # ROI or 'None'
 

@@ -865,14 +865,11 @@ def save_estimates(filename, estimates, mask_indices, orig_shape, model_type = '
     
     """ 
     final_estimates = np.zeros((orig_shape[0], estimates.shape[-1])); final_estimates[:] = np.nan
-    
+
     counter = 0
-    
-    for i in range(orig_shape[0]):
-        if i <= mask_indices[-1]:
-            if i == mask_indices[counter]:
-                final_estimates[i] = estimates[counter]
-                counter += 1
+    for _,ind in enumerate(mask_indices):
+        final_estimates[ind] = estimates[counter]
+        counter += 1
             
     if model_type == 'gauss':
         
@@ -894,8 +891,6 @@ def save_estimates(filename, estimates, mask_indices, orig_shape, model_type = '
                  ns = final_estimates[..., 5],
                  r2 = final_estimates[..., 6])
     
-
-
 
 def combine_slices(file_list,outdir,num_slices=89, ax=2):
     

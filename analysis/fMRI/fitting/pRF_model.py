@@ -38,7 +38,7 @@ elif len(sys.argv) < 4:
 
 else:
     # fill subject number and chunk number with 0 in case user forgets
-    sj = str(sys.argv[1]).zfill(2)
+    sj = str(sys.argv[1]).zfill(3)
     run_type = str(sys.argv[2])
     chunk_num = str(sys.argv[3]).zfill(3)
 
@@ -124,7 +124,8 @@ for w, file in enumerate(proc_files):
         
         masked_data, not_nan_vox, orig_shape = load_and_mask_data(file, chunk_num = chunk_num, total_chunks = total_chunks)
         
-        if len(masked_data)==0: # if all voxels nan, skip fitting completely 
+        if len(not_nan_vox)==0: # if all voxels nan, skip fitting completely
+            print('all nan voxel/vertex, skipping') 
             estimates_grid = np.zeros((orig_shape[0],6)); estimates_grid[:] = np.nan
             estimates_it = np.zeros((orig_shape[0],6)); estimates_it[:] = np.nan
             if model_type == 'css':
@@ -205,9 +206,9 @@ for w, file in enumerate(proc_files):
 
         # save estimates
         # for grid
-        save_estimates(grid_estimates_filename, estimates_grid, not_nan_vox, orig_shape, model_type = 'gauss')
+        save_estimates(grid_estimates_filename, estimates_grid, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
         # for it
-        save_estimates(it_estimates_filename, estimates_it, not_nan_vox, orig_shape, model_type = 'gauss')
+        save_estimates(it_estimates_filename, estimates_it, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
         
         if model_type == 'css':
             

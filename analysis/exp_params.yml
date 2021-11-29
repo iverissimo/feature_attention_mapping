@@ -61,7 +61,7 @@ prf:
     D-U: 17
 
   total_number_TR: 220 # of task
-  dummy_TR: 5 # we used extra 5 TRs in beginning that should be disregarded, so file will be 225
+  dummy_TR: 13 #5 # we used extra 5 TRs in beginning that should be disregarded, so file will be 225
 
   flick_rate: 'TR' #10 # Hz, rate of change of features in bar
 

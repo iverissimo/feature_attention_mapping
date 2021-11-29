@@ -181,11 +181,10 @@ if roi != 'None':
     data = data[roi_ind[roi]]
 
 # do we want to fit now, or load estimates?
+timeseries = data[vertex][np.newaxis,...]
 
 if fit_now:
-    
-    timeseries = data[vertex][np.newaxis,...]
-    
+
     ## GRID FIT
     print("Grid fit")
     gauss_fitter = Iso2DGaussianFitter(data = timeseries, 
@@ -210,6 +209,14 @@ if fit_now:
 
 
     estimates_it = gauss_fitter.iterative_search_params[0]
+
+    # set outcomes
+    xx = estimates_it[0]
+    yy = estimates_it[1]
+    size = estimates_it[2] 
+    beta = estimates_it[3]
+    baseline = estimates_it[4]
+    rsq = estimates_it[5]
     
     if model_type == 'css':
         
@@ -236,20 +243,69 @@ if fit_now:
 
         estimates_css_it = css_fitter.iterative_search_params[0]
         
+        # set outcomes
+        xx = estimates_css_it[0]
+        yy = estimates_css_it[1]
+        size = estimates_css_it[2] 
+        beta = estimates_css_it[3]
+        baseline = estimates_css_it[4]
+        ns = estimates_css_it[5]
+        rsq = estimates_css_it[6] 
+        
 else:
-    print('should load estimates, select the ones from the chosen vertex - NOT IMPLEMENTED YET')
+    print('loading estimates')
+
+    # Load pRF estimates 
+    estimates = []
     
+    # path to combined estimates
+    estimates_pth = op.join(fits_pth,'combined')
+
+    for _,field in enumerate(hemispheres): # each hemi field
+        
+        # combined estimates filename
+        est_name = [x for _,x in enumerate(os.listdir(fits_pth)) if 'chunk-001' in x and field in x][0]
+        est_name = est_name.replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
+        
+        # total path to estimates path
+        estimates_combi = op.join(estimates_pth,est_name)
+        
+        if op.isfile(estimates_combi): # if combined estimates exists
+                
+                print('loading %s'%estimates_combi)
+                estimates.append(np.load(estimates_combi)) #save both hemisphere estimates in same array
+        
+        else: # if not join chunks and save file
+            if not op.exists(estimates_pth):
+                os.makedirs(estimates_pth) 
+
+            estimates.append(join_chunks(fits_pth, estimates_combi, field,
+                                         chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type))) #'{model}'.format(model=model_type)))#
+
+    # set outcomes
+    xx = np.concatenate((estimates[0]['x'],estimates[1]['x']))[vertex]
+    yy = np.concatenate((estimates[0]['y'],estimates[1]['y']))[vertex]
+
+    size = np.concatenate((estimates[0]['size'],estimates[1]['size']))[vertex]
+
+    beta = np.concatenate((estimates[0]['betas'],estimates[1]['betas']))[vertex]
+    baseline = np.concatenate((estimates[0]['baseline'],estimates[1]['baseline']))[vertex]
+
+    if 'css' in model_type:
+        ns = np.concatenate((estimates[0]['ns'],estimates[1]['ns']))[vertex] # exponent of css
+        
+    rsq = np.concatenate((estimates[0]['r2'],estimates[1]['r2']))[vertex] 
+        
 # get prediction
 if model_type == 'css':
-    model_fit = css_model.return_prediction(estimates_css_it[0],estimates_css_it[1],
-                                            estimates_css_it[2], estimates_css_it[3],
-                                            estimates_css_it[4], estimates_css_it[5])
-    rsquare = estimates_css_it[6]
+    model_fit = css_model.return_prediction(xx,yy,
+                                            size, beta,
+                                            baseline, ns)
+
 else:
-    model_fit = gauss_model.return_prediction(estimates_it[0],estimates_it[1],
-                                            estimates_it[2], estimates_it[3],
-                                            estimates_it[4])   
-    rsquare = estimates_it[5]
+    model_fit = gauss_model.return_prediction(xx,yy,
+                                            size, beta,
+                                            baseline)   
 
 # set figure name
 fig_name = 'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_roi-{roi}_vertex-{vert}.png'.format(sj=sj,
@@ -259,13 +315,17 @@ fig_name = 'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_ro
                                                                                         model=model_type,
                                                                                         roi=roi,
                                                                                         vert=vertex) 
+
+if fit_now == False:
+    fig_name = fig_name.replace('.png','_loaded.png')
+
 # plot data with model
 fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
 
 # plot data with model
 time_sec = np.linspace(0,len(model_fit[0,...])*TR,num=len(model_fit[0,...])) # array with 90 timepoints, in seconds
     
-axis.plot(time_sec, model_fit[0,...],c='red',lw=3,label='model R$^2$ = %.2f'%rsquare,zorder=1)
+axis.plot(time_sec, model_fit[0,...],c='red',lw=3,label='model R$^2$ = %.2f'%rsq,zorder=1)
 #axis.scatter(time_sec, data_reshape[ind_max_rsq,:], marker='v',s=15,c='k',label='data')
 axis.plot(time_sec, timeseries[0,...],'k--',label='data')
 axis.set_xlabel('Time (s)',fontsize=20, labelpad=20)

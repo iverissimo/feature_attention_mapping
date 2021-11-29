@@ -87,7 +87,7 @@ mri: # refers to the Psychopy SyncGenerator class
 
   space: 'fsaverage' # space of the files to be used in analysis
   file_ext: '_bold.func.gii' # file extension
-  acq: 'nordic' # "acquisition" type to use
+  acq: 'standard' #'nordic' # "acquisition" type to use
 
   filtering:
     type: 'dc' #'HPgauss' # None

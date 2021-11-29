@@ -68,7 +68,8 @@ acq = params['mri']['acq'] # if using standard files or nordic files
 space = params['mri']['space'] # subject space
 total_chunks = params['mri']['fitting']['pRF']['total_chunks'][space] # number of chunks that data was split in
 hemispheres = ['hemi-L','hemi-R'] # only used for gifti files
-run_type = 'median'
+
+run_type = 'mean'
 
 TR = params['mri']['TR']
 
@@ -95,7 +96,7 @@ if not os.path.exists(figures_pth):
     os.makedirs(figures_pth) 
 
 # define design matrix 
-visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1)
+visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -335,6 +336,10 @@ axis.legend(loc='upper left',fontsize=10)  # doing this to guarantee that legend
 
 # times where bar is on screen [1st on, last on, 1st on, last on, etc] 
 bar_onset = np.array([20,36,37,53,66,82,83,99,120,136,137,153,166,182,183,199])*TR
+
+if params['prf']['crop']:
+    bar_onset = bar_onset - params['prf']['crop_TR']
+
 bar_directions = [val for _,val in enumerate(params['prf']['bar_pass_direction']) if 'empty' not in val]
 # plot axis vertical bar on background to indicate stimulus display time
 ax_count = 0

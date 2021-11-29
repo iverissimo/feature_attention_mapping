@@ -735,7 +735,7 @@ def load_and_mask_data(file, chunk_num = 1, total_chunks = 1):
     return masked_data, not_nan_vox, orig_shape
 
 
-def make_pRF_DM(output, params, save_imgs = False, downsample = None):
+def make_pRF_DM(output, params, save_imgs = False, downsample = None, crop = False, crop_TR = 8, overwrite=False):
     
     """Make design matrix for pRF task
     
@@ -749,7 +749,7 @@ def make_pRF_DM(output, params, save_imgs = False, downsample = None):
        if we want to save images in folder, for sanity check
     """
     
-    if not op.exists(output): 
+    if not op.exists(output) or overwrite == True: 
         print('making %s'%output)
 
         if not op.exists(op.split(output)[0]): # make base dir to save files
@@ -821,7 +821,11 @@ def make_pRF_DM(output, params, save_imgs = False, downsample = None):
                 counter += 1
 
         # swap axis to have time in last axis [x,y,t]
-        visual_dm = visual_dm_array.transpose([1,2,0]) 
+        visual_dm = visual_dm_array.transpose([1,2,0])
+
+        # in case we want to crop the beginning of the DM
+        if crop == True:
+            visual_dm = visual_dm[...,crop_TR::] 
         
         # save design matrix
         np.save(output, visual_dm)

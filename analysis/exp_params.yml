@@ -33,6 +33,9 @@ feature:
   total_number_TR: 408 # of task
   dummy_TR: 5 # we used extra 5 TRs in beginning that should be disregarded, so file will be 413
 
+  crop: False # if we want to crop the functionals further
+  crop_TR: 8 # number of functionals to crop
+
   bars_phase_dur: 0.6 # phase duration for displaying bars (in seconds) 
 
   cue_width: .2 #.55
@@ -61,7 +64,10 @@ prf:
     D-U: 17
 
   total_number_TR: 220 # of task
-  dummy_TR: 13 #5 # we used extra 5 TRs in beginning that should be disregarded, so file will be 225
+  dummy_TR: 5 # we used extra 5 TRs in beginning that should be disregarded, so file will be 225
+
+  crop: True # if we want to crop the functionals further
+  crop_TR: 8 # number of functionals to crop
 
   flick_rate: 'TR' #10 # Hz, rate of change of features in bar
 

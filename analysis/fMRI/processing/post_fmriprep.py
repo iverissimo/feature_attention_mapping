@@ -64,9 +64,11 @@ for _,task in enumerate(['pRF','FA']):
     
     task_name = 'feature' if task == 'FA' else 'prf' # due to params yml notation, should change later
 
-    ## crop files, due to "dummies" 
+    ## crop files, due to "dummies"
+    crop_TR = params[task_name]['dummy_TR'] + params[task_name]['crop_TR'] if params[task_name]['crop'] == True else params[task_name]['dummy_TR'] 
+
     proc_files[task] = crop_epi(epi_files[task], output_dir, num_TR_task = params[task_name]['total_number_TR'], 
-                                           num_TR_crop = params[task_name]['dummy_TR'])
+                                           num_TR_crop = crop_TR)
 
     ## filter files, to remove drifts
     proc_files[task] = filter_data(proc_files[task], output_dir, filter_type = params['mri']['filtering']['type'], 

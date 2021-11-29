@@ -39,7 +39,7 @@ total_chunks = params['mri']['fitting']['pRF']['total_chunks'][space] # number o
 code_base_dir = op.split(os.getcwd())[0] #base dir for python code on fMRI analysis
 
 batch_string = """#!/bin/bash
-#SBATCH -t 40:00:00
+#SBATCH -t 4:00:00
 #SBATCH -N 1 --mem=65536
 #SBATCH --cpus-per-task=16
 #SBATCH -v
@@ -52,12 +52,15 @@ conda activate i36
 
 # make derivatives dir in node
 mkdir $TMPDIR/derivatives
+mkdir $TMPDIR/derivatives/fmriprep
+mkdir $TMPDIR/derivatives/post_fmriprep
 
-cp -r $DERIV_DIR/fmriprep $TMPDIR
+#cp -r $DERIV_DIR/fmriprep/sub-$SJ_NR $TMPDIR/derivatives/fmriprep
+cp -r $DERIV_DIR/post_fmriprep/sub-$SJ_NR $TMPDIR/derivatives/post_fmriprep
 
 wait
 
-python $CODE_DIR/processing/post_fmriprep.py $SJ_NR
+#python $CODE_DIR/processing/post_fmriprep.py $SJ_NR
 
 wait          # wait until programs are finished
 

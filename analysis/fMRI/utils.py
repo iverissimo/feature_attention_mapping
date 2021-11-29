@@ -682,11 +682,15 @@ def load_and_mask_data(file, chunk_num = 1, total_chunks = 1):
     ----------
     file : str
         absolute filename of the data to be fitted
+    chunk_num: int
+        number of chunk for slicing
+    total_chunks: int
+        total amount of chunks, if 1 then returns orig data array size (no chunking)
 
     Outputs
     -------
     masked_data: arr
-        masked data array
+        (masked) data array
     not_nan_vox: list/arr
         voxel indices that were NOT masked out
     orig_shape: tuple
@@ -711,7 +715,7 @@ def load_and_mask_data(file, chunk_num = 1, total_chunks = 1):
         # new data chunk to fit
         data = data_all[num_vox_chunk*(int(chunk_num)-1):num_vox_chunk*int(chunk_num),:]
 
-        # store original shape, useful later
+        # store chunk shape, useful later
         orig_shape = data.shape
 
         print('fitting chunk %s/%d of data with shape %s'%(chunk_num,total_chunks,str(data.shape)))
@@ -841,7 +845,7 @@ def make_pRF_DM(output, params, save_imgs = False, downsample = None):
     return visual_dm
 
 
-def save_estimates(filename, estimates, mask_indices, orig_shape, model_type = 'gauss'):
+def save_estimates(filename, estimates, mask_indices, orig_shape = np.array([1974,220]), model_type = 'gauss'):
     
     """
     re-arrange estimates that were masked
@@ -857,7 +861,7 @@ def save_estimates(filename, estimates, mask_indices, orig_shape, model_type = '
         2d estimates (datapoints,estimates)
     mask_indices : arr
         array with voxel indices that were NOT masked out
-    orig_shape: tuple
+    orig_shape: tuple/arr
         orginal data shape 
     model_type: str
         model type used for fitting

@@ -1132,8 +1132,7 @@ def dva_per_pix(height_cm,distance_cm,vert_res_pix):
     return deg_per_px 
 
 
-def mask_estimates(estimates, ROI = 'None', fit_model = 'css', res = [1920,1080],
-    screen_width = 69.8, screen_distance = 210, max_size = 15, space = 'fsaverage'):
+def mask_estimates(estimates, ROI = 'None', fit_model = 'gauss', screen_limit_deg = [6,6], max_size = 15, space = 'fsaverage'):
     
     """ mask estimates, to be positive RF, within screen limits
     and for a certain ROI (if the case)
@@ -1170,12 +1169,7 @@ def mask_estimates(estimates, ROI = 'None', fit_model = 'css', res = [1920,1080]
     
     # set limits for xx and yy, forcing it to be within the screen boundaries
     # also for max fitting size used and for positive pRFs
-    max_size = max_size
-    
-    vert_lim_dva = (res[-1]/2) * dva_per_pix(screen_width, screen_distance, res[0])
-    hor_lim_dva = (res[0]/2) * dva_per_pix(screen_width, screen_distance, res[0])
-    
-    
+
     # make new variables that are masked 
     masked_xx = np.zeros(xx.shape); masked_xx[:]=np.nan
     masked_yy = np.zeros(yy.shape); masked_yy[:]=np.nan
@@ -1186,8 +1180,8 @@ def mask_estimates(estimates, ROI = 'None', fit_model = 'css', res = [1920,1080]
     masked_ns = np.zeros(ns.shape); masked_ns[:]=np.nan
 
     for i in range(len(xx)): #for all vertices
-        if xx[i] <= hor_lim_dva and xx[i] >= -hor_lim_dva: # if x within horizontal screen dim
-            if yy[i] <= vert_lim_dva and yy[i] >= -vert_lim_dva: # if y within vertical screen dim
+        if xx[i] <= screen_limit_deg[0] and xx[i] >= -screen_limit_deg[0]: # if x within horizontal screen dim
+            if yy[i] <= screen_limit_deg[1] and yy[i] >= -screen_limit_deg[1]: # if y within vertical screen dim
                 if beta[i]>=0: # only account for positive RF
                     if size[i]<=max_size: # limit size to max size defined in fit
 

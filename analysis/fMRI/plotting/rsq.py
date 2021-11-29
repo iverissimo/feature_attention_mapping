@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import cortex
 import pandas as pd
 import seaborn as sns
+from prfpy.stimulus import PRFStimulus2D
 
 sys.path.insert(0,'..') # add parent folder to path
 from utils import * #import script to use relevante functions
@@ -107,9 +108,19 @@ if task == 'pRF':
                                          chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type))) #'{model}'.format(model=model_type)))#
 
     
+# define design matrix 
+visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1)
+
+# make stimulus object, which takes an input design matrix and sets up its real-world dimensions
+prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
+                         screen_distance_cm = params['monitor']['distance'],
+                         design_matrix = visual_dm,
+                         TR = TR)
+
 # mask estimates
 print('masking estimates')
-masked_est = mask_estimates(estimates, fit_model = model_type)
+masked_est = mask_estimates(estimates, fit_model = model_type,
+                            screen_limit_deg = [prf_stim.screen_size_degrees/2,prf_stim.screen_size_degrees/2])
 
 rsq = masked_est['rsq']
 

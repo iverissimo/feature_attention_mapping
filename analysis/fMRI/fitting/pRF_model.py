@@ -137,7 +137,7 @@ for w, file in enumerate(proc_files):
             visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1)
         
             # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
-            prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['width'],
+            prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
                                      screen_distance_cm = params['monitor']['distance'],
                                      design_matrix = visual_dm,
                                      TR = TR)
@@ -155,11 +155,10 @@ for w, file in enumerate(proc_files):
             
             # and parameters
             grid_nr = params['mri']['fitting']['pRF']['grid_nr']
-            sizes = params['mri']['fitting']['pRF']['max_size'] * \
-                np.linspace(np.sqrt(params['mri']['fitting']['pRF']['min_size']/params['mri']['fitting']['pRF']['max_size']),1,grid_nr)**2
-            eccs = params['mri']['fitting']['pRF']['max_eccen'] * \
-                np.linspace(np.sqrt(params['mri']['fitting']['pRF']['min_eccen']/params['mri']['fitting']['pRF']['max_eccen']),1,grid_nr)**2
-            polars = np.linspace(0, 2*np.pi, grid_nr)
+            max_ecc_size = prf_stim.screen_size_degrees/2.0
+            sizes, eccs, polars = max_ecc_size * np.linspace(0.25, 1, grid_nr)**2, \
+                max_ecc_size * np.linspace(0.1, 1, grid_nr)**2, \
+                np.linspace(0, 2*np.pi, grid_nr)
 
 
             ## GRID FIT
@@ -186,11 +185,11 @@ for w, file in enumerate(proc_files):
             ftol = 1e-6
 
             # model parameter bounds
-            gauss_bounds = [(-2*ss, 2*ss),  # x
-                            (-2*ss, 2*ss),  # y
-                            (eps, 2*ss),  # prf size
-                            (0, +inf),  # prf amplitude
-                            (-5, +inf)]  # bold baseline
+            gauss_bounds = [(-1.5*ss, 1.5*ss),  # x
+                            (-1.5*ss, 1.5*ss),  # y
+                            (eps, 1.5*ss),  # prf size
+                            (0, 20),  # prf amplitude
+                            (-5, 5)]  # bold baseline
 
 
             # iterative fit
@@ -204,8 +203,7 @@ for w, file in enumerate(proc_files):
 
             estimates_it = gauss_fitter.iterative_search_params
 
-        # save estimates
-        # for grid
+        # save grid estimates
         save_estimates(grid_estimates_filename, estimates_grid, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
         # for it
         save_estimates(it_estimates_filename, estimates_it, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')

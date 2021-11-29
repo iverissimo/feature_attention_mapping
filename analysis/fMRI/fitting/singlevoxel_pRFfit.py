@@ -87,7 +87,7 @@ derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
 postfmriprep_dir = op.join(derivatives_dir,'post_fmriprep','sub-{sj}'.format(sj=sj),space,'processed')
 
 # path to pRF fits (if they exist)
-fits_pth =  op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), space, model_type,'run-{run}'.format(run=run_type))
+fits_pth =  op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), space, 'iterative_{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
 
 # output dir to save fit and plot
 figures_pth = op.join(derivatives_dir,'plots','single_vertex','pRFfit','sub-{sj}'.format(sj=sj), space, model_type,'run-{run}'.format(run=run_type)) # path to save plots
@@ -98,7 +98,7 @@ if not os.path.exists(figures_pth):
 visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
-prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['width'],
+prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
                          screen_distance_cm = params['monitor']['distance'],
                          design_matrix = visual_dm,
                          TR = TR)
@@ -115,11 +115,10 @@ gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
 
 # and parameters
 grid_nr = params['mri']['fitting']['pRF']['grid_nr']
-sizes = params['mri']['fitting']['pRF']['max_size'] * \
-    np.linspace(np.sqrt(params['mri']['fitting']['pRF']['min_size']/params['mri']['fitting']['pRF']['max_size']),1,grid_nr)**2
-eccs = params['mri']['fitting']['pRF']['max_eccen'] * \
-    np.linspace(np.sqrt(params['mri']['fitting']['pRF']['min_eccen']/params['mri']['fitting']['pRF']['max_eccen']),1,grid_nr)**2
-polars = np.linspace(0, 2*np.pi, grid_nr)
+max_ecc_size = prf_stim.screen_size_degrees/2.0
+sizes, eccs, polars = max_ecc_size * np.linspace(0.25, 1, grid_nr)**2, \
+    max_ecc_size * np.linspace(0.1, 1, grid_nr)**2, \
+    np.linspace(0, 2*np.pi, grid_nr)
 
 # to set up parameter bounds in iterfit
 inf = np.inf
@@ -129,11 +128,11 @@ xtol = 1e-7
 ftol = 1e-6
 
 # model parameter bounds
-gauss_bounds = [(-2*ss, 2*ss),  # x
-                (-2*ss, 2*ss),  # y
-                (eps, 2*ss),  # prf size
-                (0, +inf),  # prf amplitude
-                (-5, +inf)]  # bold baseline
+gauss_bounds = [(-1.5*ss, 1.5*ss),  # x
+                (-1.5*ss, 1.5*ss),  # y
+                (eps, 1.5*ss),  # prf size
+                (0, 20),  # prf amplitude
+                (-5, 5)]  # bold baseline
 
 # grid exponent parameter
 css_n_grid = np.linspace(params['mri']['fitting']['pRF']['min_n'], 
@@ -150,12 +149,12 @@ css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
                                 )
 
 # model parameter bounds
-css_bounds = [(-2*ss, 2*ss),  # x
-              (-2*ss, 2*ss),  # y
-              (eps, 2*ss),  # prf size
-              (0, +inf),  # prf amplitude
-              (-5, +inf),  # bold baseline
-              (params['mri']['fitting']['pRF']['min_n'], 2*params['mri']['fitting']['pRF']['max_n'])]  # CSS exponent
+css_bounds = [(-1.5*ss, 1.5*ss),  # x
+            (-1.5*ss, 1.5*ss),  # y
+            (eps, 1.5*ss),  # prf size
+            (0, 20),  # prf amplitude
+            (-5, 5),  # bold baseline
+            (0.01, 3)]  # CSS exponent
 
 # list with absolute file names to be fitted (iff gii, then 2 hemispheres)
 proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir) if 'task-pRF' in h and
@@ -202,7 +201,8 @@ if fit_now:
     # iterative fit
     print("Iterative fit")
     gauss_fitter.iterative_fit(rsq_threshold = 0.05, 
-                               verbose = False,
+                               verbose = True,
+                               starting_params = gauss_fitter.gridsearch_params,
                                bounds=gauss_bounds,
                                xtol = xtol,
                                ftol = ftol)

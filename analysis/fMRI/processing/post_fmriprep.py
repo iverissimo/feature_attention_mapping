@@ -93,12 +93,12 @@ for _,task in enumerate(['pRF','FA']):
             
             for hemi in hemispheres:
                 hemi_files.append(average_epi([val for val in proc_files[task] if hemi in val], 
-                                              final_output_dir, method = 'median'))
+                                              final_output_dir, method = 'mean'))
         
             proc_files[task] = hemi_files
             
         else:
-            proc_files[task] = average_epi(proc_files[task], final_output_dir, method = 'median')
+            proc_files[task] = average_epi(proc_files[task], final_output_dir, method = 'mean')
         
     
     else:

@@ -28,7 +28,7 @@ else:
     sj = str(sys.argv[1]).zfill(2)
     base_dir = str(sys.argv[2]) # which machine we run the data
 
-run_type = 'median'
+run_type = 'mean'
 acq = params['mri']['acq'] # if using standard files or nordic files
 space = params['mri']['space'] # subject space
 
@@ -39,7 +39,7 @@ total_chunks = params['mri']['fitting']['pRF']['total_chunks'][space] # number o
 code_base_dir = op.split(os.getcwd())[0] #base dir for python code on fMRI analysis
 
 batch_string = """#!/bin/bash
-#SBATCH -t 4:00:00
+#SBATCH -t 1:00:00
 #SBATCH -N 1 --mem=65536
 #SBATCH --cpus-per-task=16
 #SBATCH -v

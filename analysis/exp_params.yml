@@ -137,6 +137,10 @@ mri: # refers to the Psychopy SyncGenerator class
 
       N_PROCS: 4
 
+  plotting:
+    rsq_threshold: 0.12
+
+
 
 eyetracking:
 

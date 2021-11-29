@@ -242,12 +242,12 @@ for w, file in enumerate(proc_files):
                 ## ITERATIVE FIT
 
                 # model parameter bounds
-                css_bounds = [(-2*ss, 2*ss),  # x
-                              (-2*ss, 2*ss),  # y
-                              (eps, 2*ss),  # prf size
-                              (0, +inf),  # prf amplitude
-                              (-5, +inf),  # bold baseline
-                              (params['mri']['fitting']['pRF']['min_n'], 2*params['mri']['fitting']['pRF']['max_n'])]  # CSS exponent
+                css_bounds = [(-1.5*ss, 1.5*ss),  # x
+                            (-1.5*ss, 1.5*ss),  # y
+                            (eps, 1.5*ss),  # prf size
+                            (0, 20),  # prf amplitude
+                            (-5, 5),  # bold baseline
+                            (0.01, 3)]  # CSS exponent
 
 
                 # iterative fit

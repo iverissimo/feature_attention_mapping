@@ -51,7 +51,6 @@ base_dir = params['general']['current_dir'] # which machine we run the data
 acq = params['mri']['acq'] # if using standard files or nordic files
 space = params['mri']['space'] # subject space
 total_chunks = params['mri']['fitting']['pRF']['total_chunks'][space] # number of chunks that data was split in
-hemispheres = ['hemi-L','hemi-R'] # only used for gifti files
 
 TR = params['mri']['TR']
 
@@ -140,9 +139,11 @@ else:
     masked_data = data_chunk[not_nan_vox]
     
     if len(not_nan_vox)==0: # if all voxels nan, skip fitting completely
+
         print('all nan voxel/vertex, skipping') 
         estimates_grid = np.zeros((orig_shape[0],6)); estimates_grid[:] = np.nan
         estimates_it = np.zeros((orig_shape[0],6)); estimates_it[:] = np.nan
+        
         if model_type == 'css':
             estimates_css_grid = np.zeros((orig_shape[0],7)); estimates_css_grid[:] = np.nan
             estimates_css_it = np.zeros((orig_shape[0],7)); estimates_css_it[:] = np.nan
@@ -226,7 +227,7 @@ else:
     
     if model_type == 'css':
         
-        if len(masked_data)>0:
+        if len(not_nan_vox)>0:
         
             # grid exponent parameter
             css_n_grid = np.linspace(params['mri']['fitting']['pRF']['min_n'], 

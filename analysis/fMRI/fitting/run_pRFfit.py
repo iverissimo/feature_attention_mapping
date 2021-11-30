@@ -52,6 +52,12 @@ conda activate i36
 
 # make derivatives dir in node
 mkdir $TMPDIR/derivatives
+mkdir $TMPDIR/derivatives/post_fmriprep
+mkdir $TMPDIR/derivatives/post_fmriprep/sub-$SJ_NR
+
+wait
+cp -r $DERIV_DIR/post_fmriprep/sub-$SJ_NR/$SPACE $TMPDIR/derivatives/post_fmriprep/sub-$SJ_NR
+wait
 
 python pRF_model.py $SJ_NR $RUN_TYPE $CHUNK_NR
 
@@ -72,7 +78,7 @@ for _,chu in enumerate(range(total_chunks)): # submit job for each chunk
         working_string = batch_string.replace('$SJ_NR', str(sj).zfill(3))
         working_string = working_string.replace('$RUN_TYPE', run_type)
         working_string = working_string.replace('$CHUNK_NR', str(chu+1).zfill(3))
-        working_string = working_string.replace('$CODE_DIR', code_base_dir)
+        working_string = working_string.replace('$SPACE', space)
         working_string = working_string.replace('$DERIV_DIR', op.join(params['mri']['paths'][base_dir]['root'], 'derivatives'))
 
         # run it

@@ -1175,3 +1175,159 @@ def load_data_save_npz(file, outdir):
         outfiles = outfiles[0] 
 
     return outfiles
+
+def get_FA_bar_stim(output, params, bar_pos, trial_info, attend_cond = {'color': True, 'orientation': True}, 
+                    save_imgs = False, downsample = None, 
+                    crop = False, crop_TR = 8, overwrite=False):
+    
+    """Get visual stim for FA condition.
+    Similar to make_pRF_DM, it will
+    save an array with the FA (un)attended
+    bar position for the run
+    
+    Parameters
+    ----------
+    output : string
+       absolute output name for DM
+    params : yml dict
+        with experiment params
+    bar_pos: pd
+        pandas dataframe with bar positions for the whole run
+    trial_info: pd
+        pandas dataframe with useful run info
+    save_imgs : bool
+       if we want to save images in folder, for sanity check
+    """
+    
+    if not op.exists(output) or overwrite == True: 
+        print('making %s'%output)
+
+        if not op.exists(op.split(output)[0]): # make base dir to save files
+            os.makedirs(op.split(output)[0])
+    
+        # general infos
+        bar_width = params['feature']['bar_width_ratio'] 
+
+        screen_res = params['window']['size']
+        if params['window']['display'] == 'square': # if square display
+            screen_res = np.array([screen_res[1], screen_res[1]])
+            
+        if downsample != None: # if we want to downsample screen res
+            screen_res = (screen_res*downsample).astype(int)
+
+        # possible features
+        colors_bar = ['red', 'green']
+        orientation_bar = ['vertical', 'horizontal']
+        
+        # total number of TRs
+        total_TR = len(trial_info)
+
+        # save screen display for each TR
+        visual_dm_array = np.zeros((total_TR, screen_res[0],screen_res[1]))
+
+        # some counters
+        mini_blk_counter = 0
+        trl_blk_counter = 0
+
+        # for each TR
+        for i in range(total_TR):
+
+            img = Image.new('RGB', tuple(screen_res)) # background image
+
+            if 'mini_block' in trial_info.iloc[i]['trial_type']:
+
+                #print(mini_blk_counter)
+
+                # choose part of DF that corresponds to miniblock
+                miniblk_df = bar_pos.loc[bar_pos['mini_block'] == mini_blk_counter]
+
+                # get name of attended condition for miniblock
+                attended_condition = miniblk_df.loc[miniblk_df['attend_condition'] == 1]['condition'].values[0]
+                attended_color = attended_condition.split('_')[0]
+                attended_orientation = attended_condition.split('_')[-1]
+
+                # which bar do we want?
+                if attend_cond['color'] and attend_cond['orientation']: # if we want fully attended bar
+                    chosen_condition = attended_condition
+
+                elif not attend_cond['color'] and not attend_cond['orientation']: # if we want fully un-attended bar
+                    chosen_condition = [c for c in colors_bar if c != attended_color][0]+'_'+[o for o in orientation_bar if o != attended_orientation][0]
+
+                elif attend_cond['color'] and not attend_cond['orientation']: # if we want semi-attended bar (attend color not orientation)
+                    chosen_condition = [c for c in colors_bar if c == attended_color][0]+'_'+[o for o in orientation_bar if o != attended_orientation][0]
+
+                elif not attend_cond['color'] and attend_cond['orientation']: # if we want semi-attended bar (attend orientation not color)
+                    chosen_condition = [c for c in colors_bar if c != attended_color][0]+'_'+[o for o in orientation_bar if o == attended_orientation][0]
+
+                print('attended condition in miniblock %s, chosen condition is %s'%(attended_condition, chosen_condition))
+
+                # bar positions for miniblock
+                miniblk_positions = miniblk_df.loc[miniblk_df['condition'] == chosen_condition]['bar_midpoint_at_TR'].values[0]
+
+                # coordenates for bar pass of trial, for PIL Image - DO NOT CONFUSE WITH CONDITION ORIENTATION
+                # x position, y position 
+                hor_x = miniblk_positions[trl_blk_counter][0]; hor_y = miniblk_positions[trl_blk_counter][1]
+                
+                if downsample != None: # if we want to downsample screen res
+                    hor_x = hor_x*downsample; hor_y = hor_y*downsample
+                
+                hor_x = hor_x + screen_res[0]/2; hor_y = hor_y + screen_res[1]/2
+                
+                coordenates_bars = {'vertical': {'upLx': hor_x-0.5*bar_width*screen_res[0], 
+                                                   'upLy': screen_res[1],
+                                                   'lowRx': hor_x+0.5*bar_width*screen_res[0], 
+                                                   'lowRy': 0},
+                                    'horizontal': {'upLx': 0, 
+                                                 'upLy': hor_y+0.5*bar_width*screen_res[1],
+                                                 'lowRx': screen_res[0], 
+                                                 'lowRy': hor_y-0.5*bar_width*screen_res[1]}
+                                    }
+
+                # set draw method for image
+                draw = ImageDraw.Draw(img)
+                # add bar, coordinates (upLx, upLy, lowRx, lowRy)
+                draw.rectangle(tuple([coordenates_bars[chosen_condition.split('_')[-1]]['upLx'],coordenates_bars[chosen_condition.split('_')[-1]]['upLy'],
+                                    coordenates_bars[chosen_condition.split('_')[-1]]['lowRx'],coordenates_bars[chosen_condition.split('_')[-1]]['lowRy']]), 
+                               fill = (255,255,255),
+                               outline = (255,255,255))
+
+                # update counter of trials within miniblok
+                trl_blk_counter += 1
+
+                # if last trial of miniblock
+                if trl_blk_counter == len(bar_pos.iloc[0]['bar_pass_direction_at_TR']):
+                    # update counters, so we can do same in next miniblock
+                    trl_blk_counter = 0
+                    mini_blk_counter += 1
+
+            # save in array
+            visual_dm_array[i, ...] = np.array(img)[:,:,0][np.newaxis,...]
+
+        # swap axis to have time in last axis [x,y,t]
+        visual_dm = visual_dm_array.transpose([1,2,0])
+        
+        # in case we want to crop the beginning of the DM
+        if crop == True:
+            visual_dm = visual_dm[...,crop_TR::] 
+        
+        # save design matrix
+        np.save(output, visual_dm)
+        
+    else:
+        print('already exists, skipping %s'%output)
+        
+        # load
+        visual_dm = np.load(output)
+        
+    #if we want to save the images
+    if save_imgs == True:
+        outfolder = op.split(output)[0]
+
+        visual_dm = visual_dm.astype(np.uint8)
+
+        for w in range(visual_dm.shape[-1]):
+            im = Image.fromarray(visual_dm[...,w])
+            im.save(op.join(outfolder,"DM_{reg}_TR-{time}.png".format(reg=op.split(output)[-1].split('-')[-1].split('.')[0],
+                                                                      time=w)))      
+            
+    return visual_dm

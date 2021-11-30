@@ -78,10 +78,8 @@ model_type = params['mri']['fitting']['pRF']['fit_model']
 
 # define file extension that we want to use, 
 # should include processing key words
-file_ext = '_cropped_{filt}_{stand}.{a}.{b}'.format(filt = params['mri']['filtering']['type'],
-                                                    stand = 'psc',
-                                                    a = params['mri']['file_ext'].rsplit('.', 2)[-2],
-                                                    b = params['mri']['file_ext'].rsplit('.', 2)[-1])
+file_ext = '_cropped_{filt}_{stand}.npy'.format(filt = params['mri']['filtering']['type'],
+                                                    stand = 'psc')
 
 # set paths
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
@@ -157,23 +155,13 @@ css_bounds = [(-1.5*ss, 1.5*ss),  # x
             (-5, 5),  # bold baseline
             (0.01, 3)]  # CSS exponent
 
-# list with absolute file names to be fitted (iff gii, then 2 hemispheres)
+# list with absolute file name to be fitted
 proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir) if 'task-pRF' in h and
                  'acq-{acq}'.format(acq=acq) in h and run_type in h and h.endswith(file_ext)]
  
 ## load functional data
-if '.func.gii' in file_ext: # if gifti
+data = np.load(proc_files[0],allow_pickle=True) # will be (vertex, TR)
     
-    data = []
-    for _,h in enumerate(hemispheres):
-        gii_file = [x for _,x in enumerate(proc_files) if h in x][0]
-        print('loading %s' %gii_file)
-        data.append(np.array(surface.load_surf_data(gii_file)))
-
-    data = np.vstack(data) # will be (vertex, TR)
-    
-else:
-    print('not implemented for other types of spaces')
 
 if roi != 'None':
     print('masking data for ROI %s'%roi)

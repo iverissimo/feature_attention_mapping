@@ -52,17 +52,6 @@ conda activate i36
 
 # make derivatives dir in node
 mkdir $TMPDIR/derivatives
-mkdir $TMPDIR/derivatives/fmriprep
-mkdir $TMPDIR/derivatives/post_fmriprep
-
-#cp -r $DERIV_DIR/fmriprep/sub-$SJ_NR $TMPDIR/derivatives/fmriprep
-cp -r $DERIV_DIR/post_fmriprep/sub-$SJ_NR $TMPDIR/derivatives/post_fmriprep
-
-wait
-
-#python $CODE_DIR/processing/post_fmriprep.py $SJ_NR
-
-wait          # wait until programs are finished
 
 python pRF_model.py $SJ_NR $RUN_TYPE $CHUNK_NR
 

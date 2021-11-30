@@ -60,10 +60,8 @@ model_type = params['mri']['fitting']['pRF']['fit_model']
 
 # define file extension that we want to use, 
 # should include processing key words
-file_ext = '_cropped_{filt}_{stand}.{a}.{b}'.format(filt = params['mri']['filtering']['type'],
-                                                    stand = 'psc',
-                                                    a = params['mri']['file_ext'].rsplit('.', 2)[-2],
-                                                    b = params['mri']['file_ext'].rsplit('.', 2)[-1])
+file_ext = '_cropped_{filt}_{stand}.npy'.format(filt = params['mri']['filtering']['type'],
+                                                    stand = 'psc')
 
 # set paths
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
@@ -85,188 +83,205 @@ print('fitting functional files from %s'%postfmriprep_dir)
 proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir) if 'task-pRF' in h and
                  'acq-{acq}'.format(acq=acq) in h and run_type in h and h.endswith(file_ext)]
 
+## load functional data
+file = proc_files[0]
+data = np.load(file,allow_pickle=True) # will be (vertex, TR)
+
 # fit model
-for w, file in enumerate(proc_files):
 
-    ### define filenames for grid and search estimates
+### define filenames for grid and search estimates
 
-    # absolute filename for the estimates of the grid fit
-    grid_estimates_filename = file.replace('.{a}.{b}'.format(a = params['mri']['file_ext'].rsplit('.', 2)[-2], b = params['mri']['file_ext'].rsplit('.', 2)[-1]),
-                                           '_chunk-%s_of_%s_gauss_estimates.npz'%(str(chunk_num).zfill(3), str(total_chunks).zfill(3)))
-    grid_estimates_filename = op.join(output_dir.replace(model_type,'gauss'), op.split(grid_estimates_filename)[-1])
+# absolute filename for the estimates of the grid fit
+grid_estimates_filename = file.replace('.npy',
+                                        '_chunk-%s_of_%s_gauss_estimates.npz'%(str(chunk_num).zfill(3), str(total_chunks).zfill(3)))
+grid_estimates_filename = op.join(output_dir.replace(model_type,'gauss'), op.split(grid_estimates_filename)[-1])
 
-    # absolute filename for the estimates of the iterative fit
-    it_estimates_filename = grid_estimates_filename.replace('gauss_estimates.npz', 'itgauss_estimates.npz')
-    it_estimates_filename = op.join(output_dir.replace('/'+model_type,'/iterative_gauss'), op.split(it_estimates_filename)[-1])
+# absolute filename for the estimates of the iterative fit
+it_estimates_filename = grid_estimates_filename.replace('gauss_estimates.npz', 'itgauss_estimates.npz')
+it_estimates_filename = op.join(output_dir.replace('/'+model_type,'/iterative_gauss'), op.split(it_estimates_filename)[-1])
+
+if not op.exists(op.split(it_estimates_filename)[0]): # check if path to save iterative files exist
+    os.makedirs(op.split(it_estimates_filename)[0]) 
+
+if model_type == 'css':
+    #filename the estimates of the css fit
+    css_grid_estimates_filename = op.join(output_dir,
+                                    op.split(grid_estimates_filename)[-1].replace('gauss_estimates.npz', 'css_estimates.npz'))
     
-    if not op.exists(op.split(it_estimates_filename)[0]): # check if path to save iterative files exist
-        os.makedirs(op.split(it_estimates_filename)[0]) 
+    css_it_estimates_filename = it_estimates_filename.replace('itgauss_estimates.npz', 'itcss_estimates.npz')
+    css_it_estimates_filename = op.join(output_dir.replace('/'+model_type,'/iterative_css'), op.split(css_it_estimates_filename)[-1])
+    
+### now actually fit the data, if it was not fit before
 
-    if model_type == 'css':
-        #filename the estimates of the css fit
-        css_grid_estimates_filename = op.join(output_dir,
-                                        op.split(grid_estimates_filename)[-1].replace('gauss_estimates.npz', 'css_estimates.npz'))
-        
-        css_it_estimates_filename = it_estimates_filename.replace('itgauss_estimates.npz', 'itcss_estimates.npz')
-        css_it_estimates_filename = op.join(output_dir.replace('/'+model_type,'/iterative_css'), op.split(css_it_estimates_filename)[-1])
-      
-    ### now actually fit the data, if it was not fit before
+if (op.exists(it_estimates_filename) and model_type != 'css'): # if iterative fit exists, then gaussian was run
+    print('already exists %s'%it_estimates_filename)
+
+elif (model_type == 'css' and op.exists(css_it_estimates_filename)):
+    print('already exists %s'%css_it_estimates_filename)
     
-    if (op.exists(it_estimates_filename) and model_type != 'css'): # if iterative fit exists, then gaussian was run
-        print('already exists %s'%it_estimates_filename)
+else:
+    # masked data
+    print('loading data from %s' % file)
+
+    # number of vertices of chunk
+    num_vox_chunk = int(data.shape[0]/total_chunks)
     
-    elif (model_type == 'css' and op.exists(css_it_estimates_filename)):
-        print('already exists %s'%css_it_estimates_filename)
-        
+    # chunk it
+    data_chunk = data[num_vox_chunk*(int(chunk_num)-1):num_vox_chunk*int(chunk_num),:]
+    print('fitting chunk %s/%d of data with shape %s'%(chunk_num,total_chunks,str(data_chunk.shape)))
+    # store chunk shape, useful later
+    orig_shape = data_chunk.shape
+
+    # define non nan voxels for sanity check
+    not_nan_vox = np.where(~np.isnan(data_chunk[...,0]))[0]
+    print('masked data with shape %s'%(str(data_chunk[not_nan_vox].shape)))
+
+    # mask data to avoid errors in fitting (all nan batches) and make fitting faster
+    masked_data = data_chunk[not_nan_vox]
+    
+    if len(not_nan_vox)==0: # if all voxels nan, skip fitting completely
+        print('all nan voxel/vertex, skipping') 
+        estimates_grid = np.zeros((orig_shape[0],6)); estimates_grid[:] = np.nan
+        estimates_it = np.zeros((orig_shape[0],6)); estimates_it[:] = np.nan
+        if model_type == 'css':
+            estimates_css_grid = np.zeros((orig_shape[0],7)); estimates_css_grid[:] = np.nan
+            estimates_css_it = np.zeros((orig_shape[0],7)); estimates_css_it[:] = np.nan
+            
     else:
-        # load data
-        print('loading data from %s' % file)
+        # define design matrix 
+        visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+    
+        # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
+        prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
+                                    screen_distance_cm = params['monitor']['distance'],
+                                    design_matrix = visual_dm,
+                                    TR = TR)
         
-        masked_data, not_nan_vox, orig_shape = load_and_mask_data(file, chunk_num = chunk_num, total_chunks = total_chunks)
+        # define model 
+        gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
+                                            filter_predictions = True,
+                                            filter_type = params['mri']['filtering']['type'],
+                                            filter_params = {'highpass': params['mri']['filtering']['highpass'],
+                                                            'add_mean': params['mri']['filtering']['add_mean'],
+                                                            'window_length': params['mri']['filtering']['window_length'],
+                                                            'polyorder': params['mri']['filtering']['polyorder']}
+                                        )
         
-        if len(not_nan_vox)==0: # if all voxels nan, skip fitting completely
-            print('all nan voxel/vertex, skipping') 
-            estimates_grid = np.zeros((orig_shape[0],6)); estimates_grid[:] = np.nan
-            estimates_it = np.zeros((orig_shape[0],6)); estimates_it[:] = np.nan
-            if model_type == 'css':
-                estimates_css_grid = np.zeros((orig_shape[0],7)); estimates_css_grid[:] = np.nan
-                estimates_css_it = np.zeros((orig_shape[0],7)); estimates_css_it[:] = np.nan
-                
-        else:
-            # define design matrix 
-            visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
         
-            # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
-            prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
-                                     screen_distance_cm = params['monitor']['distance'],
-                                     design_matrix = visual_dm,
-                                     TR = TR)
-            
-            # define model 
-            gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
-                                             filter_predictions = True,
-                                             filter_type = params['mri']['filtering']['type'],
-                                             filter_params = {'highpass': params['mri']['filtering']['highpass'],
-                                                             'add_mean': params['mri']['filtering']['add_mean'],
-                                                             'window_length': params['mri']['filtering']['window_length'],
-                                                             'polyorder': params['mri']['filtering']['polyorder']}
-                                            )
-            
-            
-            # and parameters
-            grid_nr = params['mri']['fitting']['pRF']['grid_nr']
-            max_ecc_size = prf_stim.screen_size_degrees/2.0
-            sizes, eccs, polars = max_ecc_size * np.linspace(0.25, 1, grid_nr)**2, \
-                max_ecc_size * np.linspace(0.1, 1, grid_nr)**2, \
-                np.linspace(0, 2*np.pi, grid_nr)
+        # and parameters
+        grid_nr = params['mri']['fitting']['pRF']['grid_nr']
+        max_ecc_size = prf_stim.screen_size_degrees/2.0
+        sizes, eccs, polars = max_ecc_size * np.linspace(0.25, 1, grid_nr)**2, \
+            max_ecc_size * np.linspace(0.1, 1, grid_nr)**2, \
+            np.linspace(0, 2*np.pi, grid_nr)
 
+
+        ## GRID FIT
+        print("Grid fit")
+        gauss_fitter = Iso2DGaussianFitter(data = masked_data, 
+                                            model = gauss_model, 
+                                            n_jobs = 16)
+
+        gauss_fitter.grid_fit(ecc_grid = eccs, 
+                                polar_grid = polars, 
+                                size_grid = sizes, 
+                                pos_prfs_only = True)
+
+
+        estimates_grid = gauss_fitter.gridsearch_params
+        
+        
+        ## ITERATIVE FIT
+        # to set up parameter bounds in iterfit
+        inf = np.inf
+        eps = 1e-1
+        ss = prf_stim.screen_size_degrees
+        xtol = 1e-7
+        ftol = 1e-6
+
+        # model parameter bounds
+        gauss_bounds = [(-1.5*ss, 1.5*ss),  # x
+                        (-1.5*ss, 1.5*ss),  # y
+                        (eps, 1.5*ss),  # prf size
+                        (0, 20),  # prf amplitude
+                        (-5, 5)]  # bold baseline
+
+
+        # iterative fit
+        print("Iterative fit")
+        gauss_fitter.iterative_fit(rsq_threshold = 0.05, 
+                                    verbose = True,
+                                    starting_params = gauss_fitter.gridsearch_params,
+                                    bounds=gauss_bounds,
+                                    xtol = xtol,
+                                    ftol = ftol)
+
+
+        estimates_it = gauss_fitter.iterative_search_params
+
+    # save grid estimates
+    save_estimates(grid_estimates_filename, estimates_grid, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
+    # for it
+    save_estimates(it_estimates_filename, estimates_it, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
+    
+    if model_type == 'css':
+        
+        if len(masked_data)>0:
+        
+            # grid exponent parameter
+            css_n_grid = np.linspace(params['mri']['fitting']['pRF']['min_n'], 
+                                        params['mri']['fitting']['pRF']['max_n'],12)
+
+            # define model 
+            css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
+                                                filter_predictions = True,
+                                                filter_type = params['mri']['filtering']['type'],
+                                                filter_params = {'highpass': params['mri']['filtering']['highpass'],
+                                                                'add_mean': params['mri']['filtering']['add_mean'],
+                                                                'window_length': params['mri']['filtering']['window_length'],
+                                                                'polyorder': params['mri']['filtering']['polyorder']}
+                                            )
 
             ## GRID FIT
             print("Grid fit")
-            gauss_fitter = Iso2DGaussianFitter(data = masked_data, 
-                                               model = gauss_model, 
-                                               n_jobs = 16)
+            css_fitter = CSS_Iso2DGaussianFitter(data = masked_data, 
+                                                model = css_model, 
+                                                n_jobs = 16,
+                                                previous_gaussian_fitter = gauss_fitter)
 
-            gauss_fitter.grid_fit(ecc_grid = eccs, 
-                                  polar_grid = polars, 
-                                  size_grid = sizes, 
-                                  pos_prfs_only = True)
+            css_fitter.grid_fit(exponent_grid = css_n_grid, 
+                                pos_prfs_only = True)
 
 
-            estimates_grid = gauss_fitter.gridsearch_params
-            
-            
+            estimates_css_grid = css_fitter.gridsearch_params
+
             ## ITERATIVE FIT
-            # to set up parameter bounds in iterfit
-            inf = np.inf
-            eps = 1e-1
-            ss = prf_stim.screen_size_degrees
-            xtol = 1e-7
-            ftol = 1e-6
 
             # model parameter bounds
-            gauss_bounds = [(-1.5*ss, 1.5*ss),  # x
-                            (-1.5*ss, 1.5*ss),  # y
-                            (eps, 1.5*ss),  # prf size
-                            (0, 20),  # prf amplitude
-                            (-5, 5)]  # bold baseline
+            css_bounds = [(-1.5*ss, 1.5*ss),  # x
+                        (-1.5*ss, 1.5*ss),  # y
+                        (eps, 1.5*ss),  # prf size
+                        (0, 20),  # prf amplitude
+                        (-5, 5),  # bold baseline
+                        (0.01, 3)]  # CSS exponent
 
 
             # iterative fit
             print("Iterative fit")
-            gauss_fitter.iterative_fit(rsq_threshold = 0.05, 
-                                       verbose = True,
-                                       starting_params = gauss_fitter.gridsearch_params,
-                                       bounds=gauss_bounds,
-                                       xtol = xtol,
-                                       ftol = ftol)
+            css_fitter.iterative_fit(rsq_threshold = 0.05, 
+                                        verbose = False,
+                                        bounds = css_bounds,
+                                        xtol = xtol,
+                                        ftol = ftol)
 
 
-            estimates_it = gauss_fitter.iterative_search_params
+            estimates_css_it = css_fitter.iterative_search_params
 
-        # save grid estimates
-        save_estimates(grid_estimates_filename, estimates_grid, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
+        # save estimates
+        # for grid
+        save_estimates(css_grid_estimates_filename, estimates_css_grid, not_nan_vox, orig_shape, model_type = 'css')
         # for it
-        save_estimates(it_estimates_filename, estimates_it, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
-        
-        if model_type == 'css':
-            
-            if len(masked_data)>0:
-            
-                # grid exponent parameter
-                css_n_grid = np.linspace(params['mri']['fitting']['pRF']['min_n'], 
-                                         params['mri']['fitting']['pRF']['max_n'],12)
-
-                # define model 
-                css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
-                                                 filter_predictions = True,
-                                                 filter_type = params['mri']['filtering']['type'],
-                                                 filter_params = {'highpass': params['mri']['filtering']['highpass'],
-                                                                 'add_mean': params['mri']['filtering']['add_mean'],
-                                                                 'window_length': params['mri']['filtering']['window_length'],
-                                                                 'polyorder': params['mri']['filtering']['polyorder']}
-                                                )
-
-                ## GRID FIT
-                print("Grid fit")
-                css_fitter = CSS_Iso2DGaussianFitter(data = masked_data, 
-                                                   model = css_model, 
-                                                   n_jobs = 16,
-                                                    previous_gaussian_fitter = gauss_fitter)
-
-                css_fitter.grid_fit(exponent_grid = css_n_grid, 
-                                    pos_prfs_only = True)
-
-
-                estimates_css_grid = css_fitter.gridsearch_params
-
-                ## ITERATIVE FIT
-
-                # model parameter bounds
-                css_bounds = [(-1.5*ss, 1.5*ss),  # x
-                            (-1.5*ss, 1.5*ss),  # y
-                            (eps, 1.5*ss),  # prf size
-                            (0, 20),  # prf amplitude
-                            (-5, 5),  # bold baseline
-                            (0.01, 3)]  # CSS exponent
-
-
-                # iterative fit
-                print("Iterative fit")
-                css_fitter.iterative_fit(rsq_threshold = 0.05, 
-                                           verbose = False,
-                                           bounds = css_bounds,
-                                           xtol = xtol,
-                                           ftol = ftol)
-
-
-                estimates_css_it = css_fitter.iterative_search_params
-
-            # save estimates
-            # for grid
-            save_estimates(css_grid_estimates_filename, estimates_css_grid, not_nan_vox, orig_shape, model_type = 'css')
-            # for it
-            save_estimates(css_it_estimates_filename, estimates_css_it, not_nan_vox, orig_shape, model_type = 'css')
+        save_estimates(css_it_estimates_filename, estimates_css_it, not_nan_vox, orig_shape, model_type = 'css')
 
 
 # Print duration

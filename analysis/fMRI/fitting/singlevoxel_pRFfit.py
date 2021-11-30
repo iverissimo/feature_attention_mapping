@@ -55,8 +55,13 @@ else:
     if str(sys.argv[3]) != 'max' and str(sys.argv[3]) != 'min': # if we actually get a number for the vertex
     
         vertex = int(sys.argv[3]) # vertex number
+    else:
+        vertex = str(sys.argv[3]) 
         
     fit_now = True if str(sys.argv[4])=='fit' else False
+
+if fit_now == True and vertex in ['min','max']:
+    raise NameError('Cannot fit vertex, need to load pre-fitted estimates')
 
 # set font type for plots globally
 plt.rcParams['font.family'] = 'sans-serif'
@@ -162,16 +167,15 @@ proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir)
 ## load functional data
 data = np.load(proc_files[0],allow_pickle=True) # will be (vertex, TR)
     
-
-if roi != 'None':
+if roi != 'None' and vertex not in ['max','min']:
     print('masking data for ROI %s'%roi)
-    roi_ind = cortex.get_roi_verts(params['processing']['space'],roi) # get indices for that ROI
+    roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub'],roi) # get indices for that ROI
     data = data[roi_ind[roi]]
 
-# do we want to fit now, or load estimates?
-timeseries = data[vertex][np.newaxis,...]
-
+## do we want to fit now, or load estimates?
 if fit_now:
+
+    timeseries = data[vertex][np.newaxis,...]
 
     ## GRID FIT
     print("Grid fit")
@@ -244,46 +248,64 @@ if fit_now:
 else:
     print('loading estimates')
 
-    # Load pRF estimates 
-    estimates = []
+    ## Load pRF estimates 
     
     # path to combined estimates
     estimates_pth = op.join(fits_pth,'combined')
-
-    for _,field in enumerate(hemispheres): # each hemi field
         
-        # combined estimates filename
-        est_name = [x for _,x in enumerate(os.listdir(fits_pth)) if 'chunk-001' in x and field in x][0]
-        est_name = est_name.replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
+    # combined estimates filename
+    est_name = [x for _,x in enumerate(os.listdir(fits_pth)) if 'chunk-001' in x][0]
+    est_name = est_name.replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
+    
+    # total path to estimates path
+    estimates_combi = op.join(estimates_pth,est_name)
+    
+    if op.isfile(estimates_combi): # if combined estimates exists
+            
+            print('loading %s'%estimates_combi)
+            estimates = np.load(estimates_combi) # load it
+    
+    else: # if not join chunks and save file
+        if not op.exists(estimates_pth):
+            os.makedirs(estimates_pth) 
+
+        estimates = join_chunks(fits_pth, estimates_combi,
+                                chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
+
+    if roi != 'None':
+        print('masking data for ROI %s'%roi)
+        roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub'],roi) # get indices for that ROI
+        data = data[roi_ind[roi]]
+
+        if vertex == 'max':
+            vertex = np.where(estimates['r2'][roi_ind[roi]] == np.nanmax(estimates['r2'][roi_ind[roi]]))[0][0]
+        elif vertex == 'min': 
+            vertex = np.where(estimates['r2'][roi_ind[roi]] == np.nanmin(estimates['r2'][roi_ind[roi]]))[0][0]
+
+        timeseries = data[vertex][np.newaxis,...]
+
+        xx = estimates['x'][roi_ind[roi]][vertex]
+        yy = estimates['y'][roi_ind[roi]][vertex]
+        size = estimates['size'][roi_ind[roi]][vertex]
+        beta = estimates['betas'][roi_ind[roi]][vertex]
+        baseline = estimates['baseline'][roi_ind[roi]][vertex]
+        if 'css' in model_type:
+            ns = estimates['ns'][roi_ind[roi]][vertex]
+        rsq = estimates['r2'][roi_ind[roi]][vertex] 
+    
+    else:
+        xx = estimates['x'][vertex]
+        yy = estimates['y'][vertex]
         
-        # total path to estimates path
-        estimates_combi = op.join(estimates_pth,est_name)
+        size = estimates['size'][vertex]
         
-        if op.isfile(estimates_combi): # if combined estimates exists
-                
-                print('loading %s'%estimates_combi)
-                estimates.append(np.load(estimates_combi)) #save both hemisphere estimates in same array
+        beta = estimates['betas'][vertex]
+        baseline = estimates['baseline'][vertex]
         
-        else: # if not join chunks and save file
-            if not op.exists(estimates_pth):
-                os.makedirs(estimates_pth) 
+        if 'css' in model_type:
+            ns = estimates['ns'][vertex]
 
-            estimates.append(join_chunks(fits_pth, estimates_combi, field,
-                                         chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type))) #'{model}'.format(model=model_type)))#
-
-    # set outcomes
-    xx = np.concatenate((estimates[0]['x'],estimates[1]['x']))[vertex]
-    yy = np.concatenate((estimates[0]['y'],estimates[1]['y']))[vertex]
-
-    size = np.concatenate((estimates[0]['size'],estimates[1]['size']))[vertex]
-
-    beta = np.concatenate((estimates[0]['betas'],estimates[1]['betas']))[vertex]
-    baseline = np.concatenate((estimates[0]['baseline'],estimates[1]['baseline']))[vertex]
-
-    if 'css' in model_type:
-        ns = np.concatenate((estimates[0]['ns'],estimates[1]['ns']))[vertex] # exponent of css
-        
-    rsq = np.concatenate((estimates[0]['r2'],estimates[1]['r2']))[vertex] 
+        rsq = estimates['r2'][vertex]
         
 # get prediction
 if model_type == 'css':

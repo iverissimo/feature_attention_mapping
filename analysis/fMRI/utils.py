@@ -137,7 +137,7 @@ def correlate_vol(data1,data2,outfile):
 
 def crop_epi(file, outdir, num_TR_task=220, num_TR_crop = 5):
 
-    """ crop epi file
+    """ crop epi file (expects numpy file)
     and thus remove the first recorded "dummy" trials, if such was the case
     
     Parameters
@@ -172,8 +172,8 @@ def crop_epi(file, outdir, num_TR_task=220, num_TR_crop = 5):
     for input_file in file_list:
         
         # get file extension
-        file_extension = '.{a}.{b}'.format(a = input_file.rsplit('.', 2)[-2],
-                                   b = input_file.rsplit('.', 2)[-1])
+        file_extension = '.{b}'.format(b = input_file.rsplit('.', 2)[-1])
+
         # set output filename
         output_file = op.join(outdir, 
                     op.split(input_file)[-1].replace(file_extension,'_{name}{ext}'.format(name = 'cropped',
@@ -185,44 +185,14 @@ def crop_epi(file, outdir, num_TR_task=220, num_TR_crop = 5):
         else:
             print('making %s'%output_file)
             
-            # load file
-            nibber = nib.load(input_file)
-
-            # way depends on type of extension
-            if file_extension == '.func.gii':
-                data = np.array([nibber.darrays[i].data for i in range(len(nibber.darrays))]) #load surface data (time, vertex)
-            else:
-                affine = nibber.affine
-                data = np.array(nibber.get_fdata())
+            data = np.load(input_file,allow_pickle=True)
             
-            # check shape
-            # (note: for nifti files, time in last dim)
-            arr_shape = data.shape
-            
-            #
-            if (len(arr_shape)>2 and data.shape[-1]==num_TR_task) or (len(arr_shape)==2 and data.shape[0]==num_TR_task):
-                    raise NameError('Data already has shape of task! Sure we need to crop??')
-            else:
-                # crop initial TRs
-                if len(arr_shape)>2:
-                    crop_data = data[...,num_TR_crop:] 
-                else:
-                    crop_data = data[num_TR_crop:,:] 
+            crop_data = data[:,num_TR_crop:] 
                     
-                print('new file with shape %s' %str(crop_data.shape))
+            print('new file with shape %s' %str(crop_data.shape))
                 
             ## save cropped file
-            # again, way depends on type of extension
-            if file_extension == '.func.gii':
-                darrays = [nib.gifti.gifti.GiftiDataArray(d) for d in crop_data]
-                output_image = nib.gifti.gifti.GiftiImage(header = nibber.header, 
-                                                                  extra = nibber.extra, 
-                                                                  darrays = darrays)
-            else:
-                output_image = nib.nifti1.Nifti1Image(crop_data, affine, header = nibber.header)
-
-            # actually save
-            nib.save(output_image,output_file)
+            np.save(output_file,crop_data)
 
         # append out files
         outfiles.append(output_file)
@@ -270,8 +240,8 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False, **kwargs
     for input_file in file_list:
         
         # get file extension
-        file_extension = '.{a}.{b}'.format(a = input_file.rsplit('.', 2)[-2],
-                                   b = input_file.rsplit('.', 2)[-1])
+        file_extension = '.{b}'.format(b = input_file.rsplit('.', 2)[-1])
+
         # set output filename
         output_file = op.join(outdir, 
                     op.split(input_file)[-1].replace(file_extension,'_{filt}{ext}'.format(filt = filter_type,
@@ -283,15 +253,7 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False, **kwargs
         else:
             print('making %s'%output_file)
             
-            # load file
-            nibber = nib.load(input_file)
-
-            # way depends on type of extension
-            if file_extension == '.func.gii':
-                data = np.array([nibber.darrays[i].data for i in range(len(nibber.darrays))]) #load surface data
-            else:
-                affine = nibber.affine
-                data = np.array(nibber.get_fdata())
+            data = np.load(input_file,allow_pickle=True)
  
             ### implement filter types, by calling their specific functions
 
@@ -314,10 +276,10 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False, **kwargs
             # to compare the difference
             if plot_vert == True:
                 
-                ind2plot = np.argwhere(np.std(data, axis=0)==np.max(np.std(data, axis=0)))[0][0]
+                ind2plot = np.argwhere(np.std(data, axis=-1)==np.max(np.std(data, axis=-1)))[0][0]
                 fig = plt.figure()
-                plt.plot(data[...,ind2plot], color='dimgray',label='Original data')
-                plt.plot(data_filt[...,ind2plot], color='mediumseagreen',label='Filtered data')
+                plt.plot(data[ind2plot,...], color='dimgray',label='Original data')
+                plt.plot(data_filt[ind2plot,...], color='mediumseagreen',label='Filtered data')
 
                 plt.xlabel('Time (TR)')
                 plt.ylabel('Signal amplitude (a.u.)')
@@ -327,17 +289,7 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False, **kwargs
             
 
             ## save filtered file
-            # again, way depends on type of extension
-            if file_extension == '.func.gii':
-                darrays = [nib.gifti.gifti.GiftiDataArray(d) for d in data_filt]
-                output_image = nib.gifti.gifti.GiftiImage(header = nibber.header, 
-                                                                  extra = nibber.extra, 
-                                                                  darrays = darrays)
-            else:
-                output_image = nib.nifti1.Nifti1Image(data_filt, affine, header = nibber.header)
-
-            # actually save
-            nib.save(output_image,output_file)
+            np.save(output_file,data_filt)
 
         # append out files
         outfiles.append(output_file)
@@ -373,22 +325,13 @@ def gausskernel_data(data, TR = 1.2, cut_off_hz = 0.01, **kwargs):
     
     sigma = (1/cut_off_hz) / (2 * TR) 
 
-    # reshape to 2D if necessary, to have shape (time, vertex)
-    if len(arr_shape)>2:
-        data = np.reshape(data, (-1, data.shape[-1])) 
-        data = data.T
-
     # filter signal
-    filtered_signal = np.array(Parallel(n_jobs=2)(delayed(gaussian_filter)(i, sigma=sigma) for _,i in enumerate(data))) 
+    filtered_signal = np.array(Parallel(n_jobs=2)(delayed(gaussian_filter)(i, sigma=sigma) for _,i in enumerate(data.T))) 
 
     # add mean image back to avoid distribution around 0
-    data_filt = data - filtered_signal + np.mean(filtered_signal, axis=0)
-
-    # put back in original shape
-    if len(arr_shape)>2:
-        data_filt = data_filt.T.reshape(*arr_shape) 
+    data_filt = data.T - filtered_signal + np.mean(filtered_signal, axis=0)
     
-    return data_filt
+    return data_filt.T # to be again vertex, time
 
 
 def savgol_data(data, window_length=201, polyorder=3, **kwargs):
@@ -417,26 +360,14 @@ def savgol_data(data, window_length=201, polyorder=3, **kwargs):
         
     if window_length % 2 != 1:
         raise ValueError  # window_length should be odd
-            
-    # save shape, for file reshaping later
-    arr_shape = data.shape
-    
-    # reshape to 2D if necessary, to have shape (time, vertex)
-    if len(arr_shape)>2:
-        data = np.reshape(data, (-1, data.shape[-1])) 
-        data = data.T
 
     # filter signal
-    filtered_signal = savgol_filter(data, window_length, polyorder)
+    filtered_signal = savgol_filter(data.T, window_length, polyorder)
     
     # add mean image back to avoid distribution around 0
-    data_filt = data - filtered_signal + np.mean(filtered_signal, axis=0)
+    data_filt = data.T - filtered_signal + np.mean(filtered_signal, axis=0)
 
-   # put back in original shape
-    if len(arr_shape)>2:
-        data_filt = data_filt.T.reshape(*arr_shape) 
-
-    return data_filt
+    return data_filt.T # to be again vertex, time
 
 
 def dc_data(data, cut_off_hz = 0.01, **kwargs):
@@ -456,30 +387,18 @@ def dc_data(data, cut_off_hz = 0.01, **kwargs):
     data_filt: arr
         filtered array
     """ 
-            
-    # save shape, for file reshaping later
-    arr_shape = data.shape
-
-    # reshape to 2D if necessary, to have shape (time, vertex)
-    if len(arr_shape)>2:
-        data = np.reshape(data, (-1, data.shape[-1])) 
-        data = data.T
 
     # filter signal
-    ft = np.linspace(0, data.shape[0], data.shape[0], endpoint=False) 
+    ft = np.linspace(0, data.shape[-1], data.shape[-1], endpoint=False) 
     hp_set = dct_set(cut_off_hz, ft)
 
-    filtered_signal = signal.clean(data, detrend=False,
+    filtered_signal = signal.clean(data.T, detrend=False,
                             standardize=False, confounds=hp_set)
 
     # add mean image back to avoid distribution around 0
-    data_filt = filtered_signal + np.mean(data, axis=0) 
+    data_filt = filtered_signal + np.mean(data, axis=-1) 
 
-    # put back in original shape
-    if len(arr_shape)>2:
-        data_filt = data_filt.T.reshape(*arr_shape)
-
-    return data_filt
+    return data_filt.T # to be again vertex, time
 
 
 def psc_epi(file, outdir):
@@ -514,8 +433,8 @@ def psc_epi(file, outdir):
     for input_file in file_list:
         
         # get file extension
-        file_extension = '.{a}.{b}'.format(a = input_file.rsplit('.', 2)[-2],
-                                   b = input_file.rsplit('.', 2)[-1])
+        file_extension = '.{b}'.format(b = input_file.rsplit('.', 2)[-1])
+
         # set output filename
         output_file = op.join(outdir, 
                     op.split(input_file)[-1].replace(file_extension,'_{name}{ext}'.format(name = 'psc',
@@ -527,45 +446,14 @@ def psc_epi(file, outdir):
         else:
             print('making %s'%output_file)
             
-            # load file
-            nibber = nib.load(input_file)
-
-            # way depends on type of extension
-            if file_extension == '.func.gii':
-                data = np.array([nibber.darrays[i].data for i in range(len(nibber.darrays))]) #load surface data (time, vertex)
-            else:
-                affine = nibber.affine
-                data = np.array(nibber.get_fdata())
+            data = np.load(input_file,allow_pickle=True)
             
-            # check shape
-            # (note: for nifti files, time in last dim)
-            arr_shape = data.shape
-            
-            # reshape nii to 2D
-            if len(arr_shape)>2:
-                data = np.reshape(data, (-1, data.shape[-1])) 
-                
-                mean_signal = data.mean(axis = -1)[..., np.newaxis] 
-                data_psc = (data - mean_signal)/np.absolute(mean_signal)
-                data_psc *= 100
-                data_psc = data_psc.reshape(*arr_shape)
-                
-            else:
-                data_psc = (data - np.mean(data,axis=0))/np.absolute(np.mean(data,axis=0))
-                data_psc *= 100
+            mean_signal = data.mean(axis = -1)[..., np.newaxis]
+            data_psc = (data - mean_signal)/np.absolute(mean_signal)
+            data_psc *= 100
                 
             ## save psc file
-            # again, way depends on type of extension
-            if file_extension == '.func.gii':
-                darrays = [nib.gifti.gifti.GiftiDataArray(d) for d in data_psc]
-                output_image = nib.gifti.gifti.GiftiImage(header = nibber.header, 
-                                                                  extra = nibber.extra, 
-                                                                  darrays = darrays)
-            else:
-                output_image = nib.nifti1.Nifti1Image(data_psc, affine, header = nibber.header)
-
-            # actually save
-            nib.save(output_image,output_file)
+            np.save(output_file,data_psc)
 
         # append out files
         outfiles.append(output_file)
@@ -601,10 +489,7 @@ def average_epi(file, outdir, method = 'mean'):
         raise NameError('List of files not provided')
         
     file_list = file
-    
-    # get file extension
-    file_extension = '.{a}.{b}'.format(a = file_list[0].rsplit('.', 2)[-2],
-                                       b = file_list[0].rsplit('.', 2)[-1])
+
     # set output filename
     output_file = op.join(outdir, re.sub('run-\d{1}_','run-{mtd}_'.format(mtd = method), op.split(file_list[0])[-1]))
 
@@ -623,24 +508,7 @@ def average_epi(file, outdir, method = 'mean'):
             
             print('loading %s'%input_file)
             
-            # load file
-            nibber = nib.load(input_file)
-
-            # way depends on type of extension
-            if file_extension == '.func.gii':
-                data = np.array([nibber.darrays[i].data for i in range(len(nibber.darrays))]) #load surface data (time, vertex)
-            else:
-                affine = nibber.affine
-                data = np.array(nibber.get_fdata())
-            
-            # check shape
-            # (note: for nifti files, time in last dim)
-            arr_shape = data.shape
-            
-            # reshape to 2D if necessary, to have shape (time, vertex)
-            if len(arr_shape)>2:
-                data = np.reshape(data, (-1, data.shape[-1])) 
-                data = data.T
+            data = np.load(input_file,allow_pickle=True)
 
             all_runs.append(data)
           
@@ -651,22 +519,8 @@ def average_epi(file, outdir, method = 'mean'):
         elif method == 'mean':
             avg_data = np.mean(all_runs, axis = 0)
             
-        # put back in original shape
-        if len(arr_shape)>2:
-            avg_data = avg_data.T.reshape(*arr_shape) 
-
-        ## save averaged file
-        # again, way depends on type of extension
-        if file_extension == '.func.gii':
-            darrays = [nib.gifti.gifti.GiftiDataArray(d) for d in avg_data]
-            output_image = nib.gifti.gifti.GiftiImage(header = nibber.header, 
-                                                              extra = nibber.extra, 
-                                                              darrays = darrays)
-        else:
-            output_image = nib.nifti1.Nifti1Image(avg_data, affine, header = nibber.header)
-
         # actually save
-        nib.save(output_image,output_file)
+        np.save(output_file, avg_data)
 
 
     return output_file
@@ -1216,3 +1070,108 @@ def mask_estimates(estimates, ROI = 'None', fit_model = 'gauss', screen_limit_de
                         'rsq':masked_rsq}
     
     return masked_estimates
+
+def normalize(M):
+    """
+    normalize data array
+    """
+    return (M-np.nanmin(M))/(np.nanmax(M)-np.nanmin(M))
+
+
+def surf_data_from_cifti(data, axis, surf_name):
+
+    """
+    load surface data from cifti, from one hemisphere
+    taken from https://nbviewer.org/github/neurohackademy/nh2020-curriculum/blob/master/we-nibabel-markiewicz/NiBabel.ipynb
+    """
+
+    assert isinstance(axis, nib.cifti2.BrainModelAxis)
+    for name, data_indices, model in axis.iter_structures():  # Iterates over volumetric and surface structures
+        if name == surf_name:                                 # Just looking for a surface
+            data = data.T[data_indices]                       # Assume brainmodels axis is last, move it to front
+            vtx_indices = model.vertex                        # Generally 1-N, except medial wall vertices
+            surf_data = np.zeros((vtx_indices.max() + 1,) + data.shape[1:], dtype=data.dtype)
+            surf_data[vtx_indices] = data
+            return surf_data
+
+def load_data_save_npz(file, outdir):
+    
+    """ load data file, be it nifti, gifti or cifti
+    and save as npz - (whole brain: ("vertex", TR))
+    
+    Parameters
+    ----------
+    file : str/list/array
+        absolute filename of ciftis to be decomposed (or list of filenames)
+    outdir : str
+        path to save new files
+    
+    Outputs
+    -------
+    out_file: str
+        absolute output filename (or list of filenames)
+        
+    """
+    
+    # some params
+    hemispheres = ['hemi-L','hemi-R']
+    cifti_hemis = {'hemi-L': 'CIFTI_STRUCTURE_CORTEX_LEFT', 
+                   'hemi-R': 'CIFTI_STRUCTURE_CORTEX_RIGHT'}
+        
+    # check if single filename or list of filenames
+    
+    if isinstance(file, list): 
+        file_list = file  
+    else:
+        file_list = [file]
+        
+    # store output filename in list
+    outfiles = []
+    
+    # for each file, do the same
+    for input_file in file_list:
+        
+        # get file extension
+        file_extension = '.{a}.{b}'.format(a = input_file.rsplit('.', 2)[-2],
+                                   b = input_file.rsplit('.', 2)[-1])
+        
+        # set output filename
+        output_file = op.join(outdir, 
+                    op.split(input_file)[-1].replace(file_extension,'_{name}{ext}'.format(name = input_file.rsplit('.', 2)[-2],
+                                                                                           ext = '.npy')))
+
+        # if file already exists, skip
+        if op.exists(output_file): 
+            print('already exists, skipping %s'%output_file)
+
+        else:
+            print('making %s'%output_file)
+                    
+            if file_extension == '.dtseries.nii': # load cifti file
+
+                cifti = nib.load(input_file)
+                cifti_data = cifti.get_fdata(dtype=np.float32) # volume array (time, "voxels") 
+                cifti_hdr = cifti.header
+                axes = [cifti_hdr.get_axis(i) for i in range(cifti.ndim)]
+
+                # save gii, per hemisphere
+                # note that surface data is (time, "vertex")
+                data = np.vstack([surf_data_from_cifti(cifti_data, axes[1], cifti_hemis[hemi]) for hemi in hemispheres])
+            
+            elif file_extension == '.func.gii': # load gifti file
+                
+                print('implement later')
+            else:
+                print('implement later')
+                
+            # actually save
+            np.save(output_file,data)
+
+        # append out files
+        outfiles.append(output_file)
+
+    # if input file was not list, then return output that is also not list
+    if not isinstance(file, list): 
+        outfiles = outfiles[0] 
+
+    return outfiles

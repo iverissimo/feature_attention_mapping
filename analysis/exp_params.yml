@@ -92,8 +92,8 @@ mri: # refers to the Psychopy SyncGenerator class
   TR: 1.2  # seconds between volume acquisitions
   sync: 't'  # character used as flag for sync timing
 
-  space: 'fsaverage' # space of the files to be used in analysis
-  file_ext: '_bold.func.gii' # file extension
+  space: 'fsLR_den-170k' #'fsaverage' # space of the files to be used in analysis
+  file_ext:  '_bold.dtseries.nii' #'_bold.func.gii' # file extension
   acq: 'nordic' #'nordic' # "acquisition" type to use
 
   filtering:
@@ -175,6 +175,8 @@ plotting:
     green_vertical : (0,1,0), #(0,0.5412,0),
     red_horizontal : (1,0,0), #(0.6588,0,0),
     red_vertical : (1,0,0)} #(0.6588,0,0)}
+
+    pycortex_sub: 'hcp_999999' #'fsaverage'
 
 
 

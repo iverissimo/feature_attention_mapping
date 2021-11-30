@@ -51,8 +51,8 @@ epi_files = {'pRF':[op.join(fmriprep_dir,run) for _,run in enumerate(os.listdir(
 
 # exception for this run that could not be nordiced
 if sj == '004':
-    epi_files['FA'].append(op.join(fmriprep_dir,'sub-{sj}_ses-1_task-FA_acq-standard_run-4_space-{space}_hemi-L{file_ext}'.format(sj=sj, space=space, file_ext=file_ext))) 
-    epi_files['FA'].append(op.join(fmriprep_dir,'sub-{sj}_ses-1_task-FA_acq-standard_run-4_space-{space}_hemi-R{file_ext}'.format(sj=sj, space=space, file_ext=file_ext)))
+    epi_files['FA'].append(op.join(fmriprep_dir,'sub-{sj}_ses-1_task-FA_acq-standard_run-4_space-{space}{file_ext}'.format(sj=sj, space=space, file_ext=file_ext))) 
+    epi_files['FA'].append(op.join(fmriprep_dir,'sub-{sj}_ses-1_task-FA_acq-standard_run-4_space-{space}{file_ext}'.format(sj=sj, space=space, file_ext=file_ext)))
 
 # dict to store names of processed files, per task
 proc_files = {'pRF': [],
@@ -64,6 +64,9 @@ for _,task in enumerate(['pRF','FA']):
     
     task_name = 'feature' if task == 'FA' else 'prf' # due to params yml notation, should change later
 
+    # load and convert files in numpy arrays, to make format issue obsolete
+    epi_files[task] = load_data_save_npz(epi_files[task], output_dir)
+    
     ## crop files, due to "dummies"
     crop_TR = params[task_name]['dummy_TR'] + params[task_name]['crop_TR'] if params[task_name]['crop'] == True else params[task_name]['dummy_TR'] 
 

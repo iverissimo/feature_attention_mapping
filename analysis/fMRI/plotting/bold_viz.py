@@ -45,16 +45,13 @@ plt.rcParams['font.sans-serif'] = 'Helvetica'
 base_dir = params['general']['current_dir'] # which machine we run the data
 acq = params['mri']['acq'] # if using standard files or nordic files
 space = params['mri']['space'] # subject space
-hemispheres = ['hemi-L','hemi-R'] # only used for gifti files
 
 TR = params['mri']['TR']
 
 # define file extension that we want to use, 
 # should include processing key words
-file_ext = '_cropped_{filt}_{stand}.{a}.{b}'.format(filt = params['mri']['filtering']['type'],
-                                                    stand = 'psc',
-                                                    a = params['mri']['file_ext'].rsplit('.', 2)[-2],
-                                                    b = params['mri']['file_ext'].rsplit('.', 2)[-1])
+file_ext = '_cropped_{filt}_{stand}.npy'.format(filt = params['mri']['filtering']['type'],
+                                                    stand = 'psc')
 
 # set paths
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
@@ -68,34 +65,35 @@ if not os.path.exists(figures_pth):
 # list with absolute file names to be fitted (iff gii, then 2 hemispheres)
 proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir) if 'task-pRF' in h and
                  'acq-{acq}'.format(acq=acq) in h and run_type in h and h.endswith(file_ext)]
-data = []
-for _,h in enumerate(hemispheres):
-    gii_file = [x for _,x in enumerate(proc_files) if h in x][0]
-    print('loading %s' %gii_file)
-    data.append(np.array(surface.load_surf_data(gii_file)))
 
-data = np.vstack(data) # will be (vertex, TR)
+## load functional data
+file = proc_files[0]
+data = np.load(file,allow_pickle=True) # will be (vertex, TR)
+
+# get pycortex sub
+pysub = params['plotting']['pycortex_sub'] 
 
 # make movie
-movie_name = op.join(figures_pth,'flatmap_space-fsaverage_type-BOLD_visual_movie.mp4')
+movie_name = op.join(figures_pth,'flatmap_space-{space}_type-BOLD_visual_movie.mp4'.format(space=pysub))
 
 if not op.isfile(movie_name):
 
     for num_tr in range(data.shape[-1]):
 
         flatmap = cortex.Vertex(data[...,num_tr], 
-                                space,
+                                pysub,
                                 vmin = -5, vmax = 5,
                                 cmap='BuBkRd')
         #cortex.quickshow(flatmap,with_curvature=True,with_sulci=True)
         
-        filename = op.join(figures_pth,'flatmap_space-fsaverage_type-BOLD_visual_TR-%s.png'%str(num_tr).zfill(3))
+        filename = op.join(figures_pth,'flatmap_space-{space}_type-BOLD_visual_TR-{time}.png'.format(space=pysub,
+                                                                                            time=str(num_tr).zfill(3)))
         print('saving %s' %filename)
         _ = cortex.quickflat.make_png(filename, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
 
     ## save as video
-    img_name = filename.replace('_TR-219.png','_TR-%3d.png')
+    img_name = filename.replace('_TR-%s.png'%str(num_tr).zfill(3),'_TR-%3d.png')
     os.system("ffmpeg -r 6 -start_number 0 -i %s -vcodec mpeg4 -y %s"%(img_name,movie_name)) 
 
 else:

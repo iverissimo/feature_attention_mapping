@@ -881,8 +881,9 @@ def add_alpha2colormap(colormap = 'rainbow_r', bins = 256, invert_alpha = False,
        
     return rgb_fn 
 
-def join_chunks(path, out_name, hemi, chunk_num = 83, fit_model = 'css'):
-    """ combine all chunks into one single estimate numpy array (per hemisphere)
+def join_chunks(path, out_name, chunk_num = 83, fit_model = 'css'):
+    """ combine all chunks into one single estimate numpy array
+        assumes input is whole brain ("vertex", time)
     Parameters
     ----------
     path : str
@@ -902,11 +903,10 @@ def join_chunks(path, out_name, hemi, chunk_num = 83, fit_model = 'css'):
         numpy array of estimates
     
     """
-    print(hemi)
     
     for ch in range(chunk_num):
         
-        chunk_name = [x for _,x in enumerate(os.listdir(path)) if hemi in x and fit_model in x and 'chunk-%s'%str(ch+1).zfill(3) in x][0]
+        chunk_name = [x for _,x in enumerate(os.listdir(path)) if fit_model in x and 'chunk-%s'%str(ch+1).zfill(3) in x][0]
         print('loading chunk %s'%chunk_name)
         chunk = np.load(op.join(path, chunk_name)) # load chunk
         
@@ -937,7 +937,7 @@ def join_chunks(path, out_name, hemi, chunk_num = 83, fit_model = 'css'):
 
             rsq = np.concatenate((rsq,chunk['r2']))
     
-    print('shape of estimates for hemifield %s is %s'%(hemi,str(xx.shape)))
+    print('shape of estimates is %s'%(str(xx.shape)))
 
     # save file
     output = op.join(out_name)
@@ -1010,20 +1010,20 @@ def mask_estimates(estimates, ROI = 'None', fit_model = 'gauss', screen_limit_de
     
     """
     
-    xx = np.concatenate((estimates[0]['x'],estimates[1]['x']))
-    yy = np.concatenate((estimates[0]['y'],estimates[1]['y']))
+    xx = estimates['x']
+    yy = estimates['y']
        
-    size = np.concatenate((estimates[0]['size'],estimates[1]['size']))
+    size = estimates['size']
     
-    beta = np.concatenate((estimates[0]['betas'],estimates[1]['betas']))
-    baseline = np.concatenate((estimates[0]['baseline'],estimates[1]['baseline']))
+    beta = estimates['betas']
+    baseline = estimates['baseline']
     
     if 'css' in fit_model:
-        ns = np.concatenate((estimates[0]['ns'],estimates[1]['ns'])) # exponent of css
+        ns = estimates['ns']
     else: #if gauss
         ns = np.ones(xx.shape)
 
-    rsq = np.concatenate((estimates[0]['r2'],estimates[1]['r2']))
+    rsq = estimates['r2']
     
     # set limits for xx and yy, forcing it to be within the screen boundaries
     # also for max fitting size used and for positive pRFs

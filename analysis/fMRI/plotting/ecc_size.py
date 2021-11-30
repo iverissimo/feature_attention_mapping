@@ -52,7 +52,6 @@ base_dir = params['general']['current_dir'] # which machine we run the data
 acq = params['mri']['acq'] # if using standard files or nordic files
 space = params['mri']['space'] # subject space
 total_chunks = params['mri']['fitting']['pRF']['total_chunks'][space] # number of chunks that data was split in
-hemispheres = ['hemi-L','hemi-R'] # only used for gifti files
 
 TR = params['mri']['TR']
 
@@ -61,10 +60,8 @@ model_type = params['mri']['fitting']['pRF']['fit_model']
 
 # define file extension that we want to use, 
 # should include processing key words
-file_ext = '_cropped_{filt}_{stand}.{a}.{b}'.format(filt = params['mri']['filtering']['type'],
-                                                    stand = 'psc',
-                                                    a = params['mri']['file_ext'].rsplit('.', 2)[-2],
-                                                    b = params['mri']['file_ext'].rsplit('.', 2)[-1])
+file_ext = '_cropped_{filt}_{stand}.npy'.format(filt = params['mri']['filtering']['type'],
+                                                    stand = 'psc')
 
 # set paths
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
@@ -82,36 +79,33 @@ if not os.path.exists(figures_pth):
 
 if task == 'pRF':
     
-    # Load pRF estimates 
-    estimates = []
+    ## Load pRF estimates 
     
     # path to combined estimates
     estimates_pth = op.join(fits_pth,'combined')
+        
+    # combined estimates filename
+    est_name = [x for _,x in enumerate(os.listdir(fits_pth)) if 'chunk-001' in x][0]
+    est_name = est_name.replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
+    
+    # total path to estimates path
+    estimates_combi = op.join(estimates_pth,est_name)
+    
+    if op.isfile(estimates_combi): # if combined estimates exists
+            
+            print('loading %s'%estimates_combi)
+            estimates = np.load(estimates_combi) # load it
+    
+    else: # if not join chunks and save file
+        if not op.exists(estimates_pth):
+            os.makedirs(estimates_pth) 
 
-    for _,field in enumerate(hemispheres): # each hemi field
-        
-        # combined estimates filename
-        est_name = [x for _,x in enumerate(os.listdir(fits_pth)) if 'chunk-001' in x and field in x][0]
-        est_name = est_name.replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
-        
-        # total path to estimates path
-        estimates_combi = op.join(estimates_pth,est_name)
-        
-        if op.isfile(estimates_combi): # if combined estimates exists
-                
-                print('loading %s'%estimates_combi)
-                estimates.append(np.load(estimates_combi)) #save both hemisphere estimates in same array
-        
-        else: # if not join chunks and save file
-            if not op.exists(estimates_pth):
-                os.makedirs(estimates_pth) 
-
-            estimates.append(join_chunks(fits_pth, estimates_combi, field,
-                                         chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type))) #'{model}'.format(model=model_type)))#
+        estimates = join_chunks(fits_pth, estimates_combi,
+                                chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
 
 
 # define design matrix 
-visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1)
+visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -132,21 +126,23 @@ size = masked_est['size']
 complex_location = x + y * 1j # calculate eccentricity values
 ecc = np.abs(complex_location)
 
+# set threshold for plotting
+rsq_threshold = params['plotting']['rsq_threshold']
+
 # get vertices for subject fsaverage
-ROIs = ['V1','V2','V3','V3AB','hV4','LO','IPS0','IPS1','IPS2+','sPCS','iPCS']
+ROIs = params['plotting']['ROIs'][space]
 
-# Make a dictionary with one specific color per group - similar to fig3 colors
-ROI_pal = {'V1': (0.03137255, 0.11372549, 0.34509804), 'V2': (0.14136101, 0.25623991, 0.60530565),
-           'V3': (0.12026144, 0.50196078, 0.72156863), 'V3AB': (0.25871588, 0.71514033, 0.76807382), 
-           'hV4': (0.59215686, 0.84052288, 0.72418301), 'LO': (0.88207612, 0.9538639 , 0.69785467),
-           'IPS0': (0.99764706, 0.88235294, 0.52862745), 'IPS1': (0.99529412, 0.66901961, 0.2854902), 
-           'IPS2+': (0.83058824, 0.06117647, 0.1254902),
-           'sPCS': (0.88221453, 0.83252595, 0.91109573), 'iPCS': (0.87320261, 0.13071895, 0.47320261)
-         }
+# dictionary with one specific color per group - similar to fig3 colors
+ROI_pal = params['plotting']['ROI_pal']
+color_codes = {key: ROI_pal[key] for key in ROIs}
 
+# get pycortex sub
+pysub = params['plotting']['pycortex_sub'] 
+
+# get vertices for ROI
 roi_verts = {} #empty dictionary  
 for _,val in enumerate(ROIs):
-    roi_verts[val] = cortex.get_roi_verts(space,val)[val]
+    roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
     
 regions = {'occipital': ['V1','V2','V3','V3AB','hV4','LO'],
             'parietal': ['IPS0','IPS1','IPS2+'],
@@ -154,12 +150,14 @@ regions = {'occipital': ['V1','V2','V3','V3AB','hV4','LO'],
 
 # now select estimates per ROI
 
-rsq_threshold = params['mri']['plotting']['rsq_threshold']
 min_ecc = 0.25
 max_ecc = 3.3
 n_bins = 10
     
 for idx,roi in enumerate(ROIs): # go over ROIs
+
+    # mask estimates
+    print('masking estimates for ROI %s'%roi)
 
     # get datapoints for RF only belonging to roi
     new_size = size[roi_verts[roi]]
@@ -202,20 +200,21 @@ for idx,roi in enumerate(ROIs): # go over ROIs
                                                'mean_size': mean_size,'mean_size_std': mean_size_std,
                                                'ROI': np.tile(roi,n_bins)}),ignore_index=True)
 
+
 ### plot for Occipital Areas - V1 V2 V3 V3AB hV4 LO ###
 
 sns.set(font_scale=1.3)
 sns.set_style("ticks")
 
 ax = sns.lmplot(x = 'mean_ecc', y = 'mean_size', hue = 'ROI', data = all_roi[all_roi.ROI.isin(regions['occipital'])].applymap(lambda x: x if isinstance(x, (float,str)) else x[0]),
-                scatter=True, palette="YlGnBu_r",markers=['^','s','o','v','D','h'])
+                scatter=True, palette = color_codes, markers=['^','s','o'])
 
 ax = plt.gca()
 plt.xticks(fontsize = 18)
 plt.yticks(fontsize = 18)
 #ax.axes.tick_params(labelsize=16)
 ax.axes.set_xlim(min_ecc,max_ecc)
-ax.axes.set_ylim(0,5)
+ax.axes.set_ylim(0.5,4)
 
 ax.set_xlabel('pRF eccentricity [dva]', fontsize = 20, labelpad = 15)
 ax.set_ylabel('pRF size [dva]', fontsize = 20, labelpad = 15)
@@ -224,49 +223,72 @@ sns.despine(offset=15)
 fig1 = plt.gcf()
 fig1.savefig(op.join(figures_pth,'occipital_ecc_vs_size_binned_rsq-%0.2f.svg'%(rsq_threshold)), dpi=100,bbox_inches = 'tight')
 
-### plot for Parietal Areas - IPS0 IPS1 IPS2+ ###
 
-sns.set(font_scale=1.3)
-sns.set_style("ticks")
+# ### plot for Occipital Areas - V1 V2 V3 V3AB hV4 LO ###
 
-ax = sns.lmplot(x = 'mean_ecc', y = 'mean_size', hue = 'ROI', data = all_roi[all_roi.ROI.isin(regions['parietal'])].applymap(lambda x: x if isinstance(x, (float,str)) else x[0]),
-                scatter=True, palette="YlOrRd",markers=['^','s','o'])
-ax = plt.gca()
-plt.xticks(fontsize = 18)
-plt.yticks(fontsize = 18)
-#ax.axes.tick_params(labelsize=16)
-ax.axes.set_xlim(min_ecc,max_ecc)
-ax.axes.set_ylim(0,5)
+# sns.set(font_scale=1.3)
+# sns.set_style("ticks")
 
-ax.set_xlabel('pRF eccentricity [dva]', fontsize = 20, labelpad = 15)
-ax.set_ylabel('pRF size [dva]', fontsize = 20, labelpad = 15)
+# ax = sns.lmplot(x = 'mean_ecc', y = 'mean_size', hue = 'ROI', data = all_roi[all_roi.ROI.isin(regions['occipital'])].applymap(lambda x: x if isinstance(x, (float,str)) else x[0]),
+#                 scatter=True, palette="YlGnBu_r",markers=['^','s','o','v','D','h'])
 
-#ax.set_title('ecc vs size plot, %d bins from %.2f-%.2f ecc [dva]'%(n_bins,min_ecc,max_ecc),fontsize=12)
-sns.despine(offset=15)
-fig1 = plt.gcf()
-fig1.savefig(op.join(figures_pth,'parietal_ecc_vs_size_binned_rsq-%0.2f.svg'%(rsq_threshold)), dpi=100,bbox_inches = 'tight')
+# ax = plt.gca()
+# plt.xticks(fontsize = 18)
+# plt.yticks(fontsize = 18)
+# #ax.axes.tick_params(labelsize=16)
+# ax.axes.set_xlim(min_ecc,max_ecc)
+# ax.axes.set_ylim(0,5)
 
-### plot for Frontal Areas - sPCS iPCS ###
+# ax.set_xlabel('pRF eccentricity [dva]', fontsize = 20, labelpad = 15)
+# ax.set_ylabel('pRF size [dva]', fontsize = 20, labelpad = 15)
+# #ax.set_title('ecc vs size plot, %d bins from %.2f-%.2f ecc [dva]'%(n_bins,min_ecc,max_ecc),fontsize=12)
+# sns.despine(offset=15)
+# fig1 = plt.gcf()
+# fig1.savefig(op.join(figures_pth,'occipital_ecc_vs_size_binned_rsq-%0.2f.svg'%(rsq_threshold)), dpi=100,bbox_inches = 'tight')
 
-sns.set(font_scale=1.3)
-sns.set_style("ticks")
+# ### plot for Parietal Areas - IPS0 IPS1 IPS2+ ###
 
-ax = sns.lmplot(x = 'mean_ecc', y = 'mean_size', hue = 'ROI', data = all_roi[all_roi.ROI.isin(regions['frontal'])].applymap(lambda x: x if isinstance(x, (float,str)) else x[0]),
-                scatter=True, palette="PuRd",markers=['^','s'])
-ax = plt.gca()
-plt.xticks(fontsize = 18)
-plt.yticks(fontsize = 18)
-#ax.axes.tick_params(labelsize=16)
-ax.axes.set_xlim(min_ecc,max_ecc)
-ax.axes.set_ylim(0,5)
+# sns.set(font_scale=1.3)
+# sns.set_style("ticks")
 
-ax.set_xlabel('pRF eccentricity [dva]', fontsize = 20, labelpad = 15)
-ax.set_ylabel('pRF size [dva]', fontsize = 20, labelpad = 15)
+# ax = sns.lmplot(x = 'mean_ecc', y = 'mean_size', hue = 'ROI', data = all_roi[all_roi.ROI.isin(regions['parietal'])].applymap(lambda x: x if isinstance(x, (float,str)) else x[0]),
+#                 scatter=True, palette="YlOrRd",markers=['^','s','o'])
+# ax = plt.gca()
+# plt.xticks(fontsize = 18)
+# plt.yticks(fontsize = 18)
+# #ax.axes.tick_params(labelsize=16)
+# ax.axes.set_xlim(min_ecc,max_ecc)
+# ax.axes.set_ylim(0,5)
 
-#ax.set_title('ecc vs size plot, %d bins from %.2f-%.2f ecc [dva]'%(n_bins,min_ecc,max_ecc),fontsize=12)
-sns.despine(offset=15)
-fig1 = plt.gcf()
-fig1.savefig(os.path.join(figures_pth,'frontal_ecc_vs_size_binned_rsq-%0.2f.svg'%(rsq_threshold)), dpi=100,bbox_inches = 'tight')
+# ax.set_xlabel('pRF eccentricity [dva]', fontsize = 20, labelpad = 15)
+# ax.set_ylabel('pRF size [dva]', fontsize = 20, labelpad = 15)
+
+# #ax.set_title('ecc vs size plot, %d bins from %.2f-%.2f ecc [dva]'%(n_bins,min_ecc,max_ecc),fontsize=12)
+# sns.despine(offset=15)
+# fig1 = plt.gcf()
+# fig1.savefig(op.join(figures_pth,'parietal_ecc_vs_size_binned_rsq-%0.2f.svg'%(rsq_threshold)), dpi=100,bbox_inches = 'tight')
+
+# ### plot for Frontal Areas - sPCS iPCS ###
+
+# sns.set(font_scale=1.3)
+# sns.set_style("ticks")
+
+# ax = sns.lmplot(x = 'mean_ecc', y = 'mean_size', hue = 'ROI', data = all_roi[all_roi.ROI.isin(regions['frontal'])].applymap(lambda x: x if isinstance(x, (float,str)) else x[0]),
+#                 scatter=True, palette="PuRd",markers=['^','s'])
+# ax = plt.gca()
+# plt.xticks(fontsize = 18)
+# plt.yticks(fontsize = 18)
+# #ax.axes.tick_params(labelsize=16)
+# ax.axes.set_xlim(min_ecc,max_ecc)
+# ax.axes.set_ylim(0,5)
+
+# ax.set_xlabel('pRF eccentricity [dva]', fontsize = 20, labelpad = 15)
+# ax.set_ylabel('pRF size [dva]', fontsize = 20, labelpad = 15)
+
+# #ax.set_title('ecc vs size plot, %d bins from %.2f-%.2f ecc [dva]'%(n_bins,min_ecc,max_ecc),fontsize=12)
+# sns.despine(offset=15)
+# fig1 = plt.gcf()
+# fig1.savefig(os.path.join(figures_pth,'frontal_ecc_vs_size_binned_rsq-%0.2f.svg'%(rsq_threshold)), dpi=100,bbox_inches = 'tight')
 
 ### flatmaps ####
 
@@ -289,10 +311,10 @@ print('created costum colormap %s'%col2D_name)
 
 
 images['ecc'] = cortex.Vertex2D(ecc, alpha_level, 
-                        subject = space, #params['processing']['space'], #'fsaverage_meridians',
+                        subject = pysub, 
                         vmin = 0, vmax = 6,
-                        vmin2 = 0, vmax2 = 0.3,
-                        cmap=col2D_name)
+                        vmin2 = 0, vmax2 = np.nanmax(alpha_level),
+                        cmap = col2D_name)
 
 cortex.quickshow(images['ecc'],with_curvature=True,with_sulci=True,with_labels=False,
                  curvature_brightness = 0.4, curvature_contrast = 0.1)
@@ -310,10 +332,10 @@ col2D_name = os.path.splitext(os.path.split(SIZE_colors)[-1])[0]
 print('created costum colormap %s'%col2D_name)
 
 images['size'] = cortex.Vertex2D(size, alpha_level, 
-                        subject = space, #params['processing']['space'], #'fsaverage_meridians',
-                        vmin = 0, vmax = 10,
-                        vmin2 = 0, vmax2 = 0.3,
-                           cmap=col2D_name)
+                        subject = pysub,
+                        vmin = 0, vmax = 7,
+                        vmin2 = 0, vmax2 = np.nanmax(alpha_level),
+                        cmap ='hot_alpha') #col2D_name)
 cortex.quickshow(images['size'],with_curvature=True,with_sulci=True,with_labels=False,
                  curvature_brightness = 0.4, curvature_contrast = 0.1)
 

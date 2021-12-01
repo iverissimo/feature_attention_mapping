@@ -22,7 +22,6 @@ from prfpy.rf import *
 from prfpy.timecourse import *
 from prfpy.stimulus import PRFStimulus2D
 from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
-from prfpy.fit import Iso2DGaussianFitter, CSS_Iso2DGaussianFitter
 
 from popeye import utilities
 
@@ -151,6 +150,7 @@ events_pth = glob.glob(op.join(derivatives_dir.replace('derivatives','sourcedata
 # get absolute path to pkl with bar positions for each run
 bar_pos_files = [op.join(events_pth, h) for h in os.listdir(events_pth) if 'task-FA' in h and
                 'run-{run}'.format(run=run) in h and h.endswith('_bar_positions.pkl')]
+print('getting bar positions from %s'%bar_pos_files[0])
 
 # load bar positions for run
 bar_pos = pd.read_pickle(bar_pos_files[0])
@@ -238,9 +238,46 @@ for reg in all_regressors.keys():
     else:
         # load prediction
         prediction = np.load(reg_filename)
+        print('file already exists, loading %s'%reg_filename)
     
     ## append predictions in array, to use for FA GLM DM
     all_reg_predictions.append(prediction[np.newaxis,...])
 
 all_reg_predictions = np.vstack(all_reg_predictions)
 
+## Make actual DM to be used in GLM fit (4 regressors + intercept)
+
+DM_FA = np.zeros((all_reg_predictions.shape[1], all_reg_predictions.shape[-1], 5)) # shape of DM is (vox,time,reg)
+
+# iterate over vertex/voxel
+for i in range(all_reg_predictions.shape[1]):
+
+    DM_FA[i,:,0] = np.repeat(1,all_reg_predictions.shape[-1]) # add intercept
+    
+    for w in range(all_reg_predictions.shape[0]): # add regressor (which will be the model from pRF estimates)
+        DM_FA[i,:,w+1] = all_reg_predictions[w,i,:] 
+
+# save DM, for later checking
+np.save(op.join(output_dir,'DM_FA_run-{run}.npy'.format(run=run)),DM_FA)
+print('saving %s'%op.join(output_dir,'DM_FA_run-{run}.npy'.format(run=run)))
+
+### plot vertex DM for sanity check
+#v = 102705
+#plot_DM(DM_FA, v, op.join(output_dir,'DM_FA_vertex_%i.png'%v), names=['intercept']+list(all_regressors.keys()))
+
+## Actually fit GLM
+FA_GLM_estimates_filename = op.join(output_dir, op.split(proc_files[0])[-1].replace('.npy','_estimates.npz'))
+
+if not op.isfile(FA_GLM_estimates_filename): # if doesn't exist already
+    
+    print('fitting GLM to %d vertices'%data.shape[0])
+    glm_outcome = Parallel(n_jobs=16)(delayed(fit_glm)(data[vert], DM_FA[vert]) for vert in tqdm(range(data.shape[0])))
+
+    np.savez(FA_GLM_estimates_filename,
+                prediction = np.array([glm_outcome[i][0] for i in range(data.shape[0])]),
+                betas = np.array([glm_outcome[i][1] for i in range(data.shape[0])]),
+                r2 = np.array([glm_outcome[i][2] for i in range(data.shape[0])]),
+                mse = np.array([glm_outcome[i][3] for i in range(data.shape[0])])
+            )
+else:
+    print('already exists %s'%FA_GLM_estimates_filename)

@@ -27,6 +27,7 @@ from PIL import Image, ImageDraw
 from matplotlib import cm
 import matplotlib.colors
 
+from scipy.stats import pearsonr, t, norm
 
 
 
@@ -1375,3 +1376,45 @@ def plot_DM(DM, vertex, output, names=['intercept','ACAO', 'ACUO', 'UCAO', 'UCUO
     
     print('saving %s'%output)
     plt.savefig(output)
+
+ 
+def fit_glm(voxel, dm):
+    
+    """ GLM fit on timeseries
+    Regress a created design matrix on the input_data.
+
+    Parameters
+    ----------
+    voxel : arr
+        timeseries of a single voxel
+    dm : arr
+        DM array (#TR,#regressors)
+    
+
+    Outputs
+    -------
+    prediction : arr
+        model fit for voxel
+    betas : arr
+        betas for model
+    r2 : arr
+        coefficient of determination
+    mse : arr
+        mean of the squared residuals
+    
+    """
+
+    if np.isnan(voxel).any() or np.isnan(dm).any():
+        betas = np.repeat(np.nan, dm.shape[-1])
+        prediction = np.repeat(np.nan, dm.shape[0])
+        mse = np.nan
+        r2 = np.nan
+
+    else:   # if not nan (some vertices might have nan values)
+        betas = np.linalg.lstsq(dm, voxel, rcond = -1)[0]
+        prediction = dm.dot(betas)
+
+        mse = np.mean((voxel - prediction) ** 2) # calculate mean of squared residuals
+        r2 = pearsonr(prediction, voxel)[0] ** 2 # and the rsq
+    
+    return prediction, betas, r2, mse

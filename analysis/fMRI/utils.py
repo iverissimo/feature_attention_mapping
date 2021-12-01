@@ -1535,7 +1535,7 @@ def compute_stats(voxel, dm, contrast, betas, pvalue = 'oneside'):
         return des_var
 
     
-    if np.isnan(voxel).any():
+    if np.isnan(voxel).any() or np.isnan(dm).any():
         t_val = np.nan
         p_val = np.nan
         z_score = np.nan
@@ -1569,3 +1569,28 @@ def compute_stats(voxel, dm, contrast, betas, pvalue = 'oneside'):
             z_score = norm.isf(np.clip(p_val/2, 1.e-300, 1. - 1.e-16)) # deal with inf values of scipy
 
     return t_val,p_val,z_score
+
+
+def leave_one_out(input_list):
+
+    """ make list of lists, by leaving one out
+
+    Parameters
+    ----------
+    input_list : list/arr
+        list of items
+
+    Outputs
+    -------
+    out_lists : list/arr
+        list of lists, with each element
+        of the input_list left out of the returned lists once, in order
+
+    
+    """
+
+    out_lists = []
+    for x in input_list:
+        out_lists.append([y for y in input_list if y != x])
+
+    return out_lists

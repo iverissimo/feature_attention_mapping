@@ -1418,3 +1418,154 @@ def fit_glm(voxel, dm):
         r2 = pearsonr(prediction, voxel)[0] ** 2 # and the rsq
     
     return prediction, betas, r2, mse
+
+
+def set_contrast(dm_col,tasks,contrast_val=[1],num_cond=1):
+    
+    """ define contrast matrix
+
+    Parameters
+    ----------
+    dm_col : list/arr
+        design matrix columns (all possible task names in list)
+    tasks : list/arr
+        list with list of tasks to give contrast value
+        if num_cond=1 : [tasks]
+        if num_cond=2 : [tasks1,tasks2], contrast will be tasks1 - tasks2     
+    contrast_val : list/arr 
+        list with values for contrast
+        if num_cond=1 : [value]
+        if num_cond=2 : [value1,value2], contrast will be tasks1 - tasks2
+    num_cond : int
+        if one task vs the implicit baseline (1), or if comparing 2 conditions (2)
+
+    Outputs
+    -------
+    contrast : list/arr
+        contrast array
+
+    """
+    
+    contrast = np.zeros(len(dm_col))
+
+    if num_cond == 1: # if only one contrast value to give ("task vs implicit intercept")
+
+        for j,name in enumerate(tasks[0]):
+            for i in range(len(contrast)):
+                if dm_col[i] == name:
+                    contrast[i] = contrast_val[0]
+
+    elif num_cond == 2: # if comparing 2 conditions (task1 - task2)
+
+        for k,lbl in enumerate(tasks):
+            idx = []
+            for i,val in enumerate(lbl):
+                idx.extend(np.where([1 if val == label else 0 for _,label in enumerate(dm_col)])[0])
+
+            val = contrast_val[0] if k==0 else contrast_val[1] # value to give contrast
+
+            for j in range(len(idx)):
+                for i in range(len(dm_col)):
+                    if i==idx[j]:
+                        contrast[i]=val
+
+    print('contrast for %s is %s'%(tasks,contrast))
+    return contrast
+
+
+
+def compute_stats(voxel, dm, contrast, betas, pvalue = 'oneside'):
+    
+    """ compute statistis for GLM
+
+    Parameters
+    ----------
+    voxel : arr
+        timeseries of a single voxel
+    dm : arr
+        DM array (#TR,#regressors)
+    contrast: arr
+        contrast vector
+    betas : arr
+        betas for model at that voxel
+    pvalue : str
+        type of tail for p-value - 'oneside'/'twoside'
+
+    Outputs
+    -------
+    t_val : float
+        t-statistic for that voxel relative to contrast
+    p_val : float
+        p-value for that voxel relative to contrast
+    z_score : float
+        z-score for that voxel relative to contrast
+    
+    """
+
+    
+    def design_variance(X, which_predictor=1):
+        
+        ''' Returns the design variance of a predictor (or contrast) in X.
+        
+        Parameters
+        ----------
+        X : numpy array
+            Array of shape (N, P)
+        which_predictor : int or list/array
+            The index of the predictor you want the design var from.
+            Note that 0 refers to the intercept!
+            Alternatively, "which_predictor" can be a contrast-vector
+            
+        Outputs
+        -------
+        des_var : float
+            Design variance of the specified predictor/contrast from X.
+        '''
+    
+        is_single = isinstance(which_predictor, int)
+        if is_single:
+            idx = which_predictor
+        else:
+            idx = np.array(which_predictor) != 0
+
+        c = np.zeros(X.shape[1])
+        c[idx] = 1 if is_single == 1 else which_predictor[idx]
+        des_var = c.dot(np.linalg.pinv(X.T.dot(X))).dot(c.T)
+        
+        return des_var
+
+    
+    if np.isnan(voxel).any():
+        t_val = np.nan
+        p_val = np.nan
+        z_score = np.nan
+
+    else:   # if not nan (some vertices might have nan values)
+        
+        # calculate design variance
+        design_var = design_variance(dm, contrast)
+        
+        # sum of squared errors
+        sse = ((voxel - (dm.dot(betas))) ** 2).sum() 
+        
+        #degrees of freedom = N - P = timepoints - predictores
+        df = (dm.shape[0] - dm.shape[1])
+        
+        # t statistic for vertex
+        t_val = contrast.dot(betas) / np.sqrt((sse/df) * design_var)
+
+        if pvalue == 'oneside': 
+            # compute the p-value (right-tailed)
+            p_val = t.sf(t_val, df) 
+
+            # z-score corresponding to certain p-value
+            z_score = norm.isf(np.clip(p_val, 1.e-300, 1. - 1.e-16)) # deal with inf values of scipy
+
+        elif pvalue == 'twoside':
+            # take the absolute by np.abs(t)
+            p_val = t.sf(np.abs(t_val), df) * 2 # multiply by two to create a two-tailed p-value
+
+            # z-score corresponding to certain p-value
+            z_score = norm.isf(np.clip(p_val/2, 1.e-300, 1. - 1.e-16)) # deal with inf values of scipy
+
+    return t_val,p_val,z_score

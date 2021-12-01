@@ -72,21 +72,18 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
 batch_dir = '/home/inesv/batch/'
 
-for _,chu in enumerate(range(total_chunks)): # submit job for each chunk 
-#for slice_num in np.arange(total_slices):
+working_string = batch_string.replace('$SJ_NR', str(sj).zfill(3))
+working_string = working_string.replace('$RUN', run)
+working_string = working_string.replace('$SPACE', space)
+working_string = working_string.replace('$DERIV_DIR', op.join(params['mri']['paths'][base_dir]['root'], 'derivatives'))
+working_string = working_string.replace('$SOURCEDATA_DIR', op.join(params['mri']['paths'][base_dir]['root'], 'sourcedata'))
 
-        working_string = batch_string.replace('$SJ_NR', str(sj).zfill(3))
-        working_string = working_string.replace('$RUN', run)
-        working_string = working_string.replace('$SPACE', space)
-        working_string = working_string.replace('$DERIV_DIR', op.join(params['mri']['paths'][base_dir]['root'], 'derivatives'))
-        working_string = working_string.replace('$SOURCEDATA_DIR', op.join(params['mri']['paths'][base_dir]['root'], 'sourcedata'))
+# run it
+js_name = op.join(batch_dir, 'FA_GLM_sub-' + str(sj).zfill(3) + '_FAM.sh')
+of = open(js_name, 'w')
+of.write(working_string)
+of.close()
 
-        # run it
-        js_name = op.join(batch_dir, 'FA_GLM_sub-' + str(sj).zfill(3) + '_FAM.sh')
-        of = open(js_name, 'w')
-        of.write(working_string)
-        of.close()
-
-        print('submitting ' + js_name + ' to queue')
-        print(working_string)
-        os.system('sbatch ' + js_name)
+print('submitting ' + js_name + ' to queue')
+print(working_string)
+os.system('sbatch ' + js_name)

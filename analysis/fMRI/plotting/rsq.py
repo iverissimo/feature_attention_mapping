@@ -112,17 +112,53 @@ if task == 'pRF':
                             design_matrix = visual_dm,
                             TR = TR)
 
+    rsq = estimates['r2'] 
+
     # mask estimates
     print('masking estimates')
     masked_est = mask_estimates(estimates, fit_model = model_type,
                                 screen_limit_deg = [prf_stim.screen_size_degrees/2,prf_stim.screen_size_degrees/2])
 
-    rsq = masked_est['rsq']
+    masked_rsq = masked_est['rsq']
 
     # saved masked rsq, useful for FA plots
-    np.save(op.join(fits_pth,'combined','masked_rsq.npy'), rsq)
+    np.save(op.join(fits_pth,'combined','masked_rsq.npy'), masked_rsq)
 
-#elif task == 'FA':
+    plot_lims_dist = [0,.8] # axis value for plotting
+    plot_lims_flat = [0,.6] # axis value for plotting
+
+elif task == 'FA':
+    
+    # mask rsq given masked rsq of pRF mean run (within screen boundaries etc)
+    pRF_masked_rsq = np.load(op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), space, 
+                      'iterative_{model}'.format(model=model_type),'run-mean','combined','masked_rsq.npy'))
+    
+    runs = ['1','2','3','4'] if run_type == 'mean' else [run_type]
+        
+    rsq = []
+    
+    for r in runs:
+        
+        # path to FA fits 
+        fits_pth =  op.join(derivatives_dir,'FA_GLM_fit','sub-{sj}'.format(sj=sj), 
+                            space, model_type,'run-{run}'.format(run=r))
+        
+        # get GLM estimates file
+        estimates_filename = [op.join(fits_pth, val) for val in os.listdir(fits_pth) if val.endswith('_estimates.npz')]
+        estimates = np.load(estimates_filename[0])
+
+        # get rsquared
+        tmp_arr = estimates['r2']
+        tmp_arr[np.isnan(pRF_masked_rsq)] = np.nan
+
+        rsq.append(tmp_arr)
+        
+    
+    rsq = np.nanmean(rsq, axis=0)
+    masked_rsq = rsq.copy()
+
+    plot_lims_dist = [0,.3] # axis value for plotting
+    plot_lims_flat = [0,.3] # axis value for plotting 
 
 # set threshold for plotting
 rsq_threshold = params['plotting']['rsq_threshold']
@@ -175,16 +211,16 @@ plt.yticks(fontsize = 18)
 
 plt.xlabel('ROI',fontsize = 20,labelpad=18)
 plt.ylabel('RSQ',fontsize = 20,labelpad=18)
-plt.ylim(0,.8)
+plt.ylim(plot_lims_dist[0],plot_lims_dist[1])
 
 fig.savefig(op.join(figures_pth,'rsq_visual_violinplot.svg'), dpi=100)
 
 images = {}
 
 ## plot rsq before masking
-images['rsq'] = cortex.Vertex(estimates['r2'], 
+images['rsq'] = cortex.Vertex(rsq, 
                             pysub,
-                            vmin = 0, vmax = 0.6,
+                            vmin = plot_lims_flat[0], vmax = plot_lims_flat[1],
                             cmap='Reds')
 #cortex.quickshow(images['rsq'],with_curvature=True,with_sulci=True)
 
@@ -194,11 +230,11 @@ _ = cortex.quickflat.make_png(filename, images['rsq'], recache=False,with_colorb
 
 ## plot masked rsq 
 # also mask out nans, makes it look nicer
-new_rsq = np.array([x if np.isnan(x)==False else 0 for _,x in enumerate(rsq)])
+new_rsq = np.array([x if np.isnan(x)==False else 0 for _,x in enumerate(masked_rsq)])
 
 images['rsq_masked'] = cortex.Vertex(new_rsq, 
                                     pysub,
-                                    vmin = 0, vmax = 0.6,
+                                    vmin = plot_lims_flat[0], vmax = plot_lims_flat[1],
                                     cmap='Reds')
 #cortex.quickshow(images['rsq_masked'],with_curvature=True,with_sulci=True)
 

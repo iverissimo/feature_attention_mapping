@@ -92,7 +92,7 @@ proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir)
                  'acq-{acq}'.format(acq=acq) in h and 'run-{run}'.format(run=run) in h and h.endswith(file_ext)]
 
 # exception for sub 4, run 4 because nordic failed for FA
-if sj=='004' and run==4:
+if sj=='004' and run=='4':
     proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir) if 'task-FA' in h and
                  'acq-{acq}'.format(acq='standard') in h and 'run-{run}'.format(run=run) in h and h.endswith(file_ext)]
 

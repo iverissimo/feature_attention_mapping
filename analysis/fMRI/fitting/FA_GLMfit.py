@@ -52,7 +52,7 @@ elif len(sys.argv) < 3:
 else:
     # fill subject number and chunk number with 0 in case user forgets
     sj = str(sys.argv[1]).zfill(3)
-    run = str(sys.argv[1])
+    run = str(sys.argv[2])
 
 # print start time, for bookeeping
 start_time = datetime.datetime.now()

@@ -111,11 +111,13 @@ mri: # refers to the Psychopy SyncGenerator class
       root: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/PILOT_DATA'
       matlab: '/Applications/MATLAB_R2019a.app/bin/matlab'
       derivatives: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/PILOT_DATA/derivatives'
+      sourcedata: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/PILOT_DATA/sourcedata'
     
     lisa:
       root: '/project/projects_verissimo/FAM/PILOT_DATA'
       matlab: ''
       derivatives: '/scratch/derivatives'
+      sourcedata: '/scratch/sourcedata'
 
     aeneas:
       root: '/home/shared/2021/visual/FAM/PILOT_DATA'

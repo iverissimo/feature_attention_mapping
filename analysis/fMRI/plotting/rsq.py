@@ -19,8 +19,6 @@ from prfpy.stimulus import PRFStimulus2D
 sys.path.insert(0,'..') # add parent folder to path
 from utils import * #import script to use relevante functions
 
-import datetime
-
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
             params = yaml.safe_load(f_in)
@@ -33,13 +31,16 @@ if len(sys.argv) < 2:
 elif len(sys.argv) < 3:
     raise NameError('Please add type of run to be fitted (ex: leave_01_out vs median) '
                     'as 2nd argument in the command line!')
+
+elif len(sys.argv) < 4:
+    raise NameError('Please add task (ex: FA vs pRF) '
+                    'as 3rd argument in the command line!')
     
 else:
     # fill subject number and chunk number with 0 in case user forgets
     sj = str(sys.argv[1]).zfill(3)
     run_type = str(sys.argv[2])
-
-task = 'pRF'
+    task = str(sys.argv[3]) 
 
 # set font type for plots globally
 plt.rcParams['font.family'] = 'sans-serif'
@@ -65,10 +66,6 @@ file_ext = '_cropped_{filt}_{stand}.npy'.format(filt = params['mri']['filtering'
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
 postfmriprep_dir = op.join(derivatives_dir,'post_fmriprep','sub-{sj}'.format(sj=sj),space,'processed')
 
-# path to pRF fits 
-fits_pth =  op.join(derivatives_dir,'{task}_fit'.format(task=task),'sub-{sj}'.format(sj=sj), space, 'iterative_{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
-#fits_pth =  op.join(derivatives_dir,'{task}_fit'.format(task=task),'sub-{sj}'.format(sj=sj), space, '{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
-
 # output dir to save fit and plot
 figures_pth = op.join(derivatives_dir,'plots','rsq','{task}fit'.format(task=task),
                       'sub-{sj}'.format(sj=sj), space, model_type,'run-{run}'.format(run=run_type)) # path to save plots
@@ -76,6 +73,10 @@ if not os.path.exists(figures_pth):
     os.makedirs(figures_pth) 
 
 if task == 'pRF':
+
+    # path to pRF fits 
+    fits_pth =  op.join(derivatives_dir,'{task}_fit'.format(task=task),'sub-{sj}'.format(sj=sj), space, 'iterative_{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
+    #fits_pth =  op.join(derivatives_dir,'{task}_fit'.format(task=task),'sub-{sj}'.format(sj=sj), space, '{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
     
     ## Load pRF estimates 
     
@@ -102,21 +103,26 @@ if task == 'pRF':
                                 chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
 
     
-# define design matrix 
-visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+    # define design matrix 
+    visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
 
-# make stimulus object, which takes an input design matrix and sets up its real-world dimensions
-prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
-                         screen_distance_cm = params['monitor']['distance'],
-                         design_matrix = visual_dm,
-                         TR = TR)
+    # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
+    prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
+                            screen_distance_cm = params['monitor']['distance'],
+                            design_matrix = visual_dm,
+                            TR = TR)
 
-# mask estimates
-print('masking estimates')
-masked_est = mask_estimates(estimates, fit_model = model_type,
-                            screen_limit_deg = [prf_stim.screen_size_degrees/2,prf_stim.screen_size_degrees/2])
+    # mask estimates
+    print('masking estimates')
+    masked_est = mask_estimates(estimates, fit_model = model_type,
+                                screen_limit_deg = [prf_stim.screen_size_degrees/2,prf_stim.screen_size_degrees/2])
 
-rsq = masked_est['rsq']
+    rsq = masked_est['rsq']
+
+    # saved masked rsq, useful for FA plots
+    np.save(op.join(fits_pth,'combined','masked_rsq.npy'), rsq)
+
+#elif task == 'FA':
 
 # set threshold for plotting
 rsq_threshold = params['plotting']['rsq_threshold']
@@ -169,7 +175,7 @@ plt.yticks(fontsize = 18)
 
 plt.xlabel('ROI',fontsize = 20,labelpad=18)
 plt.ylabel('RSQ',fontsize = 20,labelpad=18)
-plt.ylim(0,1)
+plt.ylim(0,.8)
 
 fig.savefig(op.join(figures_pth,'rsq_visual_violinplot.svg'), dpi=100)
 
@@ -178,7 +184,7 @@ images = {}
 ## plot rsq before masking
 images['rsq'] = cortex.Vertex(estimates['r2'], 
                             pysub,
-                            vmin = 0, vmax = 0.7,
+                            vmin = 0, vmax = 0.6,
                             cmap='Reds')
 #cortex.quickshow(images['rsq'],with_curvature=True,with_sulci=True)
 
@@ -192,7 +198,7 @@ new_rsq = np.array([x if np.isnan(x)==False else 0 for _,x in enumerate(rsq)])
 
 images['rsq_masked'] = cortex.Vertex(new_rsq, 
                                     pysub,
-                                    vmin = 0, vmax = 0.7,
+                                    vmin = 0, vmax = 0.6,
                                     cmap='Reds')
 #cortex.quickshow(images['rsq_masked'],with_curvature=True,with_sulci=True)
 

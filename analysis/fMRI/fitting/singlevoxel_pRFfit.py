@@ -172,7 +172,10 @@ if roi != 'None' and vertex not in ['max','min']:
     roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub'],roi) # get indices for that ROI
     data = data[roi_ind[roi]]
 
-## do we want to fit now, or load estimates?
+if vertex not in ['max','min']:
+    ## do we want to fit now, or load estimates?
+    timeseries = data[vertex][np.newaxis,...]
+
 if fit_now:
 
     timeseries = data[vertex][np.newaxis,...]

@@ -110,6 +110,7 @@ pRF_masked_rsq = np.load(op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=
 # get FA GLM estimates file
 estimates_filename = [op.join(output_dir, val) for val in os.listdir(output_dir) if val.endswith('_estimates.npz')]
 estimates = np.load(estimates_filename[0])
+print('loading estimates from %s'%estimates)
 
 # Load DM
 DM_FA = np.load(op.join(output_dir,'DM_FA_run-{run}.npy'.format(run=run)))
@@ -137,6 +138,7 @@ dm_columns = np.array(['intercept'] + conditions)
 # set contrast arrays
 contrast_cond = {'ACAO_vs_others': set_contrast(dm_columns, [['ACAO'],['ACUO', 'UCAO', 'UCUO']], contrast_val = [1,-len(conditions)/(len(conditions)-1)], num_cond = 2),
                  'attended_vs_unattended': np.array([0,1,-1/4,-1/4,-1/2]),
+                 'ACAO_vs_UCUO': set_contrast(dm_columns, [['ACAO'],['UCUO']], contrast_val = [1,-1], num_cond = 2),
                  'AC_vs_UC': set_contrast(dm_columns, [['ACAO','ACUO'],['UCAO', 'UCUO']], contrast_val = [1,-1], num_cond = 2),
                  'AO_vs_UO': set_contrast(dm_columns, [['ACAO','UCAO'],['ACUO', 'UCUO']], contrast_val = [1,-1], num_cond = 2),
                  'interaction': set_contrast(dm_columns, [['ACAO','UCUO'],['ACUO', 'UCAO']], contrast_val = [1,-1], num_cond = 2)
@@ -190,7 +192,7 @@ for contrast_val in list(contrast_cond.keys()):
         print('masking t-val for ROI %s'%rois_ks)
 
         roi_tval = masked_tval.copy()
-        roi_tval[soma_stats[..., 1] >= alpha] = np.nan
+        #roi_tval[soma_stats[..., 1] >= alpha] = np.nan
         roi_tval = roi_tval[roi_verts[rois_ks]]
 
         if idx == 0:

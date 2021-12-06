@@ -148,7 +148,7 @@ elif task == 'FA':
         estimates = np.load(estimates_filename[0])
 
         # get rsquared
-        tmp_arr = estimates['r2']
+        tmp_arr = estimates['r2'].copy()
         tmp_arr[np.isnan(pRF_masked_rsq)] = np.nan
 
         rsq.append(tmp_arr)
@@ -186,7 +186,7 @@ for idx,rois_ks in enumerate(ROIs):
     # mask estimates
     print('masking estimates for ROI %s'%rois_ks)
     
-    roi_rsq = rsq[roi_verts[rois_ks]]
+    roi_rsq = masked_rsq[roi_verts[rois_ks]]
     roi_rsq = roi_rsq[roi_rsq >= rsq_threshold]
 
     if idx == 0:

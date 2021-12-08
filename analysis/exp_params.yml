@@ -99,6 +99,7 @@ mri: # refers to the Psychopy SyncGenerator class
   filtering:
     type: 'dc' #'HPgauss' # None
     cut_off_hz: 0.01 #0.014
+    first_modes_to_remove: 5
 
     window_length: 201
     polyorder: 3

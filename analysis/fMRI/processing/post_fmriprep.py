@@ -75,7 +75,7 @@ for _,task in enumerate(['pRF','FA']):
 
     ## filter files, to remove drifts
     proc_files[task] = filter_data(proc_files[task], output_dir, filter_type = params['mri']['filtering']['type'], 
-                            cut_off_hz = params['mri']['filtering']['cut_off_hz'], plot_vert=False)
+                            first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'], plot_vert=True)
 
     ## percent signal change finals
     proc_files[task] = psc_epi(proc_files[task], output_dir)

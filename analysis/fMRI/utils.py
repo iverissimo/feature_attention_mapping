@@ -206,7 +206,8 @@ def crop_epi(file, outdir, num_TR_task=220, num_TR_crop = 5):
     return outfiles
 
 
-def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False, **kwargs):
+def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False,
+                first_modes_to_remove=5, **kwargs):
     
     """ 
     Generic filtering function, implemented different types of filters
@@ -269,7 +270,7 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False, **kwargs
 
             elif filter_type == 'dc': 
 
-                data_filt = dc_data(data, **kwargs) 
+                data_filt = dc_data(data, first_modes_to_remove = first_modes_to_remove, **kwargs) 
                 
             else:
                 raise NameError('Not implemented')

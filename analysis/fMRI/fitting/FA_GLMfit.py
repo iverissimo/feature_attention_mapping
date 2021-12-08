@@ -66,7 +66,7 @@ TR = params['mri']['TR']
 
 # type of pRF model to use, and run type (mean vs median)
 model_type = params['mri']['fitting']['pRF']['fit_model']
-run_type = 'mean'
+run_type = params['mri']['fitting']['pRF']['run']
 
 # define file extension that we want to use, 
 # should include processing key words

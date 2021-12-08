@@ -129,7 +129,7 @@ mri: # refers to the Psychopy SyncGenerator class
 
   fitting:
     pRF:
-      run: 'median' 
+      run: 'mean' 
       total_chunks: {'fsaverage': 83, 'T1w': 89, 'fsLR_den-170k': 54} # total number of chunks to split the data, depends on space of files
 
       fit_model: 'gauss' #'css'

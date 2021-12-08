@@ -28,15 +28,12 @@ else:
     sj = str(sys.argv[1]).zfill(2)
     base_dir = str(sys.argv[2]) # which machine we run the data
 
-run_type = 'mean'
+run_type = params['mri']['fitting']['pRF']['run']
 acq = params['mri']['acq'] # if using standard files or nordic files
 space = params['mri']['space'] # subject space
 
 total_chunks = params['mri']['fitting']['pRF']['total_chunks'][space] # number of chunks that data was split in
-# number of slices to split data in (makes fitting faster)
-#total_slices = 89 # slice in z direction
 
-code_base_dir = op.split(os.getcwd())[0] #base dir for python code on fMRI analysis
 
 batch_string = """#!/bin/bash
 #SBATCH -t 1:00:00
@@ -51,9 +48,7 @@ echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 conda activate i36
 
 # make derivatives dir in node
-mkdir $TMPDIR/derivatives
-mkdir $TMPDIR/derivatives/post_fmriprep
-mkdir $TMPDIR/derivatives/post_fmriprep/sub-$SJ_NR
+mkdir -p $TMPDIR/{derivatives/{post_fmriprep,pRF_fit}/sub-$SJ_NR}
 
 wait
 cp -r $DERIV_DIR/post_fmriprep/sub-$SJ_NR/$SPACE $TMPDIR/derivatives/post_fmriprep/sub-$SJ_NR

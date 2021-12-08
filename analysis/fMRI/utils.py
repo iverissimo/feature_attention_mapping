@@ -11,6 +11,7 @@ import re
 
 from scipy.ndimage import gaussian_filter
 from scipy.signal import savgol_filter
+from scipy import fft
 
 from nilearn.glm.first_level.design_matrix import _cosine_drift as dct_set
 from nilearn import signal, surface
@@ -371,7 +372,7 @@ def savgol_data(data, window_length=201, polyorder=3, **kwargs):
     return data_filt.T # to be again vertex, time
 
 
-def dc_data(data, cut_off_hz = 0.01, **kwargs):
+def dc_data(data, first_modes_to_remove=5, **kwargs):
     
     """ 
     High pass discrete cosine filter array
@@ -380,8 +381,8 @@ def dc_data(data, cut_off_hz = 0.01, **kwargs):
     ----------
     data : arr
         data array
-    cut_off_hz: float
-        cut off frequency to filter
+    first_modes_to_remove: int
+        Number of low-frequency eigenmodes to remove (highpass)
 
     Outputs
     -------
@@ -389,17 +390,16 @@ def dc_data(data, cut_off_hz = 0.01, **kwargs):
         filtered array
     """ 
 
+    # get Discrete Cosine Transform
+    coeffs = fft.dct(data, norm='ortho', axis=-1)
+    coeffs[...,:first_modes_to_remove] = 0
+
     # filter signal
-    ft = np.linspace(0, data.shape[-1], data.shape[-1], endpoint=False) 
-    hp_set = dct_set(cut_off_hz, ft)
-
-    filtered_signal = signal.clean(data.T, detrend=False,
-                            standardize=False, confounds=hp_set)
-
+    filtered_signal = fft.idct(coeffs, norm='ortho', axis=-1)
     # add mean image back to avoid distribution around 0
-    data_filt = filtered_signal + np.mean(data, axis=-1) 
+    data_filt = filtered_signal + np.mean(data, axis=-1)[..., np.newaxis]
 
-    return data_filt.T # to be again vertex, time
+    return data_filt # vertex, time
 
 
 def psc_epi(file, outdir):

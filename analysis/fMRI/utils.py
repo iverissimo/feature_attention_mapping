@@ -1183,7 +1183,7 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
                                    'color': True, 'orientation': True,
                                    'miniblock': 0,'run': 1}, 
                     save_imgs = False, downsample = None, 
-                    crop = False, crop_TR = 8, overwrite=False):
+                    crop = False, crop_TR = 8, overwrite=False, save_DM=True):
     
     """Get visual stim for FA condition.
     Similar to make_pRF_DM, it will
@@ -1313,9 +1313,10 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
         # in case we want to crop the beginning of the DM
         if crop == True:
             visual_dm = visual_dm[...,crop_TR::] 
-        
-        # save design matrix
-        np.save(output, visual_dm)
+
+        if save_DM == True: 
+            # save design matrix
+            np.save(output, visual_dm)
         
     else:
         print('already exists, skipping %s'%output)

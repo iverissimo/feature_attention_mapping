@@ -162,17 +162,29 @@ trial_info_files = [op.join(events_pth, h) for h in os.listdir(events_pth) if 't
 # load trial info dataframe
 trial_info = pd.read_csv(trial_info_files[0])
 
-### all 4 regressors to use in fit
-all_regressors = {'ACAO': {'color': True, 'orientation': True},
-                  'ACUO': {'color': True, 'orientation': False},
-                  'UCAO': {'color': False, 'orientation': True},
-                  'UCUO': {'color': False, 'orientation': False}
-                    }
+### use 4x4 regressors in fit - 4 conditions x 4 miniblocks
+unique_cond = params['mri']['fitting']['FA']['condition_keys']
+
+all_regressors = pd.DataFrame(columns = ['reg_name', 'color','orientation','miniblock','run'])
+
+for key in unique_cond.keys(): # for each condition
+    
+    for blk in range(params['feature']['mini_blocks']): # for each miniblock
+        
+        all_regressors = all_regressors.append(pd.DataFrame({'reg_name': '{cond}_mblk-{blk}_run-{run}'.format(cond=key,
+                                                                                                             blk=blk,
+                                                                                                             run=run),
+                                                             'color': unique_cond[key]['color'],
+                                                             'orientation': unique_cond[key]['orientation'],
+                                                             'miniblock': blk,
+                                                             'run': int(run)
+                                                            }, index=[0]),ignore_index=True)
+
 
 all_reg_predictions = [] # to append all regressor predictions
 
 # make visual DM for each GLM regressor, and obtain prediction using pRF model
-for reg in all_regressors.keys():
+for reg in all_regressors['reg_name'].values:
     
     # filename for regressor dm
     DM_reg_filename = op.join(output_dir,'DM_regressor-{reg}.npy'.format(reg=reg))
@@ -182,7 +194,7 @@ for reg in all_regressors.keys():
     if not op.exists(reg_filename): # check if file already exists
         # make array with spatial position of bar of interest 
         DM_cond = get_FA_bar_stim(DM_reg_filename, 
-                            params, bar_pos, trial_info, attend_cond = all_regressors[reg], 
+                            params, bar_pos, trial_info, attend_cond = all_regressors[all_regressors['reg_name']==reg].to_dict('r')[0], 
                             save_imgs = False, downsample = 0.1, crop = params['feature']['crop'] , 
                             crop_TR = params['feature']['crop_TR'], overwrite=True)
         
@@ -247,7 +259,7 @@ all_reg_predictions = np.vstack(all_reg_predictions)
 
 ## Make actual DM to be used in GLM fit (4 regressors + intercept)
 
-DM_FA = np.zeros((all_reg_predictions.shape[1], all_reg_predictions.shape[-1], 5)) # shape of DM is (vox,time,reg)
+DM_FA = np.zeros((all_reg_predictions.shape[1], all_reg_predictions.shape[-1], all_reg_predictions.shape[0]+1)) # shape of DM is (vox,time,reg)
 
 # iterate over vertex/voxel
 for i in range(all_reg_predictions.shape[1]):
@@ -262,8 +274,8 @@ np.save(op.join(output_dir,'DM_FA_run-{run}.npy'.format(run=run)),DM_FA)
 print('saving %s'%op.join(output_dir,'DM_FA_run-{run}.npy'.format(run=run)))
 
 ### plot vertex DM for sanity check
-#v = 102705
-#plot_DM(DM_FA, v, op.join(output_dir,'DM_FA_vertex_%i.png'%v), names=['intercept']+list(all_regressors.keys()))
+v = 102705
+plot_DM(DM_FA, v, op.join(output_dir,'DM_FA_vertex_%i.png'%v), names=['intercept']+list(all_regressors.keys()))
 
 ## Actually fit GLM
 FA_GLM_estimates_filename = op.join(output_dir, op.split(proc_files[0])[-1].replace('.npy','_estimates.npz'))

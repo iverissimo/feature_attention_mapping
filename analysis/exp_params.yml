@@ -146,6 +146,13 @@ mri: # refers to the Psychopy SyncGenerator class
 
       N_PROCS: 4
 
+    FA: 
+      condition_keys: {'ACAO': {'color': True, 'orientation': True},
+                      'ACUO': {'color': True, 'orientation': False},
+                      'UCAO': {'color': False, 'orientation': True},
+                      'UCUO': {'color': False, 'orientation': False}
+                      }
+
     
 
 

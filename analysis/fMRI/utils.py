@@ -1178,7 +1178,10 @@ def load_data_save_npz(file, outdir):
 
     return outfiles
 
-def get_FA_bar_stim(output, params, bar_pos, trial_info, attend_cond = {'color': True, 'orientation': True}, 
+def get_FA_bar_stim(output, params, bar_pos, trial_info, 
+                    attend_cond = {'reg_name': 'ACAO_mblk-0_run-1',
+                                   'color': True, 'orientation': True,
+                                   'miniblock': 0,'run': 1}, 
                     save_imgs = False, downsample = None, 
                     crop = False, crop_TR = 8, overwrite=False):
     
@@ -1221,6 +1224,9 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info, attend_cond = {'color':
         colors_bar = ['red', 'green']
         orientation_bar = ['vertical', 'horizontal']
         
+        # miniblock number
+        mini_blk_num = int(attend_cond['miniblock'])
+        
         # total number of TRs
         total_TR = len(trial_info)
 
@@ -1228,7 +1234,6 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info, attend_cond = {'color':
         visual_dm_array = np.zeros((total_TR, screen_res[0],screen_res[1]))
 
         # some counters
-        mini_blk_counter = 0
         trl_blk_counter = 0
 
         # for each TR
@@ -1236,12 +1241,10 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info, attend_cond = {'color':
 
             img = Image.new('RGB', tuple(screen_res)) # background image
 
-            if 'mini_block' in trial_info.iloc[i]['trial_type']:
-
-                #print(mini_blk_counter)
+            if trial_info.iloc[i]['trial_type'] == 'mini_block_%i'%mini_blk_num:
 
                 # choose part of DF that corresponds to miniblock
-                miniblk_df = bar_pos.loc[bar_pos['mini_block'] == mini_blk_counter]
+                miniblk_df = bar_pos.loc[bar_pos['mini_block'] == mini_blk_num]
 
                 # get name of attended condition for miniblock
                 attended_condition = miniblk_df.loc[miniblk_df['attend_condition'] == 1]['condition'].values[0]
@@ -1300,7 +1303,6 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info, attend_cond = {'color':
                 if trl_blk_counter == len(bar_pos.iloc[0]['bar_pass_direction_at_TR']):
                     # update counters, so we can do same in next miniblock
                     trl_blk_counter = 0
-                    mini_blk_counter += 1
 
             # save in array
             visual_dm_array[i, ...] = np.array(img)[:,:,0][np.newaxis,...]
@@ -1329,8 +1331,7 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info, attend_cond = {'color':
 
         for w in range(visual_dm.shape[-1]):
             im = Image.fromarray(visual_dm[...,w])
-            im.save(op.join(outfolder,"DM_{reg}_TR-{time}.png".format(reg=op.split(output)[-1].split('-')[-1].split('.')[0],
-                                                                      time=w)))      
+            im.save(op.join(outfolder,op.split(output)[-1].replace('.npy','_TR-{time}.png'.format(time=str(w).zfill(3)))))      
             
     return visual_dm
 

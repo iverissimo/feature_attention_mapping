@@ -48,7 +48,7 @@ echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 conda activate i36
 
 # make derivatives dir in node
-mkdir -p $TMPDIR/{derivatives/{post_fmriprep,pRF_fit}/sub-$SJ_NR}
+mkdir -p $TMPDIR/derivatives/{post_fmriprep,pRF_fit}/sub-$SJ_NR
 
 wait
 cp -r $DERIV_DIR/post_fmriprep/sub-$SJ_NR/$SPACE $TMPDIR/derivatives/post_fmriprep/sub-$SJ_NR

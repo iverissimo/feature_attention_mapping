@@ -37,7 +37,7 @@ acq = params['mri']['acq'] # if using standard files or nordic files
 space = params['mri']['space'] # subject space
 
 batch_string = """#!/bin/bash
-#SBATCH -t 1:00:00
+#SBATCH -t 10:00:00
 #SBATCH -N 1 --mem=65536
 #SBATCH --cpus-per-task=16
 #SBATCH -v

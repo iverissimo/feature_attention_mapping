@@ -1,4 +1,3 @@
-
 ## make contrasts for FA task
 
 import numpy as np
@@ -115,14 +114,33 @@ print('loading estimates from %s'%estimates)
 # Load DM
 DM_FA = np.load(op.join(output_dir,'DM_FA_run-{run}.npy'.format(run=run)))
 
-### all 4 regressors used in fit
+### use 4x4 regressors in fit - 4 conditions x 4 miniblocks
+unique_cond = params['mri']['fitting']['FA']['condition_keys']
 
-all_regressors = {'ACAO': {'color': True, 'orientation': True},
-                  'ACUO': {'color': True, 'orientation': False},
-                  'UCAO': {'color': False, 'orientation': True},
-                  'UCUO': {'color': False, 'orientation': False}
-                    }
-conditions = list(all_regressors.keys())
+all_regressors = pd.DataFrame(columns = ['reg_name', 'color','orientation','miniblock','run'])
+
+for key in unique_cond.keys(): # for each condition
+    
+    for blk in range(params['feature']['mini_blocks']): # for each miniblock
+        
+        all_regressors = all_regressors.append(pd.DataFrame({'reg_name': '{cond}_mblk-{blk}_run-{run}'.format(cond=key,
+                                                                                                             blk=blk,
+                                                                                                             run=run),
+                                                             'color': unique_cond[key]['color'],
+                                                             'orientation': unique_cond[key]['orientation'],
+                                                             'miniblock': blk,
+                                                             'run': int(run)
+                                                            }, index=[0]),ignore_index=True)
+
+conditions = list(all_regressors['reg_name'].values)
+
+# get list of regressor key names, grouped by condition
+# necessary now that more regressors represent a bar
+key_lists = {'ACAO': [val for val in conditions if 'ACAO' in val],
+             'ACUO': [val for val in conditions if 'ACUO' in val],
+             'UCAO': [val for val in conditions if 'UCAO' in val],
+             'UCUO': [val for val in conditions if 'UCUO' in val]
+}
 
 # load betas
 betas = estimates['betas']
@@ -136,12 +154,13 @@ stats_all = {} # save all computed stats, don't need to load again
 dm_columns = np.array(['intercept'] + conditions)
 
 # set contrast arrays
-contrast_cond = {'ACAO_vs_others': set_contrast(dm_columns, [['ACAO'],['ACUO', 'UCAO', 'UCUO']], contrast_val = [1,-len(conditions)/(len(conditions)-1)], num_cond = 2),
-                 'attended_vs_unattended': np.array([0,1,-1/4,-1/4,-1/2]),
-                 'ACAO_vs_UCUO': set_contrast(dm_columns, [['ACAO'],['UCUO']], contrast_val = [1,-1], num_cond = 2),
-                 'AC_vs_UC': set_contrast(dm_columns, [['ACAO','ACUO'],['UCAO', 'UCUO']], contrast_val = [1,-1], num_cond = 2),
-                 'AO_vs_UO': set_contrast(dm_columns, [['ACAO','UCAO'],['ACUO', 'UCUO']], contrast_val = [1,-1], num_cond = 2),
-                 'interaction': set_contrast(dm_columns, [['ACAO','UCUO'],['ACUO', 'UCAO']], contrast_val = [1,-1], num_cond = 2)
+contrast_cond = {'ACAO_vs_others': set_contrast(dm_columns, [key_lists['ACAO'],key_lists['ACUO']+key_lists['UCAO']+key_lists['UCUO']], 
+                                                contrast_val = [1,-len(key_lists['ACAO'])/(len(key_lists['ACUO']+key_lists['UCAO']+key_lists['UCUO']))], num_cond = 2),
+                 'ACAO_vs_UCUO': set_contrast(dm_columns, [key_lists['ACAO'],key_lists['UCUO']], 
+                                            contrast_val = [1,-1], num_cond = 2),
+                 'AC_vs_UC': set_contrast(dm_columns, [key_lists['ACAO']+key_lists['ACUO'],key_lists['UCAO']+key_lists['UCUO']], 
+                                        contrast_val = [1,-1], num_cond = 2),
+                 'AO_vs_UO': set_contrast(dm_columns, [key_lists['ACAO']+key_lists['UCAO'],key_lists['ACUO']+key_lists['UCUO']], contrast_val = [1,-1], num_cond = 2)
                 }
 
 ## compute stats and make plots to visualize, in loop
@@ -154,18 +173,18 @@ for contrast_val in list(contrast_cond.keys()):
     print('making %s'%stats_filename)
 
     # compute contrast-related statistics
-    soma_stats = Parallel(n_jobs=16)(delayed(compute_stats)(data[w], DM_FA[w],
+    stats = Parallel(n_jobs=16)(delayed(compute_stats)(data[w], DM_FA[w],
                                                             contrast_cond[contrast_val],
                                                             betas[w]) for w in tqdm(range(data.shape[0])))
-    soma_stats = np.vstack(soma_stats) # t_val,p_val,zscore
+    stats = np.vstack(stats) # t_val,p_val,zscore
 
     np.savez(stats_filename,
-            t_val = soma_stats[..., 0],
-            p_val = soma_stats[..., 1],
-            zscore = soma_stats[..., 2])
+            t_val = stats[..., 0],
+            p_val = stats[..., 1],
+            zscore = stats[..., 2])
 
     ## mask t-values, according to pRF rsq
-    masked_tval = soma_stats[..., 0].copy()
+    masked_tval = stats[..., 0].copy()
     masked_tval[np.isnan(pRF_masked_rsq)] = np.nan # mask for points where pRF in screen boundaries, etc
     masked_tval[pRF_masked_rsq < rsq_threshold] = np.nan # mask for points where pRF rsq > threshold (0.1)
     
@@ -173,7 +192,7 @@ for contrast_val in list(contrast_cond.keys()):
     images = {}
     images['t_stat'] = cortex.Vertex(masked_tval,
                                 pysub,
-                                vmin = -3, vmax = 3,
+                                vmin = -5, vmax = 5,
                                 cmap='BuBkRd')
     cortex.quickshow(images['t_stat'],with_curvature=True,with_sulci=True)
 
@@ -192,7 +211,7 @@ for contrast_val in list(contrast_cond.keys()):
         print('masking t-val for ROI %s'%rois_ks)
 
         roi_tval = masked_tval.copy()
-        #roi_tval[soma_stats[..., 1] >= alpha] = np.nan
+        #roi_tval[stats[..., 1] >= alpha] = np.nan
         roi_tval = roi_tval[roi_verts[rois_ks]]
 
         if idx == 0:
@@ -215,7 +234,7 @@ for contrast_val in list(contrast_cond.keys()):
 
     plt.xlabel('ROI',fontsize = 20,labelpad=18)
     plt.ylabel('t-val',fontsize = 20,labelpad=18)
-    plt.ylim(1,5)
+    plt.ylim(-5,5) #plt.ylim(1,5)
     fig.savefig(filename.replace('.png','-ROI.png'), dpi=100)
 
 

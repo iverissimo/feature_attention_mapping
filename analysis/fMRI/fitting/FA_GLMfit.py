@@ -273,10 +273,6 @@ for i in range(all_reg_predictions.shape[1]):
 np.save(op.join(output_dir,'DM_FA_run-{run}.npy'.format(run=run)),DM_FA)
 print('saving %s'%op.join(output_dir,'DM_FA_run-{run}.npy'.format(run=run)))
 
-### plot vertex DM for sanity check
-#v = 102705
-#plot_DM(DM_FA, v, op.join(output_dir,'DM_FA_vertex_%i.png'%v), names=['intercept']+list(all_regressors['reg_name'].values))
-
 ## Actually fit GLM
 FA_GLM_estimates_filename = op.join(output_dir, op.split(proc_files[0])[-1].replace('.npy','_estimates.npz'))
 

@@ -86,7 +86,6 @@ if not op.exists(output_dir):
     if model_type!='gauss':
         os.makedirs(output_dir.replace(model_type,'gauss')) 
 
-
 # list with absolute file name to be fitted
 proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir) if 'task-FA' in h and
                  'acq-{acq}'.format(acq=acq) in h and 'run-{run}'.format(run=run) in h and h.endswith(file_ext)]
@@ -103,7 +102,7 @@ data = np.load(file,allow_pickle=True) # will be (vertex, TR)
 # path to pRF fits 
 fits_pth =  op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), space, 'iterative_{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
 
-## Load pRF estimates 
+##### Load pRF estimates ####
     
 # path to combined estimates
 pRF_estimates_pth = op.join(fits_pth,'combined')
@@ -126,20 +125,40 @@ else: # if not join chunks and save file
 
     pRF_estimates = join_chunks(fits_pth, pRF_estimates_combi,
                         chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
-    
+
+# define design matrix for pRF task
+visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+
+# make stimulus object, which takes an input design matrix and sets up its real-world dimensions
+prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
+                        screen_distance_cm = params['monitor']['distance'],
+                        design_matrix = visual_dm,
+                        TR = TR)
+
+# mask estimates, to be within screen boundaries
+print('masking estimates')
+masked_pRF_estimates = mask_estimates(pRF_estimates, fit_model = model_type,
+                            screen_limit_deg = [prf_stim.screen_size_degrees/2,prf_stim.screen_size_degrees/2])
+
 # save estimates in specific variables
-xx = pRF_estimates['x']
-yy = pRF_estimates['y']
+xx = masked_pRF_estimates['x']
+yy = masked_pRF_estimates['y']
 
-size = pRF_estimates['size']
+size = masked_pRF_estimates['size']
 
-beta = pRF_estimates['betas']
-baseline = pRF_estimates['baseline']
+beta = masked_pRF_estimates['beta']
+baseline = masked_pRF_estimates['baseline']
 
 if 'css' in model_type:
-    ns = pRF_estimates['ns']
+    ns = masked_pRF_estimates['ns']
 
-rsq = pRF_estimates['r2']
+rsq = masked_pRF_estimates['rsq']
+
+# saved masked rsq, useful for FA plots
+print('saving masked rsq in %s'%op.join(fits_pth,'combined'))
+np.save(op.join(fits_pth,'combined','masked_rsq.npy'), rsq)
+
+####
 
 ## load bar position for FA
 ## and make DM for run

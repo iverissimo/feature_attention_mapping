@@ -190,15 +190,21 @@ for key in unique_cond.keys(): # for each condition
     
     for blk in range(params['feature']['mini_blocks']): # for each miniblock
         
+        # name of attended condition in miniblock
+        attended_condition = bar_pos.loc[(bar_pos['mini_block']==blk)&(bar_pos['attend_condition']==1)]['condition'].values[0]
+        
         all_regressors = all_regressors.append(pd.DataFrame({'reg_name': '{cond}_mblk-{blk}_run-{run}'.format(cond=key,
                                                                                                              blk=blk,
                                                                                                              run=run),
                                                              'color': unique_cond[key]['color'],
                                                              'orientation': unique_cond[key]['orientation'],
+                                                             'condition_name': get_cond_name(attended_condition,key),
                                                              'miniblock': blk,
                                                              'run': int(run)
                                                             }, index=[0]),ignore_index=True)
 
+# save regressors dataframe, for later access
+all_regressors.to_csv(op.join(output_dir, 'all_regressors_info.csv'),index=False)
 
 all_reg_predictions = [] # to append all regressor predictions
 

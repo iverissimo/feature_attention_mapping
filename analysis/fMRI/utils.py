@@ -1178,9 +1178,41 @@ def load_data_save_npz(file, outdir):
 
     return outfiles
 
+
+def get_cond_name(attend_cond, cond_type='UCUO', C = ['red','green'], O = ['vertical','horizontal']):
+    
+    """
+    Get condition name for a certain key 
+    given attended condition for miniblock
+    
+    """ 
+    
+    if cond_type == 'ACAO':
+        
+        cond_name = attend_cond
+        
+    elif cond_type == 'ACUO':
+        
+        cond_name = '{col}_{ori}'.format(col = attend_cond.split('_')[0],
+                                        ori = O[O.index(attend_cond.split('_')[-1])-1])
+        
+    elif cond_type == 'UCAO':
+        
+        cond_name = '{col}_{ori}'.format(col = C[C.index(attend_cond.split('_')[0])-1],
+                                        ori = attend_cond.split('_')[-1])
+    
+    elif cond_type == 'UCUO':
+        
+        cond_name = '{col}_{ori}'.format(col = C[C.index(attend_cond.split('_')[0])-1],
+                                        ori = O[O.index(attend_cond.split('_')[-1])-1])
+        
+    return cond_name
+
+
 def get_FA_bar_stim(output, params, bar_pos, trial_info, 
                     attend_cond = {'reg_name': 'ACAO_mblk-0_run-1',
                                    'color': True, 'orientation': True,
+                                   'condition_name': 'red_vertical',
                                    'miniblock': 0,'run': 1}, 
                     save_imgs = False, downsample = None, 
                     crop = False, crop_TR = 8, overwrite=False, save_DM=True):
@@ -1219,10 +1251,6 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
             
         if downsample != None: # if we want to downsample screen res
             screen_res = (screen_res*downsample).astype(int)
-
-        # possible features
-        colors_bar = ['red', 'green']
-        orientation_bar = ['vertical', 'horizontal']
         
         # miniblock number
         mini_blk_num = int(attend_cond['miniblock'])
@@ -1248,21 +1276,19 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
 
                 # get name of attended condition for miniblock
                 attended_condition = miniblk_df.loc[miniblk_df['attend_condition'] == 1]['condition'].values[0]
-                attended_color = attended_condition.split('_')[0]
-                attended_orientation = attended_condition.split('_')[-1]
 
                 # which bar do we want?
                 if attend_cond['color'] and attend_cond['orientation']: # if we want fully attended bar
-                    chosen_condition = attended_condition
+                    chosen_condition = get_cond_name(attended_condition,'ACAO')
 
                 elif not attend_cond['color'] and not attend_cond['orientation']: # if we want fully un-attended bar
-                    chosen_condition = [c for c in colors_bar if c != attended_color][0]+'_'+[o for o in orientation_bar if o != attended_orientation][0]
+                    chosen_condition = get_cond_name(attended_condition,'UCUO')
 
                 elif attend_cond['color'] and not attend_cond['orientation']: # if we want semi-attended bar (attend color not orientation)
-                    chosen_condition = [c for c in colors_bar if c == attended_color][0]+'_'+[o for o in orientation_bar if o != attended_orientation][0]
+                    chosen_condition = get_cond_name(attended_condition,'ACUO')
 
                 elif not attend_cond['color'] and attend_cond['orientation']: # if we want semi-attended bar (attend orientation not color)
-                    chosen_condition = [c for c in colors_bar if c != attended_color][0]+'_'+[o for o in orientation_bar if o == attended_orientation][0]
+                    chosen_condition = get_cond_name(attended_condition,'UCAO')
 
                 print('attended condition in miniblock %s, chosen condition is %s'%(attended_condition, chosen_condition))
 
@@ -1597,3 +1623,5 @@ def leave_one_out(input_list):
         out_lists.append([y for y in input_list if y != x])
 
     return out_lists
+
+

@@ -154,9 +154,6 @@ mri: # refers to the Psychopy SyncGenerator class
                       }
 
     
-
-
-
 eyetracking:
 
   HP_pupil_f: 0.01

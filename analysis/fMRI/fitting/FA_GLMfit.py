@@ -291,12 +291,18 @@ for blk in range(params['feature']['mini_blocks']): # for each miniblock
     
     for trl in trial_info.loc[trial_info['trial_type']=='cue_%i'%blk]['trial_num'].values:
         
+        if params['feature']['crop']: # if cropping runs 
+            trl -= params['feature']['crop_TR'] 
+        
         cue_regs[blk,:,trl] = 1
     
     # convolve with spm hrf, similar to what prfpy is using
     cue_regs[blk] = signal.fftconvolve(cue_regs[blk], np.tile(hrf, (cue_regs.shape[1], 1)), 
                                             mode='full', axes=(-1))[..., :cue_regs.shape[-1]]
-    
+
+    ## filter it, like we do to the data
+    cue_regs[blk] =  dc_data(cue_regs[blk],
+                             first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'])
     
     ## also update regressors info to know name and order of regressors
     # basically including cues

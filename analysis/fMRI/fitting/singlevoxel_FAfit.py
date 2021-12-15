@@ -159,19 +159,33 @@ else: # if not join chunks and save file
     pRF_estimates = join_chunks(fits_pth, pRF_estimates_combi,
                         chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
     
+# define design matrix for pRF task
+visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+
+# make stimulus object, which takes an input design matrix and sets up its real-world dimensions
+prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
+                        screen_distance_cm = params['monitor']['distance'],
+                        design_matrix = visual_dm,
+                        TR = TR)
+
+# mask estimates, to be within screen boundaries
+print('masking estimates')
+masked_pRF_estimates = mask_estimates(pRF_estimates, fit_model = model_type,
+                            screen_limit_deg = [prf_stim.screen_size_degrees/2,prf_stim.screen_size_degrees/2])
+
 # save estimates in specific variables
-xx = pRF_estimates['x'][roi_ind[roi]][vertex]
-yy = pRF_estimates['y'][roi_ind[roi]][vertex]
+xx = masked_pRF_estimates['x'][roi_ind[roi]][vertex]
+yy = masked_pRF_estimates['y'][roi_ind[roi]][vertex]
 
-size = pRF_estimates['size'][roi_ind[roi]][vertex]
+size = masked_pRF_estimates['size'][roi_ind[roi]][vertex]
 
-beta = pRF_estimates['betas'][roi_ind[roi]][vertex]
-baseline = pRF_estimates['baseline'][roi_ind[roi]][vertex]
+beta = masked_pRF_estimates['beta'][roi_ind[roi]][vertex]
+baseline = masked_pRF_estimates['baseline'][roi_ind[roi]][vertex]
 
 if 'css' in model_type:
-    ns = pRF_estimates['ns'][roi_ind[roi]][vertex]
+    ns = masked_pRF_estimates['ns'][roi_ind[roi]][vertex]
 
-rsq = pRF_estimates['r2'][roi_ind[roi]][vertex]
+rsq = masked_pRF_estimates['rsq'][roi_ind[roi]][vertex]
 
 ## load bar position for FA
 ## and make DM for run
@@ -203,11 +217,15 @@ for key in unique_cond.keys(): # for each condition
     
     for blk in range(params['feature']['mini_blocks']): # for each miniblock
         
+        # name of attended condition in miniblock
+        attended_condition = bar_pos.loc[(bar_pos['mini_block']==blk)&(bar_pos['attend_condition']==1)]['condition'].values[0]
+        
         all_regressors = all_regressors.append(pd.DataFrame({'reg_name': '{cond}_mblk-{blk}_run-{run}'.format(cond=key,
                                                                                                              blk=blk,
                                                                                                              run=run),
                                                              'color': unique_cond[key]['color'],
                                                              'orientation': unique_cond[key]['orientation'],
+                                                             'condition_name': get_cond_name(attended_condition,key),
                                                              'miniblock': blk,
                                                              'run': int(run)
                                                             }, index=[0]),ignore_index=True)
@@ -267,15 +285,52 @@ for reg in all_regressors['reg_name'].values:
     # squeeze out single dimension that parallel creates
     prediction =  model_fit
 
-    
     ## append predictions in array, to use for FA GLM DM
     all_reg_predictions.append(prediction[np.newaxis,...])
 
 all_reg_predictions = np.vstack(all_reg_predictions)
 
-## Make actual DM to be used in GLM fit (4 regressors + intercept)
+### make cue regressors
 
-DM_FA = np.zeros((all_reg_predictions.shape[1], all_reg_predictions.shape[-1], all_reg_predictions.shape[0]+1)) # shape of DM is (vox,time,reg)
+# create hrf
+hrf = create_hrf()[0]
+
+# array with cue regressors
+cue_regs = np.zeros((params['feature']['mini_blocks'],all_reg_predictions.shape[1],all_reg_predictions.shape[-1]))
+
+for blk in range(params['feature']['mini_blocks']): # for each miniblock
+    
+    for trl in trial_info.loc[trial_info['trial_type']=='cue_%i'%blk]['trial_num'].values:
+
+        if params['feature']['crop']: # if cropping runs 
+            trl -= params['feature']['crop_TR'] 
+        
+        cue_regs[blk,:,trl] = 1
+    
+    # convolve with spm hrf, similar to what prfpy is using
+    cue_regs[blk] = signal.fftconvolve(cue_regs[blk], np.tile(hrf, (cue_regs.shape[1], 1)), 
+                                            mode='full', axes=(-1))[..., :cue_regs.shape[-1]]
+
+    ## filter it, like we do to the data
+    cue_regs[blk] =  dc_data(cue_regs[blk],
+                             first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'])
+    
+    ## also update regressors info to know name and order of regressors
+    # basically including cues
+    all_regressors = all_regressors.append(pd.DataFrame({'reg_name': 'cue_mblk-{blk}_run-{run}'.format(blk=blk,
+                                                                                  run=run),
+                                                             'color': np.nan,
+                                                             'orientation': np.nan,
+                                                             'condition_name': trial_info.loc[trial_info['trial_type']=='cue_%i'%blk]['attend_condition'].values[0],
+                                                             'miniblock': blk,
+                                                             'run': int(run)
+                                                            }, index=[0]),ignore_index=True)
+
+## Make actual DM to be used in GLM fit (4 regressors + intercept)
+# number of regressors
+num_regs = all_reg_predictions.shape[0] + cue_regs.shape[0] + 1 # conditions, cues, and intercept
+
+DM_FA = np.zeros((all_reg_predictions.shape[1], all_reg_predictions.shape[-1], num_regs)) # shape of DM is (vox,time,reg)
 
 # iterate over vertex/voxel
 for i in range(all_reg_predictions.shape[1]):
@@ -284,6 +339,9 @@ for i in range(all_reg_predictions.shape[1]):
     
     for w in range(all_reg_predictions.shape[0]): # add regressor (which will be the model from pRF estimates)
         DM_FA[i,:,w+1] = all_reg_predictions[w,i,:] 
+
+    for k in range(cue_regs.shape[0]): # add cues
+        DM_FA[i,:,w+2+k] = cue_regs[k,i,:]
 
 ### plot vertex DM for sanity check
 plot_DM(DM_FA, 0, op.join(figures_pth,'DM_FA_vertex_%i.png'%vertex), names=['intercept']+list(all_regressors['reg_name'].values))
@@ -343,7 +401,7 @@ fig.savefig(op.join(figures_pth,fig_name))
 
 ### PLOT REGRESSORS TO CHECK ###
 
-for key in params['mri']['fitting']['FA']['condition_keys'].keys():
+for key in np.concatenate((list(params['mri']['fitting']['FA']['condition_keys'].keys()),['cue'])):
     
     # set figure name
     fig_name = 'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_roi-{roi}_reg-{key}_vertex-{vert}.png'.format(sj=sj,
@@ -362,16 +420,27 @@ for key in params['mri']['fitting']['FA']['condition_keys'].keys():
 
     # plot data with model
     fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
-
-    # plot regressors
-    plt.plot(time_sec, all_reg_predictions[ind_predict[0]][0], 
-             c='#0040ff',lw=3,label='prediction %s'%all_regressors['reg_name'][ind_predict[0]],zorder=1)
-    plt.plot(time_sec, all_reg_predictions[ind_predict[1]][0], 
-             c='#4272ff',lw=3,label='prediction %s'%all_regressors['reg_name'][ind_predict[1]],zorder=1)
-    plt.plot(time_sec, all_reg_predictions[ind_predict[2]][0], 
-             c='#8ca9ff',lw=3,label='prediction %s'%all_regressors['reg_name'][ind_predict[2]],zorder=1)
-    plt.plot(time_sec, all_reg_predictions[ind_predict[3]][0], 
-             c='#c2d1ff',lw=3,label='prediction %s'%all_regressors['reg_name'][ind_predict[3]],zorder=1)
+    
+    if key != 'cue':
+        # plot regressors
+        plt.plot(time_sec, all_reg_predictions[ind_predict[0]][0], 
+                c='#0040ff',lw=3,label='prediction %s'%all_regressors['reg_name'][ind_predict[0]],zorder=1)
+        plt.plot(time_sec, all_reg_predictions[ind_predict[1]][0], 
+                c='#4272ff',lw=3,label='prediction %s'%all_regressors['reg_name'][ind_predict[1]],zorder=1)
+        plt.plot(time_sec, all_reg_predictions[ind_predict[2]][0], 
+                c='#8ca9ff',lw=3,label='prediction %s'%all_regressors['reg_name'][ind_predict[2]],zorder=1)
+        plt.plot(time_sec, all_reg_predictions[ind_predict[3]][0], 
+                c='#c2d1ff',lw=3,label='prediction %s'%all_regressors['reg_name'][ind_predict[3]],zorder=1)
+    else:
+        # plot regressors
+        plt.plot(time_sec, cue_regs[0][0], 
+                c='#0040ff',lw=3,label='prediction %s'%all_regressors['reg_name'][ind_predict[0]],zorder=1)
+        plt.plot(time_sec, cue_regs[1][0], 
+                c='#4272ff',lw=3,label='prediction %s'%all_regressors['reg_name'][ind_predict[1]],zorder=1)
+        plt.plot(time_sec, cue_regs[2][0], 
+                c='#8ca9ff',lw=3,label='prediction %s'%all_regressors['reg_name'][ind_predict[2]],zorder=1)
+        plt.plot(time_sec, cue_regs[3][0], 
+                c='#c2d1ff',lw=3,label='prediction %s'%all_regressors['reg_name'][ind_predict[3]],zorder=1)
 
     # plot data and bars
     plt.plot(time_sec, timeseries[0],'k--',label='FA data')

@@ -33,7 +33,7 @@ feature:
   total_number_TR: 408 # of task
   dummy_TR: 5 # we used extra 5 TRs in beginning that should be disregarded, so file will be 413
 
-  crop: False # if we want to crop the functionals further
+  crop: True # if we want to crop the functionals further
   crop_TR: 8 # number of functionals to crop
 
   bars_phase_dur: 0.6 # phase duration for displaying bars (in seconds) 

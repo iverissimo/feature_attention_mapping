@@ -203,9 +203,6 @@ for key in unique_cond.keys(): # for each condition
                                                              'run': int(run)
                                                             }, index=[0]),ignore_index=True)
 
-# save regressors dataframe, for later access
-all_regressors.to_csv(op.join(output_dir, 'all_regressors_info.csv'),index=False)
-
 all_reg_predictions = [] # to append all regressor predictions
 
 # make visual DM for each GLM regressor, and obtain prediction using pRF model
@@ -282,17 +279,57 @@ for reg in all_regressors['reg_name'].values:
 
 all_reg_predictions = np.vstack(all_reg_predictions)
 
-## Make actual DM to be used in GLM fit (4 regressors + intercept)
+### make cue regressors
 
-DM_FA = np.zeros((all_reg_predictions.shape[1], all_reg_predictions.shape[-1], all_reg_predictions.shape[0]+1)) # shape of DM is (vox,time,reg)
+# create hrf
+hrf = create_hrf()[0]
+
+# array with cue regressors
+cue_regs = np.zeros((params['feature']['mini_blocks'],all_reg_predictions.shape[1],all_reg_predictions.shape[-1]))
+
+for blk in range(params['feature']['mini_blocks']): # for each miniblock
+    
+    for trl in trial_info.loc[trial_info['trial_type']=='cue_%i'%blk]['trial_num'].values:
+        
+        cue_regs[blk,:,trl] = 1
+    
+    # convolve with spm hrf, similar to what prfpy is using
+    cue_regs[blk] = signal.fftconvolve(cue_regs[blk], np.tile(hrf, (cue_regs.shape[1], 1)), 
+                                            mode='full', axes=(-1))[..., :cue_regs.shape[-1]]
+    
+    
+    ## also update regressors info to know name and order of regressors
+    # basically including cues
+    all_regressors = all_regressors.append(pd.DataFrame({'reg_name': 'cue_mblk-{blk}_run-{run}'.format(blk=blk,
+                                                                                  run=run),
+                                                             'color': np.nan,
+                                                             'orientation': np.nan,
+                                                             'condition_name': trial_info.loc[trial_info['trial_type']=='cue_%i'%blk]['attend_condition'].values[0],
+                                                             'miniblock': blk,
+                                                             'run': int(run)
+                                                            }, index=[0]),ignore_index=True)
+    
+# save regressors dataframe, for later access
+all_regressors.to_csv(op.join(output_dir, 'all_regressors_info.csv'),index=False)
+
+## Make actual DM to be used in GLM fit (+ intercept)
+
+# number of regressors
+num_regs = all_reg_predictions.shape[0] + cue_regs.shape[0] + 1 # conditions, cues, and intercept
+
+DM_FA = np.zeros((all_reg_predictions.shape[1], all_reg_predictions.shape[-1], num_regs)) # shape of DM is (vox,time,reg)
 
 # iterate over vertex/voxel
 for i in range(all_reg_predictions.shape[1]):
 
-    DM_FA[i,:,0] = np.repeat(1,all_reg_predictions.shape[-1]) # add intercept
+    DM_FA[i,:,0] = np.repeat(1,all_reg_predictions.shape[-1]) # intercept will be first always
     
     for w in range(all_reg_predictions.shape[0]): # add regressor (which will be the model from pRF estimates)
         DM_FA[i,:,w+1] = all_reg_predictions[w,i,:] 
+        
+    for k in range(cue_regs.shape[0]): # add cues
+        DM_FA[i,:,w+2+k] = cue_regs[k,i,:]
+
 
 # save DM, for later checking
 np.save(op.join(output_dir,'DM_FA_run-{run}.npy'.format(run=run)),DM_FA)

@@ -13,8 +13,7 @@ from scipy.ndimage import gaussian_filter
 from scipy.signal import savgol_filter
 from scipy import fft
 
-from nilearn.glm.first_level.design_matrix import _cosine_drift as dct_set
-from nilearn import signal, surface
+from nilearn import surface
 
 from joblib import Parallel, delayed
 
@@ -29,6 +28,9 @@ from matplotlib import cm
 import matplotlib.colors
 
 from scipy.stats import pearsonr, t, norm
+
+import scipy.signal as signal
+from nilearn.glm.first_level.hemodynamic_models import spm_hrf, spm_time_derivative, spm_dispersion_derivative
 
 
 
@@ -1625,3 +1627,38 @@ def leave_one_out(input_list):
     return out_lists
 
 
+def create_hrf(hrf_params=[1.0, 1.0, 0.0], TR = 1.2):
+    """
+    construct single or multiple HRFs 
+    [taken from prfpy - all credits go to Marco]
+
+    Parameters
+    ----------
+    hrf_params : TYPE, optional
+        DESCRIPTION. The default is [1.0, 1.0, 0.0].
+    Returns
+    -------
+    hrf : ndarray
+        the hrf.
+    """
+
+    hrf = np.array(
+        [
+            np.ones_like(hrf_params[1])*hrf_params[0] *
+            spm_hrf(
+                tr = TR,
+                oversampling = 1,
+                time_length = 40)[...,np.newaxis],
+            hrf_params[1] *
+            spm_time_derivative(
+                tr = TR,
+                oversampling = 1,
+                time_length = 40)[...,np.newaxis],
+            hrf_params[2] *
+            spm_dispersion_derivative(
+                tr = TR,
+                oversampling = 1,
+                time_length = 40)[...,np.newaxis]]).sum(
+        axis=0)                    
+
+    return hrf.T

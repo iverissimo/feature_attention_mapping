@@ -154,6 +154,10 @@ if 'css' in model_type:
 
 rsq = masked_pRF_estimates['rsq']
 
+## rsq mask, get indices for vertices where pRF 
+# rsq is greater than 0.05 
+mask_ind = np.array([ind for ind,val in enumerate(rsq) if val>0.05])
+
 # saved masked rsq, useful for FA plots
 print('saving masked rsq in %s'%op.join(fits_pth,'combined'))
 np.save(op.join(fits_pth,'combined','masked_rsq.npy'), rsq)
@@ -244,7 +248,7 @@ for reg in all_regressors['reg_name'].values:
                                                                                  size[vert],
                                                                                  beta[vert],
                                                                                  baseline[vert],
-                                                                                 ns[vert]) for vert in tqdm(range(len(xx))))
+                                                                                 ns[vert]) for _,vert in enumerate(tqdm(mask_ind)))
 
         else:
             # define gaussian model 
@@ -261,10 +265,15 @@ for reg in all_regressors['reg_name'].values:
                                                                                    yy[vert],
                                                                                    size[vert],
                                                                                    beta[vert],
-                                                                                   baseline[vert]) for vert in tqdm(range(len(xx))))
+                                                                                   baseline[vert]) for _,vert in enumerate(tqdm(mask_ind)))
 
         # squeeze out single dimension that parallel creates
-        prediction = np.squeeze(model_fit)
+        model_fit = np.squeeze(model_fit)
+
+        # save surface prediction array 
+        prediction = np.zeros(data.shape); prediction[:]=np.nan # not fitted voxels will be nan
+        for i,ind in enumerate(mask_ind):
+            prediction[ind] = model_fit[i]
 
         # save prediction in folder, for later use/plotting
         np.save(reg_filename,prediction)

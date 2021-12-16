@@ -187,6 +187,11 @@ if 'css' in model_type:
 
 rsq = masked_pRF_estimates['rsq'][roi_ind[roi]][vertex]
 
+if np.isnan(rsq) or rsq <=0.05:
+    raise ValueError('pRF rsq is %s, not fitting vertice'%str(rsq))
+else:
+    print('pRF rsq for vertice is %.2f'%rsq)
+
 ## load bar position for FA
 ## and make DM for run
 

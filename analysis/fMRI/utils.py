@@ -1662,3 +1662,38 @@ def create_hrf(hrf_params=[1.0, 1.0, 0.0], TR = 1.2):
         axis=0)                    
 
     return hrf.T
+
+def CV_FA(voxel,dm,betas):
+    
+    """ Use betas and DM to create prediction
+    and get CV rsq of left out run
+    
+    Parameters
+    ----------
+    voxel : arr
+        timeseries of a single voxel
+    dm : arr
+        DM array (#TR,#regressors)
+    betas: arr
+        betas array (#regressors)
+    
+    Outputs
+    -------
+    prediction : arr
+        model fit for voxel
+    cv_r2 : arr
+        coefficient of determination
+    
+    """
+    if np.isnan(voxel).any() or np.isnan(dm).any():
+        
+        prediction = np.repeat(np.nan, dm.shape[0])
+        cv_r2 = np.nan
+    
+    else:
+        prediction = dm.dot(betas)
+
+        #calculate CV-rsq        
+        cv_r2 = np.nan_to_num(1-np.sum((voxel-prediction)**2, axis=-1)/(voxel.shape[0]*voxel.var(0)))
+
+    return prediction, cv_r2

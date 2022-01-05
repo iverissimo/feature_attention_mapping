@@ -2,12 +2,14 @@
 ## actual script taken from https://github.com/layerfMRI/repository/tree/master/bias_field_corr ##
 ## all credits go to Renzo Huber ##
 
-
 import os, sys
 import os.path as op
 import glob
 
 import yaml
+
+from nilearn.plotting import plot_anat
+import matplotlib.pyplot as plt
 
 # load settings from yaml
 with open(op.join(op.split(op.split(os.getcwd())[0])[0],'exp_params.yml'), 'r') as f_in:
@@ -132,6 +134,23 @@ for orig in orig_files:
         print(batch_string)
         os.system('sh ' + js_name) if base_dir == 'local' else os.system('sbatch ' + js_name)
 
+
+    # make image with before vs after, for comparison
+    # and save in dir
+
+    uncorr_file = op.join(outfolder,op.split(orig)[-1])[:-3] # remove gz
+    corr_file = op.join(outfolder,'bico_'+op.split(orig)[-1])
+
+    vmax = 50000 if 'T1w' in corr_file else 200000
+
+    # create a figure with multiple axes to plot each anatomical image
+    fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(10, 8))
+
+    plot_anat(uncorr_file,vmax=vmax, title='uncorrected', axes=axes[0],cut_coords=(0,-4,-2))
+    plot_anat(corr_file,vmax=vmax, title='corrected', axes=axes[1],cut_coords=(0,-4,-2))
+
+    # save the output figure with all the anatomical images
+    fig.savefig("%s_BFC.png"%op.join(outfolder,op.split(orig)[-1].split('.')[0]),dpi=100)
 
 
 

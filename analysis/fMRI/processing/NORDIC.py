@@ -1,6 +1,9 @@
 ## run NORDIC of functional files ##
 ## actual script from Luca's Vizioli, all credits go to him ##
 
+## requires phase and mag data to be stored in a NORDIC folder:
+# NORDIC/pre_nordic/sub-X/ses-Y/sub-X_ses-Y_..._bold_phase.nii.gz
+# NORDIC/pre_nordic/sub-X/ses-Y/sub-X_ses-Y_..._bold.nii.gz
 
 import os, sys
 import os.path as op
@@ -24,6 +27,10 @@ elif len(sys.argv)<3:
 else:
     sj = str(sys.argv[1]).zfill(3) #fill subject number with 00 in case user forgets
     base_dir = str(sys.argv[2]) # which machine we run the data
+
+if base_dir in ['lisa','cartesius']:
+
+    raise NameError('Cannot run BFC on slurm systems - needs MATLAB')
 
 # tasks to apply NORDIC
 tasks = ['pRF','FA']
@@ -62,13 +69,11 @@ for _,file in enumerate(input_mag):
         copy2(file,outfile)
         print('file copied to %s'%outfile)
         
-
 # path to output folder
 output_folder = op.join(params['mri']['paths'][base_dir]['root'], 'NORDIC','post_nordic','sub-{sj}'.format(sj=sj),'ses-1')
 if not op.exists(output_folder):
     os.makedirs(output_folder)
 print('saving files in %s'%output_folder)
-
 
 # loop over files, make sure using correct phase
 # (this is, with same run and phase)
@@ -91,7 +96,7 @@ for _,tsk in enumerate(tasks):
         
         # if file aready exists, skip
         if op.exists(nordic_nii):
-            print('NORDIC ALREDY PERFORMED ON %s,\nSKIPPING'%nordic_nii)
+            print('NORDIC ALREADY PERFORMED ON %s,\nSKIPPING'%nordic_nii)
                 
         else:
 
@@ -153,6 +158,9 @@ for _,tsk in enumerate(tasks):
             print(batch_string)
             os.system('sh ' + js_name) if base_dir == 'local' else os.system('sbatch ' + js_name)
 
+            # copy file to sourcedata
+            copy2(nordic_nii,op.join(sourcedata_pth,op.split(nordic_nii)[-1]))
+            print('file copied to %s'%op.join(sourcedata_pth,op.split(nordic_nii)[-1]))
 
 
 

@@ -104,6 +104,8 @@ if [ "$CMD" == all ]; then
 
 elif [ "$CMD" == pial ]; then
 
+    echo "running pial fixes"
+
     recon-all -s $SJ_NR -hires -autorecon-pial
 
 else

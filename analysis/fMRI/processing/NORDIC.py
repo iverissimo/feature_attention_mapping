@@ -130,7 +130,7 @@ for _,tsk in enumerate(tasks):
 
             else: # assumes slurm systems
                 
-                print('not implemented')
+                print('NOT IMPLEMENTED ON %s'%base_dir)
 
 
             keys2replace = {'$SJ_NR': str(sj).zfill(3),

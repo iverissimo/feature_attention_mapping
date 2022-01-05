@@ -125,7 +125,7 @@ for orig in orig_files:
             
     
         # run it
-        js_name = os.path.join(batch_dir, 'BFC-' + op.split(orig)[-1].replace('.nii.gz','.nii') + '.sh')
+        js_name = op.join(batch_dir, 'BFC-' + op.split(orig)[-1].replace('.nii.gz','.nii') + '.sh')
         of = open(js_name, 'w')
         of.write(batch_string)
         of.close()

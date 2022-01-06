@@ -29,8 +29,12 @@ else:
     base_dir = str(sys.argv[3]) # which machine we run the data
 
 # path to singularity image
-sing_img = '/home/inesv/my_images/fmriprep.20.2.3.simg' #fmriprep.20.2.1.simg'
+sing_img = '/home/inesv/my_images/fmriprep.21.0.0.simg' #fmriprep.20.2.3.simg'
 
+# make fmriprep folder if it does not exist
+fmriprep_folder = op.join(params['mri']['paths'][base_dir]['root'],'derivatives','fmriprep')
+if not op.exists(fmriprep_folder):
+    os.makedirs(fmriprep_folder)
 
 if file_type == 'anat':
 
@@ -76,10 +80,12 @@ wait
 
 PYTHONPATH="" singularity run --cleanenv -B /project/projects_verissimo -B $TMPDIR/FAM_wf \
 $SINGIMG \
-$ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/ participant \
---participant-label sub-$SJ_NR --output-space T1w fsnative fsaverage MNI152NLin2009cAsym --cifti-output 170k \
+$ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/fmriprep/ participant \
+--participant-label sub-$SJ_NR --fs-subjects-dir $ROOTFOLDER/derivatives/freesurfer/ \
+--output-space T1w fsnative fsaverage MNI152NLin2009cAsym --cifti-output 170k \
 --bold2t1w-init register --nthreads 30 --omp-nthreads 30 --fs-license-file $FREESURFER/license.txt \
---use-syn-sdc --bold2t1w-dof 6 --verbose --ignore slicetiming -w $TMPDIR/FAM_wf
+--use-syn-sdc --force-syn --bold2t1w-dof 6 --verbose --ignore slicetiming --dummy-scans 5 \
+-w $TMPDIR/FAM_wf
 
 wait          # wait until programs are finished
 

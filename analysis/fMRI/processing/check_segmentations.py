@@ -90,7 +90,7 @@ elif check_type == 'movie':
     working_string = working_string.replace('$DATADIR', freesurfer_datadir)
 
     # number of slices for saggital view
-    sag_slices = range(77,258) #248)
+    sag_slices = range(77,268) #248)
 
     for slice in sag_slices:
         if not op.exists(op.join(out_dir, str(slice).zfill(3) + '.png')): # if image already in dir, skip

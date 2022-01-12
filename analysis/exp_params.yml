@@ -36,6 +36,8 @@ feature:
   crop: True # if we want to crop the functionals further
   crop_TR: 8 # number of functionals to crop
 
+  regress_confounds: True # if we want to regress out fmriprep confounds
+
   bars_phase_dur: 0.6 # phase duration for displaying bars (in seconds) 
 
   cue_width: .2 #.55
@@ -69,6 +71,8 @@ prf:
   crop: True # if we want to crop the functionals further
   crop_TR: 8 # number of functionals to crop
 
+  regress_confounds: False # if we want to regress out fmriprep confounds
+
   flick_rate: 'TR' #10 # Hz, rate of change of features in bar
 
   bar_pass_direction: ['empty_long','L-R','U-D','empty','R-L','D-U','empty_long','D-U','R-L','empty','U-D','L-R','empty_long'] 
@@ -96,6 +100,11 @@ mri: # refers to the Psychopy SyncGenerator class
   file_ext:  '_bold.dtseries.nii' #'_bold.func.gii' # file extension
   acq: 'nordic' #'nordic' # "acquisition" type to use
 
+  confounds:
+    file_ext: '_desc-confounds_timeseries.tsv' # file extension for confounds
+    regs: ['a_comp_cor','cosine','framewise_displacement']
+    CumulativeVarianceExplained: 0.4 # percentage of cumulative variance explained of components, to choose number of a_comp_cor
+
   filtering:
     type: 'dc' #'HPgauss' # None
     cut_off_hz: 0.01 #0.014
@@ -105,7 +114,6 @@ mri: # refers to the Psychopy SyncGenerator class
     polyorder: 3
     highpass: True
     add_mean: True
-
 
   paths:
     local: 

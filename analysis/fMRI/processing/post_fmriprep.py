@@ -7,9 +7,7 @@ import shutil
 
 import yaml
 
-sys.path.insert(0,'..') # add parent folder to path
-from utils import * #import script to use relevante functions
-
+from FAM_utils import mri as mri_utils
 
 # define participant number, and if looking at nordic or pre-nordic data
 if len(sys.argv)<2: 
@@ -29,6 +27,7 @@ base_dir = params['general']['current_dir'] # which machine we run the data
 acq = params['mri']['acq'] # if using standard files or nordic files
 space = params['mri']['space'] # subject space
 file_ext = params['mri']['file_ext'] # file extension
+confound_ext = params['mri']['confounds']['file_ext'] # file extension
 
 hemispheres = ['hemi-L','hemi-R'] # only used for gifti files
 
@@ -49,10 +48,16 @@ epi_files = {'pRF':[op.join(fmriprep_dir,run) for _,run in enumerate(os.listdir(
              'FA': [op.join(fmriprep_dir,run) for _,run in enumerate(os.listdir(fmriprep_dir)) 
             if space in run and acq in run and 'FA' in run and run.endswith(file_ext)]}
 
+confound_files = {'pRF':[op.join(fmriprep_dir,run) for _,run in enumerate(os.listdir(fmriprep_dir)) 
+            if acq in run and 'pRF' in run and run.endswith(confound_ext)],
+             'FA': [op.join(fmriprep_dir,run) for _,run in enumerate(os.listdir(fmriprep_dir)) 
+            if acq in run and 'FA' in run and run.endswith(confound_ext)]}
+
+
 # exception for this run that could not be nordiced
 if sj == '004':
     epi_files['FA'].append(op.join(fmriprep_dir,'sub-{sj}_ses-1_task-FA_acq-standard_run-4_space-{space}{file_ext}'.format(sj=sj, space=space, file_ext=file_ext))) 
-    epi_files['FA'].append(op.join(fmriprep_dir,'sub-{sj}_ses-1_task-FA_acq-standard_run-4_space-{space}{file_ext}'.format(sj=sj, space=space, file_ext=file_ext)))
+    confound_files['FA'].append(op.join(fmriprep_dir,'sub-{sj}_ses-1_task-FA_acq-standard_run-4{file_ext}'.format(sj=sj, file_ext=confound_ext)))
 
 # dict to store names of processed files, per task
 proc_files = {'pRF': [],
@@ -65,21 +70,32 @@ for _,task in enumerate(['pRF','FA']):
     task_name = 'feature' if task == 'FA' else 'prf' # due to params yml notation, should change later
 
     # load and convert files in numpy arrays, to make format issue obsolete
-    epi_files[task] = load_data_save_npz(epi_files[task], output_dir)
+    epi_files[task] = mri_utils.load_data_save_npz(epi_files[task], output_dir)
     
     ## crop files, due to "dummies"
     crop_TR = params[task_name]['dummy_TR'] + params[task_name]['crop_TR'] if params[task_name]['crop'] == True else params[task_name]['dummy_TR'] 
 
-    proc_files[task] = crop_epi(epi_files[task], output_dir, num_TR_task = params[task_name]['total_number_TR'], 
+    proc_files[task] = mri_utils.crop_epi(epi_files[task], output_dir, num_TR_task = params[task_name]['total_number_TR'], 
                                            num_TR_crop = crop_TR)
 
-    ## filter files, to remove drifts
-    proc_files[task] = filter_data(proc_files[task], output_dir, filter_type = params['mri']['filtering']['type'], 
-                            first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'], plot_vert=True)
-
-    ## percent signal change finals
-    proc_files[task] = psc_epi(proc_files[task], output_dir)
+    if params[task_name]['regress_confounds']: # if regressing confounds
+    
+        # first sub select confounds that we are using, and store in output dir
+        confounds_list = mri_utils.select_confounds(confound_files['FA'], output_dir, reg_names = params['mri']['confounds']['regs'],
+                                                    CumulativeVarianceExplained = params['mri']['confounds']['CumulativeVarianceExplained'],
+                                                    num_TR_crop = crop_TR)
         
+        # regress out confounds, and percent signal change
+        proc_files[task] = mri_utils.regressOUT_confounds(proc_files[task], confounds_list, output_dir, TR = params['mri']['TR'])
+        
+    else: 
+        ## filter files, to remove drifts
+        proc_files[task] = mri_utils.filter_data(proc_files[task], output_dir, filter_type = params['mri']['filtering']['type'], 
+                                first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'], plot_vert=True)
+        
+        ## percent signal change finals
+        proc_files[task] = mri_utils.psc_epi(proc_files[task], output_dir)
+            
         
     ## make new outdir, to save final files that will be used for further analysis
     # avoids mistakes later on
@@ -97,13 +113,13 @@ for _,task in enumerate(['pRF','FA']):
             hemi_files = []
             
             for hemi in hemispheres:
-                hemi_files.append(average_epi([val for val in proc_files[task] if hemi in val], 
+                hemi_files.append(mri_utils.average_epi([val for val in proc_files[task] if hemi in val], 
                                               final_output_dir, method = 'mean'))
         
             proc_files[task] = hemi_files
             
         else:
-            proc_files[task] = average_epi(proc_files[task], final_output_dir, method = 'mean')
+            proc_files[task] = mri_utils.average_epi(proc_files[task], final_output_dir, method = 'mean')
         
     
     else:

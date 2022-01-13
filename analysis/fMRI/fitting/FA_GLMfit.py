@@ -301,7 +301,7 @@ all_reg_predictions = np.vstack(all_reg_predictions)
 ### make cue regressors
 
 # create hrf
-hrf = create_hrf()[0]
+hrf = mri_utils.create_hrf()[0]
 
 # array with cue regressors
 cue_regs = np.zeros((params['feature']['mini_blocks'],all_reg_predictions.shape[1],all_reg_predictions.shape[-1]))

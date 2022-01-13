@@ -12,11 +12,15 @@ import yaml
 from pathlib import Path
 import glob
 
-sys.path.insert(0,'..') # add parent folder to path
-from utils import * #import script to use relevante functions
+from FAM_utils import mri as mri_utils
 
 import pandas as pd
 import numpy as np
+
+import matplotlib.pyplot as plt
+import cortex
+
+import scipy.signal as signal
 
 # requires pfpy to be installed - preferably with python setup.py develop
 from prfpy.rf import *
@@ -24,15 +28,6 @@ from prfpy.timecourse import *
 from prfpy.stimulus import PRFStimulus2D
 from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
 
-from popeye import utilities
-
-from nistats.design_matrix import make_first_level_design_matrix
-from nistats.reporting import plot_design_matrix
-
-from joblib import Parallel, delayed
-
-import datetime
-from tqdm import tqdm
 
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
@@ -156,11 +151,11 @@ else: # if not join chunks and save file
     if not op.exists(pRF_estimates_pth):
         os.makedirs(pRF_estimates_pth) 
 
-    pRF_estimates = join_chunks(fits_pth, pRF_estimates_combi,
+    pRF_estimates = mri_utils.join_chunks(fits_pth, pRF_estimates_combi,
                         chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
     
 # define design matrix for pRF task
-visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -170,7 +165,7 @@ prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
 
 # mask estimates, to be within screen boundaries
 print('masking estimates')
-masked_pRF_estimates = mask_estimates(pRF_estimates, fit_model = model_type,
+masked_pRF_estimates = mri_utils.mask_estimates(pRF_estimates, fit_model = model_type,
                             screen_limit_deg = [prf_stim.screen_size_degrees/2,prf_stim.screen_size_degrees/2])
 
 # save estimates in specific variables
@@ -230,7 +225,7 @@ for key in unique_cond.keys(): # for each condition
                                                                                                              run=run),
                                                              'color': unique_cond[key]['color'],
                                                              'orientation': unique_cond[key]['orientation'],
-                                                             'condition_name': get_cond_name(attended_condition,key),
+                                                             'condition_name': mri_utils.get_cond_name(attended_condition,key),
                                                              'miniblock': blk,
                                                              'run': int(run)
                                                             }, index=[0]),ignore_index=True)
@@ -244,7 +239,7 @@ for reg in all_regressors['reg_name'].values:
     DM_reg_filename = op.join(figures_pth,'DM_regressor-{reg}.npy'.format(reg=reg))
     
     # make array with spatial position of bar of interest 
-    DM_cond = get_FA_bar_stim(DM_reg_filename, 
+    DM_cond = mri_utils.get_FA_bar_stim(DM_reg_filename, 
                         params, bar_pos, trial_info, attend_cond = all_regressors[all_regressors['reg_name']==reg].to_dict('r')[0], 
                         save_imgs = False, downsample = 0.1, crop = params['feature']['crop'] , 
                         crop_TR = params['feature']['crop_TR'], overwrite=True, save_DM=False)
@@ -317,8 +312,8 @@ for blk in range(params['feature']['mini_blocks']): # for each miniblock
                                             mode='full', axes=(-1))[..., :cue_regs.shape[-1]]
 
     ## filter it, like we do to the data
-    cue_regs[blk] =  dc_data(cue_regs[blk],
-                             first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'])
+    cue_regs[blk] =  mri_utils.dc_data(cue_regs[blk],
+                                        first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'])
     
     ## also update regressors info to know name and order of regressors
     # basically including cues
@@ -349,11 +344,11 @@ for i in range(all_reg_predictions.shape[1]):
         DM_FA[i,:,w+2+k] = cue_regs[k,i,:]
 
 ### plot vertex DM for sanity check
-plot_DM(DM_FA, 0, op.join(figures_pth,'DM_FA_vertex_%i.png'%vertex), names=['intercept']+list(all_regressors['reg_name'].values))
+mri_utils.plot_DM(DM_FA, 0, op.join(figures_pth,'DM_FA_vertex_%i.png'%vertex), names=['intercept']+list(all_regressors['reg_name'].values))
 
 if fit_now:
     
-    glm_outcome = fit_glm(timeseries[0], DM_FA[0])
+    glm_outcome = mri_utils.fit_glm(timeseries[0], DM_FA[0])
     
     prediction = glm_outcome[0]
     r2 = glm_outcome[-2]

@@ -11,7 +11,6 @@ import os.path as op
 import yaml
 from pathlib import Path
 
-
 # requires pfpy to be installed - preferably with python setup.py develop
 from prfpy.rf import *
 from prfpy.timecourse import *
@@ -19,12 +18,9 @@ from prfpy.stimulus import PRFStimulus2D
 from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
 from prfpy.fit import Iso2DGaussianFitter, CSS_Iso2DGaussianFitter
 
-sys.path.insert(0,'..') # add parent folder to path
-from utils import * #import script to use relevante functions
-
-import datetime
-
-from nilearn import surface
+from FAM_utils import mri as mri_utils
+import cortex
+import matplotlib.pyplot as plt
 
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
@@ -99,7 +95,7 @@ if not os.path.exists(figures_pth):
     os.makedirs(figures_pth) 
 
 # define design matrix 
-visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=True, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=True, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -272,7 +268,7 @@ else:
         if not op.exists(estimates_pth):
             os.makedirs(estimates_pth) 
 
-        estimates = join_chunks(fits_pth, estimates_combi,
+        estimates = mri_utils.join_chunks(fits_pth, estimates_combi,
                                 chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
 
     if roi != 'None':

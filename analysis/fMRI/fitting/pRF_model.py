@@ -13,8 +13,7 @@ from prfpy.stimulus import PRFStimulus2D
 from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
 from prfpy.fit import Iso2DGaussianFitter, CSS_Iso2DGaussianFitter
 
-sys.path.insert(0,'..') # add parent folder to path
-from utils import * #import script to use relevante functions
+from FAM_utils import mri as mri_utils
 
 import datetime
 
@@ -150,7 +149,7 @@ else:
             
     else:
         # define design matrix 
-        visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+        visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
     
         # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
         prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -221,9 +220,9 @@ else:
         estimates_it = gauss_fitter.iterative_search_params
 
     # save grid estimates
-    save_estimates(grid_estimates_filename, estimates_grid, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
+    mri_utils.save_estimates(grid_estimates_filename, estimates_grid, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
     # for it
-    save_estimates(it_estimates_filename, estimates_it, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
+    mri_utils.save_estimates(it_estimates_filename, estimates_it, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
     
     if model_type == 'css':
         
@@ -280,9 +279,9 @@ else:
 
         # save estimates
         # for grid
-        save_estimates(css_grid_estimates_filename, estimates_css_grid, not_nan_vox, orig_shape, model_type = 'css')
+        mri_utils.save_estimates(css_grid_estimates_filename, estimates_css_grid, not_nan_vox, orig_shape, model_type = 'css')
         # for it
-        save_estimates(css_it_estimates_filename, estimates_css_it, not_nan_vox, orig_shape, model_type = 'css')
+        mri_utils.save_estimates(css_it_estimates_filename, estimates_css_it, not_nan_vox, orig_shape, model_type = 'css')
 
 
 # Print duration

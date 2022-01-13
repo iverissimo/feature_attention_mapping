@@ -79,12 +79,12 @@ runs = ['1','2','3','4'] if run_type == 'mean' else [run_type]
 ## put betas from all runs in DataFrame
 # for easier manipulation and control
 
-betas_df = pd.DataFrame(columns = ['regressor', 'run','miniblock','betas','vertex'])
+betas_df = pd.DataFrame(columns = ['regressor', 'run','miniblock','betas','rsq','vertex'])
     
 for r in runs:
 
     # path to FA fits 
-    fits_pth =  op.join(derivatives_dir,'FA_GLM_fit','sub-{sj}'.format(sj=sj), 
+    fits_pth =  op.join(derivatives_dir,'FA_GLM_fit','sub-{sj}'.format(sj=sj), #'OLD_STUFF','FA_GLM_fit','sub-{sj}'.format(sj=sj), 
                         space, model_type,'run-{run}'.format(run=r))
 
     # get GLM estimates file
@@ -106,20 +106,51 @@ for r in runs:
         betas[rsq_mask] = np.nan
 
         betas_df = betas_df.append(pd.DataFrame({'regressor': np.tile('{cond}_{feat}'.format(cond=all_regressors.iloc[ind]['reg_name'].split('_')[0],
-                                                                 feat = all_regressors.iloc[ind]['condition_name']),
-                                                   num_vert),
+                                                                 feat = all_regressors.iloc[ind]['condition_name']),num_vert),
+                             'condition': np.tile(all_regressors.iloc[ind]['reg_name'].split('_')[0],num_vert),
                              'run': np.tile(int(all_regressors.iloc[ind]['reg_name'].split('_')[-1].split('-')[-1]),num_vert),
                              'miniblock': np.tile(int(all_regressors.iloc[ind]['reg_name'].split('_')[1].split('-')[-1]),num_vert),
                              'betas': betas,
+                             'rsq': estimates['r2'],
                              'vertex': np.arange(num_vert)}))
 
 
 ### now make new DF with average betas
+## by condition
 
-regressor_names = betas_df['regressor'].unique()
+condition_names = betas_df['condition'].unique()
 
-mean_betas_df = betas_df.groupby(['regressor', 'vertex']).mean().reset_index()##.unstack()#.reset_index()#
+new_betas_df = pd.DataFrame(columns = ['condition', 'betas','vertex'])
 
+for cond in condition_names:
+    
+    avg_betas = []
+    avg_rsq = []
+    
+    for r in [1,2,3,4]:
+        
+        avg_betas.append(betas_df[(betas_df['condition']==cond)&(betas_df['run']==r)].groupby('vertex').mean()['betas'].values)
+        avg_rsq.append(betas_df[(betas_df['condition']==cond)&(betas_df['run']==r)].groupby('vertex').mean()['rsq'].values)
+        
+        
+    new_betas_df = new_betas_df.append(pd.DataFrame({'condition':np.tile(cond,num_vert),
+                                    'betas': np.average(avg_betas,weights=avg_rsq, axis=0),
+                                    'vertex':np.arange(num_vert)
+                                }))   
+
+## normalize by ACAO condition
+
+attention_betas = new_betas_df[new_betas_df['condition']=='ACAO'].sort_values(by=['vertex'])['betas'].values
+
+norm_mean_betas_df = pd.DataFrame(columns = ['condition', 'betas','vertex'])
+
+for cond in condition_names:
+    
+    norm_mean_betas_df = norm_mean_betas_df.append(pd.DataFrame({'condition':np.tile(cond,num_vert),
+                'betas': new_betas_df[new_betas_df['condition']==cond].sort_values(by=['vertex'])['betas'].values/attention_betas,
+                'vertex':np.arange(num_vert)
+    
+    }))     
 
 # get vertices for subject fsaverage
 ROIs = params['plotting']['ROIs'][space]
@@ -143,7 +174,7 @@ for roi in ROIs:
 
     fig_dims = (20, 10)
     fig, ax = plt.subplots(figsize=fig_dims)
-    sns.barplot(y='regressor', x='betas', data = mean_betas_df.loc[mean_betas_df['vertex'].isin(roi_verts[roi])])
+    sns.barplot(y='condition', x='betas', data = norm_mean_betas_df.loc[norm_mean_betas_df['vertex'].isin(roi_verts[roi])])
 
     ax = plt.gca()
     plt.xticks(fontsize = 18)

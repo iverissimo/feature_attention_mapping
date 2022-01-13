@@ -9,8 +9,7 @@ import cortex
 import pandas as pd
 import seaborn as sns
 
-sys.path.insert(0,'..') # add parent folder to path
-from utils import * #import script to use relevante functions
+from FAM_utils import mri as mri_utils
 
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
@@ -41,8 +40,19 @@ model_type = params['mri']['fitting']['pRF']['fit_model']
 
 # define file extension that we want to use, 
 # should include processing key words
-file_ext = '_cropped_{filt}_{stand}.npy'.format(filt = params['mri']['filtering']['type'],
-                                                    stand = 'psc')
+file_ext = ''
+# if cropped first
+if params['feature']['crop']:
+    file_ext += '_{name}'.format(name='cropped')
+# type of filtering/denoising
+if params['feature']['regress_confounds']:
+    file_ext += '_{name}'.format(name='confound')
+else:
+    file_ext += '_{name}'.format(name = params['mri']['filtering']['type'])
+# type of standardization 
+file_ext += '_{name}'.format(name = params['feature']['standardize'])
+# don't forget its a numpy array
+file_ext += '.npy'
 
 # set paths
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
@@ -67,7 +77,7 @@ rsq_mask = pRF_masked_rsq < rsq_threshold
 runs = ['1','2','3','4'] if run_type == 'mean' else [run_type]
 
 ## put betas from all runs in DataFrame
-# for easier manipulaiton and control
+# for easier manipulation and control
 
 betas_df = pd.DataFrame(columns = ['regressor', 'run','miniblock','betas','vertex'])
     

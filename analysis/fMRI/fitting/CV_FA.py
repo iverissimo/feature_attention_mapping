@@ -7,15 +7,12 @@ import yaml
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import cortex
 import pandas as pd
-import seaborn as sns
-from prfpy.stimulus import PRFStimulus2D
 
 from tqdm import tqdm
+from joblib import Parallel, delayed
 
-sys.path.insert(0,'..') # add parent folder to path
-from utils import * #import script to use relevante functions
+from FAM_utils import mri as mri_utils
 
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
@@ -51,8 +48,19 @@ model_type = params['mri']['fitting']['pRF']['fit_model']
 
 # define file extension that we want to use, 
 # should include processing key words
-file_ext = '_cropped_{filt}_{stand}.npy'.format(filt = params['mri']['filtering']['type'],
-                                                    stand = 'psc')
+file_ext = ''
+# if cropped first
+if params['feature']['crop']:
+    file_ext += '_{name}'.format(name='cropped')
+# type of filtering/denoising
+if params['feature']['regress_confounds']:
+    file_ext += '_{name}'.format(name='confound')
+else:
+    file_ext += '_{name}'.format(name = params['mri']['filtering']['type'])
+# type of standardization 
+file_ext += '_{name}'.format(name = params['feature']['standardize'])
+# don't forget its a numpy array
+file_ext += '.npy'
 
 # set paths
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
@@ -174,7 +182,7 @@ mean_betas_arr = np.array(list(mean_betas_dict.values())).T
 
 ### now get CV rsq
 
-CV_FA_outcome = Parallel(n_jobs=16)(delayed(CV_FA)(data[vert], loo_DM_FA[vert], mean_betas_arr[vert]) for vert in tqdm(range(data.shape[0])))
+CV_FA_outcome = Parallel(n_jobs=16)(delayed(mri_utils.CV_FA)(data[vert], loo_DM_FA[vert], mean_betas_arr[vert]) for vert in tqdm(range(data.shape[0])))
 
 # save in folder
 CV_estimates_filename = op.join(out_pth, 'CV_run-%s_estimates.npz'%run_type)

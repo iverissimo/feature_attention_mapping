@@ -16,8 +16,7 @@ import pandas as pd
 import seaborn as sns
 from prfpy.stimulus import PRFStimulus2D
 
-sys.path.insert(0,'..') # add parent folder to path
-from utils import * #import script to use relevante functions
+from FAM_utils import mri as mri_utils
 
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
@@ -59,8 +58,19 @@ model_type = params['mri']['fitting']['pRF']['fit_model']
 
 # define file extension that we want to use, 
 # should include processing key words
-file_ext = '_cropped_{filt}_{stand}.npy'.format(filt = params['mri']['filtering']['type'],
-                                                    stand = 'psc')
+file_ext = ''
+# if cropped first
+if params['feature']['crop']:
+    file_ext += '_{name}'.format(name='cropped')
+# type of filtering/denoising
+if params['feature']['regress_confounds']:
+    file_ext += '_{name}'.format(name='confound')
+else:
+    file_ext += '_{name}'.format(name = params['mri']['filtering']['type'])
+# type of standardization 
+file_ext += '_{name}'.format(name = params['feature']['standardize'])
+# don't forget its a numpy array
+file_ext += '.npy'
 
 # set paths
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
@@ -99,12 +109,12 @@ if task == 'pRF':
         if not op.exists(estimates_pth):
             os.makedirs(estimates_pth) 
 
-        estimates = join_chunks(fits_pth, estimates_combi,
+        estimates = mri_utils.join_chunks(fits_pth, estimates_combi,
                                 chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
 
     
     # define design matrix 
-    visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+    visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
 
     # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
     prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -116,7 +126,7 @@ if task == 'pRF':
 
     # mask estimates
     print('masking estimates')
-    masked_est = mask_estimates(estimates, fit_model = model_type,
+    masked_est = mri_utils.mask_estimates(estimates, fit_model = model_type,
                                 screen_limit_deg = [prf_stim.screen_size_degrees/2,prf_stim.screen_size_degrees/2])
 
     masked_rsq = masked_est['rsq']

@@ -38,6 +38,8 @@ feature:
 
   regress_confounds: True # if we want to regress out fmriprep confounds
 
+  standardize: 'psc'
+
   bars_phase_dur: 0.6 # phase duration for displaying bars (in seconds) 
 
   cue_width: .2 #.55
@@ -72,6 +74,8 @@ prf:
   crop_TR: 8 # number of functionals to crop
 
   regress_confounds: False # if we want to regress out fmriprep confounds
+
+  standardize: 'psc'
 
   flick_rate: 'TR' #10 # Hz, rate of change of features in bar
 

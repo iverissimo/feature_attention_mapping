@@ -89,8 +89,19 @@ run_type = params['mri']['fitting']['pRF']['run']
 
 # define file extension that we want to use, 
 # should include processing key words
-file_ext = '_cropped_{filt}_{stand}.npy'.format(filt = params['mri']['filtering']['type'],
-                                                    stand = 'psc')
+file_ext = ''
+# if cropped first
+if params['feature']['crop']:
+    file_ext += '_{name}'.format(name='cropped')
+# type of filtering/denoising
+if params['feature']['regress_confounds']:
+    file_ext += '_{name}'.format(name='confound')
+else:
+    file_ext += '_{name}'.format(name = params['mri']['filtering']['type'])
+# type of standardization 
+file_ext += '_{name}'.format(name = params['feature']['standardize'])
+# don't forget its a numpy array
+file_ext += '.npy'
 
 # set paths
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
@@ -114,6 +125,10 @@ if sj=='004' and run=='4':
 
 ## load functional data
 file = proc_files[0]
+if len(proc_files)>1:
+    raise ValueError('%s files found to fit, unsure of which to use'%len(proc_files))
+else:
+    print('Fitting %s'%file)
 data = np.load(file,allow_pickle=True) # will be (vertex, TR)
 
 if roi != 'None' and vertex not in ['max','min']:
@@ -136,8 +151,11 @@ fits_pth =  op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), space, '
 pRF_estimates_pth = op.join(fits_pth,'combined')
 
 # combined estimates filename
-est_name = [x for _,x in enumerate(os.listdir(fits_pth)) if 'chunk-001' in x][0]
-est_name = est_name.replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
+est_name = [x for _,x in enumerate(os.listdir(fits_pth)) if 'chunk-001' in x]
+if len(est_name)>1:
+    raise ValueError('%s files found as pRF estimates of same chuck, unsure of which to use'%len(est_name))
+else:
+    est_name = est_name[0].replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
 
 # total path to estimates path
 pRF_estimates_combi = op.join(pRF_estimates_pth,est_name)

@@ -83,6 +83,7 @@ for _,task in enumerate(['pRF','FA']):
         # first sub select confounds that we are using, and store in output dir
         confounds_list = mri_utils.select_confounds(confound_files['FA'], output_dir, reg_names = params['mri']['confounds']['regs'],
                                                     CumulativeVarianceExplained = params['mri']['confounds']['CumulativeVarianceExplained'],
+                                                    select =  'num', num_components = 5,
                                                     num_TR_crop = crop_TR)
         
         # regress out confounds, and percent signal change

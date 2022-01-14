@@ -1703,7 +1703,8 @@ def CV_FA(voxel,dm,betas):
 
 
 def select_confounds(file, outdir, reg_names = ['a_comp_cor','cosine','framewise_displacement'],
-                    CumulativeVarianceExplained = 0.4, num_TR_crop = 5):
+                    CumulativeVarianceExplained = 0.4, num_TR_crop = 5, 
+                    select = 'num',num_components = 5):
     
     """ 
     function to subselect relevant nuisance regressors
@@ -1718,6 +1719,8 @@ def select_confounds(file, outdir, reg_names = ['a_comp_cor','cosine','framewise
         path to save new file
     reg_names : list
         list with (sub-)strings of the nuisance regressor names
+    select: str
+        selection factor ('num' - select x number of components, 'cve' - use CVE as threshold)
     CumulativeVarianceExplained: float
         value of CVE up to which a_comp_cor components are selected
         
@@ -1774,8 +1777,11 @@ def select_confounds(file, outdir, reg_names = ['a_comp_cor','cosine','framewise
 
                     reg_info = reg_info.filter(regex=reg)
 
-                    # cut off index
-                    cut_off_ind = np.where(reg_info.iloc[reg_info.index=='CumulativeVarianceExplained'].values[0] > CumulativeVarianceExplained)[0][0] 
+                    if select == 'num': 
+                        cut_off_ind = num_components
+                    elif select == 'cve':  
+                        # cut off index
+                        cut_off_ind = np.where(reg_info.iloc[reg_info.index=='CumulativeVarianceExplained'].values[0] > CumulativeVarianceExplained)[0][0] 
 
                     nuisance_columns += list(reg_info.columns[0:cut_off_ind])
 

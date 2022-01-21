@@ -244,7 +244,7 @@ class PRFSession(ExpSession):
 
 
         # define how many times bar features switch during TR, according to flick rate defined 
-        if self.settings['stimuli']['prf']['flick_rate'] == 'TR':
+        if self.settings['stimuli']['prf']['flick_stim_rate'] == 'TR':
 
             phase_conditions = np.repeat(key_list, self.trial_number/len(key_list))
             np.random.shuffle(phase_conditions) # randomized conditions, for attention to bar task

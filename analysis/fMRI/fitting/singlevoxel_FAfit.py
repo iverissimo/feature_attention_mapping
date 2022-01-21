@@ -370,6 +370,7 @@ if fit_now:
     
     prediction = glm_outcome[0]
     r2 = glm_outcome[-2]
+    
 
 ### MODEL FIGURE ###
 
@@ -398,7 +399,8 @@ plt.plot(time_sec, timeseries[0],'k--',label='FA data')
 axis.set_xlabel('Time (s)',fontsize=20, labelpad=20)
 axis.set_ylabel('BOLD signal change (%)',fontsize=20, labelpad=10)
 axis.set_xlim(0,len(prediction)*TR)
-axis.legend(loc='upper left',fontsize=10)  # doing this to guarantee that legend is how I want it  
+axis.legend(loc='upper left',fontsize=10)  # doing this to guarantee that legend is how I want it 
+#axis.set_ylim(-3,3)  
 
 # times where bar is on screen [1st on, last on, 1st on, last on, etc] 
 bar_onset = np.array([27,98,126,197,225,296,324,395])*TR
@@ -465,7 +467,8 @@ for key in np.concatenate((list(params['mri']['fitting']['FA']['condition_keys']
     axis.set_xlabel('Time (s)',fontsize=20, labelpad=20)
     axis.set_ylabel('BOLD signal change (%)',fontsize=20, labelpad=10)
     axis.set_xlim(0,len(prediction)*TR)
-    axis.legend(loc='upper left',fontsize=10)  # doing this to guarantee that legend is how I want it  
+    axis.legend(loc='upper left',fontsize=10)  # doing this to guarantee that legend is how I want it
+    #axis.set_ylim(-3,3)  
 
     # times where bar is on screen [1st on, last on, 1st on, last on, etc] 
     bar_onset = np.array([27,98,126,197,225,296,324,395])*TR

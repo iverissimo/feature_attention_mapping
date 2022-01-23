@@ -242,20 +242,19 @@ class PRFSession(ExpSession):
         # if in scanner, we want it to be synced to trigger, so lets increase trial time (in seconds, like TR)
         max_trial_time = 5 if self.settings['stimuli']['prf']['sync_scanner']==True else self.settings['mri']['TR']
 
+        # flicker frequency
+        flick_rate = self.settings['stimuli']['prf']['flick_rate']
+
+        # number of samples in trial
+        n_samples = max_trial_time * flick_rate
 
         # define how many times bar features switch during TR, according to flick rate defined 
-        if self.settings['stimuli']['prf']['flick_stim_rate'] == 'TR':
+        if self.settings['stimuli']['prf']['flick_stim_rate'] == 'TR': # if changing features at every TR
 
             phase_conditions = np.repeat(key_list, self.trial_number/len(key_list))
             np.random.shuffle(phase_conditions) # randomized conditions, for attention to bar task
 
-            # flicker frequency
-            flick_rate = self.settings['stimuli']['prf']['flick_rate']
-
-            # number of samples in trial
-            n_samples = max_trial_time * flick_rate
-
-            if self.settings['stimuli']['prf']['flick_on_off'] == True:
+            if self.settings['stimuli']['prf']['flick_on_off'] == True: # interleave with background if we want and on-off bar
                 
                 self.phase_conditions = np.array([list(np.tile([val,'background'],int(np.round(n_samples/2)))) for _,val in enumerate(phase_conditions)])
                 
@@ -265,16 +264,9 @@ class PRFSession(ExpSession):
             # define list with number of phases and their duration (duration of each must be the same)
             self.phase_durations = np.repeat(1/flick_rate,self.phase_conditions.shape[-1])    
             
-        else:
+        else: # if changing features randomly at flick rate
 
-            # flicker frequency
-            flick_rate = self.settings['stimuli']['prf']['flick_rate']
-            
-            # number of samples in trial
-            n_samples = max_trial_time * flick_rate
-
-            # interleave with background if we want and on-off bar
-            if self.settings['stimuli']['prf']['flick_on_off'] == True:
+            if self.settings['stimuli']['prf']['flick_on_off'] == True: # interleave with background if we want and on-off bar
                 
                 on_list = list(np.array(key_list*round((n_samples/2)/len(key_list))))
                 off_list = list(np.tile('background',len(on_list)))
@@ -297,7 +289,6 @@ class PRFSession(ExpSession):
 
             # define list with number of phases and their duration (duration of each must be the same)
             self.phase_durations = np.repeat(1/flick_rate,phase_conditions.shape[-1])
-
 
         # total experiment time (in seconds)
         self.total_time = self.trial_number * max_trial_time  
@@ -932,7 +923,6 @@ class FlickerSession(ExpSession):
         for trl in self.all_trials: 
             trl.run() # run forrest run
           
-
         self.close() # close session
 
 

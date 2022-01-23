@@ -249,11 +249,21 @@ class PRFSession(ExpSession):
             phase_conditions = np.repeat(key_list, self.trial_number/len(key_list))
             np.random.shuffle(phase_conditions) # randomized conditions, for attention to bar task
 
-            self.phase_conditions = np.array([[val] for _,val in enumerate(phase_conditions)])
+            # flicker frequency
+            flick_rate = self.settings['stimuli']['prf']['flick_rate']
 
+            # number of samples in trial
+            n_samples = max_trial_time * flick_rate
+
+            if self.settings['stimuli']['prf']['flick_on_off'] == True:
+                
+                self.phase_conditions = np.array([list(np.tile([val,'background'],int(np.round(n_samples/2)))) for _,val in enumerate(phase_conditions)])
+                
+            else:
+                self.phase_conditions = np.array([list(np.tile(val,int(np.round(n_samples)))) for _,val in enumerate(phase_conditions)])
+                
             # define list with number of phases and their duration (duration of each must be the same)
-            # in this case we want one color per trial
-            self.phase_durations = np.repeat(max_trial_time,self.phase_conditions.shape[-1])
+            self.phase_durations = np.repeat(1/flick_rate,self.phase_conditions.shape[-1])    
             
         else:
 
@@ -263,11 +273,23 @@ class PRFSession(ExpSession):
             # number of samples in trial
             n_samples = max_trial_time * flick_rate
 
-            # repeat keys, so for each bar pass it shows each condition X times
-            key_list = np.array(key_list*round(n_samples/len(key_list))) 
+            # interleave with background if we want and on-off bar
+            if self.settings['stimuli']['prf']['flick_on_off'] == True:
+                
+                on_list = list(np.array(key_list*round((n_samples/2)/len(key_list))))
+                off_list = list(np.tile('background',len(on_list)))
+                
+                key_list = on_list + off_list
+                key_list[::2] = on_list
+                key_list[1::2] = off_list
+                
+            else:
+                # repeat keys, so for each bar pass it shows each condition X times
+                key_list = np.array(key_list*round(n_samples/len(key_list))) 
+
             phase_conditions = key_list
 
-            # stach them in trial
+            # stack them in trial
             for r in range(self.trial_number-1):            
                 phase_conditions = np.vstack((phase_conditions,key_list))
                 

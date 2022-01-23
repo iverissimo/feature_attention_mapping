@@ -55,6 +55,8 @@ stimuli:
   ori_shift_rate: 5 #'TR' #0.83 #.25 #5 # Hz, rate of element orientation change
 
   pos_jitter: 0.03 #0.06 #degrees, x,y position jiter to add to gabor center 
+
+  num_elem: [32,32] # number of elements (gabors) per axis
   
   prf:
     bar_width_ratio: 0.125 #0.0625 # ratio of the screen res

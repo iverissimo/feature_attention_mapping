@@ -44,7 +44,7 @@ class Stim(object):
         self.element_positions = self.grid_pos
 
          # element sizes
-        element_sizes_px = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['element_size'], self.session.monitor) 
+        element_sizes_px = self.session.gabor_diameter_pix 
         self.element_sizes = np.ones((self.nElements)) * element_sizes_px 
 
         # elements spatial frequency

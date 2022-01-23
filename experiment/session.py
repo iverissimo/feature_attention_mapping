@@ -54,12 +54,15 @@ class ExpSession(PylinkEyetrackerSession):
             ## make grid of possible positions for gabors 
             # (grid spans whole display, bar will alter specific part of grid)
 
-            # first set the number of elements that fit each dimension
-            self.gabor_diameter_pix = tools.monitorunittools.deg2pix(self.settings['stimuli']['element_size'], self.monitor) # diameter of each element (pix)
-            print('gabor diameter in pix %s'%str(self.gabor_diameter_pix))
-            
-            elem_num = np.round(np.array(self.screen)/(self.gabor_diameter_pix * self.settings['stimuli']['gab_ratio'])) # [horiz #elements, vert #elements], also made it so that the elements will overlap a bit, to avoid emptyness 
+            ## first set the number of elements that fit each dimension
+            elem_num = np.array(self.settings['stimuli']['num_elem'])
 
+            gabor_diameter_pix = np.array(self.screen)/(elem_num * self.settings['stimuli']['gab_ratio'])
+            self.gabor_diameter_pix = gabor_diameter_pix[0]
+
+            print('gabor diameter in pix %s'%str(self.gabor_diameter_pix))
+            print('gabor diameter in deg %s'%str(tools.monitorunittools.pix2deg(self.gabor_diameter_pix, self.monitor)))
+            
             # then set equally spaced x and y coordinates for grid
             x_grid_pos = np.linspace(-self.screen[0]/2,
                                      self.screen[0]/2,

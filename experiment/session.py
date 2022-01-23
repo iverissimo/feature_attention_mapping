@@ -240,7 +240,7 @@ class PRFSession(ExpSession):
 
 
         # if in scanner, we want it to be synced to trigger, so lets increase trial time (in seconds, like TR)
-        max_trial_time = 5 if self.settings['mri']['scanner']==True else self.settings['mri']['TR']
+        max_trial_time = 5 if self.settings['stimuli']['prf']['sync_scanner']==True else self.settings['mri']['TR']
 
 
         # define how many times bar features switch during TR, according to flick rate defined 
@@ -544,7 +544,7 @@ class FeatureSession(ExpSession):
                         self.hemifield, self.drawing_ind, os.path.join(self.output_dir, self.output_str+'_trial_info.csv'))
                          
         # if in scanner, we want it to be synced to trigger, so lets increase trial time (in seconds, like TR)
-        max_trial_time = 5 if self.settings['mri']['scanner']==True else self.settings['mri']['TR']
+        max_trial_time = 5 if self.settings['stimuli']['feature']['sync_scanner']==True else self.settings['mri']['TR']
 
 
         # append all trials

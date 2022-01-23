@@ -68,7 +68,11 @@ stimuli:
     flick_stim_rate: 'TR' # 'freq' # rate of change of features in bar 
     flick_on_off: True # if flickering is stim-on/off screen, or if just flickering with stim-on 
 
-    bar_pass_direction: ['empty_long','L-R','U-D','empty','R-L','D-U','empty_long','D-U','R-L','empty','U-D','L-R','empty_long'] 
+    element_contrast: 1 # do full contrast during prf task
+
+    bar_pass_direction: ['empty_long','L-R','U-D','empty','R-L','D-U','empty_long','D-U','R-L','empty','U-D','L-R','empty_long']
+
+    sync_scanner: True 
 
   feature:
     bar_width_ratio: 0.125 # ratio of the screen res
@@ -92,6 +96,8 @@ stimuli:
                          'empty','cue_1','empty','mini_block_1',
                          'empty','cue_2','empty','mini_block_2',
                          'empty','cue_3','empty','mini_block_3','empty']
+
+    sync_scanner: False 
 
   flicker:
     bar_width_ratio: 0.125 # ratio of the screen res

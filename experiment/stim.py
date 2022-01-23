@@ -119,9 +119,14 @@ class PRFStim(Stim):
         
 
         if this_phase != 'background':
+
+            # change contrast of elements
+            condition_settings = self.condition_settings 
+            condition_settings[this_phase]['element_contrast'] = self.session.settings['stimuli']['prf']['element_contrast']  
+
             # update bar elements
             self.session.bar0_array = update_elements(ElementArrayStim = self.session.bar0_array,
-                                                        condition_settings = self.condition_settings, 
+                                                        condition_settings = condition_settings, 
                                                         position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor), 
                                                         orientation = orientation,
                                                         this_phase = this_phase, 

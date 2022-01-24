@@ -116,7 +116,7 @@ class PRFTrial(Trial):
                     self.session.close()
                     self.session.quit()
 
-                elif ev == self.session.mri_trigger: # TR pulse
+                elif (ev == self.session.mri_trigger) and (self.session.settings['stimuli']['prf']['sync_scanner']==True): # TR pulse
                     event_type = 'pulse'
                     self.stop_phase()
                     self.stop_trial()
@@ -297,7 +297,7 @@ class FeatureTrial(Trial):
                     self.session.close()
                     self.session.quit()
 
-                elif ev == self.session.mri_trigger: # TR pulse
+                elif (ev == self.session.mri_trigger) and (self.session.settings['stimuli']['feature']['sync_scanner']==True): # TR pulse
                     event_type = 'pulse'
                     self.stop_phase()
 

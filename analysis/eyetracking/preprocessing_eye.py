@@ -10,7 +10,7 @@ import glob
 
 import matplotlib.pyplot as plt
 
-from utils import * #import script to use relevante functions
+from FAM_utils import eye as eye_utils
 
 # load settings from yaml
 with open(op.join(op.split(os.getcwd())[0],'exp_params.yml'), 'r') as f_in:
@@ -65,7 +65,7 @@ for _,ses in enumerate(ses_type):
         hdf_file = op.join(out_dir, 'sub-{sj}_task-{task}_{ses_type}_eyetrack.h5'.format(sj=sj, task=task, ses_type = ses))  
 
         # convert
-        alias_list = edf2h5(edf_files, hdf_file) 
+        alias_list = eye_utils.edf2h5(edf_files, hdf_file) 
 
         # save all data in csvs
         # and append filenames to use later

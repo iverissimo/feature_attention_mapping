@@ -12,10 +12,10 @@ import seaborn as sns
 
 from hedfpy.EyeSignalOperator import detect_saccade_from_data
 
-from utils import * #import script to use relevante functions
+from FAM_utils import eye as eye_utils
 
 # load settings from yaml
-with open(os.path.join(os.path.split(os.getcwd())[0],'exp_params.yml'), 'r') as f_in:
+with open(op.join(op.split(os.getcwd())[0],'exp_params.yml'), 'r') as f_in:
             params = yaml.safe_load(f_in)
 
 # define participant number
@@ -210,14 +210,14 @@ for _,ses in enumerate(ses_type):
 
         filename = op.join(out_dir, 'sub-{sj}_task-{task}_gaze_KDE_run-{run}_{ses_type}.png'.format(sj=sj, run=run+1, task=task, ses_type = ses))
         
-        plot_gaze_kde(df_gaze, filename, task = task, run = run+1, conditions = ['green_horizontal','green_vertical','red_horizontal','red_vertical'], screen = params['window']['size'], downsample = 10)
+        eye_utils.plot_gaze_kde(df_gaze, filename, task = task, run = run+1, conditions = ['green_horizontal','green_vertical','red_horizontal','red_vertical'], screen = params['window']['size'], downsample = 10)
     
 
         # plot saccade histogram for run
 
         filename = op.join(out_dir, 'sub-{sj}_task-{task}_sacc_hist_run-{run}_{ses_type}.png'.format(sj=sj, run=run+1, task=task, ses_type = ses))
         
-        plot_sacc_hist(df_sacc, filename, task = task, run = run+1, 
+        eye_utils.plot_sacc_hist(df_sacc, filename, task = task, run = run+1, 
                     conditions = ['green_horizontal','green_vertical','red_horizontal','red_vertical'])
         
 

@@ -259,29 +259,30 @@ class PRFSession(ExpSession):
 
             if self.settings['stimuli']['prf']['flick_on_off'] == True: # interleave with background if we want and on-off bar
                 
-                self.phase_conditions = np.array([list(np.tile([val,'background'],int(np.round(n_samples/2)))) for _,val in enumerate(phase_conditions)])
+                self.phase_conditions = np.array([list(np.tile([val,'background'],int(np.round(n_samples)))) for _,val in enumerate(phase_conditions)])
                 
             else:
                 self.phase_conditions = np.array([list(np.tile(val,int(np.round(n_samples)))) for _,val in enumerate(phase_conditions)])
                 
             # define list with number of phases and their duration (duration of each must be the same)
-            self.phase_durations = np.repeat(1/flick_rate,self.phase_conditions.shape[-1])    
+            self.phase_durations = np.repeat(max_trial_time/self.phase_conditions.shape[-1], self.phase_conditions.shape[-1])   
             
         else: # if changing features randomly at flick rate
 
+            # repeat keys, so for each bar pass it shows each condition X times
+            key_list = np.array(key_list*round(n_samples/len(key_list))) 
+
             if self.settings['stimuli']['prf']['flick_on_off'] == True: # interleave with background if we want and on-off bar
                 
-                on_list = list(np.array(key_list*round((n_samples/2)/len(key_list))))
+                on_list = list(key_list)
                 off_list = list(np.tile('background',len(on_list)))
                 
                 key_list = on_list + off_list
                 key_list[::2] = on_list
                 key_list[1::2] = off_list
-                
             else:
-                # repeat keys, so for each bar pass it shows each condition X times
-                key_list = np.array(key_list*round(n_samples/len(key_list))) 
-
+                key_list = list(key_list) + list(key_list) 
+                
             phase_conditions = key_list
 
             # stack them in trial
@@ -291,7 +292,7 @@ class PRFSession(ExpSession):
             self.phase_conditions = phase_conditions
 
             # define list with number of phases and their duration (duration of each must be the same)
-            self.phase_durations = np.repeat(1/flick_rate,phase_conditions.shape[-1])
+            self.phase_durations = np.repeat(max_trial_time/self.phase_conditions.shape[-1], self.phase_conditions.shape[-1])
 
         # total experiment time (in seconds)
         self.total_time = self.trial_number * max_trial_time  
@@ -813,15 +814,16 @@ class FlickerSession(ExpSession):
 
         # repeat keys, so for each trial it shows each condition X times
         key_list = np.array(key_list*round(n_samples/len(key_list)))
+        key_list = list(key_list) + list(key_list)
         phase_conditions = key_list
         
         for r in range(self.trial_number-1):            
             phase_conditions = np.vstack((phase_conditions,key_list))
 
+        self.phase_conditions = phase_conditions
         
         # define list with number of phases and their duration (duration of each must be the same)
-        self.phase_durations = np.repeat(1/flick_rate,phase_conditions.shape[-1]) 
-
+        self.phase_durations = np.repeat(max_trial_time/self.phase_conditions.shape[-1], self.phase_conditions.shape[-1])
 
         # append all trials
         self.all_trials = []
@@ -830,7 +832,7 @@ class FlickerSession(ExpSession):
             self.all_trials.append(FlickerTrial(session = self,
                                                 trial_nr = i, 
                                                 phase_durations = self.phase_durations,
-                                                phase_names = phase_conditions[i],
+                                                phase_names = self.phase_conditions[i],
                                                 bar_ecc_index_at_trial = self.bar_ecc_index_all[i],
                                                 ecc_midpoint_at_trial = self.ecc_midpoint_all[i]
                                                 ))

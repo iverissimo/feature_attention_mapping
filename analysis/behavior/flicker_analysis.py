@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from scipy import stats
-from utils import * #import script to use relevante functions
+from FAM_utils import beh as beh_utils
 
 # load settings from yaml
-with open(os.path.join(os.path.split(os.getcwd())[0],'exp_params.yml'), 'r') as f_in:
+with open(op.join(op.split(os.getcwd())[0],'exp_params.yml'), 'r') as f_in:
             params = yaml.safe_load(f_in)
 
 # define participant number

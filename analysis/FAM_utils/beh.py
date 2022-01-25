@@ -48,7 +48,7 @@ def get_pp_responses(trial_IDs,events,params):
         if i!=0: # we ignore first trial because they're not supposed to reply (same/dif task)
             
             # filter df for responses for trial and trial+1(both before new trial is shown)
-            response_df = events.loc[(events['event_type']=='response')&(events['trial_nr'].isin([trl,trl+1]))] 
+            response_df = events.loc[(events['event_type']=='response')&(events['trial_nr'].isin([trl,trl+1]))&((events['response']!='t'))] 
             
             if response_df.empty: # if no response given
                 responses.append(np.nan)

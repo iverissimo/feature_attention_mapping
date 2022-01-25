@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from scipy import stats
-from utils import * #import script to use relevante functions
+from FAM_utils import beh as beh_utils
 
 # load settings from yaml
-with open(os.path.join(os.path.split(os.getcwd())[0],'exp_params.yml'), 'r') as f_in:
+with open(op.join(op.split(os.getcwd())[0],'exp_params.yml'), 'r') as f_in:
             params = yaml.safe_load(f_in)
 
 # define participant number
@@ -96,7 +96,7 @@ for _,ses in enumerate(ses_type):
                               'attend_condition': attend_condition[num], # attended condition 
                               'hemifield': trial_info.loc[trial_info['trial_type']=='mini_block_%s'%str(num)]['hemifield'].to_list(), # hemifield of attended bar
                               'trial_ID': trial_info.loc[trial_info['trial_type']=='mini_block_%s'%str(num)]['trial_num'].to_list(), # trial number for miniblocks
-                              'true_response': get_true_response(trial_info.loc[trial_info['trial_type']=='mini_block_%s'%str(num)]['hemifield'].to_list())
+                              'true_response': beh_utils.get_true_response(trial_info.loc[trial_info['trial_type']=='mini_block_%s'%str(num)]['hemifield'].to_list())
                              }, ignore_index=True) 
 
                 # save hemifield info
@@ -116,7 +116,7 @@ for _,ses in enumerate(ses_type):
                         hemi.append(pos)
                         
                     # get "true" responses for that condition
-                    tr_condition = get_true_response(hemi)
+                    tr_condition = beh_utils.get_true_response(hemi)
 
                     df_hemifield = df_hemifield.append({'run': i+1, # run number
                                             'mini_block': int(num), # miniblock number
@@ -136,7 +136,7 @@ for _,ses in enumerate(ses_type):
 
                 trial_ID_run = df_summary.loc[df_summary['mini_block']==num]['trial_ID'].values[0]
 
-                responses, responses_onset = get_pp_responses(trial_ID_run, df_run, params)
+                responses, responses_onset = beh_utils.get_pp_responses(trial_ID_run, df_run, params)
 
                 df_ev_summary = df_ev_summary.append({'mini_block': num, # miniblock number
                               'attend_condition': attend_condition[num], # attended condition 

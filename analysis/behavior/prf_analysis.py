@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from scipy import stats
-from utils import * #import script to use relevante functions
+from FAM_utils import beh as beh_utils
 
 # load settings from yaml
-with open(os.path.join(os.path.split(os.getcwd())[0],'exp_params.yml'), 'r') as f_in:
+with open(op.join(op.split(os.getcwd())[0],'exp_params.yml'), 'r') as f_in:
             params = yaml.safe_load(f_in)
 
 # define participant number
@@ -87,7 +87,7 @@ for _,ses in enumerate(ses_type):
                 if 'empty' not in (bar_pass_all[t]):
                     
                     # find bar color in that trial
-                    bar_color = [x for _,x in enumerate(df_run[df_run['trial_nr']==t]['event_type'].values) if x!='pulse' and x!='response'][0]
+                    bar_color = [x for _,x in enumerate(df_run[df_run['trial_nr']==t]['event_type'].values) if x!='pulse' and x!='response' and x!='background'][0]
 
                     # update total number of (potential) responses 
                     total_responses[bar_color]+=1

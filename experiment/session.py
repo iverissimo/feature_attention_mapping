@@ -814,7 +814,6 @@ class FlickerSession(ExpSession):
 
         # repeat keys, so for each trial it shows each condition X times
         key_list = np.array(key_list*round(n_samples/len(key_list)))
-        key_list = list(key_list) + list(key_list)
         phase_conditions = key_list
         
         for r in range(self.trial_number-1):            
@@ -823,7 +822,7 @@ class FlickerSession(ExpSession):
         self.phase_conditions = phase_conditions
         
         # define list with number of phases and their duration (duration of each must be the same)
-        self.phase_durations = np.repeat(max_trial_time/self.phase_conditions.shape[-1], self.phase_conditions.shape[-1])
+        self.phase_durations = np.repeat(1/flick_rate,self.phase_conditions.shape[-1])
 
         # append all trials
         self.all_trials = []

@@ -106,7 +106,7 @@ stimuli:
 
     bar_ecc_index: [1,2,2,1,1,2,1,2] # eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
 
-    flick_rate: 30 # Hz, flicker rate of color for square
+    flick_rate: 30 #15 # Hz, flicker rate of color for square
 
     max_trial_time: 5 # max trial time (in minutes)
 

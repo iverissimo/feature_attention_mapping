@@ -120,37 +120,22 @@ for r in runs:
 
 condition_names = betas_df['condition'].unique()
 
-new_betas_df = pd.DataFrame(columns = ['condition', 'betas','vertex'])
+new_betas_df = pd.DataFrame(columns = ['condition','run','betas','rsq','vertex'])
 
 for cond in condition_names:
-    
-    avg_betas = []
-    avg_rsq = []
     
     for r in [1,2,3,4]:
         
-        avg_betas.append(betas_df[(betas_df['condition']==cond)&(betas_df['run']==r)].groupby('vertex').mean()['betas'].values)
-        avg_rsq.append(betas_df[(betas_df['condition']==cond)&(betas_df['run']==r)].groupby('vertex').mean()['rsq'].values)
+        avg_betas = betas_df[(betas_df['condition']==cond)&(betas_df['run']==r)].groupby('vertex').mean()['betas'].values
+        avg_rsq = betas_df[(betas_df['condition']==cond)&(betas_df['run']==r)].groupby('vertex').mean()['rsq'].values
         
         
-    new_betas_df = new_betas_df.append(pd.DataFrame({'condition':np.tile(cond,num_vert),
-                                    'betas': np.average(avg_betas,weights=avg_rsq, axis=0),
-                                    'vertex':np.arange(num_vert)
-                                }))   
-
-## normalize by ACAO condition
-
-attention_betas = new_betas_df[new_betas_df['condition']=='ACAO'].sort_values(by=['vertex'])['betas'].values
-
-norm_mean_betas_df = pd.DataFrame(columns = ['condition', 'betas','vertex'])
-
-for cond in condition_names:
-    
-    norm_mean_betas_df = norm_mean_betas_df.append(pd.DataFrame({'condition':np.tile(cond,num_vert),
-                'betas': new_betas_df[new_betas_df['condition']==cond].sort_values(by=['vertex'])['betas'].values/attention_betas,
-                'vertex':np.arange(num_vert)
-    
-    }))     
+        new_betas_df = new_betas_df.append(pd.DataFrame({'condition': np.tile(cond,num_vert),
+                                                         'run': np.tile(r,num_vert),
+                                        'betas': avg_betas,
+                                        'rsq': avg_rsq,
+                                        'vertex':np.arange(num_vert)
+                                    }))   
 
 # get vertices for subject fsaverage
 ROIs = params['plotting']['ROIs'][space]
@@ -167,6 +152,50 @@ roi_verts = {} #empty dictionary
 for _,val in enumerate(ROIs):
     roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
 
+# do weighted average per ROI 
+# (vertices with better model fit will weight more in the average)
+
+avg_df = pd.DataFrame(columns = ['condition','run','betas','roi'])
+
+for roi in ROIs:
+    
+    roi_df = new_betas_df.loc[new_betas_df['vertex'].isin(roi_verts[roi])] # sub select vertices that are in ROI
+    
+    for cond in condition_names:
+
+        for r in [1,2,3,4]:
+
+            avg_betas = roi_df[(roi_df['condition']==cond)&(roi_df['run']==r)]['betas'].values
+            avg_rsq = roi_df[(roi_df['condition']==cond)&(roi_df['run']==r)]['rsq'].values
+
+            avg_df = avg_df.append(pd.DataFrame({'condition': [cond],
+                                                             'run': [r],
+                                                            'betas': [np.average(avg_betas[np.where(~np.isnan(avg_betas))[0]],
+                                                                                weights=avg_rsq[np.where(~np.isnan(avg_betas))[0]])],
+                                                             'roi': [roi]
+                                        }))#,ignore_index=True)  
+
+
+## normalize by ACAO condition
+
+norm_mean_betas_df = pd.DataFrame(columns = ['condition','run', 'betas','roi'])
+
+for roi in ROIs:
+
+    attention_betas = avg_df[(avg_df['condition']=='ACAO')&(avg_df['roi']==roi)]
+
+    for cond in condition_names:
+
+        for r in [1,2,3,4]:
+
+            norm_mean_betas_df = norm_mean_betas_df.append(pd.DataFrame({'condition': [cond],
+                                                             'run': [r],
+                        'betas': avg_df[(avg_df['condition']==cond)&(avg_df['run']==r)&(avg_df['roi']==roi)]['betas'].values/attention_betas[attention_betas['run']==r]['betas'].values[0],
+                        'roi': [roi]
+
+        }))         
+
+
 for roi in ROIs:
     
     sns.set(font_scale=1.3)
@@ -174,7 +203,7 @@ for roi in ROIs:
 
     fig_dims = (20, 10)
     fig, ax = plt.subplots(figsize=fig_dims)
-    sns.barplot(y='condition', x='betas', data = norm_mean_betas_df.loc[norm_mean_betas_df['vertex'].isin(roi_verts[roi])])
+    sns.barplot(y='condition', x='betas', data = norm_mean_betas_df[norm_mean_betas_df['roi']==roi])
 
     ax = plt.gca()
     plt.xticks(fontsize = 18)

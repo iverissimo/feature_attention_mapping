@@ -30,7 +30,8 @@ feature:
   empty_TR: 12 #5
   cue_TR: 3
 
-  total_number_TR: 408 # of task
+  total_number_trials: 408  
+  total_number_TR: 255 #408 # of task
   dummy_TR: 5 # we used extra 5 TRs in beginning that should be disregarded, so file will be 413
 
   crop: True # if we want to crop the functionals further
@@ -39,6 +40,10 @@ feature:
   regress_confounds: True # if we want to regress out fmriprep confounds
 
   standardize: 'psc'
+
+  sync_scanner: False
+
+  task_rate: 1 # 'TR' # seconds or 'TR' if synced to TR
 
   bars_phase_dur: 0.6 # phase duration for displaying bars (in seconds) 
 
@@ -77,16 +82,24 @@ prf:
 
   standardize: 'psc'
 
-  flick_rate: 'TR' #10 # Hz, rate of change of features in bar
+  flick_rate: 8 # Hz, frequency of flickering
+  flick_stim_rate: 'TR' # 'freq' # rate of change of features in bar 
+  flick_on_off: True # if flickering is stim-on/off screen, or if just flickering with stim-on 
+
+  element_contrast: 1 # do full contrast during prf task
 
   bar_pass_direction: ['empty_long','L-R','U-D','empty','R-L','D-U','empty_long','D-U','R-L','empty','U-D','L-R','empty_long'] 
+
+  sync_scanner: True
+
+  task_rate: 'TR' # 1 # seconds or 'TR' if synced to TR 
 
 flicker:
   bar_width_ratio: 0.125 # ratio of the screen res
 
   bar_ecc_index: [1,2,2,1,1,2,1,2] # eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
 
-  flick_rate: 30 # Hz, flicker rate of color for square
+  flick_rate: 15 # Hz, flicker rate of color for square
 
   max_trial_time: 5 # max trial time (in minutes)
 
@@ -97,7 +110,7 @@ flicker:
 
 
 mri: # refers to the Psychopy SyncGenerator class
-  TR: 1.2  # seconds between volume acquisitions
+  TR: 1.6  # seconds between volume acquisitions
   sync: 't'  # character used as flag for sync timing
 
   space: 'fsLR_den-170k' #'fsaverage' # space of the files to be used in analysis

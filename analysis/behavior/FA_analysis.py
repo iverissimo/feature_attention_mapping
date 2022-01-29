@@ -246,12 +246,15 @@ for _,ses in enumerate(ses_type):
 
         a = sns.regplot(ax=axs[0], x='index', y='accuracy',
                 data=df_attended.reset_index())
+        
         #axs[0].set_title('Accuracy for all runs, sub-%s'%sj)
         axs[0].set_xlabel('Blocks',fontsize=18, labelpad = 15)
         axs[0].set_ylabel('Accuracy',fontsize=18, labelpad = 15)
         a.tick_params(labelsize=15)
         axs[0].set_title('slope %0.3f, intercept %0.3f ' %(slope,intercept), fontsize=15)
         a.set_ylim(.5, 1)
+        #axs[0].set_xticks(range(len(df_attended.reset_index()['index'].to_numpy()))) 
+        #axs[0].set_xticklabels(range(0, len(df_attended.reset_index()['index'].to_numpy())))
 
         # get stats put plot in title
         slope,intercept, _,_,_ = stats.linregress(df_attended.reset_index()['index'].to_numpy(),
@@ -259,6 +262,9 @@ for _,ses in enumerate(ses_type):
 
         b = sns.regplot(ax=axs[1], x='index', y='RT_mean',
                 data=df_attended.reset_index())
+        
+        #b.set_xticks(range(len(df_attended.reset_index()['index'].to_numpy())))
+        #b.set_xticklabels(range(0, len(df_attended.reset_index()['index'].to_numpy())))
         #axs[1].set_title('RT')
         axs[1].set_xlabel('Blocks',fontsize=18, labelpad = 15)
         axs[1].set_ylabel('RT (s)',fontsize=18, labelpad = 15)

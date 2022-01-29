@@ -118,7 +118,8 @@ for _,ses in enumerate(ses_type):
                 bar_pass_direction = np.array(params['feature']['bar_pass_direction'])
 
                 # set timings of events
-                TR = params['mri']['TR']
+                TR = params['mri']['TR'] if params['feature']['task_rate']== 'TR' else params['feature']['task_rate']
+                print('feature trial rate is %.2f s'%TR) 
                 empty_TR = params['feature']['empty_TR']
                 cue_TR = params['feature']['cue_TR']
                 mini_blk_TR = params['feature']['num_bar_position'][0]*params['feature']['num_bar_position'][1]*2
@@ -206,7 +207,8 @@ for _,ses in enumerate(ses_type):
                 run_gaze = gaze_pd.loc[(gaze_pd['time']>=run_start)&(gaze_pd['time']<=run_end)]
 
                 # set timings of events
-                TR = params['mri']['TR']
+                TR = params['mri']['TR'] if params['prf']['task_rate']== 'TR' else params['prf']['task_rate']
+                print('prf trial rate is %.2f s'%TR) 
                 # sample rate eyetracking
                 sample_rate = timestamps_pd['sample_rate'].values[0]
 

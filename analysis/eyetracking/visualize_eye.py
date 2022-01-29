@@ -31,7 +31,7 @@ else:
     task = str(sys.argv[2]) 
 
 base_dir = params['general']['current_dir']
-ses_type = ['beh','func'] if base_dir == 'local' else ['beh']
+ses_type = ['func'] if base_dir == 'local' else ['beh']
 
 out_dir = op.join(params['mri']['paths'][base_dir]['root'],'derivatives',
                   'eyetracking', 'visualization', '{task}'.format(task=task),
@@ -54,7 +54,9 @@ behav_dir =  op.join(params['mri']['paths'][base_dir]['root'],'derivatives',
 
 # general params
 # set timings of events
-TR = params['mri']['TR']
+task_name = 'feature' if task == 'FA' else 'prf'
+TR = params['mri']['TR'] if params[task_name]['task_rate']== 'TR' else params[task_name]['task_rate']
+print('feature trial rate is %.2f s'%TR)
 empty_TR = params['feature']['empty_TR']
 cue_TR = params['feature']['cue_TR']
 mini_blk_TR = params['feature']['num_bar_position'][0]*params['feature']['num_bar_position'][1]*2

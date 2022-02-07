@@ -65,8 +65,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 else:
     batch_string = """#!/bin/bash
 #SBATCH -t 40:00:00
-#SBATCH -N 1 --mem=65536
-#SBATCH --cpus-per-task=16
+#SBATCH -N 1 --mem=90G
 #SBATCH -v
 #SBATCH --output=/home/inesv/batch/slurm_output_%A.out
 
@@ -83,8 +82,8 @@ $SINGIMG \
 $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/fmriprep/ participant \
 --participant-label sub-$SJ_NR --fs-subjects-dir $ROOTFOLDER/derivatives/freesurfer/ \
 --output-space T1w fsnative fsaverage MNI152NLin2009cAsym --cifti-output 170k \
---bold2t1w-init register --nthreads 30 --omp-nthreads 30 --fs-license-file $FREESURFER/license.txt \
---use-syn-sdc --force-syn --bold2t1w-dof 6 --verbose --ignore slicetiming --dummy-scans 5 \
+--bold2t1w-init register --nthread 16 --mem_mb 5000 --low-mem --fs-license-file $FREESURFER/license.txt \
+--use-syn-sdc --force-syn --bold2t1w-dof 6 --stop-on-first-crash --verbose --ignore slicetiming --skip_bids_validation --dummy-scans 5 \
 -w $TMPDIR/FAM_wf
 
 wait          # wait until programs are finished

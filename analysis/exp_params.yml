@@ -12,7 +12,7 @@ monitor:
   name: default
   width: 69.8 #69  # width of monitor (in cm)
   height: 39.3 #41 # height of monitor (in cm)
-  distance: 210 #225  # distance of participant from monitor (in cm)
+  distance: 194 #210 #225  # distance of participant from monitor (in cm)
 
 stimuli:
   gab_ratio: 0.66 #0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid
@@ -157,7 +157,7 @@ mri: # refers to the Psychopy SyncGenerator class
       run: 'mean' 
       total_chunks: {'fsaverage': 83, 'T1w': 89, 'fsLR_den-170k': 54} # total number of chunks to split the data, depends on space of files
 
-      fit_model: 'gauss' #'css'
+      fit_model: 'css' #'gauss' #'css'
 
       grid_nr: 40 # number of grid steps
       min_eccen: 0.2

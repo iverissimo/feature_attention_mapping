@@ -25,7 +25,7 @@ elif len(sys.argv)<3:
 
 else:
     # fill subject number and chunk number with 0 in case user forgets
-    sj = str(sys.argv[1]).zfill(2)
+    sj = str(sys.argv[1]).zfill(3)
     base_dir = str(sys.argv[2]) # which machine we run the data
 
 run_type = params['mri']['fitting']['pRF']['run']

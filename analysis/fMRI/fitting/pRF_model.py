@@ -17,6 +17,9 @@ from FAM_utils import mri as mri_utils
 
 import datetime
 
+import glob
+import pandas as pd
+
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
             params = yaml.safe_load(f_in)
@@ -85,6 +88,17 @@ proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir)
 file = proc_files[0]
 data = np.load(file,allow_pickle=True) # will be (vertex, TR)
 
+## make DM mask, according to sub responses
+# sourcedata dir
+source_dir = glob.glob(op.join(params['mri']['paths'][base_dir]['root'], 'sourcedata', 
+                               'sub-{sj}'.format(sj=sj), 'ses-*', 'func'))[0] 
+# list of behavior files
+behav_files = [op.join(source_dir, h) for h in os.listdir(source_dir) if 'task-pRF' in h and
+                 h.endswith('events.tsv')]
+# behav boolean mask
+DM_mask_beh = mri_utils.get_beh_mask(behav_files,params)
+
+
 # fit model
 
 ### define filenames for grid and search estimates
@@ -149,7 +163,7 @@ else:
             
     else:
         # define design matrix 
-        visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+        visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True, mask=DM_mask_beh)
     
         # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
         prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],

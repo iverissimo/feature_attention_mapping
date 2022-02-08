@@ -122,6 +122,9 @@ if model_type == 'css':
     
     css_it_estimates_filename = it_estimates_filename.replace('itgauss_estimates.npz', 'itcss_estimates.npz')
     css_it_estimates_filename = op.join(output_dir.replace('/'+model_type,'/iterative_css'), op.split(css_it_estimates_filename)[-1])
+
+    if not op.exists(op.split(css_it_estimates_filename)[0]): # check if path to save iterative files exist
+        os.makedirs(op.split(css_it_estimates_filename)[0]) 
     
 ### now actually fit the data, if it was not fit before
 

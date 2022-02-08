@@ -114,20 +114,25 @@ if task == 'pRF':
 
     
     # define design matrix 
-    visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+    visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, save_imgs=False, downsample=0.1, 
+                                            crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=False)
 
     # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
     prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
                             screen_distance_cm = params['monitor']['distance'],
                             design_matrix = visual_dm,
                             TR = TR)
+    
+    # get the ecc limits (in dva)
+    # to mask estimates
+    x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
 
     rsq = estimates['r2'] 
 
     # mask estimates
     print('masking estimates')
     masked_est = mri_utils.mask_estimates(estimates, fit_model = model_type,
-                                screen_limit_deg = [prf_stim.screen_size_degrees/2,prf_stim.screen_size_degrees/2])
+                                x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
 
     masked_rsq = masked_est['rsq']
 

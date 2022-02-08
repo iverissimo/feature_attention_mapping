@@ -1005,7 +1005,8 @@ def dva_per_pix(height_cm,distance_cm,vert_res_pix):
     return deg_per_px 
 
 
-def mask_estimates(estimates, ROI = 'None', fit_model = 'gauss', screen_limit_deg = [6,6], max_size = 15, space = 'fsaverage'):
+def mask_estimates(estimates, ROI = 'None', fit_model = 'gauss', x_ecc_lim = [-6,6], y_ecc_lim = [-6,6],
+                    max_size = 15, space = 'fsaverage'):
     
     """ mask estimates, to be positive RF, within screen limits
     and for a certain ROI (if the case)
@@ -1053,8 +1054,8 @@ def mask_estimates(estimates, ROI = 'None', fit_model = 'gauss', screen_limit_de
     masked_ns = np.zeros(ns.shape); masked_ns[:]=np.nan
 
     for i in range(len(xx)): #for all vertices
-        if xx[i] <= screen_limit_deg[0] and xx[i] >= -screen_limit_deg[0]: # if x within horizontal screen dim
-            if yy[i] <= screen_limit_deg[1] and yy[i] >= -screen_limit_deg[1]: # if y within vertical screen dim
+        if xx[i] <= np.max(x_ecc_lim) and xx[i] >= np.min(x_ecc_lim): # if x within horizontal screen dim
+            if yy[i] <= np.max(y_ecc_lim)and yy[i] >= np.min(y_ecc_lim): # if y within vertical screen dim
                 if beta[i]>=0: # only account for positive RF
                     if size[i]<=max_size: # limit size to max size defined in fit
 
@@ -1953,3 +1954,71 @@ def get_beh_mask(files,params):
 
             
     return np.array(mask_bool)
+
+
+def get_ecc_limits(visual_dm, params, screen_size_deg = [11,11]):
+    
+    """
+    Given a DM and the pRF bar directions
+    get ecc limits of visual stimulation
+    (in degrees)
+    
+    Parameters
+    ----------
+    visual_dm : array
+       design matrix for pRF task [x,y,t]
+    params : yml dict
+        with experiment params
+    screen_size_deg : list/array
+        size of screen (width, height) in degrees
+    
+    """
+    
+    # number TRs per condition
+    TR_conditions = {'L-R': params['prf']['num_TRs']['L-R'],
+                     'R-L': params['prf']['num_TRs']['R-L'],
+                     'U-D': params['prf']['num_TRs']['U-D'],
+                     'D-U': params['prf']['num_TRs']['D-U'],
+                     'empty': params['prf']['num_TRs']['empty'],
+                     'empty_long': params['prf']['num_TRs']['empty_long']}
+
+    # order of conditions in run
+    bar_pass_direction = params['prf']['bar_pass_direction']
+
+    # list of bar orientation at all TRs
+    condition_per_TR = []
+    for _,bartype in enumerate(bar_pass_direction):
+        condition_per_TR = np.concatenate((condition_per_TR,np.tile(bartype, TR_conditions[bartype])))
+
+    if params['prf']['crop']:
+        condition_per_TR = condition_per_TR[params['prf']['crop_TR']:]
+        
+    ## get ecc limits of mask 
+    # not best aproach, only considers square/rectangular mask
+
+    x_mask = np.zeros(visual_dm[...,0].shape)
+    y_mask = np.zeros(visual_dm[...,0].shape)
+
+    for i,cond in enumerate(condition_per_TR):
+
+        if cond in ['L-R','R-L']:
+            x_mask += visual_dm[...,i]
+        elif cond in ['U-D','D-U']:
+            y_mask += visual_dm[...,i]
+
+    x_mask = np.clip(x_mask,0,255)
+    y_mask = np.clip(y_mask,0,255)
+    
+    ## get y ecc limits
+    y_ecc_limit = [np.clip(np.max(y_mask.nonzero()[0])+1,0,visual_dm.shape[1])*screen_size_deg[1]/visual_dm.shape[1],
+                    np.clip(np.min(y_mask.nonzero()[0])-1,0,visual_dm.shape[1])*screen_size_deg[1]/visual_dm.shape[1]]
+
+    y_ecc_limit = screen_size_deg[1]/2 - y_ecc_limit
+
+    ## get x ecc limits
+    x_ecc_limit = [np.clip(np.max(x_mask.nonzero()[1])+1,0,visual_dm.shape[0])*screen_size_deg[0]/visual_dm.shape[0],
+                   np.clip(np.min(x_mask.nonzero()[1])-1,0,visual_dm.shape[0])*screen_size_deg[0]/visual_dm.shape[0]]
+
+    x_ecc_limit = screen_size_deg[0]/2 - x_ecc_limit
+
+    return x_ecc_limit, y_ecc_limit

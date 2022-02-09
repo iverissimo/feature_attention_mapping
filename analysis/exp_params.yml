@@ -45,7 +45,7 @@ feature:
 
   task_rate: 1 # 'TR' # seconds or 'TR' if synced to TR
 
-  bars_phase_dur: 0.6 # phase duration for displaying bars (in seconds) 
+  bars_phase_dur: 0.5 # phase duration for displaying bars (in seconds) 
 
   cue_width: .2 #.55
   cue_height: .5 #1.1

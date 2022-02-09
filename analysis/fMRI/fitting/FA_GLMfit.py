@@ -137,7 +137,8 @@ else: # if not join chunks and save file
                         chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
 
 # define design matrix for pRF task
-visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
+                    save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=False)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -145,10 +146,14 @@ prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
                         design_matrix = visual_dm,
                         TR = TR)
 
+# get the ecc limits (in dva)
+# to mask estimates
+x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
+
 # mask estimates, to be within screen boundaries
 print('masking estimates')
 masked_pRF_estimates = mri_utils.mask_estimates(pRF_estimates, fit_model = model_type,
-                            screen_limit_deg = [prf_stim.screen_size_degrees/2,prf_stim.screen_size_degrees/2])
+                                        x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
 
 # save estimates in specific variables
 xx = masked_pRF_estimates['x']
@@ -219,6 +224,16 @@ for key in unique_cond.keys(): # for each condition
 
 all_reg_predictions = [] # to append all regressor predictions
 
+# task sampling rate might be different from trial
+# so stimulus object TR needs to reflect that
+FA_sampling_rate = TR if params['feature']['task_rate']=='TR' else params['feature']['task_rate']
+
+# set oversampling factor
+osf = 10
+
+# create upsampled hrf
+hrf_oversampled = mri_utils.create_hrf(TR=TR, osf=osf)
+
 # make visual DM for each GLM regressor, and obtain prediction using pRF model
 for reg in all_regressors['reg_name'].values:
     
@@ -231,20 +246,22 @@ for reg in all_regressors['reg_name'].values:
         # make array with spatial position of bar of interest 
         DM_cond = mri_utils.get_FA_bar_stim(DM_reg_filename, 
                             params, bar_pos, trial_info, attend_cond = all_regressors[all_regressors['reg_name']==reg].to_dict('r')[0], 
-                            save_imgs = False, downsample = 0.1, crop = params['feature']['crop'] , 
+                            save_imgs = False, downsample = 0.1, crop = params['feature']['crop'],
+                            oversampling_time = osf, stim_dur_seconds = params['feature']['bars_phase_dur'], 
                             crop_TR = params['feature']['crop_TR'], overwrite=True)
         
         # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
         prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
                                  screen_distance_cm = params['monitor']['distance'],
                                  design_matrix = DM_cond,
-                                 TR = TR)
+                                 TR = TR)#FA_sampling_rate)
 
         # get prediction
         if model_type == 'css':
 
             # define CSS model 
             css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
+                                         hrf = hrf_oversampled, 
                                          filter_predictions = True,
                                          filter_type = params['mri']['filtering']['type'],
                                          filter_params = {'highpass': params['mri']['filtering']['highpass'],
@@ -263,6 +280,7 @@ for reg in all_regressors['reg_name'].values:
         else:
             # define gaussian model 
             gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
+                                         hrf = hrf_oversampled,
                                          filter_predictions = True,
                                          filter_type = params['mri']['filtering']['type'],
                                          filter_params = {'highpass': params['mri']['filtering']['highpass'],

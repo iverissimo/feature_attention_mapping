@@ -1236,7 +1236,7 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
                                    'color': True, 'orientation': True,
                                    'condition_name': 'red_vertical',
                                    'miniblock': 0,'run': 1}, 
-                    save_imgs = False, downsample = None, 
+                    save_imgs = False, downsample = None, oversampling_time = 1, stim_dur_seconds = 0.5,
                     crop = False, crop_TR = 8, overwrite=False, shift_TRs=True, save_DM=True):
     
     """Get visual stim for FA condition.
@@ -1277,21 +1277,31 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
         # miniblock number
         mini_blk_num = int(attend_cond['miniblock'])
         
-        # total number of TRs
-        total_TR = len(trial_info)
+        # total number of TRs and of trials
+        # if oversampling then they will not match
+        total_trials = len(trial_info)
+        total_TR = total_trials*oversampling_time
+
+        # stimulus duration (how long was each bar on screen)
+        stim_dur_TR = stim_dur_seconds*oversampling_time 
+        if not stim_dur_TR.is_integer():
+            raise ValueError('Stimulus duration is %s TRs, not accepted value'%str(stim_dur_TR)) 
 
         # save screen display for each TR
         visual_dm_array = np.zeros((total_TR, screen_res[0],screen_res[1]))
 
         # some counters
         trl_blk_counter = 0
+        trial_counter = 0
+        trial = 0
+        stim_counter = 0
 
-        # for each TR
+        # for each "TR"
         for i in range(total_TR):
 
             img = Image.new('RGB', tuple(screen_res)) # background image
 
-            if trial_info.iloc[i]['trial_type'] == 'mini_block_%i'%mini_blk_num:
+            if trial_info.iloc[trial]['trial_type'] == 'mini_block_%i'%mini_blk_num:
 
                 # choose part of DF that corresponds to miniblock
                 miniblk_df = bar_pos.loc[bar_pos['mini_block'] == mini_blk_num]
@@ -1311,8 +1321,9 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
 
                 elif not attend_cond['color'] and attend_cond['orientation']: # if we want semi-attended bar (attend orientation not color)
                     chosen_condition = get_cond_name(attended_condition,'UCAO')
-
-                print('attended condition in miniblock %s, chosen condition is %s'%(attended_condition, chosen_condition))
+                
+                if trial_counter == 0:
+                    print('attended condition in miniblock %s, chosen condition is %s'%(attended_condition, chosen_condition))
 
                 # bar positions for miniblock
                 miniblk_positions = miniblk_df.loc[miniblk_df['condition'] == chosen_condition]['bar_midpoint_at_TR'].values[0]
@@ -1335,17 +1346,24 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
                                                  'lowRx': screen_res[0], 
                                                  'lowRy': hor_y-0.5*bar_width*screen_res[1]}
                                     }
+                
+                # if within time to display bar, then draw it
+                if stim_counter < stim_dur_TR:
+                    # set draw method for image
+                    draw = ImageDraw.Draw(img)
+                    # add bar, coordinates (upLx, upLy, lowRx, lowRy)
+                    draw.rectangle(tuple([coordenates_bars[chosen_condition.split('_')[-1]]['upLx'],coordenates_bars[chosen_condition.split('_')[-1]]['upLy'],
+                                        coordenates_bars[chosen_condition.split('_')[-1]]['lowRx'],coordenates_bars[chosen_condition.split('_')[-1]]['lowRy']]), 
+                                fill = (255,255,255),
+                                outline = (255,255,255))
 
-                # set draw method for image
-                draw = ImageDraw.Draw(img)
-                # add bar, coordinates (upLx, upLy, lowRx, lowRy)
-                draw.rectangle(tuple([coordenates_bars[chosen_condition.split('_')[-1]]['upLx'],coordenates_bars[chosen_condition.split('_')[-1]]['upLy'],
-                                    coordenates_bars[chosen_condition.split('_')[-1]]['lowRx'],coordenates_bars[chosen_condition.split('_')[-1]]['lowRy']]), 
-                               fill = (255,255,255),
-                               outline = (255,255,255))
+                    stim_counter += 1 # increment counter
 
                 # update counter of trials within miniblok
-                trl_blk_counter += 1
+                if trial_counter == oversampling_time-1:
+                    trl_blk_counter += 1
+                    # reset stim counter
+                    stim_counter = 0
 
                 # if last trial of miniblock
                 if trl_blk_counter == len(bar_pos.iloc[0]['bar_pass_direction_at_TR']):
@@ -1354,13 +1372,21 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
 
             # save in array
             visual_dm_array[i, ...] = np.array(img)[:,:,0][np.newaxis,...]
+            
+            # increment trial counter
+            trial_counter += 1 
+            
+            # if sampling time reached,
+            if trial_counter == oversampling_time: # then reset counter and update trial
+                trial_counter = 0 
+                trial += 1
 
         # swap axis to have time in last axis [x,y,t]
         visual_dm = visual_dm_array.transpose([1,2,0])
         
         # in case we want to crop the beginning of the DM
         if crop == True:
-            visual_dm = visual_dm[...,crop_TR::] 
+            visual_dm = visual_dm[...,crop_TR*oversampling_time::] 
 
         if save_DM == True: 
             # save design matrix
@@ -1376,7 +1402,7 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
     # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
     if shift_TRs == True:
         new_visual_dm = visual_dm.copy()
-        new_visual_dm[...,:-1] = visual_dm[...,1:]
+        new_visual_dm[...,:-1*oversampling_time] = visual_dm[...,1*oversampling_time:]
         visual_dm = new_visual_dm.copy()
 
     #if we want to save the images

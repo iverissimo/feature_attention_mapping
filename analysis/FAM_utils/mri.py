@@ -1237,7 +1237,7 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
                                    'condition_name': 'red_vertical',
                                    'miniblock': 0,'run': 1}, 
                     save_imgs = False, downsample = None, 
-                    crop = False, crop_TR = 8, overwrite=False, save_DM=True):
+                    crop = False, crop_TR = 8, overwrite=False, shift_TRs=True, save_DM=True):
     
     """Get visual stim for FA condition.
     Similar to make_pRF_DM, it will
@@ -1371,7 +1371,14 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
         
         # load
         visual_dm = np.load(output)
-        
+
+    # shifting TRs to the left (quick fix)
+    # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
+    if shift_TRs == True:
+        new_visual_dm = visual_dm.copy()
+        new_visual_dm[...,:-1] = visual_dm[...,1:]
+        visual_dm = new_visual_dm.copy()
+
     #if we want to save the images
     if save_imgs == True:
         outfolder = op.split(output)[0]

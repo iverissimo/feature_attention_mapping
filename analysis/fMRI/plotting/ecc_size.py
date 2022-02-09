@@ -19,9 +19,8 @@ from statsmodels.stats import weightstats
 from prfpy.stimulus import PRFStimulus2D
 
 sys.path.insert(0,'..') # add parent folder to path
-from utils import * #import script to use relevante functions
+from FAM_utils import mri as mri_utils
 
-import datetime
 
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
@@ -100,12 +99,12 @@ if task == 'pRF':
         if not op.exists(estimates_pth):
             os.makedirs(estimates_pth) 
 
-        estimates = join_chunks(fits_pth, estimates_combi,
+        estimates = mri_utils.join_chunks(fits_pth, estimates_combi,
                                 chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
 
 
 # define design matrix 
-visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=False)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -113,10 +112,14 @@ prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
                          design_matrix = visual_dm,
                          TR = TR)
 
+# get the ecc limits (in dva)
+# to mask estimates
+x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
+
 # mask estimates
 print('masking estimates')
-masked_est = mask_estimates(estimates, fit_model = model_type,
-                            screen_limit_deg = [prf_stim.screen_size_degrees/2,prf_stim.screen_size_degrees/2])
+masked_est = mri_utils.mask_estimates(estimates, fit_model = model_type,
+                                x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
 
 rsq = masked_est['rsq']
 x = masked_est['x']
@@ -297,11 +300,11 @@ fig1.savefig(op.join(figures_pth,'occipital_ecc_vs_size_binned_rsq-%0.2f.svg'%(r
 images = {}
 
 # make alpha level based on rsquared
-alpha_level = normalize(np.clip(rsq,rsq_threshold,.3))#
+alpha_level = mri_utils.normalize(np.clip(rsq,rsq_threshold,.3))#
 
 # make costum colormap, similar to mackey paper
 n_bins = 256
-ECC_colors = add_alpha2colormap(colormap = ['#dd3933','#f3eb53','#7cb956','#82cbdb','#3d549f'],
+ECC_colors = mri_utils.add_alpha2colormap(colormap = ['#dd3933','#f3eb53','#7cb956','#82cbdb','#3d549f'],
                                bins = n_bins, cmap_name = 'ECC_mackey_costum', discrete = False)
 
 ## Plot ecc
@@ -325,7 +328,7 @@ _ = cortex.quickflat.make_png(filename, images['ecc'], recache=False,with_colorb
 
 # make costum colormap viridis_r
 n_bins = 256
-SIZE_colors = add_alpha2colormap(colormap = 'viridis_r',
+SIZE_colors = mri_utils.add_alpha2colormap(colormap = 'viridis_r',
                                bins = n_bins, cmap_name = 'SIZE_costum', discrete = False)
 
 col2D_name = os.path.splitext(os.path.split(SIZE_colors)[-1])[0]

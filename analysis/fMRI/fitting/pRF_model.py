@@ -188,7 +188,7 @@ else:
         
         # and parameters
         grid_nr = params['mri']['fitting']['pRF']['grid_nr']
-        max_ecc_size = prf_stim.screen_size_degrees/2.0
+        max_ecc_size = params['mri']['fitting']['pRF']['max_eccen'] #prf_stim.screen_size_degrees/2.0
         sizes, eccs, polars = max_ecc_size * np.linspace(0.25, 1, grid_nr)**2, \
             max_ecc_size * np.linspace(0.1, 1, grid_nr)**2, \
             np.linspace(0, 2*np.pi, grid_nr)
@@ -221,8 +221,8 @@ else:
         gauss_bounds = [(-1.5*ss, 1.5*ss),  # x
                         (-1.5*ss, 1.5*ss),  # y
                         (eps, 1.5*ss),  # prf size
-                        (0, 20),  # prf amplitude
-                        (-5, 5)]  # bold baseline
+                        (0, 1000),  # prf amplitude
+                        (-1000, 1000)]  # bold baseline
 
 
         # iterative fit
@@ -279,8 +279,8 @@ else:
             css_bounds = [(-1.5*ss, 1.5*ss),  # x
                         (-1.5*ss, 1.5*ss),  # y
                         (eps, 1.5*ss),  # prf size
-                        (0, 20),  # prf amplitude
-                        (-5, 5),  # bold baseline
+                        (0, 1000),  # prf amplitude
+                        (-1000, 1000),  # bold baseline
                         (0.01, 3)]  # CSS exponent
 
 

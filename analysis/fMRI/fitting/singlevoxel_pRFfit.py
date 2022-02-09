@@ -95,7 +95,7 @@ if not os.path.exists(figures_pth):
     os.makedirs(figures_pth) 
 
 # define design matrix 
-visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=True, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=False)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -115,7 +115,7 @@ gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
 
 # and parameters
 grid_nr = params['mri']['fitting']['pRF']['grid_nr']
-max_ecc_size = prf_stim.screen_size_degrees/2.0
+max_ecc_size = params['mri']['fitting']['pRF']['max_eccen'] #prf_stim.screen_size_degrees/2.0
 sizes, eccs, polars = max_ecc_size * np.linspace(0.25, 1, grid_nr)**2, \
     max_ecc_size * np.linspace(0.1, 1, grid_nr)**2, \
     np.linspace(0, 2*np.pi, grid_nr)
@@ -131,8 +131,8 @@ ftol = 1e-6
 gauss_bounds = [(-1.5*ss, 1.5*ss),  # x
                 (-1.5*ss, 1.5*ss),  # y
                 (eps, 1.5*ss),  # prf size
-                (0, 20),  # prf amplitude
-                (-5, 5)]  # bold baseline
+                (0, 1000),  # prf amplitude
+                (-1000, 1000)]  # bold baseline
 
 # grid exponent parameter
 css_n_grid = np.linspace(params['mri']['fitting']['pRF']['min_n'], 
@@ -152,8 +152,8 @@ css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
 css_bounds = [(-1.5*ss, 1.5*ss),  # x
             (-1.5*ss, 1.5*ss),  # y
             (eps, 1.5*ss),  # prf size
-            (0, 20),  # prf amplitude
-            (-5, 5),  # bold baseline
+            (0, 1000),  # prf amplitude
+            (-1000, 1000),  # bold baseline
             (0.01, 3)]  # CSS exponent
 
 # list with absolute file name to be fitted

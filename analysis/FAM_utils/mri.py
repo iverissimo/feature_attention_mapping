@@ -521,10 +521,10 @@ def average_epi(file, outdir, method = 'mean'):
           
         # average all
         if method == 'median':
-            avg_data = np.median(all_runs, axis = 0)
+            avg_data = np.nanmedian(all_runs, axis = 0)
             
         elif method == 'mean':
-            avg_data = np.mean(all_runs, axis = 0)
+            avg_data = np.nanmean(all_runs, axis = 0)
             
         # actually save
         np.save(output_file, avg_data)
@@ -597,7 +597,7 @@ def load_and_mask_data(file, chunk_num = 1, total_chunks = 1):
 
 
 def make_pRF_DM(output, params, save_imgs = False, downsample = None, 
-                    crop = False, crop_TR = 8, overwrite=False, mask = []):
+                    crop = False, crop_TR = 8, overwrite=False, shift_TRs = True, mask = []):
     
     """Make design matrix for pRF task
     
@@ -704,6 +704,14 @@ def make_pRF_DM(output, params, save_imgs = False, downsample = None,
         
         # load
         visual_dm = np.load(output)
+
+
+    # shifting TRs to the left (quick fix)
+    # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
+    if shift_TRs == True:
+        new_visual_dm = visual_dm.copy()
+        new_visual_dm[...,:-1] = visual_dm[...,1:]
+        visual_dm = new_visual_dm.copy()
         
     #if we want to save the images
     if save_imgs == True:

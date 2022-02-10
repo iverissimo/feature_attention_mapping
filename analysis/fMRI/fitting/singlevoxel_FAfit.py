@@ -29,6 +29,7 @@ from prfpy.stimulus import PRFStimulus2D
 from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
 
 from scipy import interpolate
+import seaborn as sns
 
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
@@ -478,6 +479,16 @@ for h in range(len(bar_directions)):
     ax_count += 2
     
 fig.savefig(op.join(figures_pth,fig_name))
+
+### PLOT BETAS for each regressor ####
+
+fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
+
+sns.barplot(y="reg_name", x="betas", 
+            data=pd.DataFrame({'reg_name': all_regressors['reg_name'].values,
+                                'betas': glm_outcome[1][1:]}))
+
+fig.savefig(op.join(figures_pth,fig_name.replace('.png','_betas.png')))
 
 ### PLOT REGRESSORS TO CHECK ###
 

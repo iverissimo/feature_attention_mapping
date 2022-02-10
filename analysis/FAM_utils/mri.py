@@ -1418,13 +1418,20 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
 
     #if we want to save the images
     if save_imgs == True:
+
+        #take into account oversampling
+        if oversampling_time == 1:
+            frames = np.arange(visual_dm.shape[-1])
+        else:
+            frames = np.arange(0,visual_dm.shape[-1],oversampling_time, dtype=int)  
+
         outfolder = op.split(output)[0]
 
         visual_dm = visual_dm.astype(np.uint8)
 
-        for w in range(visual_dm.shape[-1]):
-            im = Image.fromarray(visual_dm[...,w])
-            im.save(op.join(outfolder,op.split(output)[-1].replace('.npy','_TR-{time}.png'.format(time=str(w).zfill(3)))))      
+        for w in frames:
+            im = Image.fromarray(visual_dm[...,int(w)])
+            im.save(op.join(outfolder,op.split(output)[-1].replace('.npy','_trial-{time}.png'.format(time=str((w/oversampling_time)).zfill(3)))))      
             
     return visual_dm
 

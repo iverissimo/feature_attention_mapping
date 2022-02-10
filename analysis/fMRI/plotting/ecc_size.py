@@ -154,7 +154,7 @@ regions = {'occipital': ['V1','V2','V3','V3AB','hV4','LO'],
 # now select estimates per ROI
 
 min_ecc = 0.25
-max_ecc = 3.3
+max_ecc = 4 #3.3
 n_bins = 10
     
 for idx,roi in enumerate(ROIs): # go over ROIs

@@ -1014,7 +1014,7 @@ def dva_per_pix(height_cm,distance_cm,vert_res_pix):
 
 
 def mask_estimates(estimates, ROI = 'None', fit_model = 'gauss', x_ecc_lim = [-6,6], y_ecc_lim = [-6,6],
-                    max_size = 15, space = 'fsaverage'):
+                    max_size = 20, space = 'fsaverage'):
     
     """ mask estimates, to be positive RF, within screen limits
     and for a certain ROI (if the case)
@@ -1235,7 +1235,7 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
                     attend_cond = {'reg_name': 'ACAO_mblk-0_run-1',
                                    'color': True, 'orientation': True,
                                    'condition_name': 'red_vertical',
-                                   'miniblock': 0,'run': 1}, 
+                                   'miniblock': 0,'run': 1}, TR = 1.6, crop_unit = 'sec',
                     save_imgs = False, downsample = None, oversampling_time = 1, stim_dur_seconds = 0.5,
                     crop = False, crop_TR = 8, overwrite=False, shift_TRs=True, save_DM=True):
     
@@ -1386,7 +1386,11 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
         
         # in case we want to crop the beginning of the DM
         if crop == True:
-            visual_dm = visual_dm[...,crop_TR*oversampling_time::] 
+            if crop_unit == 'sec': # fix for the fact that I crop TRs, but task not synced to TR
+                visual_dm = visual_dm[...,int(crop_TR*TR*oversampling_time)::] 
+            
+            else: # assumes unit is TR
+               visual_dm = visual_dm[...,crop_TR*oversampling_time::] 
 
         if save_DM == True: 
             # save design matrix
@@ -1401,8 +1405,15 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
     # shifting TRs to the left (quick fix)
     # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
     if shift_TRs == True:
+
         new_visual_dm = visual_dm.copy()
-        new_visual_dm[...,:-1*oversampling_time] = visual_dm[...,1*oversampling_time:]
+
+        if crop_unit == 'sec': # fix for the fact that I shift TRs, but task not synced to TR
+            new_visual_dm[...,:-1*int(TR*oversampling_time)] = visual_dm[...,1*int(TR*oversampling_time):]
+
+        else: # assumes unit is TR
+            new_visual_dm[...,:-1*oversampling_time] = visual_dm[...,1*oversampling_time:]
+            
         visual_dm = new_visual_dm.copy()
 
     #if we want to save the images

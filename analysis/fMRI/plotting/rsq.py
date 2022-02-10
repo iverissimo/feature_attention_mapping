@@ -139,8 +139,8 @@ if task == 'pRF':
     # saved masked rsq, useful for FA plots
     np.save(op.join(fits_pth,'combined','masked_rsq.npy'), masked_rsq)
 
-    plot_lims_dist = [0,.8] # axis value for plotting
-    plot_lims_flat = [0,.6] # axis value for plotting
+    plot_lims_dist = [0,1] # axis value for plotting
+    plot_lims_flat = [0,.8] # axis value for plotting
 
 elif task == 'FA':
     

@@ -35,7 +35,7 @@ feature:
   dummy_TR: 5 # we used extra 5 TRs in beginning that should be disregarded, so file will be 413
 
   crop: True # if we want to crop the functionals further
-  crop_TR: 8 # number of functionals to crop
+  crop_TR: 3 #8 # number of functionals to crop
 
   regress_confounds: True # if we want to regress out fmriprep confounds
 

@@ -342,14 +342,11 @@ all_reg_predictions = np.vstack(all_reg_predictions)
 
 ### make cue regressors
 
-# create hrf
-hrf = mri_utils.create_hrf()[0]
-
 # array with cue regressors
 cue_regs = np.zeros((params['feature']['mini_blocks'],all_reg_predictions.shape[1],all_reg_predictions.shape[-1]))
 # array with cue regressors - UPSAMPLED
 cue_regs_upsampled = np.zeros((params['feature']['mini_blocks'], all_reg_predictions.shape[1], 
-                               all_reg_predictions.shape[-1]*osf))
+                               len(trial_info['trial_num'].values)*osf))
 
 for blk in range(params['feature']['mini_blocks']): # for each miniblock
     
@@ -362,21 +359,24 @@ for blk in range(params['feature']['mini_blocks']): # for each miniblock
     cue_regs_upsampled[blk] = signal.fftconvolve(cue_regs_upsampled[blk], np.tile(hrf_oversampled, (cue_regs_upsampled.shape[1], 1)), 
                                             mode='full', axes=(-1))[..., :cue_regs_upsampled.shape[-1]]
 
+    # original scale of data in seconds
+    original_scale = np.arange(0, cue_regs_upsampled[blk].shape[-1]/osf, 1/osf)
+
     # cubic interpolation of predictor
     interp = interpolate.interp1d(original_scale, 
-                                cue_regs_upsampled, 
+                                cue_regs_upsampled[blk], 
                                 kind = "cubic", axis=-1)
-    desired_scale = np.arange(0, cue_regs_upsampled.shape[-1]/osf, TR) # we want the predictor to be sampled in TR
+    desired_scale = np.arange(0, cue_regs_upsampled[blk].shape[-1]/osf, TR) # we want the predictor to be sampled in TR
 
-    cue_regs_upsampled = interp(desired_scale)
+    cue_regs_RESAMPLED = interp(desired_scale)
 
     ## filter it, like we do to the data
-    cue_regs_upsampled[blk] =  mri_utils.dc_data(cue_regs_upsampled[blk],
+    cue_regs_RESAMPLED =  mri_utils.dc_data(cue_regs_RESAMPLED,
                              first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'])
 
     ## need to crop out of function, to avoid rounding errors
     if params['feature']['crop']: # if cropping runs 
-        cue_regs[blk] = cue_regs_upsampled[blk][...,params['feature']['crop_TR']::] 
+        cue_regs[blk] = cue_regs_RESAMPLED[...,params['feature']['crop_TR']::] 
         
     ## also shifting TR to the left (quick fix)
     # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR

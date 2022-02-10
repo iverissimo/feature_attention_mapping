@@ -28,6 +28,7 @@ from prfpy.timecourse import *
 from prfpy.stimulus import PRFStimulus2D
 from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
 
+from scipy import interpolate
 
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
@@ -173,7 +174,8 @@ else: # if not join chunks and save file
                         chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
     
 # define design matrix for pRF task
-visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
+                    save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=False)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -181,10 +183,14 @@ prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
                         design_matrix = visual_dm,
                         TR = TR)
 
+# get the ecc limits (in dva)
+# to mask estimates
+x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
+
 # mask estimates, to be within screen boundaries
 print('masking estimates')
 masked_pRF_estimates = mri_utils.mask_estimates(pRF_estimates, fit_model = model_type,
-                            screen_limit_deg = [prf_stim.screen_size_degrees/2,prf_stim.screen_size_degrees/2])
+                                        x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
 
 # save estimates in specific variables
 xx = masked_pRF_estimates['x'][roi_ind[roi]][vertex]
@@ -250,6 +256,16 @@ for key in unique_cond.keys(): # for each condition
 
 all_reg_predictions = [] # to append all regressor predictions
 
+# task sampling rate might be different from trial
+# so stimulus object TR needs to reflect that
+FA_sampling_rate = TR if params['feature']['task_rate']=='TR' else params['feature']['task_rate']
+
+# set oversampling factor
+osf = 10
+
+# create upsampled hrf
+hrf_oversampled = mri_utils.create_hrf(TR=TR, osf=osf)
+
 # make visual DM for each GLM regressor, and obtain prediction using pRF model
 for reg in all_regressors['reg_name'].values:
     
@@ -259,50 +275,73 @@ for reg in all_regressors['reg_name'].values:
     # make array with spatial position of bar of interest 
     DM_cond = mri_utils.get_FA_bar_stim(DM_reg_filename, 
                         params, bar_pos, trial_info, attend_cond = all_regressors[all_regressors['reg_name']==reg].to_dict('r')[0], 
-                        save_imgs = False, downsample = 0.1, crop = params['feature']['crop'] , 
+                        save_imgs = False, downsample = 0.1, crop = False, shift_TRs = False, #params['feature']['crop'],
+                        oversampling_time = osf, stim_dur_seconds = params['feature']['bars_phase_dur'], 
                         crop_TR = params['feature']['crop_TR'], overwrite=True, save_DM=False)
-
+    
     # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
     prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
-                             screen_distance_cm = params['monitor']['distance'],
-                             design_matrix = DM_cond,
-                             TR = TR)
+                                screen_distance_cm = params['monitor']['distance'],
+                                design_matrix = DM_cond,
+                                TR = TR)#FA_sampling_rate)
 
     # get prediction
     if model_type == 'css':
 
         # define CSS model 
         css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
-                                     filter_predictions = True,
-                                     filter_type = params['mri']['filtering']['type'],
-                                     filter_params = {'highpass': params['mri']['filtering']['highpass'],
-                                                     'add_mean': params['mri']['filtering']['add_mean'],
-                                                     'window_length': params['mri']['filtering']['window_length'],
-                                                     'polyorder': params['mri']['filtering']['polyorder']}
+                                        filter_predictions = True,
+                                        filter_type = params['mri']['filtering']['type'],
+                                        filter_params = {'highpass': params['mri']['filtering']['highpass'],
+                                                        'add_mean': params['mri']['filtering']['add_mean'],
+                                                        'window_length': params['mri']['filtering']['window_length'],
+                                                        'polyorder': params['mri']['filtering']['polyorder']}
                                     )
+        # set our oversampled hrf
+        css_model.hrf = hrf_oversampled
 
         model_fit = css_model.return_prediction(xx,yy,
-                                        size, beta,
-                                        baseline, ns)
+                                    size, beta,
+                                    baseline, ns)
 
     else:
         # define gaussian model 
         gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
-                                     filter_predictions = True,
-                                     filter_type = params['mri']['filtering']['type'],
-                                     filter_params = {'highpass': params['mri']['filtering']['highpass'],
-                                                     'add_mean': params['mri']['filtering']['add_mean'],
-                                                     'window_length': params['mri']['filtering']['window_length'],
-                                                     'polyorder': params['mri']['filtering']['polyorder']}
+                                        filter_predictions = True,
+                                        filter_type = params['mri']['filtering']['type'],
+                                        filter_params = {'highpass': params['mri']['filtering']['highpass'],
+                                                        'add_mean': params['mri']['filtering']['add_mean'],
+                                                        'window_length': params['mri']['filtering']['window_length'],
+                                                        'polyorder': params['mri']['filtering']['polyorder']}
                                     )
+        # set our oversampled hrf
+        gauss_model.hrf = hrf_oversampled
 
         model_fit = gauss_model.return_prediction(xx,yy,
-                                        size, beta,
-                                        baseline)   
+                                    size, beta,
+                                    baseline) 
 
-    # squeeze out single dimension that parallel creates
-    prediction =  model_fit
+    # original scale of data in seconds
+    original_scale = np.arange(0, model_fit.shape[-1]/osf, 1/osf)
 
+    # cubic interpolation of predictor
+    interp = interpolate.interp1d(original_scale, 
+                                model_fit, 
+                                kind = "cubic", axis=-1)
+    desired_scale = np.arange(0, model_fit.shape[-1]/osf, TR) # we want the predictor to be sampled in TR
+
+    resampled_predictor = interp(desired_scale)
+
+    ## need to crop out of function, to avoid rounding errors
+    if params['feature']['crop']: # if cropping runs 
+        resampled_predictor = resampled_predictor[...,params['feature']['crop_TR']::] 
+        
+    ## also shifting TR to the left (quick fix)
+    # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
+    new_resampled_predictor = resampled_predictor.copy()
+    new_resampled_predictor[...,:-1] = resampled_predictor[...,1:]
+    prediction = new_resampled_predictor.copy()
+    
     ## append predictions in array, to use for FA GLM DM
     all_reg_predictions.append(prediction[np.newaxis,...])
 
@@ -310,28 +349,47 @@ all_reg_predictions = np.vstack(all_reg_predictions)
 
 ### make cue regressors
 
-# create hrf
-hrf = mri_utils.create_hrf()[0]
-
 # array with cue regressors
 cue_regs = np.zeros((params['feature']['mini_blocks'],all_reg_predictions.shape[1],all_reg_predictions.shape[-1]))
+# array with cue regressors - UPSAMPLED
+cue_regs_upsampled = np.zeros((params['feature']['mini_blocks'], all_reg_predictions.shape[1], 
+                               len(trial_info['trial_num'].values)*osf))
 
 for blk in range(params['feature']['mini_blocks']): # for each miniblock
     
     for trl in trial_info.loc[trial_info['trial_type']=='cue_%i'%blk]['trial_num'].values:
-
-        if params['feature']['crop']: # if cropping runs 
-            trl -= params['feature']['crop_TR'] 
         
-        cue_regs[blk,:,trl] = 1
+        ## fill upsampled array
+        cue_regs_upsampled[blk,:,trl*osf:trl*osf+osf] = 1
     
     # convolve with spm hrf, similar to what prfpy is using
-    cue_regs[blk] = signal.fftconvolve(cue_regs[blk], np.tile(hrf, (cue_regs.shape[1], 1)), 
-                                            mode='full', axes=(-1))[..., :cue_regs.shape[-1]]
+    cue_regs_upsampled[blk] = signal.fftconvolve(cue_regs_upsampled[blk], np.tile(hrf_oversampled, (cue_regs_upsampled.shape[1], 1)), 
+                                            mode='full', axes=(-1))[..., :cue_regs_upsampled.shape[-1]]
+
+    # original scale of data in seconds
+    original_scale = np.arange(0, cue_regs_upsampled[blk].shape[-1]/osf, 1/osf)
+
+    # cubic interpolation of predictor
+    interp = interpolate.interp1d(original_scale, 
+                                cue_regs_upsampled[blk], 
+                                kind = "cubic", axis=-1)
+    desired_scale = np.arange(0, cue_regs_upsampled[blk].shape[-1]/osf, TR) # we want the predictor to be sampled in TR
+
+    cue_regs_RESAMPLED = interp(desired_scale)
 
     ## filter it, like we do to the data
-    cue_regs[blk] =  mri_utils.dc_data(cue_regs[blk],
-                                        first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'])
+    cue_regs_RESAMPLED =  mri_utils.dc_data(cue_regs_RESAMPLED,
+                             first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'])
+
+    ## need to crop out of function, to avoid rounding errors
+    if params['feature']['crop']: # if cropping runs 
+        cue_regs[blk] = cue_regs_RESAMPLED[...,params['feature']['crop_TR']::] 
+        
+    ## also shifting TR to the left (quick fix)
+    # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
+    new_cue_regs = cue_regs[blk].copy()
+    new_cue_regs[...,:-1] = cue_regs[blk][...,1:]
+    cue_regs[blk] = new_cue_regs.copy()
     
     ## also update regressors info to know name and order of regressors
     # basically including cues
@@ -343,8 +401,10 @@ for blk in range(params['feature']['mini_blocks']): # for each miniblock
                                                              'miniblock': blk,
                                                              'run': int(run)
                                                             }, index=[0]),ignore_index=True)
+    
 
 ## Make actual DM to be used in GLM fit (4 regressors + intercept)
+
 # number of regressors
 num_regs = all_reg_predictions.shape[0] + cue_regs.shape[0] + 1 # conditions, cues, and intercept
 
@@ -403,10 +463,10 @@ axis.legend(loc='upper left',fontsize=10)  # doing this to guarantee that legend
 #axis.set_ylim(-3,3)  
 
 # times where bar is on screen [1st on, last on, 1st on, last on, etc] 
-bar_onset = np.array([27,98,126,197,225,296,324,395])*TR
+bar_onset = np.array([27,98,126,197,225,296,324,395])#/TR
 
 if params['feature']['crop']:
-    bar_onset = bar_onset - params['feature']['crop_TR']
+    bar_onset = bar_onset - params['feature']['crop_TR']*TR - TR
 
 bar_directions = [val for _,val in enumerate(params['feature']['bar_pass_direction']) if 'empty' not in val and 'cue' not in val]
 # plot axis vertical bar on background to indicate stimulus display time
@@ -469,12 +529,6 @@ for key in np.concatenate((list(params['mri']['fitting']['FA']['condition_keys']
     axis.set_xlim(0,len(prediction)*TR)
     axis.legend(loc='upper left',fontsize=10)  # doing this to guarantee that legend is how I want it
     #axis.set_ylim(-3,3)  
-
-    # times where bar is on screen [1st on, last on, 1st on, last on, etc] 
-    bar_onset = np.array([27,98,126,197,225,296,324,395])*TR
-
-    if params['feature']['crop']:
-        bar_onset = bar_onset - params['feature']['crop_TR']
 
     bar_directions = [val for _,val in enumerate(params['feature']['bar_pass_direction']) if 'empty' not in val and 'cue' not in val]
     # plot axis vertical bar on background to indicate stimulus display time

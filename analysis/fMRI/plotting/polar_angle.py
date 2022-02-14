@@ -6,13 +6,13 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 from matplotlib import colors
+import matplotlib
 import cortex
 import pandas as pd
 import seaborn as sns
 from prfpy.stimulus import PRFStimulus2D
 
-sys.path.insert(0,'..') # add parent folder to path
-from utils import * #import script to use relevante functions
+from FAM_utils import mri as mri_utils
 
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
@@ -90,12 +90,13 @@ if task == 'pRF':
         if not op.exists(estimates_pth):
             os.makedirs(estimates_pth) 
 
-        estimates = join_chunks(fits_pth, estimates_combi,
+        estimates = mri_utils.join_chunks(fits_pth, estimates_combi,
                                 chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
 
 
 # define design matrix 
-visual_dm = make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True)
+    visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, save_imgs=False, downsample=0.1, 
+                                            crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=False)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -103,10 +104,14 @@ prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
                          design_matrix = visual_dm,
                          TR = TR)
 
+# get the ecc limits (in dva)
+# to mask estimates
+x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
+
 # mask estimates
 print('masking estimates')
-masked_est = mask_estimates(estimates, fit_model = model_type,
-                            screen_limit_deg = [prf_stim.screen_size_degrees/2,prf_stim.screen_size_degrees/2])
+masked_est = mri_utils.mask_estimates(estimates, fit_model = model_type,
+                            x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
 
 rsq = masked_est['rsq']
 x = masked_est['x']
@@ -141,12 +146,12 @@ polar_ang_norm = (polar_angle + np.pi) / (np.pi * 2.0)
 
 # make alpha level based on rsquared
 # normalize the distribution, for better visualization
-alpha_level = normalize(np.clip(rsq,rsq_threshold,.3))#np.clip(rsq,rsq_threshold,.3) 
+alpha_level = mri_utils.normalize(np.clip(rsq,rsq_threshold,.3))#np.clip(rsq,rsq_threshold,.3) 
 
 # make costum colormap, similar to curtis mackey paper
 # orange to red, counter clockwise
 n_bins = 256#8
-PA_colors = add_alpha2colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb',
+PA_colors = mri_utils.add_alpha2colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb',
                               '#3d549f','#655099','#ad5a9b','#dd3933'],bins = n_bins, cmap_name = 'PA_mackey_costum',
                               discrete = False)
 
@@ -183,7 +188,7 @@ hsv_angle = []
 hsv_angle = np.ones((len(rsq), 3))
 hsv_angle[:, 0] = polar_angle.copy()
 #hsv_angle[:, 1] = np.clip(estimates_dict['rsq'] / np.nanmax(estimates_dict['rsq']) * 3, 0, 1)
-hsv_angle[:, 2] = normalize(np.clip(rsq,rsq_threshold,.3)) #rsq > rsq_threshold 
+hsv_angle[:, 2] = mri_utils.normalize(np.clip(rsq,rsq_threshold,.3)) #rsq > rsq_threshold 
 
 
 # get mid vertex index (diving hemispheres)

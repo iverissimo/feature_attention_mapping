@@ -1431,7 +1431,7 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
 
         for w in frames:
             im = Image.fromarray(visual_dm[...,int(w)])
-            im.save(op.join(outfolder,op.split(output)[-1].replace('.npy','_trial-{time}.png'.format(time=str((w/oversampling_time)).zfill(3)))))      
+            im.save(op.join(outfolder,op.split(output)[-1].replace('.npy','_trial-{time}.png'.format(time=str(int(w/oversampling_time)).zfill(3)))))      
             
     return visual_dm
 

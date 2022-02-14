@@ -172,8 +172,8 @@ elif task == 'FA':
     rsq = np.nanmean(rsq, axis=0)
     masked_rsq = rsq.copy()
 
-    plot_lims_dist = [0,.3] # axis value for plotting
-    plot_lims_flat = [0,.3] # axis value for plotting 
+    plot_lims_dist = [0,.5] # axis value for plotting
+    plot_lims_flat = [0, .3] #[0,.4] # axis value for plotting 
 
 # set threshold for plotting
 rsq_threshold = params['plotting']['rsq_threshold']

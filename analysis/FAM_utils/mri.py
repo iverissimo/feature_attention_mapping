@@ -726,7 +726,8 @@ def make_pRF_DM(output, params, save_imgs = False, downsample = None,
     return visual_dm
 
 
-def save_estimates(filename, estimates, mask_indices, orig_shape = np.array([1974,220]), model_type = 'gauss'):
+def save_estimates(filename, estimates, mask_indices, orig_shape = np.array([1974,220]), 
+                    model_type = 'gauss', fit_hrf = False):
     
     """
     re-arrange estimates that were masked
@@ -757,25 +758,51 @@ def save_estimates(filename, estimates, mask_indices, orig_shape = np.array([197
         counter += 1
             
     if model_type == 'gauss':
+
+        if fit_hrf:
+            np.savez(filename,
+                    x = final_estimates[..., 0],
+                    y = final_estimates[..., 1],
+                    size = final_estimates[..., 2],
+                    betas = final_estimates[...,3],
+                    baseline = final_estimates[..., 4],
+                    hrf_derivative = final_estimates[..., 5],
+                    hrf_dispersion = final_estimates[..., 6], 
+                    r2 = final_estimates[..., 7])
         
-        np.savez(filename,
-                 x = final_estimates[..., 0],
-                 y = final_estimates[..., 1],
-                 size = final_estimates[..., 2],
-                 betas = final_estimates[...,3],
-                 baseline = final_estimates[..., 4],
-                 r2 = final_estimates[..., 5])
+        else:
+            np.savez(filename,
+                    x = final_estimates[..., 0],
+                    y = final_estimates[..., 1],
+                    size = final_estimates[..., 2],
+                    betas = final_estimates[...,3],
+                    baseline = final_estimates[..., 4],
+                    r2 = final_estimates[..., 5])
     
     elif model_type == 'css':
-        np.savez(filename,
-                 x = final_estimates[..., 0],
-                 y = final_estimates[..., 1],
-                 size = final_estimates[..., 2],
-                 betas = final_estimates[...,3],
-                 baseline = final_estimates[..., 4],
-                 ns = final_estimates[..., 5],
-                 r2 = final_estimates[..., 6])
-    
+
+        if fit_hrf:
+            np.savez(filename,
+                    x = final_estimates[..., 0],
+                    y = final_estimates[..., 1],
+                    size = final_estimates[..., 2],
+                    betas = final_estimates[...,3],
+                    baseline = final_estimates[..., 4],
+                    ns = final_estimates[..., 5],
+                    hrf_derivative = final_estimates[..., 6],
+                    hrf_dispersion = final_estimates[..., 7], 
+                    r2 = final_estimates[..., 8])
+        
+        else:
+            np.savez(filename,
+                    x = final_estimates[..., 0],
+                    y = final_estimates[..., 1],
+                    size = final_estimates[..., 2],
+                    betas = final_estimates[...,3],
+                    baseline = final_estimates[..., 4],
+                    ns = final_estimates[..., 5],
+                    r2 = final_estimates[..., 6])
+        
 
 def combine_slices(file_list,outdir,num_slices=89, ax=2):
     
@@ -1575,6 +1602,39 @@ def set_contrast(dm_col,tasks,contrast_val=[1],num_cond=1):
     return contrast
 
 
+def design_variance(X, which_predictor=1):
+        
+        ''' Returns the design variance of a predictor (or contrast) in X.
+        
+        Parameters
+        ----------
+        X : numpy array
+            Array of shape (N, P)
+        which_predictor : int or list/array
+            The index of the predictor you want the design var from.
+            Note that 0 refers to the intercept!
+            Alternatively, "which_predictor" can be a contrast-vector
+            
+        Outputs
+        -------
+        des_var : float
+            Design variance of the specified predictor/contrast from X.
+        '''
+    
+        is_single = isinstance(which_predictor, int)
+        if is_single:
+            idx = which_predictor
+        else:
+            idx = np.array(which_predictor) != 0
+
+        if np.isnan(X).any():
+            des_var = np.nan
+        else:
+            c = np.zeros(X.shape[1])
+            c[idx] = 1 if is_single == 1 else which_predictor[idx]
+            des_var = c.dot(np.linalg.pinv(X.T.dot(X))).dot(c.T)
+        
+        return des_var
 
 def compute_stats(voxel, dm, contrast, betas, pvalue = 'oneside'):
     
@@ -1604,39 +1664,6 @@ def compute_stats(voxel, dm, contrast, betas, pvalue = 'oneside'):
     
     """
 
-    
-    def design_variance(X, which_predictor=1):
-        
-        ''' Returns the design variance of a predictor (or contrast) in X.
-        
-        Parameters
-        ----------
-        X : numpy array
-            Array of shape (N, P)
-        which_predictor : int or list/array
-            The index of the predictor you want the design var from.
-            Note that 0 refers to the intercept!
-            Alternatively, "which_predictor" can be a contrast-vector
-            
-        Outputs
-        -------
-        des_var : float
-            Design variance of the specified predictor/contrast from X.
-        '''
-    
-        is_single = isinstance(which_predictor, int)
-        if is_single:
-            idx = which_predictor
-        else:
-            idx = np.array(which_predictor) != 0
-
-        c = np.zeros(X.shape[1])
-        c[idx] = 1 if is_single == 1 else which_predictor[idx]
-        des_var = c.dot(np.linalg.pinv(X.T.dot(X))).dot(c.T)
-        
-        return des_var
-
-    
     if np.isnan(voxel).any() or np.isnan(dm).any():
         t_val = np.nan
         p_val = np.nan

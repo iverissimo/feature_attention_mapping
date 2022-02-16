@@ -58,6 +58,7 @@ TR = params['mri']['TR']
 
 # type of model to fit
 model_type = params['mri']['fitting']['pRF']['fit_model']
+fit_hrf = params['mri']['fitting']['pRF']['fit_hrf'] 
 
 # define file extension that we want to use, 
 # should include processing key words
@@ -198,7 +199,8 @@ else:
         print("Grid fit")
         gauss_fitter = Iso2DGaussianFitter(data = masked_data, 
                                             model = gauss_model, 
-                                            n_jobs = 16)
+                                            n_jobs = 16,
+                                            fit_hrf = fit_hrf)
 
         gauss_fitter.grid_fit(ecc_grid = eccs, 
                                 polar_grid = polars, 
@@ -224,12 +226,13 @@ else:
                         (0, 1000),  # prf amplitude
                         (-1000, 1000)]  # bold baseline
 
+        if fit_hrf:
+            gauss_bounds += [(0,10),(0,0)]
 
         # iterative fit
         print("Iterative fit")
         gauss_fitter.iterative_fit(rsq_threshold = 0.05, 
                                     verbose = True,
-                                    starting_params = gauss_fitter.gridsearch_params,
                                     bounds=gauss_bounds,
                                     xtol = xtol,
                                     ftol = ftol)
@@ -238,9 +241,9 @@ else:
         estimates_it = gauss_fitter.iterative_search_params
 
     # save grid estimates
-    mri_utils.save_estimates(grid_estimates_filename, estimates_grid, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
+    mri_utils.save_estimates(grid_estimates_filename, estimates_grid, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss',fit_hrf=fit_hrf)
     # for it
-    mri_utils.save_estimates(it_estimates_filename, estimates_it, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
+    mri_utils.save_estimates(it_estimates_filename, estimates_it, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss',fit_hrf=fit_hrf)
     
     if model_type == 'css':
         
@@ -265,6 +268,7 @@ else:
             css_fitter = CSS_Iso2DGaussianFitter(data = masked_data, 
                                                 model = css_model, 
                                                 n_jobs = 16,
+                                                fit_hrf = fit_hrf,
                                                 previous_gaussian_fitter = gauss_fitter)
 
             css_fitter.grid_fit(exponent_grid = css_n_grid, 
@@ -283,6 +287,8 @@ else:
                         (-1000, 1000),  # bold baseline
                         (0.01, 3)]  # CSS exponent
 
+            if fit_hrf:
+                gauss_bounds += [(0,10),(0,0)]
 
             # iterative fit
             print("Iterative fit")
@@ -297,9 +303,9 @@ else:
 
         # save estimates
         # for grid
-        mri_utils.save_estimates(css_grid_estimates_filename, estimates_css_grid, not_nan_vox, orig_shape, model_type = 'css')
+        mri_utils.save_estimates(css_grid_estimates_filename, estimates_css_grid, not_nan_vox, orig_shape, model_type = 'css',fit_hrf=fit_hrf)
         # for it
-        mri_utils.save_estimates(css_it_estimates_filename, estimates_css_it, not_nan_vox, orig_shape, model_type = 'css')
+        mri_utils.save_estimates(css_it_estimates_filename, estimates_css_it, not_nan_vox, orig_shape, model_type = 'css',fit_hrf=fit_hrf)
 
 
 # Print duration

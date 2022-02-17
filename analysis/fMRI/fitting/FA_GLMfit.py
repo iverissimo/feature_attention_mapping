@@ -63,6 +63,7 @@ TR = params['mri']['TR']
 # type of pRF model to use, and run type (mean vs median)
 model_type = params['mri']['fitting']['pRF']['fit_model']
 run_type = params['mri']['fitting']['pRF']['run']
+fit_hrf = params['mri']['fitting']['pRF']['fit_hrf'] 
 
 # define file extension that we want to use, 
 # should include processing key words
@@ -134,7 +135,7 @@ else: # if not join chunks and save file
     if not op.exists(pRF_estimates_pth):
         os.makedirs(pRF_estimates_pth) 
 
-    pRF_estimates = mri_utils.join_chunks(fits_pth, pRF_estimates_combi,
+    pRF_estimates = mri_utils.join_chunks(fits_pth, pRF_estimates_combi, fit_hrf = params['mri']['fitting']['pRF']['fit_hrf'],
                         chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
 
 # define design matrix for pRF task
@@ -233,7 +234,15 @@ FA_sampling_rate = TR if params['feature']['task_rate']=='TR' else params['featu
 osf = 10
 
 # create upsampled hrf
-hrf_oversampled = mri_utils.create_hrf(TR=TR, osf=osf)
+if fit_hrf: # use fitted hrf params
+    hrf_params = np.ones((3, pRF_estimates['hrf_derivative'].shape[0]))
+    hrf_params[1] = pRF_estimates['hrf_derivative']
+    hrf_params[2] = pRF_estimates['hrf_dispersion']
+    
+    hrf_oversampled = mri_utils.create_hrf(hrf_params = hrf_params, TR = TR, osf = osf) 
+else:
+    hrf_oversampled = np.tile(mri_utils.create_hrf(TR = TR, osf = osf), (pRF_estimates['r2'].shape[0],1))
+    hrf_params = np.full((3, pRF_estimates['r2'].shape[0]), None)
 
 # make visual DM for each GLM regressor, and obtain prediction using pRF model
 for reg in all_regressors['reg_name'].values:
@@ -277,7 +286,9 @@ for reg in all_regressors['reg_name'].values:
                                                                                  size[vert],
                                                                                  beta[vert],
                                                                                  baseline[vert],
-                                                                                 ns[vert]) for _,vert in enumerate(tqdm(mask_ind)))
+                                                                                 ns[vert],
+                                                                                 hrf_1 = hrf_params[1][vert],
+                                                                                 hrf_2 = hrf_params[2][vert]) for _,vert in enumerate(tqdm(mask_ind)))
 
         else:
             # define gaussian model 
@@ -296,7 +307,9 @@ for reg in all_regressors['reg_name'].values:
                                                                                    yy[vert],
                                                                                    size[vert],
                                                                                    beta[vert],
-                                                                                   baseline[vert]) for _,vert in enumerate(tqdm(mask_ind)))
+                                                                                   baseline[vert],
+                                                                                   hrf_1 = hrf_params[1][vert],
+                                                                                   hrf_2 = hrf_params[2][vert]) for _,vert in enumerate(tqdm(mask_ind)))
 
         # squeeze out single dimension that parallel creates
         model_fit = np.squeeze(model_fit)
@@ -356,7 +369,7 @@ for blk in range(params['feature']['mini_blocks']): # for each miniblock
         cue_regs_upsampled[blk,:,trl*osf:trl*osf+osf] = 1
     
     # convolve with spm hrf, similar to what prfpy is using
-    cue_regs_upsampled[blk] = signal.fftconvolve(cue_regs_upsampled[blk], np.tile(hrf_oversampled, (cue_regs_upsampled.shape[1], 1)), 
+    cue_regs_upsampled[blk] = signal.fftconvolve(cue_regs_upsampled[blk], hrf_oversampled, 
                                             mode='full', axes=(-1))[..., :cue_regs_upsampled.shape[-1]]
 
     # original scale of data in seconds

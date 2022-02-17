@@ -241,7 +241,7 @@ else:
         estimates_it = gauss_fitter.iterative_search_params
 
     # save grid estimates
-    mri_utils.save_estimates(grid_estimates_filename, estimates_grid, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss',fit_hrf=fit_hrf)
+    mri_utils.save_estimates(grid_estimates_filename, estimates_grid, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
     # for it
     mri_utils.save_estimates(it_estimates_filename, estimates_it, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss',fit_hrf=fit_hrf)
     
@@ -303,7 +303,7 @@ else:
 
         # save estimates
         # for grid
-        mri_utils.save_estimates(css_grid_estimates_filename, estimates_css_grid, not_nan_vox, orig_shape, model_type = 'css',fit_hrf=fit_hrf)
+        mri_utils.save_estimates(css_grid_estimates_filename, estimates_css_grid, not_nan_vox, orig_shape, model_type = 'css')
         # for it
         mri_utils.save_estimates(css_it_estimates_filename, estimates_css_it, not_nan_vox, orig_shape, model_type = 'css',fit_hrf=fit_hrf)
 

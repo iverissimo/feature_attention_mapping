@@ -214,6 +214,10 @@ if fit_now:
     beta = estimates_it[3]
     baseline = estimates_it[4]
     rsq = estimates_it[-1]
+
+    if fit_hrf:
+        hrf_deriv = estimates_it[5]
+        hrf_disp = estimates_it[6]  
     
     if model_type == 'css':
         
@@ -249,6 +253,10 @@ if fit_now:
         baseline = estimates_css_it[4]
         ns = estimates_css_it[5]
         rsq = estimates_css_it[-1] 
+
+        if fit_hrf:
+            hrf_deriv = estimates_css_it[6]
+            hrf_disp = estimates_css_it[7] 
         
 else:
     print('loading estimates')
@@ -297,6 +305,10 @@ else:
         if 'css' in model_type:
             ns = estimates['ns'][roi_ind[roi]][vertex]
         rsq = estimates['r2'][roi_ind[roi]][vertex] 
+
+        if fit_hrf:
+            hrf_deriv = estimates['hrf_derivative'][roi_ind[roi]][vertex] 
+            hrf_disp = estimates['hrf_dispersion'][roi_ind[roi]][vertex] 
     
     else:
         xx = estimates['x'][vertex]
@@ -311,7 +323,16 @@ else:
             ns = estimates['ns'][vertex]
 
         rsq = estimates['r2'][vertex]
-        
+
+        if fit_hrf:
+            hrf_deriv = estimates['hrf_derivative'][vertex] 
+            hrf_disp = estimates['hrf_dispersion'][vertex]
+
+if fit_hrf:
+    hrf = mri_utils.create_hrf(hrf_params=[1.0,hrf_deriv,hrf_disp],TR=TR)
+    gauss_model.hrf = hrf
+    css_model.hrf = hrf
+
 # get prediction
 if model_type == 'css':
     model_fit = css_model.return_prediction(xx,yy,
@@ -369,3 +390,16 @@ for h in range(8):
     ax_count += 2
 
 fig.savefig(op.join(figures_pth,fig_name))
+
+# if fitting hrf, then plot shape in comparison with canonical for comparison
+if fit_hrf:
+    fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
+
+    axis.plot(mri_utils.create_hrf(TR=TR)[0],'grey',label='spm hrf')
+    axis.plot(hrf[0],'red',label='fitted hrf')
+    axis.set_xlim(0, 25)
+    axis.legend(loc='upper right',fontsize=10) 
+    axis.set_xlabel('Time (s)',fontsize=10, labelpad=10)
+    fig.savefig(op.join(figures_pth,'HRF_roi-{roi}_vertex-{vert}.png'.format(roi=roi,vert=vertex))) 
+
+

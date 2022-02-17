@@ -931,7 +931,7 @@ def add_alpha2colormap(colormap = 'rainbow_r', bins = 256, invert_alpha = False,
        
     return rgb_fn 
 
-def join_chunks(path, out_name, chunk_num = 83, fit_model = 'css'):
+def join_chunks(path, out_name, chunk_num = 83, fit_model = 'css', fit_hrf = False):
     """ combine all chunks into one single estimate numpy array
         assumes input is whole brain ("vertex", time)
     Parameters
@@ -973,6 +973,10 @@ def join_chunks(path, out_name, chunk_num = 83, fit_model = 'css'):
                 ns = chunk['ns']
 
             rsq = chunk['r2']
+
+            if fit_hrf:
+                hrf_derivative = chunk['hrf_derivative']
+                hrf_dispersion = chunk['hrf_dispersion']
         else:
             xx = np.concatenate((xx,chunk['x']))
             yy = np.concatenate((yy,chunk['y']))
@@ -986,6 +990,10 @@ def join_chunks(path, out_name, chunk_num = 83, fit_model = 'css'):
                 ns = np.concatenate((ns,chunk['ns']))
 
             rsq = np.concatenate((rsq,chunk['r2']))
+            
+            if fit_hrf:
+                hrf_derivative = np.concatenate((hrf_derivative, chunk['hrf_derivative']))
+                hrf_dispersion = np.concatenate((hrf_dispersion, chunk['hrf_dispersion']))
     
     print('shape of estimates is %s'%(str(xx.shape)))
 
@@ -994,24 +1002,49 @@ def join_chunks(path, out_name, chunk_num = 83, fit_model = 'css'):
     print('saving %s'%output)
     
     if 'css' in fit_model:
-        np.savez(output,
+
+        if fit_hrf:
+            np.savez(output,
               x = xx,
               y = yy,
               size = size,
               betas = beta,
               baseline = baseline,
+              hrf_derivative = hrf_derivative,
+              hrf_dispersion = hrf_dispersion,
               ns = ns,
               r2 = rsq)
+
+        else:
+            np.savez(output,
+                x = xx,
+                y = yy,
+                size = size,
+                betas = beta,
+                baseline = baseline,
+                ns = ns,
+                r2 = rsq)
     else:        
-        np.savez(output,
+        if fit_hrf:
+            np.savez(output,
               x = xx,
               y = yy,
               size = size,
               betas = beta,
               baseline = baseline,
+              hrf_derivative = hrf_derivative,
+              hrf_dispersion = hrf_dispersion,
               r2 = rsq)
+
+        else:
+            np.savez(output,
+                x = xx,
+                y = yy,
+                size = size,
+                betas = beta,
+                baseline = baseline,
+                r2 = rsq)
      
-            
     return np.load(output)
 
 def dva_per_pix(height_cm,distance_cm,vert_res_pix):

@@ -109,7 +109,7 @@ if task == 'pRF':
         if not op.exists(estimates_pth):
             os.makedirs(estimates_pth) 
 
-        estimates = mri_utils.join_chunks(fits_pth, estimates_combi,
+        estimates = mri_utils.join_chunks(fits_pth, estimates_combi, fit_hrf = params['mri']['fitting']['pRF']['fit_hrf'],
                                 chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
 
     

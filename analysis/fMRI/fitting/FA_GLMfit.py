@@ -288,7 +288,8 @@ for reg in all_regressors['reg_name'].values:
                                                                                  baseline[vert],
                                                                                  ns[vert],
                                                                                  hrf_1 = hrf_params[1][vert],
-                                                                                 hrf_2 = hrf_params[2][vert]) for _,vert in enumerate(tqdm(mask_ind)))
+                                                                                 hrf_2 = hrf_params[2][vert],
+                                                                                 osf = osf) for _,vert in enumerate(tqdm(mask_ind)))
 
         else:
             # define gaussian model 
@@ -309,7 +310,8 @@ for reg in all_regressors['reg_name'].values:
                                                                                    beta[vert],
                                                                                    baseline[vert],
                                                                                    hrf_1 = hrf_params[1][vert],
-                                                                                   hrf_2 = hrf_params[2][vert]) for _,vert in enumerate(tqdm(mask_ind)))
+                                                                                   hrf_2 = hrf_params[2][vert],
+                                                                                   osf = osf) for _,vert in enumerate(tqdm(mask_ind)))
 
         # squeeze out single dimension that parallel creates
         model_fit = np.squeeze(model_fit)

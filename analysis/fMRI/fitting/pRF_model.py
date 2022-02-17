@@ -288,7 +288,7 @@ else:
                         (0.01, 3)]  # CSS exponent
 
             if fit_hrf:
-                gauss_bounds += [(0,10),(0,0)]
+                css_bounds += [(0,10),(0,0)]
 
             # iterative fit
             print("Iterative fit")

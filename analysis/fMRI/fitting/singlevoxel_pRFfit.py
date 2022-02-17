@@ -76,6 +76,7 @@ TR = params['mri']['TR']
 
 # type of model to fit
 model_type = params['mri']['fitting']['pRF']['fit_model']
+fit_hrf = params['mri']['fitting']['pRF']['fit_hrf'] 
 
 # define file extension that we want to use, 
 # should include processing key words
@@ -156,6 +157,10 @@ css_bounds = [(-1.5*ss, 1.5*ss),  # x
             (-1000, 1000),  # bold baseline
             (0.01, 3)]  # CSS exponent
 
+if fit_hrf:
+    gauss_bounds += [(0,10),(0,0)]
+    css_bounds += [(0,10),(0,0)]
+
 # list with absolute file name to be fitted
 proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir) if 'task-pRF' in h and
                  'acq-{acq}'.format(acq=acq) in h and run_type in h and h.endswith(file_ext)]
@@ -180,7 +185,8 @@ if fit_now:
     print("Grid fit")
     gauss_fitter = Iso2DGaussianFitter(data = timeseries, 
                                        model = gauss_model, 
-                                       n_jobs = 16)
+                                       n_jobs = 16,
+                                       fit_hrf = fit_hrf)
     
     gauss_fitter.grid_fit(ecc_grid = eccs, 
                           polar_grid = polars, 
@@ -194,7 +200,6 @@ if fit_now:
     print("Iterative fit")
     gauss_fitter.iterative_fit(rsq_threshold = 0.05, 
                                verbose = True,
-                               starting_params = gauss_fitter.gridsearch_params,
                                bounds=gauss_bounds,
                                xtol = xtol,
                                ftol = ftol)
@@ -208,7 +213,7 @@ if fit_now:
     size = estimates_it[2] 
     beta = estimates_it[3]
     baseline = estimates_it[4]
-    rsq = estimates_it[5]
+    rsq = estimates_it[-1]
     
     if model_type == 'css':
         
@@ -217,6 +222,7 @@ if fit_now:
         css_fitter = CSS_Iso2DGaussianFitter(data = timeseries, 
                                            model = css_model, 
                                            n_jobs = 16,
+                                            fit_hrf = fit_hrf,
                                             previous_gaussian_fitter = gauss_fitter)
 
         css_fitter.grid_fit(exponent_grid = css_n_grid, 
@@ -242,7 +248,7 @@ if fit_now:
         beta = estimates_css_it[3]
         baseline = estimates_css_it[4]
         ns = estimates_css_it[5]
-        rsq = estimates_css_it[6] 
+        rsq = estimates_css_it[-1] 
         
 else:
     print('loading estimates')

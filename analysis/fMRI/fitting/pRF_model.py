@@ -285,7 +285,7 @@ else:
                         (eps, 1.5*ss),  # prf size
                         (0, 1000),  # prf amplitude
                         (-1000, 1000),  # bold baseline
-                        (0.01, 3)]  # CSS exponent
+                        (0.01, 1)]  # CSS exponent
 
             if fit_hrf:
                 css_bounds += [(0,10),(0,0)]

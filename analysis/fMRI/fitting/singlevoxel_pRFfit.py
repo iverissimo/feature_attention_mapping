@@ -155,7 +155,7 @@ css_bounds = [(-1.5*ss, 1.5*ss),  # x
             (eps, 1.5*ss),  # prf size
             (0, 1000),  # prf amplitude
             (-1000, 1000),  # bold baseline
-            (0.01, 3)]  # CSS exponent
+            (0.01, 1)]  # CSS exponent
 
 if fit_hrf:
     gauss_bounds += [(0,10),(0,0)]
@@ -338,6 +338,8 @@ if model_type == 'css':
     model_fit = css_model.return_prediction(xx,yy,
                                             size, beta,
                                             baseline, ns)
+
+    print('exponent for vertex is %.2f'%ns)
 
 else:
     model_fit = gauss_model.return_prediction(xx,yy,

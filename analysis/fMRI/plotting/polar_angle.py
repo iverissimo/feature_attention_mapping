@@ -146,7 +146,7 @@ polar_ang_norm = (polar_angle + np.pi) / (np.pi * 2.0)
 
 # make alpha level based on rsquared
 # normalize the distribution, for better visualization
-alpha_level = mri_utils.normalize(np.clip(rsq,rsq_threshold,.3))#np.clip(rsq,rsq_threshold,.3) 
+alpha_level = mri_utils.normalize(np.clip(rsq, 0, 0.8)) #rsq_threshold,.8))#np.clip(rsq,rsq_threshold,.3) 
 
 # make costum colormap, similar to curtis mackey paper
 # orange to red, counter clockwise
@@ -181,7 +181,7 @@ _ = cortex.quickflat.make_png(filename, images['PA'], recache=False,with_colorba
 # then easier to define borders
 
 # create HSV array, with PA values (-pi to pi) that were obtained from estimates
-# saturation wieghted by a shifted distribution of RSQ (better visualization)
+# saturation weighted by a shifted distribution of RSQ (better visualization)
 # value bolean (if I don't give it an rsq threshold then it's always 1)
 
 hsv_angle = []

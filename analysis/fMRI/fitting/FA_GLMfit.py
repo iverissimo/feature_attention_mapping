@@ -95,10 +95,6 @@ if not op.exists(output_dir):
 proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir) if 'task-FA' in h and
                  'acq-{acq}'.format(acq=acq) in h and 'run-{run}'.format(run=run) in h and h.endswith(file_ext)]
 
-# exception for sub 4, run 4 because nordic failed for FA
-if sj=='004' and run=='4':
-    proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir) if 'task-FA' in h and
-                 'acq-{acq}'.format(acq='standard') in h and 'run-{run}'.format(run=run) in h and h.endswith(file_ext)]
 
 ## load functional data
 file = proc_files[0]
@@ -234,15 +230,15 @@ FA_sampling_rate = TR if params['feature']['task_rate']=='TR' else params['featu
 osf = 10
 
 # create upsampled hrf
+hrf_params = np.ones((3, pRF_estimates['hrf_derivative'].shape[0]))
 if fit_hrf: # use fitted hrf params
-    hrf_params = np.ones((3, pRF_estimates['hrf_derivative'].shape[0]))
     hrf_params[1] = pRF_estimates['hrf_derivative']
     hrf_params[2] = pRF_estimates['hrf_dispersion']
     
     hrf_oversampled = mri_utils.create_hrf(hrf_params = hrf_params, TR = TR, osf = osf) 
 else:
     hrf_oversampled = np.tile(mri_utils.create_hrf(TR = TR, osf = osf), (pRF_estimates['r2'].shape[0],1))
-    hrf_params = np.full((3, pRF_estimates['r2'].shape[0]), None)
+    hrf_params[2] = 0
 
 # make visual DM for each GLM regressor, and obtain prediction using pRF model
 for reg in all_regressors['reg_name'].values:
@@ -371,8 +367,12 @@ for blk in range(params['feature']['mini_blocks']): # for each miniblock
         cue_regs_upsampled[blk,:,trl*osf:trl*osf+osf] = 1
     
     # convolve with spm hrf, similar to what prfpy is using
-    cue_regs_upsampled[blk] = signal.fftconvolve(cue_regs_upsampled[blk], hrf_oversampled, 
-                                            mode='full', axes=(-1))[..., :cue_regs_upsampled.shape[-1]]
+    cue_convolved = Parallel(n_jobs=16)(delayed(signal.fftconvolve)(cue_regs_upsampled[blk][vert], 
+                                                hrf_oversampled[vert], 
+                                                mode='full', 
+                                                axes=(-1)) for _,vert in enumerate(tqdm(mask_ind)))
+
+    cue_regs_upsampled[blk] = np.array(cue_convolved)[...,:cue_regs_upsampled.shape[-1]].copy()
 
     # original scale of data in seconds
     original_scale = np.arange(0, cue_regs_upsampled[blk].shape[-1]/osf, 1/osf)

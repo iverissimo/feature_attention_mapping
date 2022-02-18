@@ -300,7 +300,7 @@ fig1.savefig(op.join(figures_pth,'occipital_ecc_vs_size_binned_rsq-%0.2f.svg'%(r
 images = {}
 
 # make alpha level based on rsquared
-alpha_level = mri_utils.normalize(np.clip(rsq,rsq_threshold,.3))#
+alpha_level = mri_utils.normalize(np.clip(rsq, 0, .8)) #rsq_threshold,.8))#
 
 # make costum colormap, similar to mackey paper
 n_bins = 256

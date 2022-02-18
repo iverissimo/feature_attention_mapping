@@ -31,6 +31,11 @@ from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
 from scipy import interpolate
 import seaborn as sns
 
+from joblib import Parallel, delayed
+
+import datetime
+from tqdm import tqdm
+
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
             params = yaml.safe_load(f_in)
@@ -269,6 +274,8 @@ if fit_hrf: # use fitted hrf params
     hrf_oversampled = mri_utils.create_hrf(hrf_params = hrf_params, TR = TR, osf = osf)
 else:
     hrf_oversampled = mri_utils.create_hrf(TR=TR, osf=osf)
+    hrf_params = np.ones((3, 1))
+    hrf_params[2] = 0   
 
 # make visual DM for each GLM regressor, and obtain prediction using pRF model
 for reg in all_regressors['reg_name'].values:

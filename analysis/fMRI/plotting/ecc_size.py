@@ -18,7 +18,6 @@ import seaborn as sns
 from statsmodels.stats import weightstats
 from prfpy.stimulus import PRFStimulus2D
 
-sys.path.insert(0,'..') # add parent folder to path
 from FAM_utils import mri as mri_utils
 
 

@@ -126,6 +126,9 @@ x = masked_est['x']
 y = masked_est['y']
 size = masked_est['size']
 
+if model_type == 'css': # non-linearity interacts with the Gaussian standard deviation to make an effective pRF size of σ/sqr(n)
+    size = size/np.sqrt(masked_est['ns']) 
+
 complex_location = x + y * 1j # calculate eccentricity values
 ecc = np.abs(complex_location)
 

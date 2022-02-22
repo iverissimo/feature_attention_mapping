@@ -374,7 +374,7 @@ for blk in range(params['feature']['mini_blocks']): # for each miniblock
 
     # save convolved upsampled cue in array
     for i,ind in enumerate(mask_ind):
-        cue_regs_upsampled[blk][ind] = cue_convolved[i,:cue_regs_upsampled.shape[-1]]
+        cue_regs_upsampled[blk][ind] = np.array(cue_convolved)[i,:cue_regs_upsampled.shape[-1]]
 
     # original scale of data in seconds
     original_scale = np.arange(0, cue_regs_upsampled[blk].shape[-1]/osf, 1/osf)

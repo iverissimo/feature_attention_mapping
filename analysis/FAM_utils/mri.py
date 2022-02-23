@@ -14,11 +14,12 @@ import json
 
 from scipy.ndimage import gaussian_filter
 from scipy.signal import savgol_filter
-from scipy import fft
+from scipy import fft, interpolate
 
 from nilearn import surface
 
 from joblib import Parallel, delayed
+from tqdm import tqdm
 
 import matplotlib.pyplot as plt
 
@@ -1448,9 +1449,21 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
         if crop == True:
             if crop_unit == 'sec': # fix for the fact that I crop TRs, but task not synced to TR
                 visual_dm = visual_dm[...,int(crop_TR*TR*oversampling_time)::] 
-            
             else: # assumes unit is TR
-               visual_dm = visual_dm[...,crop_TR*oversampling_time::] 
+               visual_dm = visual_dm[...,int(crop_TR*oversampling_time)::] 
+
+        # shifting TRs to the left (quick fix)
+        # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
+        if shift_TRs == True:
+
+            new_visual_dm = visual_dm.copy()
+
+            if crop_unit == 'sec': # fix for the fact that I shift TRs, but task not synced to TR
+                new_visual_dm[...,:-1*int(TR*oversampling_time)] = visual_dm[...,1*int(TR*oversampling_time):]
+            else: # assumes unit is TR
+                new_visual_dm[...,:-int(1*oversampling_time)] = visual_dm[...,int(1*oversampling_time):]
+                
+            visual_dm = new_visual_dm.copy()
 
         if save_DM == True: 
             # save design matrix
@@ -1461,20 +1474,6 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
         
         # load
         visual_dm = np.load(output)
-
-    # shifting TRs to the left (quick fix)
-    # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
-    if shift_TRs == True:
-
-        new_visual_dm = visual_dm.copy()
-
-        if crop_unit == 'sec': # fix for the fact that I shift TRs, but task not synced to TR
-            new_visual_dm[...,:-1*int(TR*oversampling_time)] = visual_dm[...,1*int(TR*oversampling_time):]
-
-        else: # assumes unit is TR
-            new_visual_dm[...,:-1*oversampling_time] = visual_dm[...,1*oversampling_time:]
-            
-        visual_dm = new_visual_dm.copy()
 
     #if we want to save the images
     if save_imgs == True:
@@ -1540,7 +1539,7 @@ def plot_DM(DM, vertex, output, names=['intercept','ACAO', 'ACUO', 'UCAO', 'UCUO
     plt.savefig(output)
 
  
-def fit_glm(voxel, dm):
+def fit_glm(voxel, dm, error='mse'):
     
     """ GLM fit on timeseries
     Regress a created design matrix on the input_data.
@@ -1561,8 +1560,8 @@ def fit_glm(voxel, dm):
         betas for model
     r2 : arr
         coefficient of determination
-    mse : arr
-        mean of the squared residuals
+    mse/rss : arr
+        mean of the squared residuals/residual sum of squares
     
     """
 
@@ -1577,9 +1576,14 @@ def fit_glm(voxel, dm):
         prediction = dm.dot(betas)
 
         mse = np.mean((voxel - prediction) ** 2) # calculate mean of squared residuals
-        r2 = pearsonr(prediction, voxel)[0] ** 2 # and the rsq
-    
-    return prediction, betas, r2, mse
+        rss =  np.sum((voxel - prediction) ** 2) # calculate residual sum of squared errors
+
+        r2 = 1 - (np.sum((voxel - prediction)**2)/ np.sum((voxel - np.mean(voxel))**2))  # and the rsq
+
+    if error == 'mse': 
+        return prediction, betas, r2, mse
+    else:
+        return prediction, betas, r2, rss 
 
 
 def set_contrast(dm_col,tasks,contrast_val=[1],num_cond=1):
@@ -2141,3 +2145,107 @@ def get_ecc_limits(visual_dm, params, screen_size_deg = [11,11]):
     x_ecc_limit = screen_size_deg[0]/2 - x_ecc_limit
 
     return x_ecc_limit, y_ecc_limit
+
+
+def get_cue_regressor(output, params, trial_info, hrf, cues = [0,1,2,3], TR = 1.6, oversampling_time = 1, baseline = None,
+                      crop_unit = 'sec', crop = False, crop_TR = 3, overwrite = False, shift_TRs = True):
+    
+    """Get time course for cue regressor
+    
+    Parameters
+    ----------
+    output : string
+       absolute output name for numpy array
+    params : yml dict
+        with experiment params
+    trial_info: pd
+        pandas dataframe with useful run info
+    hrf : array
+       hrf to convolve with cue
+    cues: list
+        list with cue miniblock numbers (we might want to have all cues in reg or just one)
+    
+    """
+    
+    if not op.exists(output) or overwrite == True:
+        print('making %s'%output)
+        
+        if not op.exists(op.split(output)[0]): # make base dir to save files
+            os.makedirs(op.split(output)[0])
+          
+        # initialized array of zeros for cue regressors - UPSAMPLED
+        cue_regs_upsampled = np.zeros((hrf.shape[0], len(trial_info)*oversampling_time))
+        
+        # fill it given cue onsets
+        for c in cues:
+            for trl in trial_info.loc[trial_info['trial_type']=='cue_%i'%c]['trial_num'].values:
+                
+                cue_regs_upsampled[:,trl*oversampling_time:trl*oversampling_time+oversampling_time] = 1
+                
+        # in case we want to crop the beginning of the DM
+        if crop == True:
+            if crop_unit == 'sec': # fix for the fact that I crop TRs, but task not synced to TR
+                cue_regs_upsampled = cue_regs_upsampled[...,int(crop_TR*TR*oversampling_time)::] 
+            else: # assumes unit is TR
+                cue_regs_upsampled = cue_regs_upsampled[...,crop_TR*oversampling_time::]
+                
+        # shifting TRs to the left (quick fix)
+        # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
+        if shift_TRs == True:
+            new_cue_regs_upsampled = cue_regs_upsampled.copy()
+
+            if crop_unit == 'sec': # fix for the fact that I shift TRs, but task not synced to TR
+                new_cue_regs_upsampled[...,:-1*int(TR*oversampling_time)] = cue_regs_upsampled[...,1*int(TR*oversampling_time):]
+            else: # assumes unit is TR
+                new_cue_regs_upsampled[...,:-1*oversampling_time] = cue_regs_upsampled[...,1*oversampling_time:]
+
+            cue_regs_upsampled = new_cue_regs_upsampled.copy()
+        
+         
+        # to deal with nans
+        mask_ind = np.unique(np.where(~np.isnan(hrf))[0])
+        
+        # convolve with hrf
+        cue_convolved = Parallel(n_jobs=16)(delayed(signal.fftconvolve)(cue_regs_upsampled[vert], 
+                                                    hrf[vert], 
+                                                    mode='full', 
+                                                    axes=(-1)) for _,vert in enumerate(tqdm(mask_ind)))
+        cue_convolved = np.array(cue_convolved)[...,:cue_regs_upsampled.shape[-1]]
+        
+        # save convolved upsampled cue in array
+        cue_regs_upsampled[mask_ind] = cue_convolved
+        
+        ## resample to data sampling rate
+        
+        # original scale of data in seconds
+        original_scale = np.arange(0, cue_regs_upsampled.shape[-1]/oversampling_time, 1/oversampling_time)
+
+        # cubic interpolation of predictor
+        interp = interpolate.interp1d(original_scale, 
+                                    cue_regs_upsampled, 
+                                    kind = "cubic", axis=-1)
+        desired_scale = np.arange(0, cue_regs_upsampled.shape[-1]/oversampling_time, TR) # we want the predictor to be sampled in TR
+
+        cue_regs_RESAMPLED = interp(desired_scale)
+
+        ## filter it, like we do to the data
+        cue_regs_RESAMPLED =  dc_data(cue_regs_RESAMPLED,
+                                 first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'])
+        
+        ## make nan vertices that are not to be fitted
+        cue_regs = np.zeros(cue_regs_RESAMPLED.shape); cue_regs[:] = np.nan 
+        cue_regs[mask_ind] = cue_regs_RESAMPLED[mask_ind]
+        
+        # add baseline if baseline array/value specified
+        if baseline is not None:
+            cue_regs[mask_ind] += baseline[mask_ind,np.newaxis] 
+      
+        # save regressor in folder, for later use/plotting
+        np.save(output, cue_regs)
+    
+    else:
+        # load regressor
+        cue_regs = np.load(output)
+        print('file already exists, loading %s'%output)
+        
+    return cue_regs

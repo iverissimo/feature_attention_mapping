@@ -38,6 +38,9 @@ from nilearn.glm.first_level.hemodynamic_models import spm_hrf, spm_time_derivat
 
 from nilearn.signal import clean
 
+from prfpy.stimulus import PRFStimulus2D
+from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
+
 def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=None):
     
     """Import a subject from fmriprep-output to pycortex
@@ -1572,7 +1575,7 @@ def fit_glm(voxel, dm, error='mse'):
         r2 = np.nan
 
     else:   # if not nan (some vertices might have nan values)
-        betas = np.linalg.lstsq(dm, voxel, rcond = -1)[0]
+        betas = np.linalg.lstsq(dm, voxel, rcond = None)[0]
         prediction = dm.dot(betas)
 
         mse = np.mean((voxel - prediction) ** 2) # calculate mean of squared residuals
@@ -2150,7 +2153,7 @@ def get_ecc_limits(visual_dm, params, screen_size_deg = [11,11]):
 def get_cue_regressor(output, params, trial_info, hrf, cues = [0,1,2,3], TR = 1.6, oversampling_time = 1, baseline = None,
                       crop_unit = 'sec', crop = False, crop_TR = 3, overwrite = False, shift_TRs = True):
     
-    """Get time course for cue regressor
+    """Get timecourse for cue regressor
     
     Parameters
     ----------
@@ -2249,3 +2252,241 @@ def get_cue_regressor(output, params, trial_info, hrf, cues = [0,1,2,3], TR = 1.
         print('file already exists, loading %s'%output)
         
     return cue_regs
+
+
+def get_FA_regressor(fa_dm, params, pRFfit_pars, 
+                     pRFmodel = 'css', TR = 1.6, hrf_params = [1,1,0], oversampling_time = 1):
+    
+    """ Get timecourse for FA regressor, given a dm
+    
+    Parameters
+    ----------
+    fa_dm: array
+        fa design matrix N x samples (N = (x,y))
+    params: yml dict
+        with experiment params
+    pRFfit_pars: parameters object
+        Parameters object from lmfit
+    oversampling_time: int
+        value that FA dm is oversampled by, to then downsample predictor
+    
+    """
+    
+    ## make stimulus object, 
+    # which takes an input design matrix and sets up its real-world dimensions
+    prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
+                             screen_distance_cm = params['monitor']['distance'],
+                             design_matrix = fa_dm,
+                             TR = TR)
+    
+    ## create pRF estimates-based FA regressor
+    if pRFmodel == 'css':
+        
+        # define CSS model 
+        css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
+                                     filter_predictions = True,
+                                     filter_type = params['mri']['filtering']['type'],
+                                     filter_params = {'highpass': params['mri']['filtering']['highpass'],
+                                                     'add_mean': params['mri']['filtering']['add_mean'],
+                                                     'window_length': params['mri']['filtering']['window_length'],
+                                                     'polyorder': params['mri']['filtering']['polyorder']}
+                                    )
+        
+        model_fit = css_model.return_prediction(pRFfit_pars['pRF_x'].value, pRFfit_pars['pRF_y'].value,
+                                    pRFfit_pars['pRF_size'].value, pRFfit_pars['pRF_beta'].value,
+                                    pRFfit_pars['pRF_baseline'].value, pRFfit_pars['pRF_n'].value,
+                                    hrf_1 = hrf_params[1],
+                                    hrf_2 = hrf_params[2],
+                                    osf = oversampling_time)
+    else:
+        # assumes gaussian model
+        gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
+                                        filter_predictions = True,
+                                        filter_type = params['mri']['filtering']['type'],
+                                        filter_params = {'highpass': params['mri']['filtering']['highpass'],
+                                                        'add_mean': params['mri']['filtering']['add_mean'],
+                                                        'window_length': params['mri']['filtering']['window_length'],
+                                                        'polyorder': params['mri']['filtering']['polyorder']}
+                                    )
+
+        model_fit = gauss_model.return_prediction(pRFfit_pars['pRF_x'].value, pRFfit_pars['pRF_y'].value,
+                                    pRFfit_pars['pRF_size'].value, pRFfit_pars['pRF_beta'].value,
+                                    pRFfit_pars['pRF_baseline'].value,
+                                    hrf_1 = hrf_params[1],
+                                    hrf_2 = hrf_params[2],
+                                    osf = oversampling_time) 
+        
+    # original scale of data in seconds
+    original_scale = np.arange(0, model_fit.shape[-1]/oversampling_time, 1/oversampling_time)
+
+    # cubic interpolation of predictor
+    interp = interpolate.interp1d(original_scale, 
+                                model_fit, 
+                                kind = "cubic", axis=-1)
+    desired_scale = np.arange(0, model_fit.shape[-1]/oversampling_time, TR) # we want the predictor to be sampled in TR
+
+    FA_regressor = interp(desired_scale)
+    
+    # squeeze out single dimension
+    FA_regressor = np.squeeze(FA_regressor)
+    
+    return FA_regressor
+    
+    
+def get_residuals_FA(fit_pars, data, bar_dm_dict, params, hrf_params = [1,1,0], 
+                     cue_regressor = [], pRFmodel = 'css', 
+                     TR = 1.6, oversampling_time = 1, num_regs = 2):
+
+
+    ## set DM - all bars simultaneously on screen, multiplied by weights
+    for i, cond in enumerate(bar_dm_dict.keys()):
+        
+        if i==0:
+            gain_dm = bar_dm_dict[cond][np.newaxis,...]*fit_pars['gain_{cond}'.format(cond=cond)].value
+        else:
+            gain_dm = np.vstack((gain_dm, 
+                                bar_dm_dict[cond][np.newaxis,...]*fit_pars['gain_{cond}'.format(cond=cond)].value))
+    
+    # taking the max value of the spatial position at each time point (to account for overlaps)
+    gain_dm = np.amax(gain_dm, axis=0)
+
+
+    
+    ## make stimulus object, 
+    # which takes an input design matrix and sets up its real-world dimensions
+    prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
+                             screen_distance_cm = params['monitor']['distance'],
+                             design_matrix = gain_dm,
+                             TR = TR)
+    
+    ## create pRF estimates-based FA regressor
+    if pRFmodel == 'css':
+        
+        # define CSS model 
+        css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
+                                     filter_predictions = True,
+                                     filter_type = params['mri']['filtering']['type'],
+                                     filter_params = {'highpass': params['mri']['filtering']['highpass'],
+                                                     'add_mean': params['mri']['filtering']['add_mean'],
+                                                     'window_length': params['mri']['filtering']['window_length'],
+                                                     'polyorder': params['mri']['filtering']['polyorder']}
+                                    )
+        
+        model_fit = css_model.return_prediction(fit_pars['pRF_x'].value, fit_pars['pRF_y'].value,
+                                    fit_pars['pRF_size'].value, fit_pars['pRF_beta'].value,
+                                    fit_pars['pRF_baseline'].value, fit_pars['pRF_n'].value,
+                                    hrf_1 = hrf_params[1],
+                                    hrf_2 = hrf_params[2],
+                                    osf = oversampling_time)
+    else:
+        # assumes gaussian model
+        gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
+                                        filter_predictions = True,
+                                        filter_type = params['mri']['filtering']['type'],
+                                        filter_params = {'highpass': params['mri']['filtering']['highpass'],
+                                                        'add_mean': params['mri']['filtering']['add_mean'],
+                                                        'window_length': params['mri']['filtering']['window_length'],
+                                                        'polyorder': params['mri']['filtering']['polyorder']}
+                                    )
+
+        model_fit = gauss_model.return_prediction(fit_pars['pRF_x'].value, fit_pars['pRF_y'].value,
+                                    fit_pars['pRF_size'].value, fit_pars['pRF_beta'].value,
+                                    fit_pars['pRF_baseline'].value,
+                                    hrf_1 = hrf_params[1],
+                                    hrf_2 = hrf_params[2],
+                                    osf = oversampling_time) 
+        
+    # original scale of data in seconds
+    original_scale = np.arange(0, model_fit.shape[-1]/oversampling_time, 1/oversampling_time)
+
+    # cubic interpolation of predictor
+    interp = interpolate.interp1d(original_scale, 
+                                model_fit, 
+                                kind = "cubic", axis=-1)
+    desired_scale = np.arange(0, model_fit.shape[-1]/oversampling_time, TR) # we want the predictor to be sampled in TR
+
+    FA_regressor = interp(desired_scale)
+    # squeeze out single dimension
+    FA_regressor = np.squeeze(FA_regressor)
+
+    ## calculate model
+    if num_regs == 1: # if 1 regressor given, then comparing pRF FA regressor directly to data
+
+        prediction = FA_regressor
+
+        # calculate rsq of fit
+        r2 = 1 - (np.sum((data - prediction)**2)/ np.sum((data - np.mean(data))**2))  
+
+    else:
+        ## Make actual DM to be used in GLM fit (intercept + FA regressor + cue regressor)
+        
+        DM_FA = np.zeros((FA_regressor.shape[0], num_regs+1))
+        
+        DM_FA[...,0] = 1 # add intercept in first position
+        DM_FA[...,1] = FA_regressor # add FA regressor
+        DM_FA[...,2] = cue_regressor # add cue regressor
+        
+        ## Fit GLM on FA data
+        prediction, betas , r2, _ = fit_glm(data, DM_FA)
+        
+        # update values of pars, as outputed by glm 
+        fit_pars['intercept'].set(betas[0])
+        fit_pars['FA_beta'].set(betas[1])
+        fit_pars['cue_beta'].set(betas[2])
+
+    print('FA GLM fit R2 is %.2f'%r2)
+    
+    # return error "timecourse", that will be used by minimize
+    return  data - prediction
+
+
+def plot_FA_DM(output, bar_dm_dict, 
+               bar_weights = {'ACAO': 1, 'ACUO': 1, 'UCAO': 1,'UCUO': 1}, oversampling_time = 10):
+    
+    """Plot FA DM
+    
+    Parameters
+    ----------
+    output : string
+       absolute output name for numpy array
+    bar_dm_dict: dict
+        dictionary with the dm for each condition
+    bar_weights: dict
+        dictionary with weight values (gain) given to each bar
+    oversampling_time: int
+        value that cond dm is oversampled by, to then downsample when plotting
+        (note that FA_DM saved will be oversampled, same as inputs)
+    
+    """
+    
+    ## set DM - all bars simultaneously on screen, multiplied by weights
+    for i, cond in enumerate(bar_dm_dict.keys()):
+        
+        if i==0:
+            weighted_dm = bar_dm_dict[cond][np.newaxis,...]*bar_weights[cond]
+        else:
+            weighted_dm = np.vstack((weighted_dm, 
+                                bar_dm_dict[cond][np.newaxis,...]*bar_weights[cond]))
+    
+    # taking the max value of the spatial position at each time point (to account for overlaps)
+    weighted_dm = np.amax(weighted_dm, axis=0)
+    
+    # save array with DM
+    np.save(output, weighted_dm)
+    
+    ## save frames as images
+    #take into account oversampling
+    if oversampling_time == 1:
+        frames = np.arange(weighted_dm.shape[-1])
+    else:
+        frames = np.arange(0,weighted_dm.shape[-1],oversampling_time, dtype=int)  
+
+    outfolder = op.split(output)[0]
+
+    weighted_dm = weighted_dm.astype(np.uint8)
+
+    for w in frames:
+        im = Image.fromarray(weighted_dm[...,int(w)])
+        im.save(op.join(outfolder,op.split(output)[-1].replace('.npy','_trial-{time}.png'.format(time=str(int(w/oversampling_time)).zfill(3))))) 
+
+    print('saved dm in %s'%outfolder)

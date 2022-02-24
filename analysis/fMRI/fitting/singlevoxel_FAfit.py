@@ -20,21 +20,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cortex
 
-import scipy.signal as signal
-
 # requires pfpy to be installed - preferably with python setup.py develop
 from prfpy.rf import *
 from prfpy.timecourse import *
 from prfpy.stimulus import PRFStimulus2D
-from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
 
-from scipy import interpolate
 import seaborn as sns
 
-from joblib import Parallel, delayed
-
-import datetime
-from tqdm import tqdm
+from lmfit import Parameters
 
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
@@ -195,16 +188,16 @@ masked_pRF_estimates = mri_utils.mask_estimates(pRF_estimates, fit_model = model
                                         x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
 
 # save estimates in specific variables
-xx = masked_pRF_estimates['x'][roi_ind[roi]][vertex]
-yy = masked_pRF_estimates['y'][roi_ind[roi]][vertex]
+# of parameters object
+pRF_pars = Parameters()
 
-size = masked_pRF_estimates['size'][roi_ind[roi]][vertex]
-
-beta = masked_pRF_estimates['beta'][roi_ind[roi]][vertex]
-baseline = masked_pRF_estimates['baseline'][roi_ind[roi]][vertex]
-
+pRF_pars.add('pRF_x', value = masked_pRF_estimates['x'][roi_ind[roi]][vertex])
+pRF_pars.add('pRF_y', value = masked_pRF_estimates['y'][roi_ind[roi]][vertex])
+pRF_pars.add('pRF_size', value = masked_pRF_estimates['size'][roi_ind[roi]][vertex])
+pRF_pars.add('pRF_beta', value = masked_pRF_estimates['beta'][roi_ind[roi]][vertex])
+pRF_pars.add('pRF_baseline', value = masked_pRF_estimates['baseline'][roi_ind[roi]][vertex])
 if 'css' in model_type:
-    ns = masked_pRF_estimates['ns'][roi_ind[roi]][vertex]
+    pRF_pars.add('pRF_n', value = masked_pRF_estimates['ns'][roi_ind[roi]][vertex])
 
 rsq = masked_pRF_estimates['rsq'][roi_ind[roi]][vertex]
 
@@ -286,81 +279,19 @@ for reg in all_regressors['reg_name'].values:
     # make array with spatial position of bar of interest 
     DM_cond = mri_utils.get_FA_bar_stim(DM_reg_filename, 
                         params, bar_pos, trial_info, attend_cond = all_regressors[all_regressors['reg_name']==reg].to_dict('r')[0], 
-                        save_imgs = False, downsample = 0.1, crop = False, shift_TRs = False, #params['feature']['crop'],
-                        oversampling_time = osf, stim_dur_seconds = params['feature']['bars_phase_dur'], 
-                        crop_TR = params['feature']['crop_TR'], overwrite=True, save_DM=False)
-    
-    # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
-    prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
-                                screen_distance_cm = params['monitor']['distance'],
-                                design_matrix = DM_cond,
-                                TR = TR)#FA_sampling_rate)
+                        save_imgs = False, downsample = 0.1, oversampling_time = osf, 
+                        stim_dur_seconds = params['feature']['bars_phase_dur'], 
+                        crop = True, crop_unit = 'sec', 
+                        crop_TR = params['feature']['crop_TR'],
+                        shift_TRs = True, TR = TR,
+                        overwrite = True, save_DM = False)
 
-    # get prediction
-    if model_type == 'css':
-
-        # define CSS model 
-        css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
-                                        filter_predictions = True,
-                                        filter_type = params['mri']['filtering']['type'],
-                                        filter_params = {'highpass': params['mri']['filtering']['highpass'],
-                                                        'add_mean': params['mri']['filtering']['add_mean'],
-                                                        'window_length': params['mri']['filtering']['window_length'],
-                                                        'polyorder': params['mri']['filtering']['polyorder']}
-                                    )
-        # set our oversampled hrf
-        css_model.hrf = hrf_oversampled
-
-        model_fit = css_model.return_prediction(xx,yy,
-                                    size, beta,
-                                    baseline, ns,
-                                    hrf_1 = hrf_params[1],
-                                    hrf_2 = hrf_params[2],
-                                    osf = osf)
-
-    else:
-        # define gaussian model 
-        gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
-                                        filter_predictions = True,
-                                        filter_type = params['mri']['filtering']['type'],
-                                        filter_params = {'highpass': params['mri']['filtering']['highpass'],
-                                                        'add_mean': params['mri']['filtering']['add_mean'],
-                                                        'window_length': params['mri']['filtering']['window_length'],
-                                                        'polyorder': params['mri']['filtering']['polyorder']}
-                                    )
-        # set our oversampled hrf
-        gauss_model.hrf = hrf_oversampled
-
-        model_fit = gauss_model.return_prediction(xx,yy,
-                                    size, beta,
-                                    baseline,
-                                    hrf_1 = hrf_params[1],
-                                    hrf_2 = hrf_params[2],
-                                    osf = osf) 
-
-    # original scale of data in seconds
-    original_scale = np.arange(0, model_fit.shape[-1]/osf, 1/osf)
-
-    # cubic interpolation of predictor
-    interp = interpolate.interp1d(original_scale, 
-                                model_fit, 
-                                kind = "cubic", axis=-1)
-    desired_scale = np.arange(0, model_fit.shape[-1]/osf, TR) # we want the predictor to be sampled in TR
-
-    resampled_predictor = interp(desired_scale)
-
-    ## need to crop out of function, to avoid rounding errors
-    if params['feature']['crop']: # if cropping runs 
-        resampled_predictor = resampled_predictor[...,params['feature']['crop_TR']::] 
-        
-    ## also shifting TR to the left (quick fix)
-    # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
-    new_resampled_predictor = resampled_predictor.copy()
-    new_resampled_predictor[...,:-1] = resampled_predictor[...,1:]
-    prediction = new_resampled_predictor.copy()
+    prediction = mri_utils.get_FA_regressor(DM_cond, params, pRF_pars, 
+                                            pRFmodel = model_type, TR = TR, hrf_params = hrf_params, 
+                                            oversampling_time = osf)
     
     ## append predictions in array, to use for FA GLM DM
-    all_reg_predictions.append(prediction[np.newaxis,...])
+    all_reg_predictions.append(prediction[np.newaxis,...][np.newaxis,...])
 
 all_reg_predictions = np.vstack(all_reg_predictions)
 
@@ -373,40 +304,14 @@ cue_regs_upsampled = np.zeros((params['feature']['mini_blocks'], all_reg_predict
                                len(trial_info['trial_num'].values)*osf))
 
 for blk in range(params['feature']['mini_blocks']): # for each miniblock
-    
-    for trl in trial_info.loc[trial_info['trial_type']=='cue_%i'%blk]['trial_num'].values:
-        
-        ## fill upsampled array
-        cue_regs_upsampled[blk,:,trl*osf:trl*osf+osf] = 1
-    
-    # convolve with spm hrf, similar to what prfpy is using
-    cue_regs_upsampled[blk] = signal.fftconvolve(cue_regs_upsampled[blk], hrf_oversampled, 
-                                            mode='full', axes=(-1))[..., :cue_regs_upsampled.shape[-1]]
 
-    # original scale of data in seconds
-    original_scale = np.arange(0, cue_regs_upsampled[blk].shape[-1]/osf, 1/osf)
+    cue_regressor = mri_utils.get_cue_regressor(params, trial_info, hrf_params = hrf_params, 
+                                                cues = [blk], TR = TR, oversampling_time = osf, 
+                                                baseline = pRF_pars['pRF_baseline'].value,
+                                                crop_unit = 'sec', crop = True, crop_TR = params['feature']['crop_TR'], 
+                                                shift_TRs = True)
 
-    # cubic interpolation of predictor
-    interp = interpolate.interp1d(original_scale, 
-                                cue_regs_upsampled[blk], 
-                                kind = "cubic", axis=-1)
-    desired_scale = np.arange(0, cue_regs_upsampled[blk].shape[-1]/osf, TR) # we want the predictor to be sampled in TR
-
-    cue_regs_RESAMPLED = interp(desired_scale)
-
-    ## filter it, like we do to the data
-    cue_regs_RESAMPLED =  mri_utils.dc_data(cue_regs_RESAMPLED,
-                             first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'])
-
-    ## need to crop out of function, to avoid rounding errors
-    if params['feature']['crop']: # if cropping runs 
-        cue_regs[blk] = cue_regs_RESAMPLED[...,params['feature']['crop_TR']::] 
-        
-    ## also shifting TR to the left (quick fix)
-    # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
-    new_cue_regs = cue_regs[blk].copy()
-    new_cue_regs[...,:-1] = cue_regs[blk][...,1:]
-    cue_regs[blk] = new_cue_regs.copy()
+    cue_regs[blk] = cue_regressor.copy()[np.newaxis,...]
     
     ## also update regressors info to know name and order of regressors
     # basically including cues

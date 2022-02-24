@@ -19,7 +19,6 @@ from scipy import fft, interpolate
 from nilearn import surface
 
 from joblib import Parallel, delayed
-from tqdm import tqdm
 
 import matplotlib.pyplot as plt
 
@@ -31,7 +30,7 @@ from PIL import Image, ImageDraw
 from matplotlib import cm
 import matplotlib.colors
 
-from scipy.stats import pearsonr, t, norm
+from scipy.stats import t, norm
 
 import scipy.signal as signal
 from nilearn.glm.first_level.hemodynamic_models import spm_hrf, spm_time_derivative, spm_dispersion_derivative
@@ -40,6 +39,8 @@ from nilearn.signal import clean
 
 from prfpy.stimulus import PRFStimulus2D
 from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
+
+
 
 def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=None):
     
@@ -2151,7 +2152,7 @@ def get_ecc_limits(visual_dm, params, screen_size_deg = [11,11]):
 
 
 def get_cue_regressor(params, trial_info, hrf_params = [1,1,0], cues = [0,1,2,3], TR = 1.6, oversampling_time = 1, baseline = None,
-                      crop_unit = 'sec', crop = False, crop_TR = 3, overwrite = False, shift_TRs = True, pad_length = 20):
+                      crop_unit = 'sec', crop = False, crop_TR = 3, shift_TRs = True, pad_length = 20):
     
     """Get timecourse for cue regressor
     
@@ -2239,7 +2240,7 @@ def get_cue_regressor(params, trial_info, hrf_params = [1,1,0], cues = [0,1,2,3]
 
 
 def get_FA_regressor(fa_dm, params, pRFfit_pars, 
-                     pRFmodel = 'css', TR = 1.6, hrf_params = [1,1,0], oversampling_time = 1):
+                     pRFmodel = 'css', TR = 1.6, hrf_params = [1,1,0], oversampling_time = 1, pad_length=20):
     
     """ Get timecourse for FA regressor, given a dm
     
@@ -2281,7 +2282,8 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars,
                                     pRFfit_pars['pRF_baseline'].value, pRFfit_pars['pRF_n'].value,
                                     hrf_1 = hrf_params[1],
                                     hrf_2 = hrf_params[2],
-                                    osf = oversampling_time)
+                                    osf = oversampling_time,
+                                    pad_length = pad_length*oversampling_time)
     else:
         # assumes gaussian model
         gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
@@ -2298,7 +2300,8 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars,
                                     pRFfit_pars['pRF_baseline'].value,
                                     hrf_1 = hrf_params[1],
                                     hrf_2 = hrf_params[2],
-                                    osf = oversampling_time) 
+                                    osf = oversampling_time,
+                                    pad_length = pad_length*oversampling_time) 
         
     # original scale of data in seconds
     original_scale = np.arange(0, model_fit.shape[-1]/oversampling_time, 1/oversampling_time)

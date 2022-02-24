@@ -2150,8 +2150,8 @@ def get_ecc_limits(visual_dm, params, screen_size_deg = [11,11]):
     return x_ecc_limit, y_ecc_limit
 
 
-def get_cue_regressor(output, params, trial_info, hrf, cues = [0,1,2,3], TR = 1.6, oversampling_time = 1, baseline = None,
-                      crop_unit = 'sec', crop = False, crop_TR = 3, overwrite = False, shift_TRs = True):
+def get_cue_regressor(params, trial_info, hrf_params = [1,1,0], cues = [0,1,2,3], TR = 1.6, oversampling_time = 1, baseline = None,
+                      crop_unit = 'sec', crop = False, crop_TR = 3, overwrite = False, shift_TRs = True, pad_length = 20):
     
     """Get timecourse for cue regressor
     
@@ -2169,87 +2169,71 @@ def get_cue_regressor(output, params, trial_info, hrf, cues = [0,1,2,3], TR = 1.
         list with cue miniblock numbers (we might want to have all cues in reg or just one)
     
     """
+
+    hrf = create_hrf(hrf_params = hrf_params, TR = TR, osf = oversampling_time)
+        
+    # initialized array of zeros for cue regressors - UPSAMPLED
+    cue_regs_upsampled = np.zeros((1, len(trial_info)*oversampling_time))
     
-    if not op.exists(output) or overwrite == True:
-        print('making %s'%output)
-        
-        if not op.exists(op.split(output)[0]): # make base dir to save files
-            os.makedirs(op.split(output)[0])
-          
-        # initialized array of zeros for cue regressors - UPSAMPLED
-        cue_regs_upsampled = np.zeros((hrf.shape[0], len(trial_info)*oversampling_time))
-        
-        # fill it given cue onsets
-        for c in cues:
-            for trl in trial_info.loc[trial_info['trial_type']=='cue_%i'%c]['trial_num'].values:
-                
-                cue_regs_upsampled[:,trl*oversampling_time:trl*oversampling_time+oversampling_time] = 1
-                
-        # in case we want to crop the beginning of the DM
-        if crop == True:
-            if crop_unit == 'sec': # fix for the fact that I crop TRs, but task not synced to TR
-                cue_regs_upsampled = cue_regs_upsampled[...,int(crop_TR*TR*oversampling_time)::] 
-            else: # assumes unit is TR
-                cue_regs_upsampled = cue_regs_upsampled[...,crop_TR*oversampling_time::]
-                
-        # shifting TRs to the left (quick fix)
-        # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
-        if shift_TRs == True:
-            new_cue_regs_upsampled = cue_regs_upsampled.copy()
+    # fill it given cue onsets
+    for c in cues:
+        for trl in trial_info.loc[trial_info['trial_type']=='cue_%i'%c]['trial_num'].values:
+            
+            cue_regs_upsampled[:,trl*oversampling_time:trl*oversampling_time+oversampling_time] = 1
+            
+    # in case we want to crop the beginning of the DM
+    if crop == True:
+        if crop_unit == 'sec': # fix for the fact that I crop TRs, but task not synced to TR
+            cue_regs_upsampled = cue_regs_upsampled[...,int(crop_TR*TR*oversampling_time)::] 
+        else: # assumes unit is TR
+            cue_regs_upsampled = cue_regs_upsampled[...,crop_TR*oversampling_time::]
+            
+    # shifting TRs to the left (quick fix)
+    # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
+    if shift_TRs == True:
+        new_cue_regs_upsampled = cue_regs_upsampled.copy()
 
-            if crop_unit == 'sec': # fix for the fact that I shift TRs, but task not synced to TR
-                new_cue_regs_upsampled[...,:-1*int(TR*oversampling_time)] = cue_regs_upsampled[...,1*int(TR*oversampling_time):]
-            else: # assumes unit is TR
-                new_cue_regs_upsampled[...,:-1*oversampling_time] = cue_regs_upsampled[...,1*oversampling_time:]
+        if crop_unit == 'sec': # fix for the fact that I shift TRs, but task not synced to TR
+            new_cue_regs_upsampled[...,:-1*int(TR*oversampling_time)] = cue_regs_upsampled[...,1*int(TR*oversampling_time):]
+        else: # assumes unit is TR
+            new_cue_regs_upsampled[...,:-1*oversampling_time] = cue_regs_upsampled[...,1*oversampling_time:]
 
-            cue_regs_upsampled = new_cue_regs_upsampled.copy()
-        
-         
-        # to deal with nans
-        mask_ind = np.unique(np.where(~np.isnan(hrf))[0])
-        
-        # convolve with hrf
-        cue_convolved = Parallel(n_jobs=16)(delayed(signal.fftconvolve)(cue_regs_upsampled[vert], 
-                                                    hrf[vert], 
-                                                    mode='full', 
-                                                    axes=(-1)) for _,vert in enumerate(tqdm(mask_ind)))
-        cue_convolved = np.array(cue_convolved)[...,:cue_regs_upsampled.shape[-1]]
-        
-        # save convolved upsampled cue in array
-        cue_regs_upsampled[mask_ind] = cue_convolved
-        
-        ## resample to data sampling rate
-        
-        # original scale of data in seconds
-        original_scale = np.arange(0, cue_regs_upsampled.shape[-1]/oversampling_time, 1/oversampling_time)
-
-        # cubic interpolation of predictor
-        interp = interpolate.interp1d(original_scale, 
-                                    cue_regs_upsampled, 
-                                    kind = "cubic", axis=-1)
-        desired_scale = np.arange(0, cue_regs_upsampled.shape[-1]/oversampling_time, TR) # we want the predictor to be sampled in TR
-
-        cue_regs_RESAMPLED = interp(desired_scale)
-
-        ## filter it, like we do to the data
-        cue_regs_RESAMPLED =  dc_data(cue_regs_RESAMPLED,
-                                 first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'])
-        
-        ## make nan vertices that are not to be fitted
-        cue_regs = np.zeros(cue_regs_RESAMPLED.shape); cue_regs[:] = np.nan 
-        cue_regs[mask_ind] = cue_regs_RESAMPLED[mask_ind]
-        
-        # add baseline if baseline array/value specified
-        if baseline is not None:
-            cue_regs[mask_ind] += baseline[mask_ind,np.newaxis] 
-      
-        # save regressor in folder, for later use/plotting
-        np.save(output, cue_regs)
+        cue_regs_upsampled = new_cue_regs_upsampled.copy()
     
-    else:
-        # load regressor
-        cue_regs = np.load(output)
-        print('file already exists, loading %s'%output)
+    
+    ## convolve with hrf
+    #scipy fftconvolve does not have padding options so doing it manually
+    pad = np.tile(cue_regs_upsampled[:,0], (pad_length*oversampling_time,1)).T
+    padded_cue = np.hstack((pad,cue_regs_upsampled))
+
+    cue_convolved = signal.fftconvolve(padded_cue, hrf, axes=(-1))[..., pad_length*oversampling_time:cue_regs_upsampled.shape[-1]+pad_length*oversampling_time]  
+    
+    # save convolved upsampled cue in array
+    cue_regs_upsampled = np.array(cue_convolved)#[...,:cue_regs_upsampled.shape[-1]]
+    
+    ## resample to data sampling rate
+    
+    # original scale of data in seconds
+    original_scale = np.arange(0, cue_regs_upsampled.shape[-1]/oversampling_time, 1/oversampling_time)
+
+    # cubic interpolation of predictor
+    interp = interpolate.interp1d(original_scale, 
+                                cue_regs_upsampled, 
+                                kind = "cubic", axis=-1)
+    desired_scale = np.arange(0, cue_regs_upsampled.shape[-1]/oversampling_time, TR) # we want the predictor to be sampled in TR
+
+    cue_regs_RESAMPLED = interp(desired_scale)
+
+    ## filter it, like we do to the data
+    cue_regs_RESAMPLED =  dc_data(cue_regs_RESAMPLED,
+                                first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'])
+    
+    ## make nan vertices that are not to be fitted
+    cue_regs = cue_regs_RESAMPLED
+    
+    # add baseline if baseline array/value specified
+    if baseline is not None:
+        cue_regs += baseline 
         
     return cue_regs
 
@@ -2350,65 +2334,10 @@ def get_residuals_FA(fit_pars, data, bar_dm_dict, params, hrf_params = [1,1,0],
     # taking the max value of the spatial position at each time point (to account for overlaps)
     gain_dm = np.amax(gain_dm, axis=0)
 
-
+    ## get FA regressor
+    FA_regressor = get_FA_regressor(gain_dm, params, fit_pars, 
+                                    pRFmodel = pRFmodel, TR = TR, hrf_params = hrf_params, oversampling_time = oversampling_time)
     
-    ## make stimulus object, 
-    # which takes an input design matrix and sets up its real-world dimensions
-    prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
-                             screen_distance_cm = params['monitor']['distance'],
-                             design_matrix = gain_dm,
-                             TR = TR)
-    
-    ## create pRF estimates-based FA regressor
-    if pRFmodel == 'css':
-        
-        # define CSS model 
-        css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
-                                     filter_predictions = True,
-                                     filter_type = params['mri']['filtering']['type'],
-                                     filter_params = {'highpass': params['mri']['filtering']['highpass'],
-                                                     'add_mean': params['mri']['filtering']['add_mean'],
-                                                     'window_length': params['mri']['filtering']['window_length'],
-                                                     'polyorder': params['mri']['filtering']['polyorder']}
-                                    )
-        
-        model_fit = css_model.return_prediction(fit_pars['pRF_x'].value, fit_pars['pRF_y'].value,
-                                    fit_pars['pRF_size'].value, fit_pars['pRF_beta'].value,
-                                    fit_pars['pRF_baseline'].value, fit_pars['pRF_n'].value,
-                                    hrf_1 = hrf_params[1],
-                                    hrf_2 = hrf_params[2],
-                                    osf = oversampling_time)
-    else:
-        # assumes gaussian model
-        gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
-                                        filter_predictions = True,
-                                        filter_type = params['mri']['filtering']['type'],
-                                        filter_params = {'highpass': params['mri']['filtering']['highpass'],
-                                                        'add_mean': params['mri']['filtering']['add_mean'],
-                                                        'window_length': params['mri']['filtering']['window_length'],
-                                                        'polyorder': params['mri']['filtering']['polyorder']}
-                                    )
-
-        model_fit = gauss_model.return_prediction(fit_pars['pRF_x'].value, fit_pars['pRF_y'].value,
-                                    fit_pars['pRF_size'].value, fit_pars['pRF_beta'].value,
-                                    fit_pars['pRF_baseline'].value,
-                                    hrf_1 = hrf_params[1],
-                                    hrf_2 = hrf_params[2],
-                                    osf = oversampling_time) 
-        
-    # original scale of data in seconds
-    original_scale = np.arange(0, model_fit.shape[-1]/oversampling_time, 1/oversampling_time)
-
-    # cubic interpolation of predictor
-    interp = interpolate.interp1d(original_scale, 
-                                model_fit, 
-                                kind = "cubic", axis=-1)
-    desired_scale = np.arange(0, model_fit.shape[-1]/oversampling_time, TR) # we want the predictor to be sampled in TR
-
-    FA_regressor = interp(desired_scale)
-    # squeeze out single dimension
-    FA_regressor = np.squeeze(FA_regressor)
-
     ## calculate model
     if num_regs == 1: # if 1 regressor given, then comparing pRF FA regressor directly to data
 
@@ -2490,3 +2419,79 @@ def plot_FA_DM(output, bar_dm_dict,
         im.save(op.join(outfolder,op.split(output)[-1].replace('.npy','_trial-{time}.png'.format(time=str(int(w/oversampling_time)).zfill(3))))) 
 
     print('saved dm in %s'%outfolder)
+
+
+def plot_FA_model(fit_pars, data, bar_dm_dict, params, hrf_params = [1,1,0], 
+                     cue_regressor = [], pRFmodel = 'css', 
+                     TR = 1.6, oversampling_time = 1, num_regs = 2):
+    
+    ### REDUNDANT FUNC - JUST FOR QUICK CHECK ###
+
+    ## set DM - all bars simultaneously on screen, multiplied by weights
+    for i, cond in enumerate(bar_dm_dict.keys()):
+        
+        if i==0:
+            gain_dm = bar_dm_dict[cond][np.newaxis,...]*fit_pars['gain_{cond}'.format(cond=cond)].value
+        else:
+            gain_dm = np.vstack((gain_dm, 
+                                bar_dm_dict[cond][np.newaxis,...]*fit_pars['gain_{cond}'.format(cond=cond)].value))
+    
+    # taking the max value of the spatial position at each time point (to account for overlaps)
+    gain_dm = np.amax(gain_dm, axis=0)
+
+    ## get FA regressor
+    FA_regressor = get_FA_regressor(gain_dm, params, fit_pars, 
+                                    pRFmodel = pRFmodel, TR = TR, hrf_params = hrf_params, oversampling_time = oversampling_time)
+    
+    ## calculate model
+    if num_regs == 1: # if 1 regressor given, then comparing pRF FA regressor directly to data
+
+        prediction = FA_regressor
+
+        # calculate rsq of fit
+        r2 = 1 - (np.sum((data - prediction)**2)/ np.sum((data - np.mean(data))**2))  
+
+    else:
+        ## Make actual DM to be used in GLM fit (intercept + FA regressor + cue regressor)
+        
+        DM_FA = np.zeros((FA_regressor.shape[0], num_regs+1))
+        
+        DM_FA[...,0] = 1 # add intercept in first position
+        DM_FA[...,1] = FA_regressor # add FA regressor
+        DM_FA[...,2] = cue_regressor # add cue regressor
+        
+        ## Fit GLM on FA data
+        prediction, _ , r2, _ = fit_glm(data, DM_FA)
+        
+    
+    ## now plot data with model
+
+    fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
+
+    # plot data with model
+    time_sec = np.linspace(0,len(data)*TR, num=len(data)) # array with timepoints, in seconds
+
+    plt.plot(time_sec, prediction, c='#0040ff',lw=3,label='model R$^2$ = %.2f'%r2,zorder=1)
+    plt.plot(time_sec, data,'k--',label='FA data')
+    axis.set_xlabel('Time (s)',fontsize=20, labelpad=20)
+    axis.set_ylabel('BOLD signal change (%)',fontsize=20, labelpad=10)
+    axis.set_xlim(0,len(prediction)*TR)
+    axis.legend(loc='upper left',fontsize=10)  # doing this to guarantee that legend is how I want it 
+    #axis.set_ylim(-3,3)  
+
+    # times where bar is on screen [1st on, last on, 1st on, last on, etc] 
+    bar_onset = np.array([27,98,126,197,225,296,324,395])#/TR
+
+    if params['feature']['crop']:
+        bar_onset = bar_onset - params['feature']['crop_TR']*TR - TR
+
+    bar_directions = [val for _,val in enumerate(params['feature']['bar_pass_direction']) if 'empty' not in val and 'cue' not in val]
+    # plot axis vertical bar on background to indicate stimulus display time
+    ax_count = 0
+    for h in range(len(bar_directions)):
+
+        plt.axvspan(bar_onset[ax_count], bar_onset[ax_count+1]+TR, facecolor='#0040ff', alpha=0.1)
+
+        ax_count += 2
+
+

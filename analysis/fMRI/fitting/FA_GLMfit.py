@@ -29,6 +29,7 @@ from joblib import Parallel, delayed
 import datetime
 from tqdm import tqdm
 from scipy import interpolate
+from lmfit import Parameters
 
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
@@ -154,6 +155,22 @@ masked_pRF_estimates = mri_utils.mask_estimates(pRF_estimates, fit_model = model
                                         x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
 
 # save estimates in specific variables
+# of parameters object
+pRF_pars = Parameters()
+
+pRF_pars.add('pRF_x', value = masked_pRF_estimates['x'])
+pRF_pars.add('pRF_y', value = masked_pRF_estimates['y'])
+pRF_pars.add('pRF_size', value = masked_pRF_estimates['size'][roi_ind[roi]][vertex])
+pRF_pars.add('pRF_beta', value = masked_pRF_estimates['beta'][roi_ind[roi]][vertex])
+pRF_pars.add('pRF_baseline', value = masked_pRF_estimates['baseline'][roi_ind[roi]][vertex])
+if 'css' in model_type:
+    pRF_pars.add('pRF_n', value = masked_pRF_estimates['ns'][roi_ind[roi]][vertex])
+
+rsq = masked_pRF_estimates['rsq'][roi_ind[roi]][vertex]
+
+
+
+
 xx = masked_pRF_estimates['x']
 yy = masked_pRF_estimates['y']
 

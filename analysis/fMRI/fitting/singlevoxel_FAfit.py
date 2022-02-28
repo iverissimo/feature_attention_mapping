@@ -283,7 +283,7 @@ for reg in all_regressors['reg_name'].values:
                         stim_dur_seconds = params['feature']['bars_phase_dur'], 
                         crop = True, crop_unit = 'sec', 
                         crop_TR = params['feature']['crop_TR'],
-                        shift_TRs = True, TR = TR,
+                        shift_TRs = True, TR = TR, shift_TR_num = 1.5,
                         overwrite = True, save_DM = False)
 
     prediction = mri_utils.get_FA_regressor(DM_cond, params, pRF_pars, 
@@ -309,7 +309,7 @@ for blk in range(params['feature']['mini_blocks']): # for each miniblock
                                                 cues = [blk], TR = TR, oversampling_time = osf, 
                                                 baseline = pRF_pars['pRF_baseline'].value,
                                                 crop_unit = 'sec', crop = True, crop_TR = params['feature']['crop_TR'], 
-                                                shift_TRs = True)
+                                                shift_TRs = True, shift_TR_num = 1.5)
 
     cue_regs[blk] = cue_regressor.copy()[np.newaxis,...]
     

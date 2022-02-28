@@ -159,7 +159,7 @@ mri: # refers to the Psychopy SyncGenerator class
 
       fit_model: 'css' #'gauss' #'css'
 
-      fit_hrf: True
+      fit_hrf: True #True
 
       grid_nr: 40 # number of grid steps
       min_eccen: 0.2

@@ -40,7 +40,8 @@ from nilearn.signal import clean
 from prfpy.stimulus import PRFStimulus2D
 from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
 
-
+from nilearn.glm.first_level import first_level
+from nilearn.glm.regression import ARModel
 
 def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=None):
     
@@ -1302,7 +1303,7 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
                                    'condition_name': 'red_vertical',
                                    'miniblock': 0,'run': 1}, TR = 1.6, crop_unit = 'sec',
                     save_imgs = False, downsample = None, oversampling_time = 1, stim_dur_seconds = 0.5,
-                    crop = False, crop_TR = 8, overwrite=False, shift_TRs=True, save_DM=True):
+                    crop = False, crop_TR = 8, overwrite=False, shift_TRs=True, shift_TR_num = 1, save_DM=True):
     
     """Get visual stim for FA condition.
     Similar to make_pRF_DM, it will
@@ -1463,9 +1464,9 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
             new_visual_dm = visual_dm.copy()
 
             if crop_unit == 'sec': # fix for the fact that I shift TRs, but task not synced to TR
-                new_visual_dm[...,:-1*int(TR*oversampling_time)] = visual_dm[...,1*int(TR*oversampling_time):]
+                new_visual_dm[...,:-int(shift_TR_num*TR*oversampling_time)] = visual_dm[...,int(shift_TR_num*TR*oversampling_time):]
             else: # assumes unit is TR
-                new_visual_dm[...,:-int(1*oversampling_time)] = visual_dm[...,int(1*oversampling_time):]
+                new_visual_dm[...,:-int(shift_TR_num*oversampling_time)] = visual_dm[...,int(shift_TR_num*oversampling_time):]
                 
             visual_dm = new_visual_dm.copy()
 
@@ -2152,7 +2153,7 @@ def get_ecc_limits(visual_dm, params, screen_size_deg = [11,11]):
 
 
 def get_cue_regressor(params, trial_info, hrf_params = [1,1,0], cues = [0,1,2,3], TR = 1.6, oversampling_time = 1, baseline = None,
-                      crop_unit = 'sec', crop = False, crop_TR = 3, shift_TRs = True, pad_length = 20):
+                      crop_unit = 'sec', crop = False, crop_TR = 3, shift_TRs = True, shift_TR_num = 1, pad_length = 20):
     
     """Get timecourse for cue regressor
     
@@ -2195,9 +2196,9 @@ def get_cue_regressor(params, trial_info, hrf_params = [1,1,0], cues = [0,1,2,3]
         new_cue_regs_upsampled = cue_regs_upsampled.copy()
 
         if crop_unit == 'sec': # fix for the fact that I shift TRs, but task not synced to TR
-            new_cue_regs_upsampled[...,:-1*int(TR*oversampling_time)] = cue_regs_upsampled[...,1*int(TR*oversampling_time):]
+            new_cue_regs_upsampled[...,:-int(shift_TR_num*TR*oversampling_time)] = cue_regs_upsampled[...,int(shift_TR_num*TR*oversampling_time):]
         else: # assumes unit is TR
-            new_cue_regs_upsampled[...,:-1*oversampling_time] = cue_regs_upsampled[...,1*oversampling_time:]
+            new_cue_regs_upsampled[...,:-int(shift_TR_num*oversampling_time)] = cue_regs_upsampled[...,int(shift_TR_num*oversampling_time):]
 
         cue_regs_upsampled = new_cue_regs_upsampled.copy()
     
@@ -2319,9 +2320,9 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars,
     
     return FA_regressor
     
-    
+
 def get_residuals_FA(fit_pars, data, bar_dm_dict, params, hrf_params = [1,1,0], 
-                     cue_regressor = [], pRFmodel = 'css', 
+                     cue_regressor = [], pRFmodel = 'css', ar_noise_model = 1, 
                      TR = 1.6, oversampling_time = 1, num_regs = 2):
 
 
@@ -2367,9 +2368,20 @@ def get_residuals_FA(fit_pars, data, bar_dm_dict, params, hrf_params = [1,1,0],
         fit_pars['cue_beta'].set(betas[2])
 
     print('FA GLM fit R2 is %.2f'%r2)
-    
+
+    # OLS residuals
+    residuals = data - prediction
+
+    # compute the AR coefficients
+    ar_coef_ = first_level._yule_walker(residuals, ar_noise_model)
+    # Fit the AR model according to current AR(N) estimates
+    ar_result = ARModel(DM_FA, ar_coef_).fit(data.T)
+
+    residuals = ar_result.residuals
+    print('FA GLM fit with AR - R2 is %.2f'%ar_result.r_square)
+
     # return error "timecourse", that will be used by minimize
-    return  data - prediction
+    return  residuals
 
 
 def plot_FA_DM(output, bar_dm_dict, 

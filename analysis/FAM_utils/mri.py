@@ -43,6 +43,11 @@ from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
 from nilearn.glm.first_level import first_level
 from nilearn.glm.regression import ARModel
 
+from prfpy.rf import gauss2D_iso_cart
+from prfpy.timecourse import stimulus_through_prf
+
+from prfpy.timecourse import filter_predictions
+
 def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=None):
     
     """Import a subject from fmriprep-output to pycortex
@@ -2202,7 +2207,6 @@ def get_cue_regressor(params, trial_info, hrf_params = [1,1,0], cues = [0,1,2,3]
 
         cue_regs_upsampled = new_cue_regs_upsampled.copy()
     
-    
     ## convolve with hrf
     #scipy fftconvolve does not have padding options so doing it manually
     pad = np.tile(cue_regs_upsampled[:,0], (pad_length*oversampling_time,1)).T
@@ -2240,7 +2244,7 @@ def get_cue_regressor(params, trial_info, hrf_params = [1,1,0], cues = [0,1,2,3]
     return cue_regs
 
 
-def get_FA_regressor(fa_dm, params, pRFfit_pars, 
+def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True, 
                      pRFmodel = 'css', TR = 1.6, hrf_params = [1,1,0], oversampling_time = 1, pad_length=20):
     
     """ Get timecourse for FA regressor, given a dm
@@ -2257,53 +2261,51 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars,
         value that FA dm is oversampled by, to then downsample predictor
     
     """
-    
-    ## make stimulus object, 
-    # which takes an input design matrix and sets up its real-world dimensions
-    prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
-                             screen_distance_cm = params['monitor']['distance'],
-                             design_matrix = fa_dm,
-                             TR = TR)
-    
-    ## create pRF estimates-based FA regressor
-    if pRFmodel == 'css':
-        
-        # define CSS model 
-        css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
-                                     filter_predictions = True,
-                                     filter_type = params['mri']['filtering']['type'],
-                                     filter_params = {'highpass': params['mri']['filtering']['highpass'],
-                                                     'add_mean': params['mri']['filtering']['add_mean'],
-                                                     'window_length': params['mri']['filtering']['window_length'],
-                                                     'polyorder': params['mri']['filtering']['polyorder']}
-                                    )
-        
-        model_fit = css_model.return_prediction(pRFfit_pars['pRF_x'].value, pRFfit_pars['pRF_y'].value,
-                                    pRFfit_pars['pRF_size'].value, pRFfit_pars['pRF_beta'].value,
-                                    pRFfit_pars['pRF_baseline'].value, pRFfit_pars['pRF_n'].value,
-                                    hrf_1 = hrf_params[1],
-                                    hrf_2 = hrf_params[2],
-                                    osf = oversampling_time,
-                                    pad_length = pad_length*oversampling_time)
-    else:
-        # assumes gaussian model
-        gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
-                                        filter_predictions = True,
-                                        filter_type = params['mri']['filtering']['type'],
-                                        filter_params = {'highpass': params['mri']['filtering']['highpass'],
-                                                        'add_mean': params['mri']['filtering']['add_mean'],
-                                                        'window_length': params['mri']['filtering']['window_length'],
-                                                        'polyorder': params['mri']['filtering']['polyorder']}
-                                    )
+    ## set hrf
+    hrf = create_hrf(hrf_params = hrf_params, TR = TR, osf = oversampling_time)
 
-        model_fit = gauss_model.return_prediction(pRFfit_pars['pRF_x'].value, pRFfit_pars['pRF_y'].value,
-                                    pRFfit_pars['pRF_size'].value, pRFfit_pars['pRF_beta'].value,
-                                    pRFfit_pars['pRF_baseline'].value,
-                                    hrf_1 = hrf_params[1],
-                                    hrf_2 = hrf_params[2],
-                                    osf = oversampling_time,
-                                    pad_length = pad_length*oversampling_time) 
-        
+    ## make screen  grid
+    screen_size_degrees = 2.0 * \
+    np.degrees(np.arctan(params['monitor']['height'] /
+                         (2.0*params['monitor']['distance'])))
+
+    oneD_grid = np.linspace(-screen_size_degrees/2, screen_size_degrees/2, fa_dm.shape[0], endpoint=True)
+    x_coordinates,y_coordinates = np.meshgrid(oneD_grid, oneD_grid)
+
+    # create the single rf
+    rf = np.rot90(gauss2D_iso_cart(x = x_coordinates[..., np.newaxis],
+                        y = y_coordinates[..., np.newaxis],
+                        mu = (pRFfit_pars['pRF_x'].value, pRFfit_pars['pRF_y'].value),
+                        sigma = pRFfit_pars['pRF_size'].value,
+                        normalize_RFs = False).T, axes=(1,2))
+
+    if not 'pRF_n' in pRFfit_pars.keys(): # accounts for gauss or css model
+        pRFfit_pars.add('pRF_n', value = 1, vary = False)
+
+    neural_tc = stimulus_through_prf(rf, fa_dm, 1)**pRFfit_pars['pRF_n'].value
+
+    # convolve with hrf
+    #scipy fftconvolve does not have padding options so doing it manually
+    pad = np.tile(neural_tc[:,0], (pad_length*oversampling_time,1)).T
+    padded_cue = np.hstack((pad,neural_tc))
+
+    tc_convolved = signal.fftconvolve(padded_cue, hrf, axes=(-1))[..., pad_length*oversampling_time:neural_tc.shape[-1]+pad_length*oversampling_time]  
+
+    # save convolved upsampled cue in array
+    tc_convolved = np.array(tc_convolved)#[...,:cue_regs_upsampled.shape[-1]]
+
+    if filter:
+        model_fit = pRFfit_pars['pRF_baseline'].value + pRFfit_pars['pRF_beta'].value * filter_predictions(
+                                                                                            tc_convolved,
+                                                                                            filter_type = params['mri']['filtering']['type'],
+                                                                                            filter_params = {'highpass': params['mri']['filtering']['highpass'],
+                                                                                                        'add_mean': params['mri']['filtering']['add_mean'],
+                                                                                                        'window_length': params['mri']['filtering']['window_length'],
+                                                                                                        'polyorder': params['mri']['filtering']['polyorder']})
+    else:
+        model_fit = pRFfit_pars['pRF_baseline'].value + pRFfit_pars['pRF_beta'].value * tc_convolved
+
+    
     # original scale of data in seconds
     original_scale = np.arange(0, model_fit.shape[-1]/oversampling_time, 1/oversampling_time)
 
@@ -2371,14 +2373,6 @@ def get_residuals_FA(fit_pars, data, bar_dm_dict, params, hrf_params = [1,1,0],
 
     # OLS residuals
     residuals = data - prediction
-
-    # compute the AR coefficients
-    ar_coef_ = first_level._yule_walker(residuals, ar_noise_model)
-    # Fit the AR model according to current AR(N) estimates
-    ar_result = ARModel(DM_FA, ar_coef_).fit(data.T)
-
-    residuals = ar_result.residuals
-    print('FA GLM fit with AR - R2 is %.2f'%ar_result.r_square)
 
     # return error "timecourse", that will be used by minimize
     return  residuals

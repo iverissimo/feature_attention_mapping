@@ -48,6 +48,8 @@ from prfpy.timecourse import stimulus_through_prf
 
 from prfpy.timecourse import filter_predictions
 
+from lmfit import Parameters, minimize
+
 def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=None):
     
     """Import a subject from fmriprep-output to pycortex
@@ -2255,8 +2257,8 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True,
         fa design matrix N x samples (N = (x,y))
     params: yml dict
         with experiment params
-    pRFfit_pars: parameters object
-        Parameters object from lmfit
+    pRFfit_pars: dict
+        Dictionary with parameter key, value from lmfit
     oversampling_time: int
         value that FA dm is oversampled by, to then downsample predictor
     
@@ -2275,14 +2277,14 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True,
     # create the single rf
     rf = np.rot90(gauss2D_iso_cart(x = x_coordinates[..., np.newaxis],
                         y = y_coordinates[..., np.newaxis],
-                        mu = (pRFfit_pars['pRF_x'].value, pRFfit_pars['pRF_y'].value),
-                        sigma = pRFfit_pars['pRF_size'].value,
+                        mu = (pRFfit_pars['pRF_x'], pRFfit_pars['pRF_y']),
+                        sigma = pRFfit_pars['pRF_size'],
                         normalize_RFs = False).T, axes=(1,2))
 
     if not 'pRF_n' in pRFfit_pars.keys(): # accounts for gauss or css model
-        pRFfit_pars.add('pRF_n', value = 1, vary = False)
+        pRFfit_pars['pRF_n'] = 1
 
-    neural_tc = stimulus_through_prf(rf, fa_dm, 1)**pRFfit_pars['pRF_n'].value
+    neural_tc = stimulus_through_prf(rf, fa_dm, 1)**pRFfit_pars['pRF_n']
 
     # convolve with hrf
     #scipy fftconvolve does not have padding options so doing it manually
@@ -2295,7 +2297,7 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True,
     tc_convolved = np.array(tc_convolved)#[...,:cue_regs_upsampled.shape[-1]]
 
     if filter:
-        model_fit = pRFfit_pars['pRF_baseline'].value + pRFfit_pars['pRF_beta'].value * filter_predictions(
+        model_fit = pRFfit_pars['pRF_baseline'] + pRFfit_pars['pRF_beta'] * filter_predictions(
                                                                                             tc_convolved,
                                                                                             filter_type = params['mri']['filtering']['type'],
                                                                                             filter_params = {'highpass': params['mri']['filtering']['highpass'],
@@ -2303,7 +2305,7 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True,
                                                                                                         'window_length': params['mri']['filtering']['window_length'],
                                                                                                         'polyorder': params['mri']['filtering']['polyorder']})
     else:
-        model_fit = pRFfit_pars['pRF_baseline'].value + pRFfit_pars['pRF_beta'].value * tc_convolved
+        model_fit = pRFfit_pars['pRF_baseline'] + pRFfit_pars['pRF_beta'] * tc_convolved
 
     
     # original scale of data in seconds
@@ -2324,24 +2326,29 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True,
     
 
 def get_residuals_FA(fit_pars, data, bar_dm_dict, params, hrf_params = [1,1,0], 
-                     cue_regressor = [], pRFmodel = 'css', ar_noise_model = 1, 
+                     cue_regressor = [], pRFmodel = 'css',
                      TR = 1.6, oversampling_time = 1, num_regs = 2):
 
+    # turn Parameters into dict (if not already), for simplification
+    if type(fit_pars) is dict:
+        fit_pars_dict = fit_pars
+    else:
+        fit_pars_dict = fit_pars.valuesdict()
 
     ## set DM - all bars simultaneously on screen, multiplied by weights
     for i, cond in enumerate(bar_dm_dict.keys()):
         
         if i==0:
-            gain_dm = bar_dm_dict[cond][np.newaxis,...]*fit_pars['gain_{cond}'.format(cond=cond)].value
+            gain_dm = bar_dm_dict[cond][np.newaxis,...]*fit_pars_dict['gain_{cond}'.format(cond=cond)]
         else:
             gain_dm = np.vstack((gain_dm, 
-                                bar_dm_dict[cond][np.newaxis,...]*fit_pars['gain_{cond}'.format(cond=cond)].value))
+                                bar_dm_dict[cond][np.newaxis,...]*fit_pars_dict['gain_{cond}'.format(cond=cond)]))
     
     # taking the max value of the spatial position at each time point (to account for overlaps)
     gain_dm = np.amax(gain_dm, axis=0)
 
     ## get FA regressor
-    FA_regressor = get_FA_regressor(gain_dm, params, fit_pars, 
+    FA_regressor = get_FA_regressor(gain_dm, params, fit_pars_dict, 
                                     pRFmodel = pRFmodel, TR = TR, hrf_params = hrf_params, oversampling_time = oversampling_time)
     
     ## calculate model
@@ -2364,10 +2371,12 @@ def get_residuals_FA(fit_pars, data, bar_dm_dict, params, hrf_params = [1,1,0],
         ## Fit GLM on FA data
         prediction, betas , r2, _ = fit_glm(data, DM_FA)
         
-        # update values of pars, as outputed by glm 
-        fit_pars['intercept'].set(betas[0])
-        fit_pars['FA_beta'].set(betas[1])
-        fit_pars['cue_beta'].set(betas[2])
+        # update values of pars, as outputed by glm
+        # if input params was Parameters object
+        if type(fit_pars) is not dict and type(fit_pars) is not pd.DataFrame:
+            fit_pars['intercept'].set(betas[0])
+            fit_pars['FA_beta'].set(betas[1])
+            fit_pars['cue_beta'].set(betas[2])
 
     print('FA GLM fit R2 is %.2f'%r2)
 
@@ -2430,77 +2439,42 @@ def plot_FA_DM(output, bar_dm_dict,
     print('saved dm in %s'%outfolder)
 
 
-def plot_FA_model(fit_pars, data, bar_dm_dict, params, hrf_params = [1,1,0], 
-                     cue_regressor = [], pRFmodel = 'css', 
-                     TR = 1.6, oversampling_time = 1, num_regs = 2):
+def get_gain_fit_params(timecourse, fit_pars, params = [], trial_info = [], all_cond_DM = [], 
+                           hrf_params = [1,1,0], osf = 10, TR = 1.6, pRFmodel = 'css',
+                           xx = [], yy = [], size = [], betas = [], baseline = [], ns = [],
+                           **kwargs):
+
+    """
+    Function that will fit gain per voxel
+    """
     
-    ### REDUNDANT FUNC - JUST FOR QUICK CHECK ###
-
-    ## set DM - all bars simultaneously on screen, multiplied by weights
-    for i, cond in enumerate(bar_dm_dict.keys()):
-        
-        if i==0:
-            gain_dm = bar_dm_dict[cond][np.newaxis,...]*fit_pars['gain_{cond}'.format(cond=cond)].value
-        else:
-            gain_dm = np.vstack((gain_dm, 
-                                bar_dm_dict[cond][np.newaxis,...]*fit_pars['gain_{cond}'.format(cond=cond)].value))
+    # make cue regressor timecourses
+    # also adding baseline of pRF
+    cue_regressor = get_cue_regressor(params, trial_info, hrf_params = hrf_params, 
+                                                cues = np.arange(params['feature']['mini_blocks']),
+                                     TR = TR, oversampling_time = osf, baseline = baseline,
+                                     crop_unit = 'sec', crop = True, crop_TR = params['feature']['crop_TR'], 
+                                     shift_TRs = True, shift_TR_num = 1.5)
     
-    # taking the max value of the spatial position at each time point (to account for overlaps)
-    gain_dm = np.amax(gain_dm, axis=0)
-
-    ## get FA regressor
-    FA_regressor = get_FA_regressor(gain_dm, params, fit_pars, 
-                                    pRFmodel = pRFmodel, TR = TR, hrf_params = hrf_params, oversampling_time = oversampling_time)
+    # set parameters that are vertex specific
+    # (others already defined when Parameters object initialized)
+    fit_pars['pRF_x'].set(xx)
+    fit_pars['pRF_y'].set(yy)
+    fit_pars['pRF_beta'].set(betas)
+    fit_pars['pRF_size'].set(size)
+    fit_pars['pRF_baseline'].set(baseline)
+    if 'css' in pRFmodel:
+        fit_pars['pRF_n'].set(ns)
+            
     
-    ## calculate model
-    if num_regs == 1: # if 1 regressor given, then comparing pRF FA regressor directly to data
-
-        prediction = FA_regressor
-
-        # calculate rsq of fit
-        r2 = 1 - (np.sum((data - prediction)**2)/ np.sum((data - np.mean(data))**2))  
-
-    else:
-        ## Make actual DM to be used in GLM fit (intercept + FA regressor + cue regressor)
+    ## minimize residuals
+    out = minimize(get_residuals_FA, fit_pars, args = [timecourse, all_cond_DM, params],
+                   kws={'cue_regressor': cue_regressor[0], 'hrf_params': hrf_params,
+                        'pRFmodel': pRFmodel,
+                       'oversampling_time': osf, 'num_regs': 2}, 
+                   method = 'lbfgsb')
         
-        DM_FA = np.zeros((FA_regressor.shape[0], num_regs+1))
-        
-        DM_FA[...,0] = 1 # add intercept in first position
-        DM_FA[...,1] = FA_regressor # add FA regressor
-        DM_FA[...,2] = cue_regressor # add cue regressor
-        
-        ## Fit GLM on FA data
-        prediction, _ , r2, _ = fit_glm(data, DM_FA)
-        
-    
-    ## now plot data with model
+    return out.params.valuesdict()
 
-    fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
-
-    # plot data with model
-    time_sec = np.linspace(0,len(data)*TR, num=len(data)) # array with timepoints, in seconds
-
-    plt.plot(time_sec, prediction, c='#0040ff',lw=3,label='model R$^2$ = %.2f'%r2,zorder=1)
-    plt.plot(time_sec, data,'k--',label='FA data')
-    axis.set_xlabel('Time (s)',fontsize=20, labelpad=20)
-    axis.set_ylabel('BOLD signal change (%)',fontsize=20, labelpad=10)
-    axis.set_xlim(0,len(prediction)*TR)
-    axis.legend(loc='upper left',fontsize=10)  # doing this to guarantee that legend is how I want it 
-    #axis.set_ylim(-3,3)  
-
-    # times where bar is on screen [1st on, last on, 1st on, last on, etc] 
-    bar_onset = np.array([27,98,126,197,225,296,324,395])#/TR
-
-    if params['feature']['crop']:
-        bar_onset = bar_onset - params['feature']['crop_TR']*TR - TR
-
-    bar_directions = [val for _,val in enumerate(params['feature']['bar_pass_direction']) if 'empty' not in val and 'cue' not in val]
-    # plot axis vertical bar on background to indicate stimulus display time
-    ax_count = 0
-    for h in range(len(bar_directions)):
-
-        plt.axvspan(bar_onset[ax_count], bar_onset[ax_count+1]+TR, facecolor='#0040ff', alpha=0.1)
-
-        ax_count += 2
 
 

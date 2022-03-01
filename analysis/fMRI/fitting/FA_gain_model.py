@@ -282,7 +282,10 @@ for key in unique_cond.keys(): # for each condition
         
     # append in all condition DM
     all_cond_DM[key] = DM_cond
-    
+
+ ## stack DM for efficiency
+cond_DM_stacked = np.stack((all_cond_DM[k] for k in all_cond_DM.keys()),axis = 0)
+   
 ## set starting params
 starting_params = {'gain_ACAO': 1, 'gain_ACUO': 0, 'gain_UCAO': 0,'gain_UCUO':0}
 
@@ -313,7 +316,7 @@ pars.add('intercept', value = 1, vary = False)
 results = np.array(Parallel(n_jobs=16)(delayed(mri_utils.get_gain_fit_params)(data[vertex], 
                                                                     pars,
                                                                    params = params, trial_info = trial_info,
-                                                                   all_cond_DM = all_cond_DM,
+                                                                   all_cond_DM = cond_DM_stacked,
                                         hrf_params = hrf_params[...,vertex], pRFmodel = model_type,
                                         xx = xx[vertex], yy = yy[vertex], size = size[vertex],
                                         betas = beta[vertex], baseline = baseline[vertex], ns = ns[vertex]) 

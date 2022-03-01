@@ -2325,7 +2325,7 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True,
     return FA_regressor
     
 
-def get_residuals_FA(fit_pars, data, bar_dm_dict, params, hrf_params = [1,1,0], 
+def get_residuals_FA(fit_pars, data, bar_dm_arr, params, hrf_params = [1,1,0], 
                      cue_regressor = [], pRFmodel = 'css',
                      TR = 1.6, oversampling_time = 1, num_regs = 2):
 
@@ -2336,14 +2336,13 @@ def get_residuals_FA(fit_pars, data, bar_dm_dict, params, hrf_params = [1,1,0],
         fit_pars_dict = fit_pars.valuesdict()
 
     ## set DM - all bars simultaneously on screen, multiplied by weights
-    for i, cond in enumerate(bar_dm_dict.keys()):
-        
-        if i==0:
-            gain_dm = bar_dm_dict[cond][np.newaxis,...]*fit_pars_dict['gain_{cond}'.format(cond=cond)]
-        else:
-            gain_dm = np.vstack((gain_dm, 
-                                bar_dm_dict[cond][np.newaxis,...]*fit_pars_dict['gain_{cond}'.format(cond=cond)]))
-    
+    bar_weights = {'ACAO': fit_pars_dict['gain_ACAO'], 
+                'ACUO': fit_pars_dict['gain_ACUO'], 
+                'UCAO': fit_pars_dict['gain_UCAO'], 
+                'UCUO': fit_pars_dict['gain_UCUO']}
+    weights_arr = np.array([bar_weights[k] for k in bar_weights.keys()])
+
+    gain_dm = bar_dm_arr * weights_arr[:,None,None,None]
     # taking the max value of the spatial position at each time point (to account for overlaps)
     gain_dm = np.amax(gain_dm, axis=0)
 

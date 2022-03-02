@@ -50,6 +50,9 @@ from prfpy.timecourse import filter_predictions
 
 from lmfit import Parameters, minimize
 
+import functools
+import operator
+
 def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=None):
     
     """Import a subject from fmriprep-output to pycortex
@@ -2340,11 +2343,11 @@ def get_residuals_FA(fit_pars, data, bar_dm_arr, params, hrf_params = [1,1,0],
                 'ACUO': fit_pars_dict['gain_ACUO'], 
                 'UCAO': fit_pars_dict['gain_UCAO'], 
                 'UCUO': fit_pars_dict['gain_UCUO']}
-    weights_arr = np.array([bar_weights[k] for k in bar_weights.keys()])
+    weights_arr = np.array([bar_weights[k] for k in bar_weights.keys()]).astype(np.float32)
 
-    gain_dm = bar_dm_arr * weights_arr[:,None,None,None]
+    gain_dm = list(functools.reduce(operator.mul, x, y) for x, y in zip(bar_dm_arr[:,np.newaxis,:,:,:], weights_arr))
     # taking the max value of the spatial position at each time point (to account for overlaps)
-    gain_dm = np.amax(gain_dm, axis=0)
+    gain_dm = functools.reduce(np.maximum, gain_dm) #np.amax(gain_dm, axis=0)
 
     ## get FA regressor
     FA_regressor = get_FA_regressor(gain_dm, params, fit_pars_dict, 

@@ -284,7 +284,7 @@ for key in unique_cond.keys(): # for each condition
     all_cond_DM[key] = DM_cond
 
  ## stack DM for efficiency
-cond_DM_stacked = np.stack((all_cond_DM[k] for k in all_cond_DM.keys()),axis = 0)
+cond_DM_stacked = np.stack((all_cond_DM[k].astype(np.float32) for k in all_cond_DM.keys()),axis = 0)
    
 ## set starting params
 starting_params = {'gain_ACAO': 1, 'gain_ACUO': 0, 'gain_UCAO': 0,'gain_UCUO':0}

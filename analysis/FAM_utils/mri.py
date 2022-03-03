@@ -752,7 +752,7 @@ def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1,
             im = Image.fromarray(visual_dm[...,w])
             im.save(op.join(outfolder,"DM_TR-%i.png"%w))      
             
-    return visual_dm
+    return normalize(visual_dm)
 
 
 def save_estimates(filename, estimates, mask_indices, orig_shape = np.array([1974,220]), 
@@ -1325,7 +1325,7 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
                                    'color': True, 'orientation': True,
                                    'condition_name': 'red_vertical',
                                    'miniblock': 0,'run': 1}, TR = 1.6, crop_unit = 'sec',
-                    save_imgs = False, downsample = None, oversampling_time = 1, stim_dur_seconds = 0.5,
+                    save_imgs = False, res_scaling = 1, oversampling_time = None, stim_dur_seconds = 0.5,
                     crop = False, crop_TR = 8, overwrite=False, shift_TRs=True, shift_TR_num = 1, save_DM=True):
     
     """Get visual stim for FA condition.
@@ -1358,26 +1358,27 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
 
         screen_res = params['window']['size']
         if params['window']['display'] == 'square': # if square display
-            screen_res = np.array([screen_res[1], screen_res[1]])
-            
-        if downsample != None: # if we want to downsample screen res
-            screen_res = (screen_res*downsample).astype(int)
+            screen_res = np.array([screen_res[1], screen_res[1]])            
         
         # miniblock number
         mini_blk_num = int(attend_cond['miniblock'])
-        
+
+        # if oversampling is None, then we're working with the trials
+        if oversampling_time is None:
+            osf = 1
+        else:
+            osf = oversampling_time
+            
         # total number of TRs and of trials
         # if oversampling then they will not match
         total_trials = len(trial_info)
-        total_TR = total_trials*oversampling_time
+        total_TR = total_trials*osf
 
         # stimulus duration (how long was each bar on screen)
-        stim_dur_TR = stim_dur_seconds*oversampling_time 
-        if not stim_dur_TR.is_integer():
-            raise ValueError('Stimulus duration is %s TRs, not accepted value'%str(stim_dur_TR)) 
+        stim_dur_TR = int(np.ceil(stim_dur_seconds*osf))
 
         # save screen display for each TR
-        visual_dm_array = np.zeros((total_TR, screen_res[0],screen_res[1]))
+        visual_dm_array = np.zeros((total_TR,  round(screen_res[0]*res_scaling), round(screen_res[1]*res_scaling)))
 
         # some counters
         trl_blk_counter = 0
@@ -1419,12 +1420,8 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
 
                 # coordenates for bar pass of trial, for PIL Image - DO NOT CONFUSE WITH CONDITION ORIENTATION
                 # x position, y position 
-                hor_x = miniblk_positions[trl_blk_counter][0]; hor_y = miniblk_positions[trl_blk_counter][1]
-                
-                if downsample != None: # if we want to downsample screen res
-                    hor_x = hor_x*downsample; hor_y = hor_y*downsample
-                
-                hor_x = hor_x + screen_res[0]/2; hor_y = hor_y + screen_res[1]/2
+                hor_x = miniblk_positions[trl_blk_counter][0] + screen_res[0]/2
+                hor_y = miniblk_positions[trl_blk_counter][1] + screen_res[1]/2
                 
                 coordenates_bars = {'vertical': {'upLx': hor_x-0.5*bar_width*screen_res[0], 
                                                    'upLy': screen_res[1],
@@ -1449,7 +1446,7 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
                     stim_counter += 1 # increment counter
 
                 # update counter of trials within miniblok
-                if trial_counter == oversampling_time-1:
+                if trial_counter == osf-1:
                     trl_blk_counter += 1
                     # reset stim counter
                     stim_counter = 0
@@ -1460,13 +1457,13 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
                     trl_blk_counter = 0
 
             # save in array
-            visual_dm_array[i, ...] = np.array(img)[:,:,0][np.newaxis,...]
+            visual_dm_array[i, ...] = np.array(img)[::round(1/res_scaling),::round(1/res_scaling),0][np.newaxis,...]
             
             # increment trial counter
             trial_counter += 1 
             
             # if sampling time reached,
-            if trial_counter == oversampling_time: # then reset counter and update trial
+            if trial_counter == osf: # then reset counter and update trial
                 trial_counter = 0 
                 trial += 1
 
@@ -1476,9 +1473,9 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
         # in case we want to crop the beginning of the DM
         if crop == True:
             if crop_unit == 'sec': # fix for the fact that I crop TRs, but task not synced to TR
-                visual_dm = visual_dm[...,int(crop_TR*TR*oversampling_time)::] 
+                visual_dm = visual_dm[...,int(crop_TR*TR*osf)::] 
             else: # assumes unit is TR
-               visual_dm = visual_dm[...,int(crop_TR*oversampling_time)::] 
+               visual_dm = visual_dm[...,int(crop_TR*osf)::] 
 
         # shifting TRs to the left (quick fix)
         # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
@@ -1487,9 +1484,9 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
             new_visual_dm = visual_dm.copy()
 
             if crop_unit == 'sec': # fix for the fact that I shift TRs, but task not synced to TR
-                new_visual_dm[...,:-int(shift_TR_num*TR*oversampling_time)] = visual_dm[...,int(shift_TR_num*TR*oversampling_time):]
+                new_visual_dm[...,:-int(shift_TR_num*TR*osf)] = visual_dm[...,int(shift_TR_num*TR*osf):]
             else: # assumes unit is TR
-                new_visual_dm[...,:-int(shift_TR_num*oversampling_time)] = visual_dm[...,int(shift_TR_num*oversampling_time):]
+                new_visual_dm[...,:-int(shift_TR_num*osf)] = visual_dm[...,int(shift_TR_num*osf):]
                 
             visual_dm = new_visual_dm.copy()
 
@@ -1507,10 +1504,10 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
     if save_imgs == True:
 
         #take into account oversampling
-        if oversampling_time == 1:
+        if osf == 1:
             frames = np.arange(visual_dm.shape[-1])
         else:
-            frames = np.arange(0,visual_dm.shape[-1],oversampling_time, dtype=int)  
+            frames = np.arange(0,visual_dm.shape[-1], osf, dtype=int)  
 
         outfolder = op.split(output)[0]
 
@@ -1518,7 +1515,7 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
 
         for w in frames:
             im = Image.fromarray(visual_dm[...,int(w)])
-            im.save(op.join(outfolder,op.split(output)[-1].replace('.npy','_trial-{time}.png'.format(time=str(int(w/oversampling_time)).zfill(3)))))      
+            im.save(op.join(outfolder,op.split(output)[-1].replace('.npy','_trial-{time}.png'.format(time=str(int(w/osf)).zfill(3)))))      
             
     return visual_dm
 
@@ -2157,8 +2154,8 @@ def get_ecc_limits(visual_dm, params, screen_size_deg = [11,11]):
         elif cond in ['U-D','D-U']:
             y_mask += visual_dm[...,i]
 
-    x_mask = np.clip(x_mask,0,255)
-    y_mask = np.clip(y_mask,0,255)
+    x_mask = np.clip(x_mask,0,1)
+    y_mask = np.clip(y_mask,0,1)
     
     ## get y ecc limits
     y_ecc_limit = [np.clip(np.max(y_mask.nonzero()[0])+1,0,visual_dm.shape[1])*screen_size_deg[1]/visual_dm.shape[1],
@@ -2504,3 +2501,15 @@ def get_gain_fit_params(timecourse, fit_pars, params = [], trial_info = [], all_
 
 
 
+def get_oversampled_ind(orig_ind, osf = 10):
+
+    """Helper function to get oversampled indices
+    for bookeeping
+    """
+    
+    osf_ind = []
+    
+    for _,val in enumerate(orig_ind):
+        osf_ind += list(np.arange(val*osf,val*osf+osf))
+    
+    return np.array(osf_ind)

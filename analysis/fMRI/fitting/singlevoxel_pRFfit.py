@@ -22,6 +22,8 @@ from FAM_utils import mri as mri_utils
 import cortex
 import matplotlib.pyplot as plt
 
+import glob
+
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
             params = yaml.safe_load(f_in)
@@ -90,13 +92,25 @@ postfmriprep_dir = op.join(derivatives_dir,'post_fmriprep','sub-{sj}'.format(sj=
 # path to pRF fits (if they exist)
 fits_pth =  op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), space, 'iterative_{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
 
+## make DM mask, according to sub responses
+# sourcedata dir
+source_dir = glob.glob(op.join(params['mri']['paths'][base_dir]['root'], 'sourcedata', 
+                               'sub-{sj}'.format(sj=sj), 'ses-*', 'func'))[0] 
+# list of behavior files
+behav_files = [op.join(source_dir, h) for h in os.listdir(source_dir) if 'task-pRF' in h and
+                 h.endswith('events.tsv')]
+# behav boolean mask
+DM_mask_beh = mri_utils.get_beh_mask(behav_files,params)
+
 # output dir to save fit and plot
 figures_pth = op.join(derivatives_dir,'plots','single_vertex','pRFfit','sub-{sj}'.format(sj=sj), space, model_type,'run-{run}'.format(run=run_type)) # path to save plots
 if not os.path.exists(figures_pth):
     os.makedirs(figures_pth) 
 
 # define design matrix 
-visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=False)
+visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
+                                save_imgs = False, res_scaling=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
+                                overwrite = False,  mask = DM_mask_beh)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],

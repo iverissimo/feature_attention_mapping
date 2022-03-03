@@ -58,6 +58,10 @@ acq = params['mri']['acq'] # if using standard files or nordic files
 space = params['mri']['space'] # subject space
 total_chunks = params['mri']['fitting']['pRF']['total_chunks'][space] # number of chunks that data was split in
 
+screen_res = params['window']['size']
+if params['window']['display'] == 'square': # if square display
+    screen_res = np.array([screen_res[1], screen_res[1]])
+
 TR = params['mri']['TR']
 
 # type of pRF model to use, and run type (mean vs median)
@@ -143,10 +147,10 @@ behav_files = [op.join(source_dir, h) for h in os.listdir(source_dir) if 'task-p
 # behav boolean mask
 DM_mask_beh = mri_utils.get_beh_mask(behav_files,params)
 
-
 # define design matrix for pRF task
 visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
-                    save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=False)
+                    save_imgs=False, res_scaling = 0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'],
+                    shift_TRs = True, shift_TR_num = 1, overwrite = True, mask = DM_mask_beh)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -157,6 +161,11 @@ prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
 # get the ecc limits (in dva)
 # to mask estimates
 x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
+
+# also compute limit in pixels
+# to make spatial position mask for FA DM   
+xy_lim_pix = {'x_lim': x_ecc_lim*screen_res[0]/prf_stim.screen_size_degrees,
+              'y_lim': y_ecc_lim*screen_res[1]/prf_stim.screen_size_degrees}
 
 # mask estimates, to be within screen boundaries
 print('masking estimates')
@@ -235,8 +244,8 @@ for key in unique_cond.keys(): # for each condition
 # so stimulus object TR needs to reflect that
 FA_sampling_rate = TR if params['feature']['task_rate']=='TR' else params['feature']['task_rate']
 
-# set oversampling factor
-osf = 10
+## set oversampling factor
+osf = 10 
 
 # create upsampled hrf
 hrf_params = np.ones((3, pRF_estimates['r2'].shape[0]))
@@ -272,11 +281,11 @@ for key in unique_cond.keys(): # for each condition
             reg_dm = mri_utils.get_FA_bar_stim(op.join(output_dir,'DM_regressor-{reg}.npy'.format(reg=reg)), 
                                 params, bar_pos, trial_info, TR = TR,
                                 attend_cond = all_conditions[all_conditions['reg_name']==reg].to_dict('r')[0], 
-                                save_imgs = False, downsample = 0.1, oversampling_time = osf, 
+                                save_imgs = False, res_scaling = 0.1, oversampling_time = None, 
                                 stim_dur_seconds = params['feature']['bars_phase_dur'], 
-                                crop = True, crop_unit = 'sec', 
+                                crop = False, crop_unit = 'sec', 
                                 crop_TR = params['feature']['crop_TR'],
-                                shift_TRs = True, shift_TR_num = 1.5, # to account for lack of slicetimecorrection
+                                shift_TRs = False, shift_TR_num = 1.5, # to account for lack of slicetimecorrection
                                 overwrite = True, save_DM = False)
 
             all_regs_dm.append(reg_dm)

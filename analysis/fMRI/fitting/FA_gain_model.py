@@ -134,6 +134,16 @@ else: # if not join chunks and save file
     pRF_estimates = mri_utils.join_chunks(fits_pth, pRF_estimates_combi, fit_hrf = params['mri']['fitting']['pRF']['fit_hrf'],
                         chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
 
+## make pRF DM mask, according to sub responses
+source_dir = glob.glob(op.join(params['mri']['paths'][base_dir]['root'], 'sourcedata', 
+                               'sub-{sj}'.format(sj=sj), 'ses-*', 'func'))[0] 
+# list of behavior files
+behav_files = [op.join(source_dir, h) for h in os.listdir(source_dir) if 'task-pRF' in h and
+                 h.endswith('events.tsv')]
+# behav boolean mask
+DM_mask_beh = mri_utils.get_beh_mask(behav_files,params)
+
+
 # define design matrix for pRF task
 visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
                     save_imgs=False, downsample=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=False)

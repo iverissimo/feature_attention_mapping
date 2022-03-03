@@ -612,8 +612,9 @@ def load_and_mask_data(file, chunk_num = 1, total_chunks = 1):
     return masked_data, not_nan_vox, orig_shape
 
 
-def make_pRF_DM(output, params, save_imgs = False, downsample = None, 
-                    crop = False, crop_TR = 8, overwrite=False, shift_TRs = True, mask = []):
+def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1, 
+                    crop = False, crop_TR = 8, overwrite=False, 
+                shift_TRs = True, shift_TR_num = 1, mask = []):
     
     """Make design matrix for pRF task
     
@@ -624,7 +625,9 @@ def make_pRF_DM(output, params, save_imgs = False, downsample = None,
     params : yml dict
         with experiment params
     save_imgs : bool
-       if we want to save images in folder, for sanity check
+        if we want to save images in folder, for sanity check
+    res_scaling: float/int
+        resolution scaling factor, to downsample screen spatial res of DM
     """
     
     if not op.exists(output) or overwrite == True: 
@@ -639,9 +642,6 @@ def make_pRF_DM(output, params, save_imgs = False, downsample = None,
         screen_res = params['window']['size']
         if params['window']['display'] == 'square': # if square display
             screen_res = np.array([screen_res[1], screen_res[1]])
-
-        if downsample != None: # if we want to downsample screen res
-            screen_res = (screen_res*downsample).astype(int)
 
         # number TRs per condition
         TR_conditions = {'L-R': params['prf']['num_TRs']['L-R'],
@@ -682,7 +682,7 @@ def make_pRF_DM(output, params, save_imgs = False, downsample = None,
                              }
 
         # save screen display for each TR
-        visual_dm_array = np.zeros((total_TR, screen_res[0],screen_res[1]))
+        visual_dm_array = np.zeros((total_TR, round(screen_res[0]*res_scaling), round(screen_res[1]*res_scaling)))
         counter = 0
         for _,bartype in enumerate(bar_pass_direction): # loop over bar pass directions
 
@@ -702,7 +702,7 @@ def make_pRF_DM(output, params, save_imgs = False, downsample = None,
                                     fill = (255,255,255),
                                     outline = (255,255,255))
 
-                visual_dm_array[counter, ...] = np.array(img)[:,:,0][np.newaxis,...]
+                visual_dm_array[counter, ...] = np.array(img)[::round(1/res_scaling),::round(1/res_scaling),0][np.newaxis,...]
                 counter += 1
 
         # swap axis to have time in last axis [x,y,t]
@@ -726,7 +726,7 @@ def make_pRF_DM(output, params, save_imgs = False, downsample = None,
     # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
     if shift_TRs == True:
         new_visual_dm = visual_dm.copy()
-        new_visual_dm[...,:-1] = visual_dm[...,1:]
+        new_visual_dm[...,:-shift_TR_num] = visual_dm[...,shift_TR_num:]
         visual_dm = new_visual_dm.copy()
         
     #if we want to save the images
@@ -2162,6 +2162,14 @@ def get_ecc_limits(visual_dm, params, screen_size_deg = [11,11]):
     return x_ecc_limit, y_ecc_limit
 
 
+def weight_dm(bar_dm_list, weights_array):
+
+    gain_dm = bar_dm_list * weights_array[:,None,None,None]
+    gain_dm = np.max(gain_dm, axis=0) 
+    
+    return gain_dm
+
+
 def get_cue_regressor(params, trial_info, hrf_params = [1,1,0], cues = [0,1,2,3], TR = 1.6, oversampling_time = 1, baseline = None,
                       crop_unit = 'sec', crop = False, crop_TR = 3, shift_TRs = True, shift_TR_num = 1, pad_length = 20):
     
@@ -2345,9 +2353,12 @@ def get_residuals_FA(fit_pars, data, bar_dm_arr, params, hrf_params = [1,1,0],
                 'UCUO': fit_pars_dict['gain_UCUO']}
     weights_arr = np.array([bar_weights[k] for k in bar_weights.keys()]).astype(np.float32)
 
-    gain_dm = list(functools.reduce(operator.mul, x, y) for x, y in zip(bar_dm_arr[:,np.newaxis,:,:,:], weights_arr))
     # taking the max value of the spatial position at each time point (to account for overlaps)
-    gain_dm = functools.reduce(np.maximum, gain_dm) #np.amax(gain_dm, axis=0)
+    gain_dm = weight_dm(bar_dm_arr, weights_arr)
+    
+    #gain_dm = list(functools.reduce(operator.mul, x, y) for x, y in zip(bar_dm_arr[:,np.newaxis,:,:,:], weights_arr))
+    # taking the max value of the spatial position at each time point (to account for overlaps)
+    #gain_dm = functools.reduce(np.maximum, gain_dm) #np.amax(gain_dm, axis=0)
 
     ## get FA regressor
     FA_regressor = get_FA_regressor(gain_dm, params, fit_pars_dict, 

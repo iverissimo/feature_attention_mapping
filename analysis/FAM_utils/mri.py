@@ -2296,33 +2296,7 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True, stim_ind = [],
         value that FA dm is oversampled by, to then downsample predictor
     
     """
-    
-    # get oversampled (if not done already) indices where bar on screen
-    # and upsample dm
-    if len(stim_ind)>0:
-        osf_stim_ind = get_oversampled_ind(stim_ind, osf = oversampling_time)
-        osf_dm = np.zeros((fa_dm.shape[0],fa_dm.shape[1], fa_dm.shape[2]*oversampling_time))
-        osf_dm[...,osf_stim_ind] = np.repeat(fa_dm[...,stim_ind], oversampling_time, axis = -1)
-        fa_dm = osf_dm.copy() 
-
-    # in case we want to crop the beginning of the DM
-    if crop == True:
-        if crop_unit == 'sec': # fix for the fact that I crop TRs, but task not synced to TR
-            fa_dm = fa_dm[...,int(crop_TR*TR*oversampling_time)::] 
-        else: # assumes unit is TR
-            fa_dm = fa_dm[...,crop_TR*oversampling_time::]
-
-    # shifting TRs to the left (quick fix)
-    # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
-    if shift_TRs == True:
-        new_fa_dm = fa_dm.copy()
-        if crop_unit == 'sec': # fix for the fact that I shift TRs, but task not synced to TR
-            new_fa_dm[...,:-int(shift_TR_num*TR*oversampling_time)] = fa_dm[...,int(shift_TR_num*TR*oversampling_time):]
-        else: # assumes unit is TR
-            new_fa_dm[...,:-int(shift_TR_num*oversampling_time)] = fa_dm[...,int(shift_TR_num*oversampling_time):]
-
-        fa_dm = new_fa_dm.copy()
-            
+        
     ## set hrf
     hrf = create_hrf(hrf_params = hrf_params, TR = TR, osf = oversampling_time)
 
@@ -2344,7 +2318,36 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True, stim_ind = [],
     if not 'pRF_n' in pRFfit_pars.keys(): # accounts for gauss or css model
         pRFfit_pars['pRF_n'] = 1
 
-    neural_tc = stimulus_through_prf(rf, fa_dm, 1)**pRFfit_pars['pRF_n']
+    tc = stimulus_through_prf(rf, fa_dm, 1)**pRFfit_pars['pRF_n']
+
+    # get oversampled (if not done already) indices where bar on screen
+    # and upsample dm
+ 
+    if len(stim_ind)>0:
+        osf_stim_ind = get_oversampled_ind(stim_ind, osf = oversampling_time)
+        up_samp_tc = np.zeros((tc.shape[0], tc.shape[1]*oversampling_time))
+        up_samp_tc[...,osf_stim_ind] = np.repeat(tc[...,stim_ind], oversampling_time, axis = -1)
+        neural_tc = up_samp_tc 
+    else:
+        neural_tc = tc 
+
+    # in case we want to crop the beginning of the DM
+    if crop == True:
+        if crop_unit == 'sec': # fix for the fact that I crop TRs, but task not synced to TR
+            neural_tc = neural_tc[...,int(crop_TR*TR*oversampling_time)::] 
+        else: # assumes unit is TR
+            neural_tc = neural_tc[...,crop_TR*oversampling_time::]
+    
+     # shifting TRs to the left (quick fix)
+    # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
+    if shift_TRs == True:
+        up_neural_tc = neural_tc.copy()
+        if crop_unit == 'sec': # fix for the fact that I shift TRs, but task not synced to TR
+            up_neural_tc[...,:-int(shift_TR_num*TR*oversampling_time)] = neural_tc[...,int(shift_TR_num*TR*oversampling_time):]
+        else: # assumes unit is TR
+            up_neural_tc[...,:-int(shift_TR_num*oversampling_time)] = neural_tc[...,int(shift_TR_num*oversampling_time):]
+
+        neural_tc = up_neural_tc.copy()
 
     # convolve with hrf
     #scipy fftconvolve does not have padding options so doing it manually

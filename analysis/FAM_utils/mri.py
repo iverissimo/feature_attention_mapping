@@ -653,16 +653,18 @@ def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1,
 
         # order of conditions in run
         bar_pass_direction = params['prf']['bar_pass_direction']
+
+        # list of bar orientation at all TRs
+        condition_per_TR = []
+        for _,bartype in enumerate(bar_pass_direction):
+            condition_per_TR = np.concatenate((condition_per_TR, np.tile(bartype, TR_conditions[bartype])))
         
         # get total number of TRs in run
-        # list of bar orientation at all TRs
-        total_TR = 0
-        for _,bartype in enumerate(bar_pass_direction):
-            total_TR += TR_conditions[bartype]
+        total_TR = len(condition_per_TR)
 
         # set fake mask, in case we are not masking actually
         if len(mask) == 0:
-            mask = np.tile(False,total_TR)
+            mask = np.tile(False, total_TR)
 
         # all possible positions in pixels for for midpoint of
         # y position for vertical bar passes, 
@@ -681,29 +683,31 @@ def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1,
                                      'lowRx': np.repeat(screen_res[0],TR_conditions['D-U']), 'lowRy': np.array(list(reversed(ver_y-0.5*bar_width*screen_res[1])))}
                              }
 
+        
         # save screen display for each TR
         visual_dm_array = np.zeros((total_TR, round(screen_res[0]*res_scaling), round(screen_res[1]*res_scaling)))
-        counter = 0
-        for _,bartype in enumerate(bar_pass_direction): # loop over bar pass directions
+        i = 0
 
-            for i in range(TR_conditions[bartype]):
+        for trl,bartype in enumerate(condition_per_TR): # loop over bar pass directions
 
-                img = Image.new('RGB', tuple(screen_res)) # background image
+            img = Image.new('RGB', tuple(screen_res)) # background image
 
-                if bartype not in np.array(['empty','empty_long']): # if not empty screen
+            if bartype not in np.array(['empty','empty_long']): # if not empty screen
 
-                    if mask[counter]==False: # if not masked 
+                if mask[trl]==False: # if not masked 
 
-                        # set draw method for image
-                        draw = ImageDraw.Draw(img)
-                        # add bar, coordinates (upLx, upLy, lowRx, lowRy)
-                        draw.rectangle(tuple([coordenates_bars[bartype]['upLx'][i],coordenates_bars[bartype]['upLy'][i],
-                                            coordenates_bars[bartype]['lowRx'][i],coordenates_bars[bartype]['lowRy'][i]]), 
-                                    fill = (255,255,255),
-                                    outline = (255,255,255))
+                    # set draw method for image
+                    draw = ImageDraw.Draw(img)
+                    # add bar, coordinates (upLx, upLy, lowRx, lowRy)
+                    draw.rectangle(tuple([coordenates_bars[bartype]['upLx'][i],coordenates_bars[bartype]['upLy'][i],
+                                        coordenates_bars[bartype]['lowRx'][i],coordenates_bars[bartype]['lowRy'][i]]), 
+                                fill = (255,255,255),
+                                outline = (255,255,255))
 
-                visual_dm_array[counter, ...] = np.array(img)[::round(1/res_scaling),::round(1/res_scaling),0][np.newaxis,...]
-                counter += 1
+                # increment counter
+                i = i+1 if condition_per_TR[trl] == condition_per_TR[trl+1] else 0                    
+
+            visual_dm_array[trl, ...] = np.array(img)[::round(1/res_scaling),::round(1/res_scaling),0][np.newaxis,...]
 
         # swap axis to have time in last axis [x,y,t]
         visual_dm = visual_dm_array.transpose([1,2,0])

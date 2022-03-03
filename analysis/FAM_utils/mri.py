@@ -1324,7 +1324,8 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
                     attend_cond = {'reg_name': 'ACAO_mblk-0_run-1',
                                    'color': True, 'orientation': True,
                                    'condition_name': 'red_vertical',
-                                   'miniblock': 0,'run': 1}, TR = 1.6, crop_unit = 'sec',
+                                   'miniblock': 0,'run': 1}, xy_lim_pix = {'x_lim': [-540,540],'y_lim': [-540,540]},
+                                   TR = 1.6, crop_unit = 'sec',
                     save_imgs = False, res_scaling = 1, oversampling_time = None, stim_dur_seconds = 0.5,
                     crop = False, crop_TR = 8, overwrite=False, shift_TRs=True, shift_TR_num = 1, save_DM=True):
     
@@ -1456,8 +1457,18 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
                     # update counters, so we can do same in next miniblock
                     trl_blk_counter = 0
 
-            # save in array
-            visual_dm_array[i, ...] = np.array(img)[::round(1/res_scaling),::round(1/res_scaling),0][np.newaxis,...]
+            ## mask the array - messy, fix later
+            mask_array = np.array(img)[...,0].copy()
+            x_bounds = [int(screen_res[0]/2 + xy_lim_pix['x_lim'][0]), int(screen_res[0]/2 + xy_lim_pix['x_lim'][1])]
+            y_bounds = [int(screen_res[1]/2 + xy_lim_pix['y_lim'][0]), int(screen_res[1]/2 + xy_lim_pix['y_lim'][1])]
+
+            mask_array[..., (screen_res[0] - x_bounds[0]):] = 0
+            mask_array[..., 0:(screen_res[0] - x_bounds[1])] = 0
+            mask_array[(screen_res[1] - y_bounds[0]):, ...] = 0
+            mask_array[0:(screen_res[1] - y_bounds[1]), ...] = 0
+
+            ## save and dpwnsample spatial resolution
+            visual_dm_array[i, ...] = mask_array[::round(1/res_scaling),::round(1/res_scaling)][np.newaxis,...]
             
             # increment trial counter
             trial_counter += 1 

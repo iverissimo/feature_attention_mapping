@@ -283,7 +283,7 @@ for key in unique_cond.keys(): # for each condition
                                 attend_cond = all_conditions[all_conditions['reg_name']==reg].to_dict('r')[0], 
                                 save_imgs = False, res_scaling = 0.1, oversampling_time = None, 
                                 stim_dur_seconds = params['feature']['bars_phase_dur'], 
-                                crop = False, crop_unit = 'sec', 
+                                crop = False, crop_unit = 'sec', xy_lim_pix = xy_lim_pix,
                                 crop_TR = params['feature']['crop_TR'],
                                 shift_TRs = False, shift_TR_num = 1.5, # to account for lack of slicetimecorrection
                                 overwrite = True, save_DM = False)

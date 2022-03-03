@@ -2278,8 +2278,9 @@ def get_cue_regressor(params, trial_info, hrf_params = [1,1,0], cues = [0,1,2,3]
     return cue_regs
 
 
-def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True, 
-                     pRFmodel = 'css', TR = 1.6, hrf_params = [1,1,0], oversampling_time = 1, pad_length=20):
+def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True, stim_ind = [], 
+                     pRFmodel = 'css', TR = 1.6, hrf_params = [1,1,0], oversampling_time = 1, pad_length=20,
+                     crop_unit = 'sec', crop = True, crop_TR = 3, shift_TRs = True, shift_TR_num = 1.5):
     
     """ Get timecourse for FA regressor, given a dm
     
@@ -2295,6 +2296,33 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True,
         value that FA dm is oversampled by, to then downsample predictor
     
     """
+    
+    # get oversampled (if not done already) indices where bar on screen
+    # and upsample dm
+    if len(stim_ind)>0:
+        osf_stim_ind = get_oversampled_ind(stim_ind, osf = oversampling_time)
+        osf_dm = np.zeros((fa_dm.shape[0],fa_dm.shape[1], fa_dm.shape[2]*oversampling_time))
+        osf_dm[...,osf_stim_ind] = np.repeat(fa_dm[...,stim_ind], oversampling_time, axis = -1)
+        fa_dm = osf_dm.copy() 
+
+    # in case we want to crop the beginning of the DM
+    if crop == True:
+        if crop_unit == 'sec': # fix for the fact that I crop TRs, but task not synced to TR
+            fa_dm = fa_dm[...,int(crop_TR*TR*oversampling_time)::] 
+        else: # assumes unit is TR
+            fa_dm = fa_dm[...,crop_TR*oversampling_time::]
+
+    # shifting TRs to the left (quick fix)
+    # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
+    if shift_TRs == True:
+        new_fa_dm = fa_dm.copy()
+        if crop_unit == 'sec': # fix for the fact that I shift TRs, but task not synced to TR
+            new_fa_dm[...,:-int(shift_TR_num*TR*oversampling_time)] = fa_dm[...,int(shift_TR_num*TR*oversampling_time):]
+        else: # assumes unit is TR
+            new_fa_dm[...,:-int(shift_TR_num*oversampling_time)] = fa_dm[...,int(shift_TR_num*oversampling_time):]
+
+        fa_dm = new_fa_dm.copy()
+            
     ## set hrf
     hrf = create_hrf(hrf_params = hrf_params, TR = TR, osf = oversampling_time)
 
@@ -2358,7 +2386,7 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True,
     
 
 def get_residuals_FA(fit_pars, data, bar_dm_arr, params, hrf_params = [1,1,0], 
-                     cue_regressor = [], pRFmodel = 'css',
+                     cue_regressor = [], pRFmodel = 'css', stim_ind = [],
                      TR = 1.6, oversampling_time = 1, num_regs = 2):
 
     # turn Parameters into dict (if not already), for simplification
@@ -2377,12 +2405,8 @@ def get_residuals_FA(fit_pars, data, bar_dm_arr, params, hrf_params = [1,1,0],
     # taking the max value of the spatial position at each time point (to account for overlaps)
     gain_dm = weight_dm(bar_dm_arr, weights_arr)
     
-    #gain_dm = list(functools.reduce(operator.mul, x, y) for x, y in zip(bar_dm_arr[:,np.newaxis,:,:,:], weights_arr))
-    # taking the max value of the spatial position at each time point (to account for overlaps)
-    #gain_dm = functools.reduce(np.maximum, gain_dm) #np.amax(gain_dm, axis=0)
-
     ## get FA regressor
-    FA_regressor = get_FA_regressor(gain_dm, params, fit_pars_dict, 
+    FA_regressor = get_FA_regressor(gain_dm, params, fit_pars_dict, stim_ind = stim_ind,  
                                     pRFmodel = pRFmodel, TR = TR, hrf_params = hrf_params, oversampling_time = oversampling_time)
     
     ## calculate model
@@ -2476,6 +2500,7 @@ def plot_FA_DM(output, bar_dm_dict,
 def get_gain_fit_params(timecourse, fit_pars, params = [], trial_info = [], all_cond_DM = [], 
                            hrf_params = [1,1,0], osf = 10, TR = 1.6, pRFmodel = 'css',
                            xx = [], yy = [], size = [], betas = [], baseline = [], ns = [],
+                           stim_ind = [],
                            **kwargs):
 
     """
@@ -2504,7 +2529,7 @@ def get_gain_fit_params(timecourse, fit_pars, params = [], trial_info = [], all_
     ## minimize residuals
     out = minimize(get_residuals_FA, fit_pars, args = [timecourse, all_cond_DM, params],
                    kws={'cue_regressor': cue_regressor[0], 'hrf_params': hrf_params,
-                        'pRFmodel': pRFmodel,
+                        'pRFmodel': pRFmodel, 'stim_ind': stim_ind,
                        'oversampling_time': osf, 'num_regs': 2}, 
                    method = 'lbfgsb')
         

@@ -304,6 +304,10 @@ for key in unique_cond.keys(): # for each condition
 
  ## stack DM for efficiency
 cond_DM_stacked = np.stack((all_cond_DM[k].astype(np.float32) for k in all_cond_DM.keys()),axis = 0)
+
+## get indices when bar was on screen
+# (useful for upsampling)
+bar_on_screen_ind = np.where(np.sum(cond_DM_stacked,axis=0).reshape(-1, cond_DM_stacked.shape[-1]).sum(axis=0)>0)[0]
    
 ## set starting params
 starting_params = {'gain_ACAO': 1, 'gain_ACUO': 0, 'gain_UCAO': 0,'gain_UCUO':0}
@@ -336,6 +340,7 @@ results = np.array(Parallel(n_jobs=16)(delayed(mri_utils.get_gain_fit_params)(da
                                                                     pars,
                                                                    params = params, trial_info = trial_info,
                                                                    all_cond_DM = cond_DM_stacked,
+                                                                   stim_ind = bar_on_screen_ind, 
                                         hrf_params = hrf_params[...,vertex], pRFmodel = model_type,
                                         xx = xx[vertex], yy = yy[vertex], size = size[vertex],
                                         betas = beta[vertex], baseline = baseline[vertex], ns = ns[vertex]) 

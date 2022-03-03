@@ -694,15 +694,13 @@ def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1,
 
             if bartype not in np.array(['empty','empty_long']): # if not empty screen
 
-                if mask[trl]==False: # if not masked 
-
-                    # set draw method for image
-                    draw = ImageDraw.Draw(img)
-                    # add bar, coordinates (upLx, upLy, lowRx, lowRy)
-                    draw.rectangle(tuple([coordenates_bars[bartype]['upLx'][i],coordenates_bars[bartype]['upLy'][i],
-                                        coordenates_bars[bartype]['lowRx'][i],coordenates_bars[bartype]['lowRy'][i]]), 
-                                fill = (255,255,255),
-                                outline = (255,255,255))
+                # set draw method for image
+                draw = ImageDraw.Draw(img)
+                # add bar, coordinates (upLx, upLy, lowRx, lowRy)
+                draw.rectangle(tuple([coordenates_bars[bartype]['upLx'][i],coordenates_bars[bartype]['upLy'][i],
+                                    coordenates_bars[bartype]['lowRx'][i],coordenates_bars[bartype]['lowRy'][i]]), 
+                            fill = (255,255,255),
+                            outline = (255,255,255))
 
                 # increment counter
                 i = i+1 if condition_per_TR[trl] == condition_per_TR[trl+1] else 0                    
@@ -711,6 +709,17 @@ def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1,
 
         # swap axis to have time in last axis [x,y,t]
         visual_dm = visual_dm_array.transpose([1,2,0])
+
+        ## turn behavior mask into position mask
+        # get indices for horizontal and vertical bar pass
+        hor_pass_ind = np.array([ind for ind,val in enumerate(condition_per_TR) if val in ['L-R','R-L'] and mask[ind]==False])
+        ver_pass_ind = np.array([ind for ind,val in enumerate(condition_per_TR) if val in ['U-D','D-U'] and mask[ind]==False])
+
+        hor_mask = visual_dm[...,hor_pass_ind].sum(axis=-1); hor_mask[hor_mask > 0] = 1
+        vert_mask = visual_dm[...,ver_pass_ind].sum(axis=-1) ; vert_mask[vert_mask > 0] = 1
+        position_mask = hor_mask * vert_mask
+
+        visual_dm = visual_dm * position_mask[...,np.newaxis]
 
         # in case we want to crop the beginning of the DM
         if crop == True:

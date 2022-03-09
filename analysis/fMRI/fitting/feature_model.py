@@ -150,7 +150,7 @@ class FA_model:
         self.trial_info = trial_info
         
         ## get info on conditions in run (4 conditions x 4 miniblocks = 16)
-        all_conditions = pd.DataFrame(columns = ['reg_name', 'color','orientation','miniblock','run'])
+        all_conditions = pd.DataFrame(columns = ['reg_name', 'color','orientation','miniblock'])
 
         for key in self.unique_cond.keys(): # for each condition
 
@@ -160,14 +160,12 @@ class FA_model:
                 attended_cond = bar_pos.loc[(bar_pos['mini_block']==blk)&(bar_pos['attend_condition']==1)]['condition'].values[0]
                 
                 # append "regressor" info in dataframe
-                all_conditions = all_conditions.append(pd.DataFrame({'reg_name': '{cond}_mblk-{blk}_run-{run}'.format(cond = key,
-                                                                                                                     blk = blk,
-                                                                                                                     run = run),
+                all_conditions = all_conditions.append(pd.DataFrame({'reg_name': '{cond}_mblk-{blk}'.format(cond = key,
+                                                                                                                     blk = blk),
                                                                      'color': self.unique_cond[key]['color'],
                                                                      'orientation': self.unique_cond[key]['orientation'],
                                                                      'condition_name': mri_utils.get_cond_name(attended_cond, key),
-                                                                     'miniblock': blk,
-                                                                     'run': int(run)
+                                                                     'miniblock': blk
                                                                     }, index=[0]),ignore_index=True)
 
     

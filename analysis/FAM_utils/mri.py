@@ -1306,10 +1306,10 @@ def get_cond_name(attend_cond, cond_type='UCUO', C = ['red','green'], O = ['vert
 
 
 def get_FA_bar_stim(bar_pos, trial_info, 
-                    attend_cond = {'reg_name': 'ACAO_mblk-0_run-1',
+                    attend_cond = {'reg_name': 'ACAO_mblk-0',
                                    'color': True, 'orientation': True,
                                    'condition_name': 'red_vertical',
-                                   'miniblock': 0,'run': 1}, xy_lim_pix = {'x_lim': [-540,540],'y_lim': [-540,540]},
+                                   'miniblock': 0}, xy_lim_pix = {'x_lim': [-540,540],'y_lim': [-540,540]},
                                    bar_width = .125, screen_res = [1080, 1080],
                                    TR = 1.6, crop_unit = 'sec',
                     res_scaling = 1, oversampling_time = None, stim_dur_seconds = 0.5,

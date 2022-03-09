@@ -217,7 +217,59 @@ class FA_model:
         
         return all_regs_dict # return dict
         
-        
+    
+    def make_FA_DM(self, pars_dict,
+               hrf_params = [1,1,0], 
+               cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []},
+               weight_stim = False,
+               **kwargs):
+    
+        # if we want to weight bar stim
+        if weight_stim:
+            # get weighted visual FA dm   
+            weights_arr = np.array([pars_dict['gain_{key}'.format(key = name)] for name in self.unique_cond.keys()]).astype(np.float32)
+
+            # taking the max value of the spatial position at each time point (to account for overlaps)
+            dm = mri_utils.weight_dm(self.FA_visual_DM, weights_arr)
+        else:
+            dm = self.FA_visual_DM
+
+        # get FA regressor
+        bar_stim_regressors = {}
+
+        for key in self.bar_stim_regressors_keys:
+            bar_stim_regressors[key] = mri_utils.get_FA_regressor(dm, self.exp_params, pars_dict, 
+                                                                stim_ind = self.bar_on_screen_ind,
+                                                                TR = self.TR, hrf_params = hrf_params, oversampling_time = self.osf,
+                                                                crop = self.fa_crop, crop_TR = self.fa_crop_TRs, 
+                                                                shift_TRs = self.fa_shift_TRs, shift_TR_num = self.fa_shift_TR_num
+                                                                )
+            # save len of regressor, to use later
+            len_reg = bar_stim_regressors[key].shape[0]
+
+        # set all DM regressor names
+        self.all_regressor_keys = np.concatenate((np.array(['intercept']), 
+                                              self.bar_stim_regressors_keys, 
+                                              self.cue_regressors_keys))
+
+
+        # fill DM array
+        FA_design_matrix = np.zeros((len_reg, len(self.all_regressor_keys)))
+
+        for i, val in enumerate(self.all_regressor_keys):
+
+            if 'intercept' in val:
+                FA_design_matrix[...,i] = 1
+
+            elif val in self.bar_stim_regressors_keys:
+                FA_design_matrix[...,i] = bar_stim_regressors[val]
+
+            else:
+                FA_design_matrix[...,i] = cue_regressors[val]
+
+        return FA_design_matrix
+
+
         
 class FA_GainModel(FA_model):
     
@@ -328,43 +380,11 @@ class FA_GainModel(FA_model):
         else:
             fit_pars_dict = fit_pars.valuesdict()
         
-        # get weighted visual FA dm   
-        weights_arr = np.array([fit_pars_dict['gain_{key}'.format(key = name)] for name in self.unique_cond.keys()]).astype(np.float32)
-        
-        # taking the max value of the spatial position at each time point (to account for overlaps)
-        gain_dm = mri_utils.weight_dm(self.FA_visual_DM, weights_arr)
-        
-        # get FA regressor
-        bar_stim_regressors = {}
-        
-        for key in self.bar_stim_regressors_keys:
-            bar_stim_regressors[key] = mri_utils.get_FA_regressor(gain_dm, self.exp_params, fit_pars_dict, 
-                                                                stim_ind = self.bar_on_screen_ind,
-                                                                TR = self.TR, hrf_params = hrf_params, oversampling_time = self.osf,
-                                                                crop = self.fa_crop, crop_TR = self.fa_crop_TRs, 
-                                                                shift_TRs = self.fa_shift_TRs, shift_TR_num = self.fa_shift_TR_num
-                                                                )
-            # save len of regressor, to use later
-            len_reg = bar_stim_regressors[key].shape[0]
-
-        # set all DM regressor names
-        self.all_regressor_keys = np.concatenate((np.array(['intercept']), 
-                                              self.bar_stim_regressors_keys, 
-                                              self.cue_regressors_keys))
-        
-        # fill DM array
-        FA_design_matrix = np.zeros((len_reg, len(self.all_regressor_keys)))
-        
-        for i, val in enumerate(self.all_regressor_keys):
-            
-            if 'intercept' in val:
-                FA_design_matrix[...,i] = 1
-                
-            elif val in self.bar_stim_regressors_keys:
-                FA_design_matrix[...,i] = bar_stim_regressors[val]
-                
-            else:
-                FA_design_matrix[...,i] = cue_regressors[val]
+        ## set up actual DM that goes into fitting
+        FA_design_matrix = self.make_FA_DM(fit_pars_dict,
+                                           hrf_params = hrf_params, 
+                                           cue_regressors = cue_regressors,
+                                           weight_stim = True)
                 
         ## Fit GLM on FA data
         prediction, betas , r2, _ = mri_utils.fit_glm(timecourse, FA_design_matrix)

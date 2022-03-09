@@ -175,11 +175,7 @@ hrf_params = np.ones((3, fa_model.pRF_estimates['rsq'].shape[0]))
 if fa_model.fit_hrf: # use fitted hrf params
     hrf_params[1] = fa_model.pRF_estimates['hrf_derivative']
     hrf_params[2] = fa_model.pRF_estimates['hrf_dispersion']
-    
-    #hrf_oversampled = mri_utils.create_hrf(hrf_params = hrf_params, TR = fa_model.TR, osf = fa_model.osf) 
 else:
-    #hrf_oversampled = np.tile(mri_utils.create_hrf(TR = fa_model.TR, osf = fa_model.osf), 
-    #                          (hrf_params.shape[-1],1))
     hrf_params[2] = 0
 
 
@@ -212,6 +208,7 @@ fa_pars.add('rsq', value = 0, vary = False)
 
 
 ## fit it!
+print('iterative fitting params')
 results = fa_model.iterative_fit(data, fa_pars, 
                                      hrf_params = hrf_params, 
                                      mask_ind = mask_ind)
@@ -219,3 +216,42 @@ results = fa_model.iterative_fit(data, fa_pars,
 ## save fitted params Dataframe
 results.to_csv(op.join(output_dir,'iterative_params.csv'), index = False)
 
+## save DM given fitted params for all relevant vertices
+# others will be nan
+print('saving design matrix')
+
+dm_surf = np.zeros((data.shape[0], data.shape[1], len(fa_model.all_regressor_keys))); dm_surf[:] = np.nan
+
+dm = np.array(Parallel(n_jobs=16)(delayed(fa_model.make_FA_DM)(results.to_dict('r')[ind],
+                                                   hrf_params = hrf_params[..., vert], 
+                                                   cue_regressors = {'cue_0': fa_model.cue_regressors[0][vert], 
+                                                                   'cue_1': fa_model.cue_regressors[1][vert], 
+                                                                   'cue_2': fa_model.cue_regressors[2][vert], 
+                                                                   'cue_3': fa_model.cue_regressors[3][vert]},
+                                                   weight_stim = True)
+                                       for ind, vert in enumerate(tqdm(results['vertex'].values))))
+
+dm_surf[mask_ind, ...] = dm
+
+fa_dm_filename = op.join(output_dir,'DM_FA_iterative_gain_run-{run}.npz'.format(run=run))
+np.savez(fa_dm_filename,
+        dm = dm_surf,
+        reg_names = fa_model.all_regressor_keys)
+
+## save also model predictions for whole surface
+print('saving model timecourses')
+
+model_tc_surf = np.zeros((data.shape[0], data.shape[1])); model_tc_surf[:] = np.nan
+
+model_tc = np.array(Parallel(n_jobs=16)(delayed(mri_utils.get_fa_prediction_tc)(dm[ind],
+                                                   np.concatenate(([results.iloc[ind]['intercept']],
+                                                                    [results.iloc[ind]['beta_%s'%val] for val in fa_model.all_regressor_keys if val != 'intercept']
+                                                                   )),
+                                                                timecourse = data[vert],
+                                                                r2 = results.iloc[ind]['rsq'], viz_model = False)
+                                       for ind, vert in enumerate(tqdm(results['vertex'].values))))
+
+model_tc_surf[mask_ind[:2], ...] = model_tc
+
+model_tc_filename = op.join(output_dir,'prediction_FA_iterative_gain_run-{run}.npy'.format(run=run))
+np.save(model_tc_filename, model_tc_surf)

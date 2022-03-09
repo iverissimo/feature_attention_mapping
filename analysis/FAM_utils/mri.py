@@ -49,6 +49,7 @@ from prfpy.timecourse import stimulus_through_prf
 from prfpy.timecourse import filter_predictions
 
 from lmfit import Parameters, minimize
+from tqdm import tqdm
 
 import functools
 import operator
@@ -1000,40 +1001,48 @@ def join_chunks(path, out_name, chunk_num = 83, fit_model = 'css', fit_hrf = Fal
 
             if 'css' in fit_model: 
                 ns = chunk['ns']
+            else: # assumes gauss
+                ns = np.ones(xx.shape)
 
             rsq = chunk['r2']
 
             if fit_hrf:
                 hrf_derivative = chunk['hrf_derivative']
                 hrf_dispersion = chunk['hrf_dispersion']
+            else: # assumes standard spm params
+                hrf_derivative = np.ones(xx.shape)
+                hrf_dispersion = np.zeros(xx.shape) 
+
         else:
-            xx = np.concatenate((xx,chunk['x']))
-            yy = np.concatenate((yy,chunk['y']))
+            xx = np.concatenate((xx, chunk['x']))
+            yy = np.concatenate((yy, chunk['y']))
 
-            size = np.concatenate((size,chunk['size']))
+            size = np.concatenate((size, chunk['size']))
 
-            beta = np.concatenate((beta,chunk['betas']))
-            baseline = np.concatenate((baseline,chunk['baseline']))
+            beta = np.concatenate((beta, chunk['betas']))
+            baseline = np.concatenate((baseline, chunk['baseline']))
 
             if 'css' in fit_model:
-                ns = np.concatenate((ns,chunk['ns']))
+                ns = np.concatenate((ns, chunk['ns']))
+            else: # assumes gauss
+                ns = np.concatenate((ns, np.ones(xx.shape)))
 
-            rsq = np.concatenate((rsq,chunk['r2']))
+            rsq = np.concatenate((rsq, chunk['r2']))
             
             if fit_hrf:
                 hrf_derivative = np.concatenate((hrf_derivative, chunk['hrf_derivative']))
                 hrf_dispersion = np.concatenate((hrf_dispersion, chunk['hrf_dispersion']))
+            else: # assumes standard spm params
+                hrf_derivative = np.concatenate((hrf_derivative, np.ones(xx.shape)))
+                hrf_dispersion = np.concatenate((hrf_dispersion, np.zeros(xx.shape))) 
     
     print('shape of estimates is %s'%(str(xx.shape)))
 
     # save file
     output = op.join(out_name)
     print('saving %s'%output)
-    
-    if 'css' in fit_model:
 
-        if fit_hrf:
-            np.savez(output,
+    np.savez(output,
               x = xx,
               y = yy,
               size = size,
@@ -1043,36 +1052,6 @@ def join_chunks(path, out_name, chunk_num = 83, fit_model = 'css', fit_hrf = Fal
               hrf_dispersion = hrf_dispersion,
               ns = ns,
               r2 = rsq)
-
-        else:
-            np.savez(output,
-                x = xx,
-                y = yy,
-                size = size,
-                betas = beta,
-                baseline = baseline,
-                ns = ns,
-                r2 = rsq)
-    else:        
-        if fit_hrf:
-            np.savez(output,
-              x = xx,
-              y = yy,
-              size = size,
-              betas = beta,
-              baseline = baseline,
-              hrf_derivative = hrf_derivative,
-              hrf_dispersion = hrf_dispersion,
-              r2 = rsq)
-
-        else:
-            np.savez(output,
-                x = xx,
-                y = yy,
-                size = size,
-                betas = beta,
-                baseline = baseline,
-                r2 = rsq)
      
     return np.load(output)
 
@@ -1131,10 +1110,10 @@ def mask_estimates(estimates, ROI = 'None', fit_model = 'gauss', x_ecc_lim = [-6
     beta = estimates['betas']
     baseline = estimates['baseline']
     
-    if 'css' in fit_model:
-        ns = estimates['ns']
-    else: #if gauss
-        ns = np.ones(xx.shape)
+    ns = estimates['ns']
+
+    hrf_derivative = estimates['hrf_derivative']
+    hrf_dispersion = estimates['hrf_dispersion']
 
     rsq = estimates['r2']
     
@@ -1147,8 +1126,10 @@ def mask_estimates(estimates, ROI = 'None', fit_model = 'gauss', x_ecc_lim = [-6
     masked_size = np.zeros(size.shape); masked_size[:]=np.nan
     masked_beta = np.zeros(beta.shape); masked_beta[:]=np.nan
     masked_baseline = np.zeros(baseline.shape); masked_baseline[:]=np.nan
-    masked_rsq = np.zeros(rsq.shape); masked_rsq[:]=np.nan
     masked_ns = np.zeros(ns.shape); masked_ns[:]=np.nan
+    masked_hrf_derivative = np.zeros(hrf_derivative.shape); masked_hrf_derivative[:]=np.nan
+    masked_hrf_dispersion = np.zeros(hrf_dispersion.shape); masked_hrf_dispersion[:]=np.nan
+    masked_rsq = np.zeros(rsq.shape); masked_rsq[:]=np.nan
 
     for i in range(len(xx)): #for all vertices
         if xx[i] <= np.max(x_ecc_lim) and xx[i] >= np.min(x_ecc_lim): # if x within horizontal screen dim
@@ -1163,11 +1144,13 @@ def mask_estimates(estimates, ROI = 'None', fit_model = 'gauss', x_ecc_lim = [-6
                         masked_beta[i] = beta[i]
                         masked_baseline[i] = baseline[i]
                         masked_rsq[i] = rsq[i]
-                        masked_ns[i]=ns[i]
+                        masked_ns[i] = ns[i]
+                        masked_hrf_derivative[i] = hrf_derivative[i]
+                        masked_hrf_dispersion[i] =  hrf_dispersion[i]
 
     if ROI != 'None':
         
-        roi_ind = cortex.get_roi_verts(space,ROI) # get indices for that ROI
+        roi_ind = cortex.get_roi_verts(space, ROI) # get indices for that ROI
         
         # mask for roi
         masked_xx = masked_xx[roi_ind[ROI]]
@@ -1177,10 +1160,12 @@ def mask_estimates(estimates, ROI = 'None', fit_model = 'gauss', x_ecc_lim = [-6
         masked_baseline = masked_baseline[roi_ind[ROI]]
         masked_rsq = masked_rsq[roi_ind[ROI]]
         masked_ns = masked_ns[roi_ind[ROI]]
+        masked_hrf_derivative = masked_hrf_derivative[roi_ind[ROI]]
+        masked_hrf_dispersion = masked_hrf_dispersion[roi_ind[ROI]]
 
-    masked_estimates = {'x':masked_xx,'y':masked_yy,'size':masked_size,
-                        'beta':masked_beta,'baseline':masked_baseline,'ns':masked_ns,
-                        'rsq':masked_rsq}
+    masked_estimates = {'x': masked_xx,'y': masked_yy,'size': masked_size,
+                        'beta': masked_beta,'baseline': masked_baseline,'ns': masked_ns,
+                        'rsq': masked_rsq, 'hrf_derivative': masked_hrf_derivative, 'hrf_dispersion': masked_hrf_dispersion}
     
     return masked_estimates
 
@@ -1320,14 +1305,15 @@ def get_cond_name(attend_cond, cond_type='UCUO', C = ['red','green'], O = ['vert
     return cond_name
 
 
-def get_FA_bar_stim(output, params, bar_pos, trial_info, 
+def get_FA_bar_stim(bar_pos, trial_info, 
                     attend_cond = {'reg_name': 'ACAO_mblk-0_run-1',
                                    'color': True, 'orientation': True,
                                    'condition_name': 'red_vertical',
                                    'miniblock': 0,'run': 1}, xy_lim_pix = {'x_lim': [-540,540],'y_lim': [-540,540]},
+                                   bar_width = .125, screen_res = [1080, 1080],
                                    TR = 1.6, crop_unit = 'sec',
-                    save_imgs = False, res_scaling = 1, oversampling_time = None, stim_dur_seconds = 0.5,
-                    crop = False, crop_TR = 8, overwrite=False, shift_TRs=True, shift_TR_num = 1, save_DM=True):
+                    res_scaling = 1, oversampling_time = None, stim_dur_seconds = 0.5,
+                    crop = False, crop_TR = 3, shift_TRs=True, shift_TR_num = 1):
     
     """Get visual stim for FA condition.
     Similar to make_pRF_DM, it will
@@ -1348,190 +1334,159 @@ def get_FA_bar_stim(output, params, bar_pos, trial_info,
        if we want to save images in folder, for sanity check
     """
     
-    if not op.exists(output) or overwrite == True: 
-        print('making %s'%output)
-
-        if not op.exists(op.split(output)[0]): # make base dir to save files
-            os.makedirs(op.split(output)[0])
     
-        # general infos
-        bar_width = params['feature']['bar_width_ratio'] 
+    # general infos
+    #bar_width = params['feature']['bar_width_ratio'] 
 
-        screen_res = params['window']['size']
-        if params['window']['display'] == 'square': # if square display
-            screen_res = np.array([screen_res[1], screen_res[1]])            
-        
-        # miniblock number
-        mini_blk_num = int(attend_cond['miniblock'])
+    #screen_res = params['window']['size']
+    #if params['window']['display'] == 'square': # if square display
+    #    screen_res = np.array([screen_res[1], screen_res[1]])            
+    
+    # miniblock number
+    mini_blk_num = int(attend_cond['miniblock'])
 
-        # if oversampling is None, then we're working with the trials
-        if oversampling_time is None:
-            osf = 1
-        else:
-            osf = oversampling_time
-            
-        # total number of TRs and of trials
-        # if oversampling then they will not match
-        total_trials = len(trial_info)
-        total_TR = total_trials*osf
-
-        # stimulus duration (how long was each bar on screen)
-        stim_dur_TR = int(np.ceil(stim_dur_seconds*osf))
-
-        # save screen display for each TR
-        visual_dm_array = np.zeros((total_TR,  round(screen_res[0]*res_scaling), round(screen_res[1]*res_scaling)))
-
-        # some counters
-        trl_blk_counter = 0
-        trial_counter = 0
-        trial = 0
-        stim_counter = 0
-
-        # for each "TR"
-        for i in range(total_TR):
-
-            img = Image.new('RGB', tuple(screen_res)) # background image
-
-            if trial_info.iloc[trial]['trial_type'] == 'mini_block_%i'%mini_blk_num:
-
-                # choose part of DF that corresponds to miniblock
-                miniblk_df = bar_pos.loc[bar_pos['mini_block'] == mini_blk_num]
-
-                # get name of attended condition for miniblock
-                attended_condition = miniblk_df.loc[miniblk_df['attend_condition'] == 1]['condition'].values[0]
-
-                # which bar do we want?
-                if attend_cond['color'] and attend_cond['orientation']: # if we want fully attended bar
-                    chosen_condition = get_cond_name(attended_condition,'ACAO')
-
-                elif not attend_cond['color'] and not attend_cond['orientation']: # if we want fully un-attended bar
-                    chosen_condition = get_cond_name(attended_condition,'UCUO')
-
-                elif attend_cond['color'] and not attend_cond['orientation']: # if we want semi-attended bar (attend color not orientation)
-                    chosen_condition = get_cond_name(attended_condition,'ACUO')
-
-                elif not attend_cond['color'] and attend_cond['orientation']: # if we want semi-attended bar (attend orientation not color)
-                    chosen_condition = get_cond_name(attended_condition,'UCAO')
-                
-                if trial_counter == 0:
-                    print('attended condition in miniblock %s, chosen condition is %s'%(attended_condition, chosen_condition))
-
-                # bar positions for miniblock
-                miniblk_positions = miniblk_df.loc[miniblk_df['condition'] == chosen_condition]['bar_midpoint_at_TR'].values[0]
-
-                # coordenates for bar pass of trial, for PIL Image - DO NOT CONFUSE WITH CONDITION ORIENTATION
-                # x position, y position 
-                hor_x = miniblk_positions[trl_blk_counter][0] + screen_res[0]/2
-                hor_y = miniblk_positions[trl_blk_counter][1] + screen_res[1]/2
-                
-                coordenates_bars = {'vertical': {'upLx': hor_x-0.5*bar_width*screen_res[0], 
-                                                   'upLy': screen_res[1],
-                                                   'lowRx': hor_x+0.5*bar_width*screen_res[0], 
-                                                   'lowRy': 0},
-                                    'horizontal': {'upLx': 0, 
-                                                 'upLy': hor_y+0.5*bar_width*screen_res[1],
-                                                 'lowRx': screen_res[0], 
-                                                 'lowRy': hor_y-0.5*bar_width*screen_res[1]}
-                                    }
-                
-                # if within time to display bar, then draw it
-                if stim_counter < stim_dur_TR:
-                    # set draw method for image
-                    draw = ImageDraw.Draw(img)
-                    # add bar, coordinates (upLx, upLy, lowRx, lowRy)
-                    draw.rectangle(tuple([coordenates_bars[chosen_condition.split('_')[-1]]['upLx'],coordenates_bars[chosen_condition.split('_')[-1]]['upLy'],
-                                        coordenates_bars[chosen_condition.split('_')[-1]]['lowRx'],coordenates_bars[chosen_condition.split('_')[-1]]['lowRy']]), 
-                                fill = (255,255,255),
-                                outline = (255,255,255))
-
-                    stim_counter += 1 # increment counter
-
-                # update counter of trials within miniblok
-                if trial_counter == osf-1:
-                    trl_blk_counter += 1
-                    # reset stim counter
-                    stim_counter = 0
-
-                # if last trial of miniblock
-                if trl_blk_counter == len(bar_pos.iloc[0]['bar_pass_direction_at_TR']):
-                    # update counters, so we can do same in next miniblock
-                    trl_blk_counter = 0
-
-            ## mask the array - messy, fix later
-            mask_array = np.array(img)[...,0].copy()
-            x_bounds = [int(screen_res[0]/2 + xy_lim_pix['x_lim'][0]), int(screen_res[0]/2 + xy_lim_pix['x_lim'][1])]
-            y_bounds = [int(screen_res[1]/2 + xy_lim_pix['y_lim'][0]), int(screen_res[1]/2 + xy_lim_pix['y_lim'][1])]
-
-            mask_array[..., (screen_res[0] - x_bounds[0]):] = 0
-            mask_array[..., 0:(screen_res[0] - x_bounds[1])] = 0
-            mask_array[(screen_res[1] - y_bounds[0]):, ...] = 0
-            mask_array[0:(screen_res[1] - y_bounds[1]), ...] = 0
-
-            ## save and dpwnsample spatial resolution
-            visual_dm_array[i, ...] = mask_array[::round(1/res_scaling),::round(1/res_scaling)][np.newaxis,...]
-            
-            # increment trial counter
-            trial_counter += 1 
-            
-            # if sampling time reached,
-            if trial_counter == osf: # then reset counter and update trial
-                trial_counter = 0 
-                trial += 1
-
-        # swap axis to have time in last axis [x,y,t]
-        visual_dm = visual_dm_array.transpose([1,2,0])
-        
-        # in case we want to crop the beginning of the DM
-        if crop == True:
-            if crop_unit == 'sec': # fix for the fact that I crop TRs, but task not synced to TR
-                visual_dm = visual_dm[...,int(crop_TR*TR*osf)::] 
-            else: # assumes unit is TR
-               visual_dm = visual_dm[...,int(crop_TR*osf)::] 
-
-        # shifting TRs to the left (quick fix)
-        # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
-        if shift_TRs == True:
-
-            new_visual_dm = visual_dm.copy()
-
-            if crop_unit == 'sec': # fix for the fact that I shift TRs, but task not synced to TR
-                new_visual_dm[...,:-int(shift_TR_num*TR*osf)] = visual_dm[...,int(shift_TR_num*TR*osf):]
-            else: # assumes unit is TR
-                new_visual_dm[...,:-int(shift_TR_num*osf)] = visual_dm[...,int(shift_TR_num*osf):]
-                
-            visual_dm = new_visual_dm.copy()
-
-        if save_DM == True: 
-            # save design matrix
-            np.save(output, visual_dm)
-        
+    # if oversampling is None, then we're working with the trials
+    if oversampling_time is None:
+        osf = 1
     else:
-        print('already exists, skipping %s'%output)
+        osf = oversampling_time
         
-        # load
-        visual_dm = np.load(output)
+    # total number of TRs and of trials
+    # if oversampling then they will not match
+    total_trials = len(trial_info)
+    total_TR = total_trials*osf
 
-    #if we want to save the images
-    if save_imgs == True:
+    # stimulus duration (how long was each bar on screen)
+    stim_dur_TR = int(np.ceil(stim_dur_seconds*osf))
 
-        #take into account oversampling
-        if osf == 1:
-            frames = np.arange(visual_dm.shape[-1])
-        else:
-            frames = np.arange(0,visual_dm.shape[-1], osf, dtype=int)  
+    # save screen display for each TR
+    visual_dm_array = np.zeros((total_TR,  round(screen_res[0]*res_scaling), round(screen_res[1]*res_scaling)))
 
-        outfolder = op.split(output)[0]
+    # some counters
+    trl_blk_counter = 0
+    trial_counter = 0
+    trial = 0
+    stim_counter = 0
 
-        visual_dm = visual_dm.astype(np.uint8)
+    # for each "TR"
+    for i in range(total_TR):
 
-        for w in frames:
-            im = Image.fromarray(visual_dm[...,int(w)])
-            im.save(op.join(outfolder,op.split(output)[-1].replace('.npy','_trial-{time}.png'.format(time=str(int(w/osf)).zfill(3)))))      
+        img = Image.new('RGB', tuple(screen_res)) # background image
+
+        if trial_info.iloc[trial]['trial_type'] == 'mini_block_%i'%mini_blk_num:
+
+            # choose part of DF that corresponds to miniblock
+            miniblk_df = bar_pos.loc[bar_pos['mini_block'] == mini_blk_num]
+
+            # get name of attended condition for miniblock
+            attended_condition = miniblk_df.loc[miniblk_df['attend_condition'] == 1]['condition'].values[0]
+
+            # which bar do we want?
+            if attend_cond['color'] and attend_cond['orientation']: # if we want fully attended bar
+                chosen_condition = get_cond_name(attended_condition,'ACAO')
+
+            elif not attend_cond['color'] and not attend_cond['orientation']: # if we want fully un-attended bar
+                chosen_condition = get_cond_name(attended_condition,'UCUO')
+
+            elif attend_cond['color'] and not attend_cond['orientation']: # if we want semi-attended bar (attend color not orientation)
+                chosen_condition = get_cond_name(attended_condition,'ACUO')
+
+            elif not attend_cond['color'] and attend_cond['orientation']: # if we want semi-attended bar (attend orientation not color)
+                chosen_condition = get_cond_name(attended_condition,'UCAO')
+            
+            if trial_counter == 0:
+                print('attended condition in miniblock %s, chosen condition is %s'%(attended_condition, chosen_condition))
+
+            # bar positions for miniblock
+            miniblk_positions = miniblk_df.loc[miniblk_df['condition'] == chosen_condition]['bar_midpoint_at_TR'].values[0]
+
+            # coordenates for bar pass of trial, for PIL Image - DO NOT CONFUSE WITH CONDITION ORIENTATION
+            # x position, y position 
+            hor_x = miniblk_positions[trl_blk_counter][0] + screen_res[0]/2
+            hor_y = miniblk_positions[trl_blk_counter][1] + screen_res[1]/2
+            
+            coordenates_bars = {'vertical': {'upLx': hor_x-0.5*bar_width*screen_res[0], 
+                                                'upLy': screen_res[1],
+                                                'lowRx': hor_x+0.5*bar_width*screen_res[0], 
+                                                'lowRy': 0},
+                                'horizontal': {'upLx': 0, 
+                                                'upLy': hor_y+0.5*bar_width*screen_res[1],
+                                                'lowRx': screen_res[0], 
+                                                'lowRy': hor_y-0.5*bar_width*screen_res[1]}
+                                }
+            
+            # if within time to display bar, then draw it
+            if stim_counter < stim_dur_TR:
+                # set draw method for image
+                draw = ImageDraw.Draw(img)
+                # add bar, coordinates (upLx, upLy, lowRx, lowRy)
+                draw.rectangle(tuple([coordenates_bars[chosen_condition.split('_')[-1]]['upLx'],coordenates_bars[chosen_condition.split('_')[-1]]['upLy'],
+                                    coordenates_bars[chosen_condition.split('_')[-1]]['lowRx'],coordenates_bars[chosen_condition.split('_')[-1]]['lowRy']]), 
+                            fill = (255,255,255),
+                            outline = (255,255,255))
+
+                stim_counter += 1 # increment counter
+
+            # update counter of trials within miniblok
+            if trial_counter == osf-1:
+                trl_blk_counter += 1
+                # reset stim counter
+                stim_counter = 0
+
+            # if last trial of miniblock
+            if trl_blk_counter == len(bar_pos.iloc[0]['bar_pass_direction_at_TR']):
+                # update counters, so we can do same in next miniblock
+                trl_blk_counter = 0
+
+        ## mask the array - messy, fix later
+        mask_array = np.array(img)[...,0].copy()
+        x_bounds = [int(screen_res[0]/2 + xy_lim_pix['x_lim'][0]), int(screen_res[0]/2 + xy_lim_pix['x_lim'][1])]
+        y_bounds = [int(screen_res[1]/2 + xy_lim_pix['y_lim'][0]), int(screen_res[1]/2 + xy_lim_pix['y_lim'][1])]
+
+        mask_array[..., (screen_res[0] - x_bounds[0]):] = 0
+        mask_array[..., 0:(screen_res[0] - x_bounds[1])] = 0
+        mask_array[(screen_res[1] - y_bounds[0]):, ...] = 0
+        mask_array[0:(screen_res[1] - y_bounds[1]), ...] = 0
+
+        ## save and dpwnsample spatial resolution
+        visual_dm_array[i, ...] = mask_array[::round(1/res_scaling),::round(1/res_scaling)][np.newaxis,...]
+        
+        # increment trial counter
+        trial_counter += 1 
+        
+        # if sampling time reached,
+        if trial_counter == osf: # then reset counter and update trial
+            trial_counter = 0 
+            trial += 1
+
+    # swap axis to have time in last axis [x,y,t]
+    visual_dm = visual_dm_array.transpose([1,2,0])
+    
+    # in case we want to crop the beginning of the DM
+    if crop == True:
+        if crop_unit == 'sec': # fix for the fact that I crop TRs, but task not synced to TR
+            visual_dm = visual_dm[...,int(crop_TR*TR*osf)::] 
+        else: # assumes unit is TR
+            visual_dm = visual_dm[...,int(crop_TR*osf)::] 
+
+    # shifting TRs to the left (quick fix)
+    # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
+    if shift_TRs == True:
+
+        new_visual_dm = visual_dm.copy()
+
+        if crop_unit == 'sec': # fix for the fact that I shift TRs, but task not synced to TR
+            new_visual_dm[...,:-int(shift_TR_num*TR*osf)] = visual_dm[...,int(shift_TR_num*TR*osf):]
+        else: # assumes unit is TR
+            new_visual_dm[...,:-int(shift_TR_num*osf)] = visual_dm[...,int(shift_TR_num*osf):]
+            
+        visual_dm = new_visual_dm.copy()
+
             
     return visual_dm
 
 
-def plot_DM(DM, vertex, output, names=['intercept','ACAO', 'ACUO', 'UCAO', 'UCUO']):
+def plot_DM(DM, vertex, output, names=['intercept','ACAO', 'ACUO', 'UCAO', 'UCUO'], save_fig = False):
     
     """ plot design matrix for a given vertex
     similar to nilearn dm plotting func
@@ -1570,9 +1525,10 @@ def plot_DM(DM, vertex, output, names=['intercept','ACAO', 'ACUO', 'UCAO', 'UCUO
     ax.xaxis.tick_top()
 
     plt.tight_layout()
-    
-    print('saving %s'%output)
-    plt.savefig(output)
+
+    if save_fig: 
+        print('saving %s'%output)
+        plt.savefig(output)
 
  
 def fit_glm(voxel, dm, error='mse'):
@@ -1833,6 +1789,38 @@ def create_hrf(hrf_params=[1.0, 1.0, 0.0], TR = 1.2, osf = 1):
         axis=0)                    
 
     return hrf.T
+
+
+def resample_arr(upsample_data, osf = 10, final_sf = 1.6):
+
+    """ resample array
+    using cubic interpolation
+    
+    Parameters
+    ----------
+    upsample_data : arr
+        1d array that is upsampled
+    osf : int
+        oversampling factor (that data was upsampled by)
+    final_sf: float
+        final sampling rate that we want to obtain
+        
+    """
+    
+    # original scale of data in seconds
+    original_scale = np.arange(0, upsample_data.shape[-1]/osf, 1/osf)
+
+    # cubic interpolation of predictor
+    interp = interpolate.interp1d(original_scale, 
+                                upsample_data, 
+                                kind = "cubic", axis=-1)
+    
+    desired_scale = np.arange(0, upsample_data.shape[-1]/osf, final_sf) # we want the predictor to be sampled in TR
+
+    out_arr = interp(desired_scale)
+    
+    return out_arr
+
 
 def CV_FA(voxel,dm,betas):
     
@@ -2191,7 +2179,8 @@ def weight_dm(bar_dm_list, weights_array):
     return gain_dm
 
 
-def get_cue_regressor(params, trial_info, hrf_params = [1,1,0], cues = [0,1,2,3], TR = 1.6, oversampling_time = 1, baseline = None,
+def get_cue_regressor(trial_info, hrf_params = [1,1,0], cues = [0,1,2,3], TR = 1.6, oversampling_time = 1, 
+                        baseline = None, first_modes_to_remove = 5,
                       crop_unit = 'sec', crop = False, crop_TR = 3, shift_TRs = True, shift_TR_num = 1, pad_length = 20):
     
     """Get timecourse for cue regressor
@@ -2214,7 +2203,7 @@ def get_cue_regressor(params, trial_info, hrf_params = [1,1,0], cues = [0,1,2,3]
     hrf = create_hrf(hrf_params = hrf_params, TR = TR, osf = oversampling_time)
         
     # initialized array of zeros for cue regressors - UPSAMPLED
-    cue_regs_upsampled = np.zeros((1, len(trial_info)*oversampling_time))
+    cue_regs_upsampled = np.zeros((hrf.shape[0], len(trial_info)*oversampling_time))
     
     # fill it given cue onsets
     for c in cues:
@@ -2246,41 +2235,32 @@ def get_cue_regressor(params, trial_info, hrf_params = [1,1,0], cues = [0,1,2,3]
     pad = np.tile(cue_regs_upsampled[:,0], (pad_length*oversampling_time,1)).T
     padded_cue = np.hstack((pad,cue_regs_upsampled))
 
-    cue_convolved = signal.fftconvolve(padded_cue, hrf, axes=(-1))[..., pad_length*oversampling_time:cue_regs_upsampled.shape[-1]+pad_length*oversampling_time]  
-    
-    # save convolved upsampled cue in array
-    cue_regs_upsampled = np.array(cue_convolved)#[...,:cue_regs_upsampled.shape[-1]]
+    print('convolving cue regressor')
+    cue_regs_upsampled = np.array(Parallel(n_jobs=16)(delayed(signal.fftconvolve)(padded_cue[vertex], hrf[vertex], axes=(-1))
+                                             for _,vertex in enumerate(tqdm(range(padded_cue.shape[0])))))[..., pad_length*oversampling_time:cue_regs_upsampled.shape[-1]+pad_length*oversampling_time] 
     
     ## resample to data sampling rate
-    
-    # original scale of data in seconds
-    original_scale = np.arange(0, cue_regs_upsampled.shape[-1]/oversampling_time, 1/oversampling_time)
-
-    # cubic interpolation of predictor
-    interp = interpolate.interp1d(original_scale, 
-                                cue_regs_upsampled, 
-                                kind = "cubic", axis=-1)
-    desired_scale = np.arange(0, cue_regs_upsampled.shape[-1]/oversampling_time, TR) # we want the predictor to be sampled in TR
-
-    cue_regs_RESAMPLED = interp(desired_scale)
+    print('resampling to TR')
+    cue_regs_RESAMPLED = np.array(Parallel(n_jobs=16)(delayed(resample_arr)(cue_regs_upsampled[vertex], osf = oversampling_time, final_sf = TR)
+                                                                    for _,vertex in enumerate(tqdm(range(cue_regs_upsampled.shape[0])))))
 
     ## filter it, like we do to the data
-    cue_regs_RESAMPLED =  dc_data(cue_regs_RESAMPLED,
-                                first_modes_to_remove = params['mri']['filtering']['first_modes_to_remove'])
-    
-    ## make nan vertices that are not to be fitted
-    cue_regs = cue_regs_RESAMPLED
+    cue_regs =  dc_data(cue_regs_RESAMPLED,
+                                first_modes_to_remove = first_modes_to_remove)
     
     # add baseline if baseline array/value specified
     if baseline is not None:
-        cue_regs += baseline 
+        if np.size(baseline) > 1:
+            cue_regs = np.add(cue_regs, baseline[..., np.newaxis])
+        else:
+            cue_regs += baseline 
         
     return cue_regs
 
 
 def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True, stim_ind = [], 
-                     pRFmodel = 'css', TR = 1.6, hrf_params = [1,1,0], oversampling_time = 1, pad_length=20,
-                     crop_unit = 'sec', crop = True, crop_TR = 3, shift_TRs = True, shift_TR_num = 1.5):
+                    TR = 1.6, hrf_params = [1,1,0], oversampling_time = 1, pad_length=20,
+                    crop_unit = 'sec', crop = True, crop_TR = 3, shift_TRs = True, shift_TR_num = 1.5):
     
     """ Get timecourse for FA regressor, given a dm
     
@@ -2357,7 +2337,7 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True, stim_ind = [],
     tc_convolved = signal.fftconvolve(padded_cue, hrf, axes=(-1))[..., pad_length*oversampling_time:neural_tc.shape[-1]+pad_length*oversampling_time]  
 
     # save convolved upsampled cue in array
-    tc_convolved = np.array(tc_convolved)#[...,:cue_regs_upsampled.shape[-1]]
+    tc_convolved = np.array(tc_convolved)
 
     if filter:
         model_fit = pRFfit_pars['pRF_baseline'] + pRFfit_pars['pRF_beta'] * filter_predictions(
@@ -2370,82 +2350,14 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True, stim_ind = [],
     else:
         model_fit = pRFfit_pars['pRF_baseline'] + pRFfit_pars['pRF_beta'] * tc_convolved
 
-    
-    # original scale of data in seconds
-    original_scale = np.arange(0, model_fit.shape[-1]/oversampling_time, 1/oversampling_time)
-
-    # cubic interpolation of predictor
-    interp = interpolate.interp1d(original_scale, 
-                                model_fit, 
-                                kind = "cubic", axis=-1)
-    desired_scale = np.arange(0, model_fit.shape[-1]/oversampling_time, TR) # we want the predictor to be sampled in TR
-
-    FA_regressor = interp(desired_scale)
+    # resample to data sampling rate
+    FA_regressor = resample_arr(model_fit, osf = oversampling_time, final_sf = TR)
     
     # squeeze out single dimension
     FA_regressor = np.squeeze(FA_regressor)
     
     return FA_regressor
     
-
-def get_residuals_FA(fit_pars, data, bar_dm_arr, params, hrf_params = [1,1,0], 
-                     cue_regressor = [], pRFmodel = 'css', stim_ind = [],
-                     TR = 1.6, oversampling_time = 1, num_regs = 2):
-
-    # turn Parameters into dict (if not already), for simplification
-    if type(fit_pars) is dict:
-        fit_pars_dict = fit_pars
-    else:
-        fit_pars_dict = fit_pars.valuesdict()
-
-    ## set DM - all bars simultaneously on screen, multiplied by weights
-    bar_weights = {'ACAO': fit_pars_dict['gain_ACAO'], 
-                'ACUO': fit_pars_dict['gain_ACUO'], 
-                'UCAO': fit_pars_dict['gain_UCAO'], 
-                'UCUO': fit_pars_dict['gain_UCUO']}
-    weights_arr = np.array([bar_weights[k] for k in bar_weights.keys()]).astype(np.float32)
-
-    # taking the max value of the spatial position at each time point (to account for overlaps)
-    gain_dm = weight_dm(bar_dm_arr, weights_arr)
-    
-    ## get FA regressor
-    FA_regressor = get_FA_regressor(gain_dm, params, fit_pars_dict, stim_ind = stim_ind,  
-                                    pRFmodel = pRFmodel, TR = TR, hrf_params = hrf_params, oversampling_time = oversampling_time)
-    
-    ## calculate model
-    if num_regs == 1: # if 1 regressor given, then comparing pRF FA regressor directly to data
-
-        prediction = FA_regressor
-
-        # calculate rsq of fit
-        r2 = 1 - (np.sum((data - prediction)**2)/ np.sum((data - np.mean(data))**2))  
-
-    else:
-        ## Make actual DM to be used in GLM fit (intercept + FA regressor + cue regressor)
-        
-        DM_FA = np.zeros((FA_regressor.shape[0], num_regs+1))
-        
-        DM_FA[...,0] = 1 # add intercept in first position
-        DM_FA[...,1] = FA_regressor # add FA regressor
-        DM_FA[...,2] = cue_regressor # add cue regressor
-        
-        ## Fit GLM on FA data
-        prediction, betas , r2, _ = fit_glm(data, DM_FA)
-        
-        # update values of pars, as outputed by glm
-        # if input params was Parameters object
-        if type(fit_pars) is not dict and type(fit_pars) is not pd.DataFrame:
-            fit_pars['intercept'].set(betas[0])
-            fit_pars['FA_beta'].set(betas[1])
-            fit_pars['cue_beta'].set(betas[2])
-
-    print('FA GLM fit R2 is %.2f'%r2)
-
-    # OLS residuals
-    residuals = data - prediction
-
-    # return error "timecourse", that will be used by minimize
-    return  residuals
 
 
 def plot_FA_DM(output, bar_dm_dict, 
@@ -2500,45 +2412,6 @@ def plot_FA_DM(output, bar_dm_dict,
     print('saved dm in %s'%outfolder)
 
 
-def get_gain_fit_params(timecourse, fit_pars, params = [], trial_info = [], all_cond_DM = [], 
-                           hrf_params = [1,1,0], osf = 10, TR = 1.6, pRFmodel = 'css',
-                           xx = [], yy = [], size = [], betas = [], baseline = [], ns = [],
-                           stim_ind = [],
-                           **kwargs):
-
-    """
-    Function that will fit gain per voxel
-    """
-    
-    # make cue regressor timecourses
-    # also adding baseline of pRF
-    cue_regressor = get_cue_regressor(params, trial_info, hrf_params = hrf_params, 
-                                                cues = np.arange(params['feature']['mini_blocks']),
-                                     TR = TR, oversampling_time = osf, baseline = baseline,
-                                     crop_unit = 'sec', crop = True, crop_TR = params['feature']['crop_TR'], 
-                                     shift_TRs = True, shift_TR_num = 1.5)
-    
-    # set parameters that are vertex specific
-    # (others already defined when Parameters object initialized)
-    fit_pars['pRF_x'].set(xx)
-    fit_pars['pRF_y'].set(yy)
-    fit_pars['pRF_beta'].set(betas)
-    fit_pars['pRF_size'].set(size)
-    fit_pars['pRF_baseline'].set(baseline)
-    if 'css' in pRFmodel:
-        fit_pars['pRF_n'].set(ns)
-            
-    
-    ## minimize residuals
-    out = minimize(get_residuals_FA, fit_pars, args = [timecourse, all_cond_DM, params],
-                   kws={'cue_regressor': cue_regressor[0], 'hrf_params': hrf_params,
-                        'pRFmodel': pRFmodel, 'stim_ind': stim_ind,
-                       'oversampling_time': osf, 'num_regs': 2}, 
-                   method = 'lbfgsb')
-        
-    return out.params.valuesdict()
-
-
 
 def get_oversampled_ind(orig_ind, osf = 10):
 
@@ -2552,3 +2425,40 @@ def get_oversampled_ind(orig_ind, osf = 10):
         osf_ind += list(np.arange(val*osf,val*osf+osf))
     
     return np.array(osf_ind)
+
+
+def get_fa_prediction_tc(dm, betas, 
+                          timecourse = [], r2 = 0, viz_model = False, TR = 1.6, 
+                          bar_onset = [27,98,126,197,225,296,324,395], crop_TR = 3, shift_TR_num = 1.5):
+    
+    
+    prediction = dm.dot(betas)
+    
+    if viz_model:
+        
+        fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
+        # plot data with model
+        time_sec = np.linspace(0,len(timecourse)*TR, num=len(timecourse)) # array with timepoints, in seconds
+
+        plt.plot(time_sec, prediction, c='#0040ff',lw=3,label='model R$^2$ = %.2f'%r2,zorder=1)
+        plt.plot(time_sec, timecourse,'k--',label='FA data')
+        axis.set_xlabel('Time (s)',fontsize=20, labelpad=20)
+        axis.set_ylabel('BOLD signal change (%)',fontsize=20, labelpad=10)
+        axis.set_xlim(0,len(prediction)*TR)
+        axis.legend(loc='upper left',fontsize=10) 
+        #axis.set_ylim(-3,3)  
+
+        # times where bar is on screen [1st on, last on, 1st on, last on, etc] 
+        # ugly AF - change in future 
+        bar_onset = np.array(bar_onset)#/TR
+        bar_onset = bar_onset - crop_TR*TR - TR*shift_TR_num
+
+        bar_directions = np.array(['mini_block_0', 'mini_block_1', 'mini_block_2', 'mini_block_3'])
+        # plot axis vertical bar on background to indicate stimulus display time
+        ax_count = 0
+        for h in range(len(bar_directions)):
+            plt.axvspan(bar_onset[ax_count], bar_onset[ax_count+1]+TR, facecolor='#0040ff', alpha=0.1)
+            ax_count += 2
+
+    
+    return prediction

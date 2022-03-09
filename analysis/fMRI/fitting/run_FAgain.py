@@ -58,7 +58,7 @@ wait
 cp -r $SOURCEDATA_DIR/sub-$SJ_NR $TMPDIR/sourcedata
 wait
 
-python FA_gain_model.py $SJ_NR $RUN 
+python FA_gain.py $SJ_NR $RUN 
 
 wait          # wait until programs are finished
 

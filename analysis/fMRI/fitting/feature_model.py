@@ -34,7 +34,7 @@ class FA_model:
             
         # screen info
         self.screen_size_cm = exp_params['monitor']['height']
-        self.screen_distance_cm = params['monitor']['distance']
+        self.screen_distance_cm = exp_params['monitor']['distance']
             
         # mri TR
         self.TR = exp_params['mri']['TR']

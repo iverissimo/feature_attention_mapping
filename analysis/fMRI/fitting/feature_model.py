@@ -231,11 +231,16 @@ class FA_model:
         else:
             dm = self.FA_visual_DM
 
+        if len(dm.shape) == 3:
+            new_dm = dm[np.newaxis,...]
+        else:
+            new_dm = dm
+
         # get FA regressor
         bar_stim_regressors = {}
 
-        for key in self.bar_stim_regressors_keys:
-            bar_stim_regressors[key] = mri_utils.get_FA_regressor(dm, self.exp_params, pars_dict, 
+        for i, key in enumerate(self.bar_stim_regressors_keys):
+            bar_stim_regressors[key] = mri_utils.get_FA_regressor(new_dm[i], self.exp_params, pars_dict, 
                                                                 stim_ind = self.bar_on_screen_ind,
                                                                 TR = self.TR, hrf_params = hrf_params, oversampling_time = self.osf,
                                                                 crop = self.fa_crop, crop_TR = self.fa_crop_TRs, 
@@ -266,6 +271,90 @@ class FA_model:
 
         return FA_design_matrix, all_regressor_keys
         
+
+class FA_GLM(FA_model):
+    
+    def __init__(self, 
+                 exp_params):
+        
+        super().__init__(exp_params)
+        
+    
+    def fit(self, data,
+        hrf_params = None, mask_ind = [], nr_cue_regs = 4, reg_cond_names = ['ACAO', 'ACUO', 'UCAO', 'UCUO']):
+
+        ## set mask indices to all, if not specified
+        if len(mask_ind) == 0:
+            mask_ind = np.arange(data.shape[0])
+
+
+        ## hrf params - should be (3, #vertices)
+        self.hrf_params = hrf_params
+
+        ## get cue regressor(s)
+        if not hasattr(self, 'cue_regressors'):
+            self.cue_regressors = np.stack((mri_utils.get_cue_regressor(self.trial_info, 
+                                                        hrf_params = self.hrf_params, cues = [i],
+                                                        TR = self.TR, oversampling_time = self.osf, 
+                                                        baseline = self.pRF_estimates['baseline'],
+                                                        crop_unit = 'sec', crop = self.fa_crop, 
+                                                        crop_TR = self.fa_crop_TRs, 
+                                                        shift_TRs = self.fa_shift_TRs, 
+                                                        shift_TR_num = self.fa_shift_TR_num) for i in range(nr_cue_regs)), axis = 0)
+
+
+        # save cue regressor names (for bookeeping)
+        self.cue_regressors_keys = np.stack(('cue_{num}'.format(num = num) for num in range(nr_cue_regs)), axis = 0)
+
+        # also save FA regressor name
+        self.bar_stim_regressors_keys = reg_cond_names
+
+        ## get indices when bar was on screen
+        # (useful for upsampling)
+        self.bar_on_screen_ind = np.where(np.sum(self.FA_visual_DM, axis=0).reshape(-1, self.FA_visual_DM.shape[-1]).sum(axis=0)>0)[0]
+
+
+        ## actually fit vertices
+        # and output relevant params + rsq of model fit in dataframe
+
+        results = np.array(Parallel(n_jobs=16)(delayed(self.get_glm_params)(data[vertex],
+                                                                                 hrf_params = self.hrf_params[...,vertex],
+                                                                                 rf_params = {'pRF_x': self.pRF_estimates['x'][vertex], 
+                                                                                               'pRF_y': self.pRF_estimates['y'][vertex], 
+                                                                                               'pRF_beta': self.pRF_estimates['beta'][vertex], 
+                                                                                               'pRF_size': self.pRF_estimates['size'][vertex], 
+                                                                                               'pRF_baseline': self.pRF_estimates['baseline'][vertex], 
+                                                                                               'pRF_n': self.pRF_estimates['ns'][vertex]},
+                                                                                 cue_regressors = {'cue_0': self.cue_regressors[0][vertex], 
+                                                                                                   'cue_1': self.cue_regressors[1][vertex], 
+                                                                                                   'cue_2': self.cue_regressors[2][vertex], 
+                                                                                                   'cue_3': self.cue_regressors[3][vertex]})
+                                                                       for _,vertex in enumerate(tqdm(mask_ind))))
+
+        return results
+
+    
+    def get_glm_params(self, timecourse, 
+                           hrf_params = [1,1,0], 
+                           rf_params = {'pRF_x': None, 'pRF_y': None, 'pRF_beta': None, 
+                                           'pRF_size': None, 'pRF_baseline': None, 'pRF_n': None},
+                           cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []}):
+
+        ## set up actual DM that goes into fitting
+
+        ## set up actual DM that goes into fitting
+        FA_design_matrix, all_regressor_keys  = self.make_FA_DM(rf_params,
+                                                           hrf_params = hrf_params, 
+                                                           cue_regressors = cue_regressors,
+                                                           weight_stim = False)
+
+        self.all_regressor_keys = all_regressor_keys
+
+        ## Fit GLM on FA data
+        prediction, betas , r2, mse = mri_utils.fit_glm(timecourse, FA_design_matrix)
+
+        return prediction, betas , r2, mse
+
     
         
 class FA_GainModel(FA_model):

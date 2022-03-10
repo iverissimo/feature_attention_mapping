@@ -209,9 +209,9 @@ fa_pars.add('rsq', value = 0, vary = False)
 ## fit it!
 
 ## set grid params
-fa_pars['gain_ACUO'].set(min = -1.e-10, max = 1.01, brute_step = .05)
-fa_pars['gain_UCAO'].set(min = -1.e-10, max = 1.01, brute_step = .05)
-fa_pars['gain_UCUO'].set(min = -1.e-10, max = 1.01, brute_step = .05)
+fa_pars['gain_ACUO'].set(min = -1.e-10, max = 1.01, brute_step = .1) #.05)
+fa_pars['gain_UCAO'].set(min = -1.e-10, max = 1.01, brute_step = .1) #.05)
+fa_pars['gain_UCUO'].set(min = -1.e-10, max = 1.01, brute_step = .1) #.05)
 
 print('grid fitting params')
 grid_results = fa_model.grid_fit(data, fa_pars, 

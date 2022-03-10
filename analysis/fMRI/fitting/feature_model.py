@@ -280,24 +280,23 @@ class FA_GainModel(FA_model):
     
     def iterative_fit(self, data, starting_params, 
                       hrf_params = None, mask_ind = [], nr_cue_regs = 4, 
-                      cue_regressors = [],
-                      **kwargs):
+                    prev_fit_params = []):
         
         ## set mask indices to all, if not specified
         if len(mask_ind) == 0:
             mask_ind = np.arange(data.shape[0])
         
         ## set starting params, also includes bounds and if are varied
-        self.starting_params = starting_params 
+        self.starting_params = starting_params
+
+        if len(prev_fit_params) == 0: # if no previously fitted params
+            prev_fit_params = np.full(data.shape[0], None) # make None array
         
         ## hrf params - should be (3, #vertices)
         self.hrf_params = hrf_params
         
-        
         ## get cue regressor(s)
-        if len(cue_regressors)>0:
-            self.cue_regressors = cue_regressors
-        else:
+        if not hasattr(self, 'cue_regressors'):
             self.cue_regressors = np.stack((mri_utils.get_cue_regressor(self.trial_info, 
                                                         hrf_params = self.hrf_params, cues = [i],
                                                         TR = self.TR, oversampling_time = self.osf, 
@@ -333,8 +332,9 @@ class FA_GainModel(FA_model):
                                                                                  cue_regressors = {'cue_0': self.cue_regressors[0][vertex], 
                                                                                                    'cue_1': self.cue_regressors[1][vertex], 
                                                                                                    'cue_2': self.cue_regressors[2][vertex], 
-                                                                                                   'cue_3': self.cue_regressors[3][vertex]})
-                                                                       for _,vertex in enumerate(tqdm(mask_ind))))
+                                                                                                   'cue_3': self.cue_regressors[3][vertex]},
+                                                                                prev_fit_params = prev_fit_params[ind])
+                                                                       for ind, vertex in enumerate(tqdm(mask_ind))))
             
         ## save fitted params list of dicts as Dataframe
         fitted_params_df = pd.DataFrame(d for d in results)
@@ -351,14 +351,20 @@ class FA_GainModel(FA_model):
                              set_params = {'pRF_x': None, 'pRF_y': None, 'pRF_beta': None, 
                                            'pRF_size': None, 'pRF_baseline': None, 'pRF_n': None},
                              cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []},
+                             prev_fit_params = None,
                              **kwargs):
         
         ## set parameters 
-        # (for example, that are vertex specific)
-        for key in set_params.keys():
-            starting_params[key].set(set_params[key])
             
-        
+        # if previous params provided, override starting params
+        if prev_fit_params is not None:
+            for key in starting_params.keys():
+                starting_params[key].set(prev_fit_params[key])
+
+        else: # just set params that are vertex specific
+            for key in set_params.keys():
+                starting_params[key].set(set_params[key])
+            
         
         ## minimize residuals
         out = minimize(self.get_gain_residuals, starting_params, args = [timecourse],
@@ -372,8 +378,7 @@ class FA_GainModel(FA_model):
         
     def get_gain_residuals(self, fit_pars, timecourse, 
                            hrf_params = [1,1,0], 
-                           cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []},
-                             **kwargs):
+                           cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []}):
         
         ## set up actual DM that goes into fitting
         
@@ -435,8 +440,7 @@ class FA_GainModel(FA_model):
     
     
     def grid_fit(self, data, starting_params, 
-                      hrf_params = None, mask_ind = [], nr_cue_regs = 4, 
-                      cue_regressors = []):
+                      hrf_params = None, mask_ind = [], nr_cue_regs = 4):
         
         ## set mask indices to all, if not specified
         if len(mask_ind) == 0:
@@ -450,9 +454,7 @@ class FA_GainModel(FA_model):
         
         
         ## get cue regressor(s)
-        if len(cue_regressors)>0:
-            self.cue_regressors = cue_regressors
-        else:
+        if not hasattr(self, 'cue_regressors'):
             self.cue_regressors = np.stack((mri_utils.get_cue_regressor(self.trial_info, 
                                                         hrf_params = self.hrf_params, cues = [i],
                                                         TR = self.TR, oversampling_time = self.osf, 

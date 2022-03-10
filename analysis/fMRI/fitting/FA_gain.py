@@ -206,12 +206,28 @@ fa_pars.add('beta_bar_stim', value = 0, vary = False)
 fa_pars.add('intercept', value = 1, vary = False)
 fa_pars.add('rsq', value = 0, vary = False)
 
+## fit it!
+
+## set grid params
+fa_pars['gain_ACUO'].set(min = -1.e-10, max = 1.01, brute_step = .05)
+fa_pars['gain_UCAO'].set(min = -1.e-10, max = 1.01, brute_step = .05)
+fa_pars['gain_UCUO'].set(min = -1.e-10, max = 1.01, brute_step = .05)
+
+print('grid fitting params')
+grid_results = fa_model.grid_fit(data, fa_pars, 
+                             hrf_params = hrf_params, 
+                             mask_ind = mask_ind)
+    
+## save fitted params Dataframe
+grid_results.to_csv(op.join(output_dir,'grid_params.csv'), index = False)
+
 
 ## fit it!
 print('iterative fitting params')
 results = fa_model.iterative_fit(data, fa_pars, 
                                      hrf_params = hrf_params, 
-                                     mask_ind = mask_ind)
+                                     mask_ind = mask_ind,
+                                     prev_fit_params = np.array(grid_results.to_dict('r'))) # using grid fit outcome as starting point
 
 ## save fitted params Dataframe
 results.to_csv(op.join(output_dir,'iterative_params.csv'), index = False)

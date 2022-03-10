@@ -220,8 +220,6 @@ results.to_csv(op.join(output_dir,'iterative_params.csv'), index = False)
 # others will be nan
 print('saving design matrix')
 
-dm_surf = np.zeros((data.shape[0], data.shape[1], len(fa_model.all_regressor_keys))); dm_surf[:] = np.nan
-
 dm = np.array(Parallel(n_jobs=16)(delayed(fa_model.make_FA_DM)(results.to_dict('r')[ind],
                                                    hrf_params = hrf_params[..., vert], 
                                                    cue_regressors = {'cue_0': fa_model.cue_regressors[0][vert], 
@@ -231,27 +229,34 @@ dm = np.array(Parallel(n_jobs=16)(delayed(fa_model.make_FA_DM)(results.to_dict('
                                                    weight_stim = True)
                                        for ind, vert in enumerate(tqdm(results['vertex'].values))))
 
-dm_surf[mask_ind, ...] = dm
+# get all regressor key names to save out as well
+all_regressor_keys = dm[0][1]
+
+# reshape dm 
+dm_reshape = np.stack((dm[ind][0] for ind in range(len(mask_ind))), axis = 0)
+
+dm_surf = np.zeros((data.shape[0], data.shape[1], len(all_regressor_keys))); dm_surf[:] = np.nan
+dm_surf[mask_ind, ...] = dm_reshape
 
 fa_dm_filename = op.join(output_dir,'DM_FA_iterative_gain_run-{run}.npz'.format(run=run))
 np.savez(fa_dm_filename,
         dm = dm_surf,
-        reg_names = fa_model.all_regressor_keys)
+        reg_names = all_regressor_keys)
 
 ## save also model predictions for whole surface
 print('saving model timecourses')
 
 model_tc_surf = np.zeros((data.shape[0], data.shape[1])); model_tc_surf[:] = np.nan
 
-model_tc = np.array(Parallel(n_jobs=16)(delayed(mri_utils.get_fa_prediction_tc)(dm[ind],
+model_tc = np.array(Parallel(n_jobs=16)(delayed(mri_utils.get_fa_prediction_tc)(dm_reshape[ind],
                                                    np.concatenate(([results.iloc[ind]['intercept']],
-                                                                    [results.iloc[ind]['beta_%s'%val] for val in fa_model.all_regressor_keys if val != 'intercept']
+                                                                    [results.iloc[ind]['beta_%s'%val] for val in all_regressor_keys if val != 'intercept']
                                                                    )),
                                                                 timecourse = data[vert],
                                                                 r2 = results.iloc[ind]['rsq'], viz_model = False)
                                        for ind, vert in enumerate(tqdm(results['vertex'].values))))
 
-model_tc_surf[mask_ind[:2], ...] = model_tc
+model_tc_surf[mask_ind, ...] = model_tc
 
 model_tc_filename = op.join(output_dir,'prediction_FA_iterative_gain_run-{run}.npy'.format(run=run))
 np.save(model_tc_filename, model_tc_surf)

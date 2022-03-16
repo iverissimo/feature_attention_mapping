@@ -2462,3 +2462,33 @@ def get_fa_prediction_tc(dm, betas,
 
     
     return prediction
+
+
+def create_glasser_df(path2file):
+    
+    # we read in the atlas data, which consists of 180 separate regions per hemisphere. 
+    # These are labeled separately, so the labels go to 360.
+    cifti = nib.load(op.join(path2file,
+                         'Q1-Q6_RelatedParcellation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.59k_fs_LR.dlabel.nii'))
+
+    # get index data array
+    cifti_data = np.array(cifti.get_fdata(dtype=np.float32))[0]
+    # from header get label dict with key + rgba
+    cifti_hdr = cifti.header
+    label_dict = cifti_hdr.get_axis(0)[0][1]
+    
+    ## make atlas data frame
+    atlas_df = pd.DataFrame(columns = ['ROI', 'index','R','G','B','A'])
+
+    for key in label_dict.keys():
+
+        if label_dict[key][0] != '???': 
+            atlas_df = atlas_df.append(pd.DataFrame({'ROI': label_dict[key][0].replace('_ROI',''),
+                                                     'index': key,
+                                                     'R': label_dict[key][1][0],
+                                                     'G': label_dict[key][1][1],
+                                                     'B': label_dict[key][1][2],
+                                                     'A': label_dict[key][1][3]
+                                                    }, index=[0]),ignore_index=True)
+            
+    return atlas_df, cifti_data

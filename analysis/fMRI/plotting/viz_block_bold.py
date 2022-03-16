@@ -183,20 +183,21 @@ for i, val in enumerate(stim_ind):
 miniblk_start_ind = np.array(miniblk_start_ind[::2])   
 miniblk_end_ind = np.concatenate((miniblk_end_ind[1::2], np.array([stim_ind[-1]])))
 
-# get vertices for subject fsaverage
-ROIs = params['plotting']['ROIs'][space]
+## get vertices from ROIs
+## of glasser atlas
 
-# dictionary with one specific color per group - similar to fig3 colors
-ROI_pal = params['plotting']['ROI_pal']
-color_codes = {key: ROI_pal[key] for key in ROIs}
+# Get Glasser atlas
+atlas_df, atlas_array = mri_utils.create_glasser_df(op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
 
-# get pycortex sub
-pysub = params['plotting']['pycortex_sub'] 
+# ROI names
+ROIs = list(params['plotting']['ROIs']['glasser_atlas'].keys())
+# colors
+color_codes = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs}
 
 # get vertices for ROI
 roi_verts = {} #empty dictionary  
-for _,val in enumerate(ROIs):
-    roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
+for _,key in enumerate(ROIs):
+    roi_verts[key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
 
 # load masked pRF rsq, to select vertices that have 
 # decent rsq
@@ -219,9 +220,9 @@ fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
  
 time_sec = np.linspace(0,len(all_data[0])*TR,num=len(all_data[0])) # array with timepoints, in seconds
 
-plt.plot(time_sec, avg_roi['V1'], linewidth = 2.5, label='V1 data')
-plt.plot(time_sec, avg_roi['V2'], linewidth = 2.5, label='V2 data')
-plt.plot(time_sec, avg_roi['V3'], linewidth = 2.5, label='V3 data')
+for _,key in enumerate(ROIs):
+    plt.plot(time_sec, avg_roi[key], linewidth = 2.5, label = '%s'%key, color = color_codes[key])
+
 
 axis.set_xlabel('Time (s)',fontsize=20, labelpad=20)
 axis.set_ylabel('BOLD signal change (%)',fontsize=20, labelpad=10)
@@ -247,43 +248,25 @@ for _,val in enumerate(ROIs):
 
 ## plot timecourse of each miniblock
 # aligned to same timepoint
-fig, axis = plt.subplots(3, 1, figsize=(6,12), dpi=100)
+fig, axis = plt.subplots(len(ROIs), 1, figsize=(6,24), dpi=100)
 
-## plot for V1
-axis[0].plot(avg_roi['V1'][miniblk_start_ind[0]-interv:miniblk_end_ind[0]+interv])
-axis[0].plot(avg_roi['V1'][miniblk_start_ind[1]-interv:miniblk_end_ind[1]+interv])
-axis[0].plot(avg_roi['V1'][miniblk_start_ind[2]-interv:miniblk_end_ind[2]+interv])
-axis[0].plot(avg_roi['V1'][miniblk_start_ind[3]-interv:miniblk_end_ind[3]+interv])
+## plot for each ROI
 
-axis[0].plot(avg_miniblk['V1'], linewidth = 4, c='black')
+for i,key in enumerate(ROIs):
+    
+    axis[i].plot(avg_roi[key][miniblk_start_ind[0]-interv:miniblk_end_ind[0]+interv])
+    axis[i].plot(avg_roi[key][miniblk_start_ind[1]-interv:miniblk_end_ind[1]+interv])
+    axis[i].plot(avg_roi[key][miniblk_start_ind[2]-interv:miniblk_end_ind[2]+interv])
+    axis[i].plot(avg_roi[key][miniblk_start_ind[3]-interv:miniblk_end_ind[3]+interv])
 
-axis[0].set_xticks([])
-axis[0].axvspan(interv, miniblk_end_ind[0]-miniblk_start_ind[0]+interv, facecolor='#0040ff', alpha=0.1)
-axis[0].set_title('V1',fontweight="bold")
+    axis[i].plot(avg_miniblk[key], linewidth = 4, c='black')
 
-## plot for V2
-axis[1].plot(avg_roi['V2'][miniblk_start_ind[0]-interv:miniblk_end_ind[0]+interv])
-axis[1].plot(avg_roi['V2'][miniblk_start_ind[1]-interv:miniblk_end_ind[1]+interv])
-axis[1].plot(avg_roi['V2'][miniblk_start_ind[2]-interv:miniblk_end_ind[2]+interv])
-axis[1].plot(avg_roi['V2'][miniblk_start_ind[3]-interv:miniblk_end_ind[3]+interv])
-
-axis[1].plot(avg_miniblk['V2'], linewidth = 4, c='black')
-
-axis[1].set_xticks([])
-axis[1].axvspan(interv, miniblk_end_ind[0]-miniblk_start_ind[0]+interv, facecolor='#0040ff', alpha=0.1)
-axis[1].set_title('V2',fontweight="bold")
-
-## plot for V3
-axis[2].plot(avg_roi['V3'][miniblk_start_ind[0]-interv:miniblk_end_ind[0]+interv])
-axis[2].plot(avg_roi['V3'][miniblk_start_ind[1]-interv:miniblk_end_ind[1]+interv])
-axis[2].plot(avg_roi['V3'][miniblk_start_ind[2]-interv:miniblk_end_ind[2]+interv])
-axis[2].plot(avg_roi['V3'][miniblk_start_ind[3]-interv:miniblk_end_ind[3]+interv])
-
-axis[2].plot(avg_miniblk['V3'], linewidth = 4, c='black')
-
-axis[2].set_xlabel('Time (TR)',fontsize=20, labelpad=20)
-axis[2].axvspan(interv, miniblk_end_ind[0]-miniblk_start_ind[0]+interv, facecolor='#0040ff', alpha=0.1)
-axis[2].set_title('V3',fontweight="bold")
+    axis[i].axvspan(interv, miniblk_end_ind[0]-miniblk_start_ind[0]+interv, facecolor='#0040ff', alpha=0.1)
+    axis[i].set_title(key, fontweight = "bold")
+    
+    if i<len(ROIs)-1:
+        axis[i].set_xticks([])
+axis[i].set_xlabel('Time (TR)',fontsize=20, labelpad=20)
 
 fig.savefig(op.join(figures_pth, 'average_bold_accross_miniblocks_TR.png'))
 

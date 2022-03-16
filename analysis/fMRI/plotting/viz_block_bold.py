@@ -15,8 +15,16 @@ import numpy as np
 import cortex
 
 import matplotlib.pyplot as plt
-from scipy.interpolate import UnivariateSpline
 
+# inserting path to fitting, to get feature model objects
+# should reorganize folder in future, to avoid this
+sys.path.insert(1, op.join(str(Path(os.getcwd()).parents[0]), 'fitting'))
+from feature_model import FA_GainModel
+
+from lmfit import Parameters, minimize
+
+from joblib import Parallel, delayed
+from tqdm import tqdm
 
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
@@ -272,7 +280,89 @@ fig.savefig(op.join(figures_pth, 'average_bold_accross_miniblocks_TR.png'))
 
 
 ## average across rois and miniblocks
+## and model nuisance
 
 avg_minblk_tc =  np.mean(np.stack((avg_miniblk[val] for val in ROIs), axis = 0), axis = 0)
 
-## model nuisance
+## make nuisance regressor
+# for the miniblock
+
+pars = Parameters()
+pars.add('duration', value = 0, min = 0, max = 5, vary = True, brute_step = .1) # duration in TR
+
+## minimize residuals
+out = minimize(mri_utils.make_nuisance_regressor, pars, #args = [avg_minblk_tc],
+               kws={'timecourse': avg_minblk_tc, 'onsets': [interv], 
+                    'hrf': mri_utils.create_hrf(hrf_params=[1.0, 1.0, 0.0], TR = TR, osf = 10)[0]}, 
+               method = 'brute')
+
+# save nuisance regressor duration
+# (in TR!)
+reg_dur_TR = out.params.valuesdict()['duration']
+pars['duration'].value = reg_dur_TR
+
+reg = mri_utils.make_nuisance_regressor(pars, timecourse = avg_minblk_tc, onsets = [interv], 
+                    hrf = mri_utils.create_hrf(hrf_params=[1.0, 1.0, 0.0], TR = TR, osf = 10)[0],
+                       fit = False)
+
+## make plot to check
+fig, axis = plt.subplots(1, figsize=(12,6), dpi=100)
+plt.plot(avg_minblk_tc)
+plt.plot(reg, linewidth = 4, c='black')
+plt.axvspan(interv, miniblk_end_ind[0]-miniblk_start_ind[0]+interv, facecolor='#0040ff', alpha=0.1)
+
+plt.xlabel('Time (TR)',fontsize=20, labelpad=20)
+
+fig.savefig(op.join(figures_pth, 'nuisance_regressor_miniblk.png'))
+
+# make nuisance regressor for whole brain
+# and save in output dir
+
+# path to pRF fits 
+prf_fits_pth =  op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), space, 
+                        'iterative_{model}'.format(model = params['mri']['fitting']['pRF']['fit_model']),
+                        'run-{run}'.format(run = params['mri']['fitting']['pRF']['run']))
+
+# load them into numpy dict
+### define model
+fa_model = FA_GainModel(params)
+pRF_estimates = fa_model.get_pRF_estimates(prf_fits_pth, params['mri']['fitting']['pRF']['total_chunks'][space])
+
+# create upsampled hrf
+hrf_params = np.ones((3, fa_model.pRF_estimates['r2'].shape[0]))
+
+if fa_model.fit_hrf: # use fitted hrf params
+    hrf_params[1] = fa_model.pRF_estimates['hrf_derivative']
+    hrf_params[2] = fa_model.pRF_estimates['hrf_dispersion']
+else:
+    hrf_params[2] = 0
+
+# get indices that are relevant to create regressor
+mask_ind = np.array([ind for ind,val in enumerate(pRF_rsq) if val > rsq_threshold])
+
+
+all_regs = np.array(Parallel(n_jobs=16)(delayed(mri_utils.make_nuisance_regressor)(pars, 
+                                                                    timecourse = all_data[vert], 
+                                                                    onsets = miniblk_start_ind, 
+                                                                    hrf = mri_utils.create_hrf(hrf_params = hrf_params[..., vert], TR = TR, osf = 10)[0],
+                                                                    fit = False)
+                                        for _,vert in enumerate(tqdm(mask_ind)))) 
+
+
+## save in the same shape of data 
+nuisance_regressor_surf = np.zeros(all_data.shape)
+nuisance_regressor_surf[mask_ind] = all_regs 
+
+## save regressor
+filename = op.join(figures_pth, 'nuisance_regressor.npy')
+print('saving %s'%filename)
+np.save(filename, nuisance_regressor_surf)
+
+# plot example vertex for sanity check
+fig, axis = plt.subplots(1, figsize=(12,6), dpi=100)
+plt.plot(nuisance_regressor_surf[102874])
+for ax_count in range(params['feature']['mini_blocks']):
+    
+    plt.axvspan(miniblk_start_ind[ax_count], miniblk_end_ind[ax_count], facecolor='#0040ff', alpha=0.1)
+    
+fig.savefig(op.join(figures_pth, 'example_nuisance_regressor.png'))

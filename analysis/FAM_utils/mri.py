@@ -2492,3 +2492,34 @@ def create_glasser_df(path2file):
                                                     }, index=[0]),ignore_index=True)
             
     return atlas_df, cifti_data
+
+
+def make_nuisance_regressor(pars, timecourse = [], onsets = [1], hrf = [], fit = True, osf = 10):
+    
+    nuisance_reg = np.zeros((timecourse.shape[0]*osf))
+    
+    for t in onsets:
+        nuisance_reg[t*osf:int((t+pars['duration'].value)*osf)] = 1
+
+    # convolve regressor
+    pad_length = 20*osf
+    pad = np.tile(0, pad_length).T
+    padded_tc = np.hstack((pad, nuisance_reg))
+
+    conv_reg = signal.fftconvolve(padded_tc, hrf)[pad_length:timecourse.shape[0]*osf+pad_length]
+    
+    # donwsample again
+    conv_reg = resample_arr(conv_reg, osf = osf, final_sf = 1)
+    
+    if fit:
+        # make dm
+        dm = np.ones((2, conv_reg.shape[0]))
+        dm[-1] = conv_reg
+
+        prediction, _ , r2, _ = fit_glm(timecourse, dm.T)
+        print(r2)
+        
+        return timecourse - prediction
+    
+    else:
+        return conv_reg

@@ -72,8 +72,10 @@ class FA_model:
         self.fa_crop_TRs = exp_params['feature']['crop_TR']
         self.fa_shift_TR_num = 1.5
         self.fa_shift_TRs = True
-    
 
+        # if we include nuisance reg
+        self.use_nuisance_reg = True
+    
         
 
     def get_pRF_estimates(self, prf_path, nr_chunks):
@@ -219,6 +221,7 @@ class FA_model:
                hrf_params = [1,1,0], 
                cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []},
                weight_stim = False,
+               nuisance_regressors = [],
                **kwargs):
     
         # if we want to weight bar stim
@@ -246,13 +249,17 @@ class FA_model:
                                                                 crop = self.fa_crop, crop_TR = self.fa_crop_TRs, 
                                                                 shift_TRs = self.fa_shift_TRs, shift_TR_num = self.fa_shift_TR_num
                                                                 )
-            # save len of regressor, to use later
-            len_reg = bar_stim_regressors[key].shape[0]
+        # save len of regressor, to use later
+        len_reg = bar_stim_regressors[key].shape[0]
 
         # set all DM regressor names
         all_regressor_keys = np.concatenate((np.array(['intercept']), 
                                               self.bar_stim_regressors_keys, 
                                               self.cue_regressors_keys))
+
+        # if we're including nuisance regressor
+        if len(nuisance_regressors)>0:
+            all_regressor_keys = np.concatenate((all_regressor_keys, np.array(['nuisance'])))
 
 
         # fill DM array
@@ -265,6 +272,9 @@ class FA_model:
 
             elif val in self.bar_stim_regressors_keys:
                 FA_design_matrix[...,i] = bar_stim_regressors[val]
+
+            elif 'nuisance' in val:
+                FA_design_matrix[...,i] = nuisance_regressors
 
             else:
                 FA_design_matrix[...,i] = cue_regressors[val]
@@ -368,7 +378,7 @@ class FA_GainModel(FA_model):
         
     
     def iterative_fit(self, data, starting_params, 
-                      hrf_params = None, mask_ind = [], nr_cue_regs = 4, 
+                      hrf_params = None, mask_ind = [], nr_cue_regs = 4, nuisance_regressors = [], 
                     prev_fit_params = []):
         
         ## set mask indices to all, if not specified
@@ -407,6 +417,10 @@ class FA_GainModel(FA_model):
         self.bar_on_screen_ind = np.where(np.sum(self.FA_visual_DM, axis=0).reshape(-1, self.FA_visual_DM.shape[-1]).sum(axis=0)>0)[0]
 
         
+        ## if using nuisance regressor
+        if self.use_nuisance_reg:
+            self.nuisance_regressors = nuisance_regressors
+
         ## actually fit vertices
         # and output relevant params + rsq of model fit in dataframe
         
@@ -422,6 +436,7 @@ class FA_GainModel(FA_model):
                                                                                                    'cue_1': self.cue_regressors[1][vertex], 
                                                                                                    'cue_2': self.cue_regressors[2][vertex], 
                                                                                                    'cue_3': self.cue_regressors[3][vertex]},
+                                                                                 nuisance_regressors = self.nuisance_regressors[vertex],
                                                                                 prev_fit_params = prev_fit_params[ind])
                                                                        for ind, vertex in enumerate(tqdm(mask_ind))))
             
@@ -440,7 +455,7 @@ class FA_GainModel(FA_model):
                              set_params = {'pRF_x': None, 'pRF_y': None, 'pRF_beta': None, 
                                            'pRF_size': None, 'pRF_baseline': None, 'pRF_n': None},
                              cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []},
-                             prev_fit_params = None,
+                             nuisance_regressors = [], prev_fit_params = None,
                              **kwargs):
         
         ## set parameters 
@@ -457,7 +472,7 @@ class FA_GainModel(FA_model):
         
         ## minimize residuals
         out = minimize(self.get_gain_residuals, starting_params, args = [timecourse],
-                       kws={'hrf_params': hrf_params, 'cue_regressors': cue_regressors}, 
+                       kws={'hrf_params': hrf_params, 'cue_regressors': cue_regressors, 'nuisance_regressors':nuisance_regressors}, 
                        method = 'lbfgsb')
         
         # return best fitting params
@@ -467,7 +482,7 @@ class FA_GainModel(FA_model):
         
     def get_gain_residuals(self, fit_pars, timecourse, 
                            hrf_params = [1,1,0], 
-                           cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []}):
+                           cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []}, nuisance_regressors = []):
         
         ## set up actual DM that goes into fitting
         
@@ -481,6 +496,7 @@ class FA_GainModel(FA_model):
         FA_design_matrix, all_regressor_keys  = self.make_FA_DM(fit_pars_dict,
                                                            hrf_params = hrf_params, 
                                                            cue_regressors = cue_regressors,
+                                                           nuisance_regressors = nuisance_regressors,
                                                            weight_stim = True)
         
         self.all_regressor_keys = all_regressor_keys
@@ -511,7 +527,8 @@ class FA_GainModel(FA_model):
                          hrf_params = [1,1,0],
                          set_params = {'pRF_x': None, 'pRF_y': None, 'pRF_beta': None, 
                                        'pRF_size': None, 'pRF_baseline': None, 'pRF_n': None},
-                         cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []}):
+                         cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []},
+                         nuisance_regressors = []):
         
         ## set parameters 
         # (for example, that are vertex specific)
@@ -521,7 +538,7 @@ class FA_GainModel(FA_model):
         
         ## minimize residuals
         out = minimize(self.get_gain_residuals, starting_params, args = [timecourse],
-                       kws={'hrf_params': hrf_params, 'cue_regressors': cue_regressors}, 
+                       kws={'hrf_params': hrf_params, 'cue_regressors': cue_regressors, 'nuisance_regressors':nuisance_regressors}, 
                        method = 'brute')
         
         # return best fitting params
@@ -529,7 +546,7 @@ class FA_GainModel(FA_model):
     
     
     def grid_fit(self, data, starting_params, 
-                      hrf_params = None, mask_ind = [], nr_cue_regs = 4):
+                      hrf_params = None, mask_ind = [], nr_cue_regs = 4, nuisance_regressors = []):
         
         ## set mask indices to all, if not specified
         if len(mask_ind) == 0:
@@ -564,7 +581,10 @@ class FA_GainModel(FA_model):
         # (useful for upsampling)
         self.bar_on_screen_ind = np.where(np.sum(self.FA_visual_DM, axis=0).reshape(-1, self.FA_visual_DM.shape[-1]).sum(axis=0)>0)[0]
 
-        
+        ## if using nuisance regressor
+        if self.use_nuisance_reg:
+            self.nuisance_regressors = nuisance_regressors
+ 
         ## actually fit vertices
         # and output relevant params + rsq of model fit in dataframe
         
@@ -579,7 +599,8 @@ class FA_GainModel(FA_model):
                                                                                  cue_regressors = {'cue_0': self.cue_regressors[0][vertex], 
                                                                                                    'cue_1': self.cue_regressors[1][vertex], 
                                                                                                    'cue_2': self.cue_regressors[2][vertex], 
-                                                                                                   'cue_3': self.cue_regressors[3][vertex]})
+                                                                                                   'cue_3': self.cue_regressors[3][vertex]},
+                                                                                 nuisance_regressors = self.nuisance_regressors[vertex])
                                                                        for _,vertex in enumerate(tqdm(mask_ind))))
             
         ## save fitted params list of dicts as Dataframe

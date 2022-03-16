@@ -60,6 +60,7 @@ acq = params['mri']['acq'] # if using standard files or nordic files
 space = params['mri']['space'] # subject space
 
 mask_prf = True # if we're masking pRFs
+use_nuisance_reg = True # if we are using nuisance regressor (to account for start block arousal)
 
 ## define file extension that we want to use, 
 # should include processing key words
@@ -178,6 +179,11 @@ if fa_model.fit_hrf: # use fitted hrf params
 else:
     hrf_params[2] = 0
 
+if use_nuisance_reg:
+    fa_model.use_nuisance_reg = use_nuisance_reg
+    nuisance_regressors = np.load(op.join(derivatives_dir, 'block_nuisance', 'sub-{sj}'.format(sj=sj), 
+                                            space,'nuisance_regressor.npy'))
+
 
 ##set all necessary parameters used for 
 # gain fit - also setting which ones we fit or not
@@ -203,6 +209,7 @@ fa_pars.add('beta_cue_1', value = 0, vary = False)
 fa_pars.add('beta_cue_2', value = 0, vary = False)
 fa_pars.add('beta_cue_3', value = 0, vary = False)
 fa_pars.add('beta_bar_stim', value = 0, vary = False)
+fa_pars.add('beta_nuisance', value = 0, vary = False)
 fa_pars.add('intercept', value = 1, vary = False)
 fa_pars.add('rsq', value = 0, vary = False)
 
@@ -216,7 +223,8 @@ fa_pars['gain_UCUO'].set(min = -1.e-10, max = 1.01, brute_step = .1) #.05)
 print('grid fitting params')
 grid_results = fa_model.grid_fit(data, fa_pars, 
                              hrf_params = hrf_params, 
-                             mask_ind = mask_ind)
+                             mask_ind = mask_ind,
+                             nuisance_regressors = nuisance_regressors)
     
 ## save fitted params Dataframe
 grid_results.to_csv(op.join(output_dir,'grid_params.csv'), index = False)
@@ -227,6 +235,7 @@ print('iterative fitting params')
 results = fa_model.iterative_fit(data, fa_pars, 
                                      hrf_params = hrf_params, 
                                      mask_ind = mask_ind,
+                                     nuisance_regressors = nuisance_regressors,
                                      prev_fit_params = np.array(grid_results.to_dict('r'))) # using grid fit outcome as starting point
 
 ## save fitted params Dataframe
@@ -242,6 +251,7 @@ dm = np.array(Parallel(n_jobs=16)(delayed(fa_model.make_FA_DM)(results.to_dict('
                                                                    'cue_1': fa_model.cue_regressors[1][vert], 
                                                                    'cue_2': fa_model.cue_regressors[2][vert], 
                                                                    'cue_3': fa_model.cue_regressors[3][vert]},
+                                                   nuisance_regressors = nuisance_regressors[vert],
                                                    weight_stim = True)
                                        for ind, vert in enumerate(tqdm(results['vertex'].values))))
 

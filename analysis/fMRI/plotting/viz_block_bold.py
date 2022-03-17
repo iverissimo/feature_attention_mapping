@@ -112,7 +112,7 @@ if params['feature']['crop']:
     cue_onset = cue_onset - params['feature']['crop_TR']*TR - TR*1.5
     
     ## resample stim_on array
-    tmp_arr = np.repeat(stim_on_bool, osf)#[int(params['feature']['crop_TR']*TR*osf):]
+    tmp_arr = np.repeat(stim_on_bool, osf)
     tmp_arr[:-int(TR*1.5*osf)] = np.repeat(stim_on_bool, osf)[int(TR*1.5*osf):]
     stim_on_bool = tmp_arr.copy()[int(params['feature']['crop_TR']*TR*osf):]
     
@@ -188,8 +188,8 @@ for i, val in enumerate(stim_ind):
                 miniblk_end_ind.append(stim_ind[i-1])
 
 # remove cue start indices
-miniblk_start_ind = np.array(miniblk_start_ind[::2])   
-miniblk_end_ind = np.concatenate((miniblk_end_ind[1::2], np.array([stim_ind[-1]])))
+miniblk_start_ind = np.array(miniblk_start_ind[::2])-1    
+miniblk_end_ind = np.concatenate((miniblk_end_ind[1::2], np.array([stim_ind[-1]])))+1
 
 ## get vertices from ROIs
 ## of glasser atlas

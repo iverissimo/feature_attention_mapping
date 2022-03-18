@@ -2523,3 +2523,69 @@ def make_nuisance_regressor(pars, timecourse = [], onsets = [1], hrf = [], fit =
     
     else:
         return conv_reg
+
+def make_raw_vertex_image(data1, cmap, vmin, vmax, 
+                          data2 = [], vmin2 = [], vmax2 = [], subject='fsaverage', data2D = False):  
+    """ function to fix web browser bug in pycortex
+        allows masking of data with nans
+    
+    Parameters
+    ----------
+    data1 : array
+        data array
+    cmap : str
+        string with colormap name
+    vmin: int/float
+        minimum value
+    vmax: int/float 
+        maximum value
+    subject: str
+        overlay subject name to use
+    
+    Outputs
+    -------
+    vx_fin : VertexRGB
+        vertex object to call in webgl
+    
+    """
+    
+    # Get curvature
+    curv = cortex.db.get_surfinfo(subject, type = 'curvature', recache=False)#,smooth=1)
+    # Adjust curvature contrast / color. Alternately, you could work
+    # with curv.data, maybe threshold it, and apply a color map.     
+    curv.data[curv.data>0] = .1
+    curv.data[curv.data<=0] = -.1
+    #curv.data = np.sign(curv.data.data) * .25
+    
+    curv.vmin = -1
+    curv.vmax = 1
+    curv.cmap = 'gray'
+    
+    # Create display data 
+    vx = cortex.Vertex(data1, subject, cmap=cmap, vmin=vmin, vmax=vmax)
+    
+    # Pick an arbitrary region to mask out
+    # (in your case you could use np.isnan on your data in similar fashion)
+    if data2D:
+        data2[np.isnan(data2)] = vmin2
+        norm2 = colors.Normalize(vmin2, vmax2)  
+        alpha = np.clip(norm2(data2), 0, 1)
+    else:
+        alpha = ~np.isnan(data1) #(data < 0.2) | (data > 0.4)
+    alpha = alpha.astype(np.float)
+    
+    # Map to RGB
+    vx_rgb = np.vstack([vx.raw.red.data, vx.raw.green.data, vx.raw.blue.data])
+    vx_rgb[:,alpha>0] = vx_rgb[:,alpha>0]* alpha[alpha>0]
+    
+    curv_rgb = np.vstack([curv.raw.red.data, curv.raw.green.data, curv.raw.blue.data])
+    # do this to avoid artifacts where curvature gets color of 0 valur of colormap
+    curv_rgb[:,np.where((vx_rgb > 0))[-1]] = curv_rgb[:,np.where((vx_rgb > 0))[-1]] * (1-alpha)[np.where((vx_rgb > 0))[-1]]#np.zeros(curv_rgb[:,np.where(vx_rgb > 0)[-1]].shape)
+
+    # Alpha mask
+    display_data = curv_rgb + vx_rgb #curv_rgb * (1-alpha) + vx_rgb * alpha
+
+    # Create vertex RGB object out of R, G, B channels
+    vx_fin = cortex.VertexRGB(*display_data, subject, curvature_brightness = 0.4, curvature_contrast = 0.1)
+
+    return vx_fin

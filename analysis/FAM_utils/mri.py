@@ -28,7 +28,7 @@ from cortex import fmriprep
 from PIL import Image, ImageDraw
 
 from matplotlib import cm
-import matplotlib.colors
+import matplotlib.colors as colors
 
 from scipy.stats import t, norm
 
@@ -53,6 +53,8 @@ from tqdm import tqdm
 
 import functools
 import operator
+
+from statsmodels.stats import weightstats
 
 def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=None):
     
@@ -886,10 +888,11 @@ def combine_slices(file_list,outdir,num_slices=89, ax=2):
     return out_file
 
   
-def add_alpha2colormap(colormap = 'rainbow_r', bins = 256, invert_alpha = False, cmap_name = 'costum',
+def make_colormap(colormap = 'rainbow_r', bins = 256, add_alpha = True, invert_alpha = False, cmap_name = 'costum',
                       discrete = False):
 
-    """ add alpha channel to colormap,
+    """ make custom colormap
+    can add alpha channel to colormap,
     and save to pycortex filestore
     Parameters
     ----------
@@ -920,30 +923,33 @@ def add_alpha2colormap(colormap = 'rainbow_r', bins = 256, invert_alpha = False,
         cvals  = np.arange(len(colormap))
         norm = plt.Normalize(min(cvals),max(cvals))
         tuples = list(zip(map(norm,cvals), colormap))
-        cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", tuples)
+        cmap = colors.LinearSegmentedColormap.from_list("", tuples)
         
         if discrete == True: # if we want a discrete colormap from list
-            cmap = matplotlib.colors.ListedColormap(colormap)
+            cmap = colors.ListedColormap(colormap)
             bins = int(len(colormap))
 
     # convert into array
     cmap_array = cmap(range(bins))
     
-    # make alpha array
-    if invert_alpha == True: # in case we want to invert alpha (y from 1 to 0 instead pf 0 to 1)
-        _, alpha = np.meshgrid(np.linspace(0, 1, bins, endpoint=False), 1-np.linspace(0, 1, bins))
+    if add_alpha: 
+        # reshape array for map
+        new_map = []
+        for i in range(cmap_array.shape[-1]):
+            new_map.append(np.tile(cmap_array[...,i],(bins,1)))
+
+        new_map = np.moveaxis(np.array(new_map), 0, -1)
+
+        # make alpha array
+        if invert_alpha == True: # in case we want to invert alpha (y from 1 to 0 instead pf 0 to 1)
+            _, alpha = np.meshgrid(np.linspace(0, 1, bins, endpoint=False), 1-np.linspace(0, 1, bins))
+        else:
+            _, alpha = np.meshgrid(np.linspace(0, 1, bins, endpoint=False), np.linspace(0, 1, bins, endpoint=False))
+
+        # add alpha channel
+        new_map[...,-1] = alpha
     else:
-        _, alpha = np.meshgrid(np.linspace(0, 1, bins, endpoint=False), np.linspace(0, 1, bins, endpoint=False))
-    
-    # reshape array for map
-    new_map = []
-    for i in range(cmap_array.shape[-1]):
-        new_map.append(np.tile(cmap_array[...,i],(bins,1)))
-
-    new_map = np.moveaxis(np.array(new_map), 0, -1)
-
-    # add alpha channel
-    new_map[...,-1] = alpha
+        new_map = cmap_array.copy() 
     
     fig = plt.figure(figsize=(1,1))
     ax = fig.add_axes([0,0,1,1])
@@ -953,9 +959,12 @@ def add_alpha2colormap(colormap = 'rainbow_r', bins = 256, invert_alpha = False,
     origin = 'lower')
     ax.axis('off')
 
-    rgb_fn = os.path.join(os.path.split(cortex.database.default_filestore)[
+    if add_alpha: 
+        rgb_fn = op.join(op.split(cortex.database.default_filestore)[
                           0], 'colormaps', cmap_name+'_alpha_bins_%d.png'%bins)
-
+    else:
+        rgb_fn = op.join(op.split(cortex.database.default_filestore)[
+                          0], 'colormaps', cmap_name+'_bins_%d.png'%bins)
     #misc.imsave(rgb_fn, new_map)
     plt.savefig(rgb_fn, dpi = 200,transparent=True)
        
@@ -2524,8 +2533,8 @@ def make_nuisance_regressor(pars, timecourse = [], onsets = [1], hrf = [], fit =
     else:
         return conv_reg
 
-def make_raw_vertex_image(data1, cmap, vmin, vmax, 
-                          data2 = [], vmin2 = [], vmax2 = [], subject='fsaverage', data2D = False):  
+def make_raw_vertex_image(data1, cmap = 'hot', vmin = 0, vmax = 1, 
+                          data2 = [], vmin2 = 0, vmax2 = 1, subject = 'fsaverage', data2D = False):  
     """ function to fix web browser bug in pycortex
         allows masking of data with nans
     
@@ -2534,7 +2543,7 @@ def make_raw_vertex_image(data1, cmap, vmin, vmax,
     data1 : array
         data array
     cmap : str
-        string with colormap name
+        string with colormap name (not the alpha version)
     vmin: int/float
         minimum value
     vmax: int/float 
@@ -2562,7 +2571,7 @@ def make_raw_vertex_image(data1, cmap, vmin, vmax,
     curv.cmap = 'gray'
     
     # Create display data 
-    vx = cortex.Vertex(data1, subject, cmap=cmap, vmin=vmin, vmax=vmax)
+    vx = cortex.Vertex(data1, subject, cmap = cmap, vmin = vmin, vmax = vmax)
     
     # Pick an arbitrary region to mask out
     # (in your case you could use np.isnan on your data in similar fashion)
@@ -2576,16 +2585,45 @@ def make_raw_vertex_image(data1, cmap, vmin, vmax,
     
     # Map to RGB
     vx_rgb = np.vstack([vx.raw.red.data, vx.raw.green.data, vx.raw.blue.data])
-    vx_rgb[:,alpha>0] = vx_rgb[:,alpha>0]* alpha[alpha>0]
+    vx_rgb[:,alpha>0] = vx_rgb[:,alpha>0] * alpha[alpha>0]
     
     curv_rgb = np.vstack([curv.raw.red.data, curv.raw.green.data, curv.raw.blue.data])
     # do this to avoid artifacts where curvature gets color of 0 valur of colormap
-    curv_rgb[:,np.where((vx_rgb > 0))[-1]] = curv_rgb[:,np.where((vx_rgb > 0))[-1]] * (1-alpha)[np.where((vx_rgb > 0))[-1]]#np.zeros(curv_rgb[:,np.where(vx_rgb > 0)[-1]].shape)
+    curv_rgb[:,np.where((vx_rgb > 0))[-1]] = curv_rgb[:,np.where((vx_rgb > 0))[-1]] * (1-alpha)[np.where((vx_rgb > 0))[-1]]
 
     # Alpha mask
-    display_data = curv_rgb + vx_rgb #curv_rgb * (1-alpha) + vx_rgb * alpha
+    display_data = curv_rgb + vx_rgb 
 
     # Create vertex RGB object out of R, G, B channels
     vx_fin = cortex.VertexRGB(*display_data, subject, curvature_brightness = 0.4, curvature_contrast = 0.1)
 
     return vx_fin
+
+
+def get_weighted_bins(data_df, x_key = 'ecc', y_key = 'size', weight_key = 'rsq', n_bins = 10):
+    
+    # sort values by eccentricity
+    data_df = data_df.sort_values(by=[x_key])
+
+    #divide in equally sized bins
+    bin_size = int(len(data_df)/n_bins) 
+    
+    mean_x = []
+    mean_x_std = []
+    mean_y = []
+    mean_y_std = []
+    
+    # for each bin calculate rsq-weighted means and errors of binned ecc/gain 
+    for j in range(n_bins): 
+        
+        mean_x.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][x_key],
+                                              weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).mean)
+        mean_x_std.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][x_key],
+                                                  weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
+
+        mean_y.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][y_key],
+                                              weights = data_df[bin_size * j:bin_size*(j+1)][weight_key]).mean)
+        mean_y_std.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][y_key],
+                                                  weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
+
+    return mean_x, mean_x_std, mean_y, mean_y_std

@@ -535,3 +535,6 @@ cortex.quickshow(images['ns'],with_curvature=True,with_sulci=True,with_colorbar=
                  curvature_brightness = 0.4, curvature_contrast = 0.1)                
 
 #cortex.webshow(images)
+#viewer_path = '/Users/verissimo/Documents/Projects/iverissimo.github.io'
+#print(viewer_path)
+#cortex.webgl.make_static(viewer_path, data = images, recache=False)

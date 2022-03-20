@@ -12,19 +12,6 @@ from FAM_utils import mri as mri_utils
 import pandas as pd
 import numpy as np
 
-
-# requires pfpy to be installed - preferably with python setup.py develop
-from prfpy.rf import *
-from prfpy.timecourse import *
-from prfpy.stimulus import PRFStimulus2D
-
-from joblib import Parallel, delayed
-
-import datetime
-from tqdm import tqdm
-
-from lmfit import Parameters
-
 # inserting path to fitting, to get feature model objects
 # should reorganize folder in future, to avoid this
 sys.path.insert(1, op.join(str(Path(os.getcwd()).parents[0]), 'fitting'))
@@ -193,19 +180,42 @@ for i in range(np.array(results).shape[0]):
     
 rsq_gain = np.array(rsq_gain)
 
+
+### make alpha level based on pRF rsquared ###
+#mask = np.zeros(pRF_estimates['rsq'].shape); mask[:] = np.nan
+#mask[mask_ind] = pRF_estimates['rsq'][mask_ind]
+
+alpha_level = mri_utils.normalize(np.clip(pRF_estimates['rsq'], 0, .8))#mask, 0, .8)) # normalize 
+
+# number of bins for colormaps
+n_bins_colors = 256
+
+## plot flatmaps
+
 images = {}
 
 ## plot rsq average accross runs
-images['FA_rsq'] = cortex.Vertex(np.nanmean(rsq_gain, axis=0), 
-                            pysub,
-                            vmin = 0, vmax = .3,
-                            cmap='Reds').raw
+images['FA_rsq'] = mri_utils.make_raw_vertex_image(np.nanmean(rsq_gain, axis=0), 
+                                                   cmap = 'Reds', vmin = 0, vmax = .3, 
+                                                  data2 = alpha_level, vmin2 = 0, vmax2 = 1, 
+                                                   subject = pysub, data2D = True)
+
 cortex.quickshow(images['FA_rsq'],with_curvature=True,with_sulci=True)
 
 filename = op.join(figures_pth,'flatmap_space-{space}_type-rsq_FA.svg'.format(space=pysub))
 print('saving %s' %filename)
-_ = cortex.quickflat.make_png(filename, images['FA_rsq'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
+reds_alpha = mri_utils.make_colormap(colormap = 'Reds',
+                               bins = n_bins_colors, cmap_name = 'Reds', discrete = False, add_alpha = True)
+col2D_name = op.splitext(op.split(reds_alpha)[-1])[0]
+
+# save flatmap like this, to get colorbar
+_ = cortex.quickflat.make_png(filename, 
+                              cortex.Vertex2D(np.nanmean(rsq_gain, axis=0), 
+                                              alpha_level, subject = pysub, 
+                                              vmin = 0, vmax = .3, vmin2 = 0, vmax2 = 1,
+                                                cmap = col2D_name), 
+                              recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 ### now plot gain values
 
 ## reunite them all in dict, according to condition
@@ -232,16 +242,27 @@ for i, cond in enumerate(fa_model.unique_cond.keys()):
 # plot gain on surface
 for _, cond in enumerate(fa_model.unique_cond.keys()):
     
-    images['gain_%s'%cond] = cortex.Vertex(surf_gain_all[cond], #np.subtract(surf_gain_all['ACAO'], surf_gain_all['UCUO']), 
-                                pysub,
-                                vmin = 0, vmax = 1,
-                                cmap='plasma').raw
+    images['gain_%s'%cond] = mri_utils.make_raw_vertex_image(surf_gain_all[cond], 
+                                                       cmap = 'plasma', vmin = 0, vmax = 1, 
+                                                      data2 = alpha_level, vmin2 = 0, vmax2 = 1, 
+                                                       subject = pysub, data2D = True)
+
     cortex.quickshow(images['gain_%s'%cond], with_curvature=True,with_sulci=True)
 
     filename = op.join(figures_pth,'flatmap_space-{space}_type-{cond}.svg'.format(space = pysub, cond = cond))
     print('saving %s' %filename)
-    _ = cortex.quickflat.make_png(filename, images['gain_%s'%cond], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
+    plasma_alpha = mri_utils.make_colormap(colormap = 'plasma',
+                                   bins = n_bins_colors, cmap_name = 'plasma', discrete = False, add_alpha = True)
+    col2D_name = op.splitext(op.split(plasma_alpha)[-1])[0]
+    
+    # save flatmap like this, to get colorbar
+    _ = cortex.quickflat.make_png(filename, 
+                                  cortex.Vertex2D(surf_gain_all[cond], 
+                                                  alpha_level, subject = pysub, 
+                                                  vmin = 0, vmax = 1, vmin2 = 0, vmax2 = 1,
+                                                    cmap = col2D_name), 
+                                  recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 ## get vertices from ROIs
 ## of glasser atlas
 
@@ -446,82 +467,71 @@ for cond in fa_model.unique_cond.keys():
     fig1 = plt.gcf()
     fig1.savefig(op.join(figures_pth,'gain_vs_size_ROIs_cond-%s'%cond), dpi=100,bbox_inches = 'tight')
 
-# make alpha level based on rsquared
-mask = np.zeros(pRF_estimates['rsq'].shape); mask[:] = np.nan
-mask[mask_ind] = pRF_estimates['rsq'][mask_ind]
+## plot pRF ecc ##
 
-alpha_level = mri_utils.normalize(np.clip(mask, 0, .8)) #rsq_threshold,.8))#
-
-# make costum colormap, similar to mackey paper
-n_bins = 256
-ECC_colors = mri_utils.make_colormap(colormap = ['#dd3933','#f3eb53','#7cb956','#82cbdb','#3d549f'],
-                               bins = n_bins, cmap_name = 'ECC_mackey_costum', discrete = False, add_alpha = True)
-
-## Plot ecc
-# create costume colormp rainbow_r
-col2D_name = os.path.splitext(os.path.split(ECC_colors)[-1])[0]
-print('created costum colormap %s'%col2D_name)
-
+# only used voxels where pRF rsq bigger than 0
 ecc4plot = np.zeros(pRF_estimates['rsq'].shape); ecc4plot[:] = np.nan
-ecc4plot[mask_ind] = eccentricity[mask_ind]
+ecc4plot[pRF_estimates['rsq']>0] = eccentricity[pRF_estimates['rsq']>0]
 
+# get matplotlib color map from segmented colors
+ecc_cmap = mri_utils.make_colormap(colormap = ['#dd3933','#f3eb53','#7cb956','#82cbdb','#3d549f'],
+                               bins = n_bins_colors, cmap_name = 'ECC_mackey_costum', 
+                                   discrete = False, add_alpha = False, return_cmap = True)
 
-images['ecc'] = cortex.Vertex2D(eccentricity, alpha_level, 
-                        subject = pysub, 
-                        vmin = 0, vmax = 6,
-                        vmin2 = 0, vmax2 = np.nanmax(alpha_level),
-                        cmap = col2D_name).raw
+images['ecc'] = mri_utils.make_raw_vertex_image(ecc4plot, 
+                                               cmap = ecc_cmap, vmin = 0, vmax = 6, 
+                                              data2 = alpha_level, vmin2 = 0, vmax2 = 1, 
+                                               subject = pysub, data2D = True)
 
 cortex.quickshow(images['ecc'],with_curvature=True,with_sulci=True,with_labels=False,
                  curvature_brightness = 0.4, curvature_contrast = 0.1)
 
-SIZE_colors = mri_utils.make_colormap(colormap = 'viridis_r',
-                               bins = n_bins, cmap_name = 'SIZE_costum', discrete = False, add_alpha = True)
+## plot pRF size ##
 
-col2D_name = os.path.splitext(os.path.split(SIZE_colors)[-1])[0]
-print('created costum colormap %s'%col2D_name)
-
+# only used voxels where pRF rsq bigger than 0
 size4plot = np.zeros(pRF_estimates['rsq'].shape); size4plot[:] = np.nan
-size4plot[mask_ind] = (pRF_estimates['size']/np.sqrt(pRF_estimates['ns']))[mask_ind]
+size4plot[pRF_estimates['rsq']>0] = (pRF_estimates['size']/np.sqrt(pRF_estimates['ns']))[pRF_estimates['rsq']>0]
 
-images['size'] = cortex.Vertex2D(size4plot, alpha_level, 
-                        subject = pysub,
-                        vmin = 0, vmax = 7,
-                        vmin2 = 0, vmax2 = np.nanmax(alpha_level),
-                        cmap ='hot_alpha').raw #col2D_name)
+images['size'] = mri_utils.make_raw_vertex_image(size4plot, 
+                                               cmap = 'hot', vmin = 0, vmax = 7, 
+                                              data2 = alpha_level, vmin2 = 0, vmax2 = 1, 
+                                               subject = pysub, data2D = True)
+
 cortex.quickshow(images['size'],with_curvature=True,with_sulci=True,with_labels=False,
                  curvature_brightness = 0.4, curvature_contrast = 0.1)
 
-PA_colors = mri_utils.make_colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb',
-                              '#3d549f','#655099','#ad5a9b','#dd3933'],bins = n_bins, cmap_name = 'PA_mackey_costum',
-                              discrete = False, add_alpha = True)
+## plot pRF polar angle ##
 
-# create costume colormp rainbow_r
-col2D_name = op.splitext(op.split(PA_colors)[-1])[0]
-print('created costum colormap %s'%col2D_name)
-
+# only used voxels where pRF rsq bigger than 0
 pa4plot = np.zeros(pRF_estimates['rsq'].shape); pa4plot[:] = np.nan
-pa4plot[mask_ind] = ((polar_angle + np.pi) / (np.pi * 2.0))[mask_ind]
+pa4plot[pRF_estimates['rsq']>0] = ((polar_angle + np.pi) / (np.pi * 2.0))[pRF_estimates['rsq']>0]
 
-images['PA'] = cortex.Vertex2D(pa4plot, alpha_level,
-                                subject = pysub, 
-                                vmin = 0, vmax = 1,
-                                vmin2 = 0, vmax2 = np.nanmax(alpha_level),
-                                cmap = col2D_name).raw
+# get matplotlib color map from segmented colors
+PA_cmap = mri_utils.make_colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb',
+                              '#3d549f','#655099','#ad5a9b','#dd3933'], bins = n_bins_colors, 
+                                    cmap_name = 'PA_mackey_costum',
+                              discrete = False, add_alpha = False, return_cmap = True)
+
+
+images['PA'] = mri_utils.make_raw_vertex_image(pa4plot, 
+                                               cmap = PA_cmap, vmin = 0, vmax = 1, 
+                                              data2 = alpha_level, vmin2 = 0, vmax2 = 1, 
+                                               subject = pysub, data2D = True)
 
 cortex.quickshow(images['PA'],with_curvature=True,with_sulci=True,with_colorbar=True,
                  curvature_brightness = 0.4, curvature_contrast = 0.1)
 
-## plot rsq before masking
+## plot pRF polar angle ##
 
+# only used voxels where pRF rsq bigger than 0
 n4plot = np.zeros(pRF_estimates['rsq'].shape); n4plot[:] = np.nan
-n4plot[mask_ind] = pRF_estimates['ns'][mask_ind]
+n4plot[pRF_estimates['rsq']>0] = pRF_estimates['ns'][pRF_estimates['rsq']>0]
 
 images['ns'] = mri_utils.make_raw_vertex_image(n4plot, cmap = 'plasma', vmin = 0, vmax = 1, 
                           data2 = alpha_level, vmin2 = 0, vmax2 = 1, subject = pysub, data2D = True)
 
 
 cortex.quickshow(images['ns'],with_curvature=True,with_sulci=True,with_colorbar=True,
-                 curvature_brightness = 0.4, curvature_contrast = 0.1)
+                 curvature_brightness = 0.4, curvature_contrast = 0.1)                
 
 #cortex.webshow(images)

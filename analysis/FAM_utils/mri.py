@@ -3,6 +3,7 @@
 # for the different sequences piloted
 
 
+from filecmp import cmp
 import numpy as np
 import os
 from os import path as op
@@ -889,7 +890,7 @@ def combine_slices(file_list,outdir,num_slices=89, ax=2):
 
   
 def make_colormap(colormap = 'rainbow_r', bins = 256, add_alpha = True, invert_alpha = False, cmap_name = 'costum',
-                      discrete = False):
+                      discrete = False, return_cmap = False):
 
     """ make custom colormap
     can add alpha channel to colormap,
@@ -931,15 +932,15 @@ def make_colormap(colormap = 'rainbow_r', bins = 256, add_alpha = True, invert_a
 
     # convert into array
     cmap_array = cmap(range(bins))
+
+    # reshape array for map
+    new_map = []
+    for i in range(cmap_array.shape[-1]):
+        new_map.append(np.tile(cmap_array[...,i],(bins,1)))
+
+    new_map = np.moveaxis(np.array(new_map), 0, -1)
     
     if add_alpha: 
-        # reshape array for map
-        new_map = []
-        for i in range(cmap_array.shape[-1]):
-            new_map.append(np.tile(cmap_array[...,i],(bins,1)))
-
-        new_map = np.moveaxis(np.array(new_map), 0, -1)
-
         # make alpha array
         if invert_alpha == True: # in case we want to invert alpha (y from 1 to 0 instead pf 0 to 1)
             _, alpha = np.meshgrid(np.linspace(0, 1, bins, endpoint=False), 1-np.linspace(0, 1, bins))
@@ -948,14 +949,16 @@ def make_colormap(colormap = 'rainbow_r', bins = 256, add_alpha = True, invert_a
 
         # add alpha channel
         new_map[...,-1] = alpha
+        cmap_ext = (0,1,0,1)
     else:
-        new_map = cmap_array.copy() 
+        new_map = new_map[:1,...].copy() 
+        cmap_ext = (0,100,0,1)
     
     fig = plt.figure(figsize=(1,1))
     ax = fig.add_axes([0,0,1,1])
     # plot 
     plt.imshow(new_map,
-    extent = (0,1,0,1),
+    extent = cmap_ext,
     origin = 'lower')
     ax.axis('off')
 
@@ -967,8 +970,11 @@ def make_colormap(colormap = 'rainbow_r', bins = 256, add_alpha = True, invert_a
                           0], 'colormaps', cmap_name+'_bins_%d.png'%bins)
     #misc.imsave(rgb_fn, new_map)
     plt.savefig(rgb_fn, dpi = 200,transparent=True)
-       
-    return rgb_fn 
+
+    if return_cmap:
+        return cmap
+    else:
+        return rgb_fn 
 
 def join_chunks(path, out_name, chunk_num = 83, fit_model = 'css', fit_hrf = False):
     """ combine all chunks into one single estimate numpy array

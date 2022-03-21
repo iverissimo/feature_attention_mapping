@@ -193,15 +193,15 @@ fa_pars = Parameters()
 fa_pars.add('pRF_x', value = 0, vary = False)
 fa_pars.add('pRF_y', value = 0, vary = False)
 fa_pars.add('pRF_size', value = 0, vary = False)
-fa_pars.add('pRF_beta', value = 0, vary = False, min = -1.e-10)
-fa_pars.add('pRF_baseline', value = 0, vary = False, min = -10, max = 10)
+fa_pars.add('pRF_beta', value = 0, vary = False)
+fa_pars.add('pRF_baseline', value = 0, vary = False)
 fa_pars.add('pRF_n', value = 1, vary = False)
 
 # add gain params for each bar - will vary
-fa_pars.add('gain_ACAO', value = 1, vary = False, min = -1.e-10, max = 1.00001) # attended condition doesnt vary - pRF task was attended to bar
-fa_pars.add('gain_ACUO', value = 0, vary = True, min = -1.e-10, max = 1.00001)
-fa_pars.add('gain_UCAO', value = 0, vary = True, min = -1.e-10, max = 1.00001)
-fa_pars.add('gain_UCUO', value = 0, vary = True, min = -1.e-10, max = 1.00001)
+fa_pars.add('gain_ACAO', value = 1, vary = False) # attended condition doesnt vary - pRF task was attended to bar
+fa_pars.add('gain_ACUO', value = 0, vary = True, min = 0, max = 1)
+fa_pars.add('gain_UCAO', value = 0, vary = True, min = 0, max = 1)
+fa_pars.add('gain_UCUO', value = 0, vary = True, min = 0, max = 1)
 
 # add params that will be filled by GLM - will not vary
 fa_pars.add('beta_cue_0', value = 0, vary = False)
@@ -216,9 +216,9 @@ fa_pars.add('rsq', value = 0, vary = False)
 ## fit it!
 
 ## set grid params
-fa_pars['gain_ACUO'].set(min = -1.e-10, max = 1.01, brute_step = .1) #.05)
-fa_pars['gain_UCAO'].set(min = -1.e-10, max = 1.01, brute_step = .1) #.05)
-fa_pars['gain_UCUO'].set(min = -1.e-10, max = 1.01, brute_step = .1) #.05)
+fa_pars['gain_ACUO'].set(min = .1, max = 1, brute_step = .2) #.05)
+fa_pars['gain_UCAO'].set(min = .1, max = 1, brute_step = .2) #.05)
+fa_pars['gain_UCUO'].set(min = .1, max = 1, brute_step = .2) #.05)
 
 print('grid fitting params')
 grid_results = fa_model.grid_fit(data, fa_pars, 

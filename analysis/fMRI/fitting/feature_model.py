@@ -213,7 +213,7 @@ class FA_model:
             all_regs_dict[reg] = np.amax(np.array(all_r_dm),axis=0)
                 
         ## stack DM in array         
-        self.FA_visual_DM = np.stack((all_regs_dict[k].astype(np.float32) for k in regs),axis = 0)
+        self.FA_visual_DM = np.stack((all_regs_dict[k].astype(np.float64) for k in regs),axis = 0)
         
         return all_regs_dict # return dict
     
@@ -227,7 +227,7 @@ class FA_model:
         # if we want to weight bar stim
         if weight_stim:
             # get weighted visual FA dm   
-            weights_arr = np.array([pars_dict['gain_{key}'.format(key = name)] for name in self.unique_cond.keys()]).astype(np.float32)
+            weights_arr = np.array([pars_dict['gain_{key}'.format(key = name)] for name in self.unique_cond.keys()]).astype(np.float64)
 
             # taking the max value of the spatial position at each time point (to account for overlaps)
             dm = mri_utils.weight_dm(self.FA_visual_DM, weights_arr)

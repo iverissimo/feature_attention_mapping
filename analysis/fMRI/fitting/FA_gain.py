@@ -94,19 +94,26 @@ output_dir =  op.join(derivatives_dir,'FA_gain','sub-{sj}'.format(sj=sj), space,
 
 ## check if path to save fit estimates exists
 if not op.exists(output_dir): 
-    os.makedirs(output_dir) 
+    os.makedirs(output_dir)
+
+## if doing leave-one-out, we are fitting all runs except left out one
+if 'loo' in run:
+    runs2fit = np.array([str(r+1) for r in np.arange(4) if str(r+1) != run[-1:]])
+else:
+    runs2fit = np.array([run]) 
 
 ## list with absolute file name to be fitted
-proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir) if 'task-FA' in h and
-                 'acq-{acq}'.format(acq=acq) in h and 'run-{run}'.format(run=run) in h and h.endswith(file_ext)]
+proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir) for r in runs2fit 
+                       if 'task-FA' in h and 'acq-{acq}'.format(acq = acq) in h and 
+                       'run-{run}'.format(run = r) in h and h.endswith(file_ext)]
 
 ## load functional data
-file = proc_files[0]
 if len(proc_files)>1:
-    raise ValueError('%s files found to fit, unsure of which to use'%len(proc_files))
-else:
-    print('Fitting %s'%file)
-data = np.load(file,allow_pickle=True) # will be (vertex, TR)
+    print(' fitting several files - %i files found for run %s'%(len(proc_files),run))
+
+[print('Fitting %s'%p) for p in proc_files]
+
+data = np.stack((np.load(file, allow_pickle=True) for file in proc_files))# will be (runs, vertex, TR)
 
 ##### Load pRF estimates ####
 #### to use in FA model ####
@@ -149,19 +156,21 @@ np.save(op.join(op.split(output_dir)[0], 'masked_pRF_rsq.npy'), pRF_estimates['r
 ##### and make DM for run #####
 
 # get absolute path to pkl with bar positions for each run
-bar_pos_files = [op.join(source_dir, h) for h in os.listdir(source_dir) if 'task-FA' in h and
-                'run-{run}'.format(run=run) in h and h.endswith('_bar_positions.pkl')]
-print('getting bar positions from %s'%bar_pos_files[0])
+bar_pos_files = [op.join(source_dir, h) for h in os.listdir(source_dir) for r in runs2fit if 'task-FA' in h and
+                'run-{run}'.format(run = r) in h and h.endswith('_bar_positions.pkl')]
+[print('getting bar positions from %s'%bpos) for bpos in bar_pos_files]
 
-# load bar positions for run
-bar_pos = pd.read_pickle(bar_pos_files[0])
+# load bar positions for runs
+bar_pos = []
+[bar_pos.append(pd.read_pickle(file)) for file in bar_pos_files]
 
 # get absolute path to csv with general infos for each run
-trial_info_files = [op.join(source_dir, h) for h in os.listdir(source_dir) if 'task-FA' in h and
-                'run-{run}'.format(run=run) in h and h.endswith('_trial_info.csv')]
+trial_info_files = [op.join(source_dir, h) for h in os.listdir(source_dir) for r in runs2fit if 'task-FA' in h and
+                'run-{run}'.format(run = r) in h and h.endswith('_trial_info.csv')]
 
-# load trial info dataframe
-trial_info = pd.read_csv(trial_info_files[0])
+# load trial info dataframe for runs
+trial_info = []
+[trial_info.append(pd.read_csv(file)) for file in trial_info_files]
 
 ## make visual FA DM (spatial postions over time)
 fa_model.bar_pos = bar_pos

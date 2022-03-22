@@ -148,32 +148,41 @@ class FA_model:
     
     def get_conditions_dataframe(self, bar_pos, trial_info):
         
+        if isinstance(self.bar_pos, list) or isinstance(self.trial_info, list):
+            print("list of bar positions and/or trial info provided")
+        else:
+            bar_pos = [bar_pos]
+            trial_info = [trial_info]
+
         self.bar_pos = bar_pos
         self.trial_info = trial_info
+            
+        # loop over list of runs
+        all_conditions = []
         
-        ## get info on conditions in run (4 conditions x 4 miniblocks = 16)
-        all_conditions = pd.DataFrame(columns = ['reg_name', 'color','orientation','miniblock'])
+        for i in range(len(bar_pos)):
+            
+            ## get info on conditions in run (4 conditions x 4 miniblocks = 16)
+            df = pd.DataFrame(columns = ['reg_name', 'color','orientation','miniblock', 'condition_name'])
 
-        for key in self.unique_cond.keys(): # for each condition
+            for key in self.unique_cond.keys(): # for each condition
 
-            for blk in range(self.num_mblk): # for each miniblock
+                for blk in range(self.num_mblk): # for each miniblock
 
-                # name of attended condition in miniblock
-                attended_cond = bar_pos.loc[(bar_pos['mini_block']==blk)&(bar_pos['attend_condition']==1)]['condition'].values[0]
-                
-                # append "regressor" info in dataframe
-                all_conditions = all_conditions.append(pd.DataFrame({'reg_name': '{cond}_mblk-{blk}'.format(cond = key,
-                                                                                                                     blk = blk),
-                                                                     'color': self.unique_cond[key]['color'],
-                                                                     'orientation': self.unique_cond[key]['orientation'],
-                                                                     'condition_name': mri_utils.get_cond_name(attended_cond, key),
-                                                                     'miniblock': blk
-                                                                    }, index=[0]),ignore_index=True)
+                    # name of attended condition in miniblock
+                    attended_cond = bar_pos[i].loc[(bar_pos[i]['mini_block']==blk)&(bar_pos[i]['attend_condition']==1)]['condition'].values[0]
 
-    
-        return all_conditions
-    
-        
+                    # append "regressor" info in dataframe
+                    df = df.append(pd.DataFrame({'reg_name': '{cond}_mblk-{blk}'.format(cond = key, blk = blk),
+                                                                         'color': self.unique_cond[key]['color'],
+                                                                         'orientation': self.unique_cond[key]['orientation'],
+                                                                         'condition_name': mri_utils.get_cond_name(attended_cond, key),
+                                                                         'miniblock': blk
+                                                                        }, index=[0]),ignore_index=True)
+            all_conditions.append(df)
+
+        return all_conditions if len(bar_pos)>1 else all_conditions[0]
+     
     
     def make_FA_visual_DM(self, regs, crop = False, shift_TRs = False,
                           crop_unit = 'sec', oversampling_time = None, **kwargs):
@@ -182,40 +191,55 @@ class FA_model:
         ## get all condition dataframe, with relevant info
         all_conditions = self.get_conditions_dataframe(self.bar_pos, self.trial_info)
         
+        if isinstance(all_conditions, list):
+            print("list of condition dataframe provided")
+        else:
+            all_conditions = [all_conditions]
+            
+        # loop over list of runs (if such is the case)
+        all_regs_dict = []
+        tmp_visual_DM = []
         
-        all_regs_dict = {} # store in dict, to keep track
+        for i in range(len(all_conditions)):
+            
+            tmp_dict = {} 
         
-        for reg in regs: # for each regressor we want to include in final design matrix
-            
-            # doign this because we might want to group "regressors"
-            r_list = [val for _,val in enumerate(all_conditions['reg_name'].values) if reg in val]
-            
-            all_r_dm = []
-            
-            for r in r_list:
+            for reg in regs: # for each regressor we want to include in final design matrix
+
+                # doign this because we might want to group "regressors"
+                r_list = [val for _,val in enumerate(all_conditions[i]['reg_name'].values) if reg in val]
+
+                all_r_dm = []
+
+                for r in r_list:
+
+                    # make array with spatial position of bar of interest 
+                    r_dm =  mri_utils.get_FA_bar_stim(self.bar_pos[i], self.trial_info[i], 
+                                                      TR = self.TR,
+                                    attend_cond = all_conditions[i][all_conditions[i]['reg_name'] == r].to_dict('r')[0], 
+                                    res_scaling = self.res_scaling, oversampling_time = oversampling_time, 
+                                    stim_dur_seconds = self.stim_dur_seconds, 
+                                    xy_lim_pix = self.xy_lim_pix,
+                                    crop = crop, crop_unit = crop_unit, 
+                                    crop_TR = self.fa_crop_TRs,
+                                    shift_TRs = shift_TRs, shift_TR_num = self.fa_shift_TR_num 
+                                    )
+
+                    all_r_dm.append(r_dm)
+
+                # collapse all
+                # and append in regressor DM
+                tmp_dict[reg] = np.amax(np.array(all_r_dm),axis=0)
                 
-                # make array with spatial position of bar of interest 
-                r_dm =  mri_utils.get_FA_bar_stim(self.bar_pos, self.trial_info, 
-                                                  TR = self.TR,
-                                attend_cond = all_conditions[all_conditions['reg_name'] == r].to_dict('r')[0], 
-                                res_scaling = self.res_scaling, oversampling_time = oversampling_time, 
-                                stim_dur_seconds = self.stim_dur_seconds, 
-                                xy_lim_pix = self.xy_lim_pix,
-                                crop = crop, crop_unit = crop_unit, 
-                                crop_TR = self.fa_crop_TRs,
-                                shift_TRs = shift_TRs, shift_TR_num = self.fa_shift_TR_num 
-                                )
-                
-                all_r_dm.append(r_dm)
+            all_regs_dict.append(tmp_dict) # store in list of dict, to keep track
             
-            # collapse all
-            # and append in regressor DM
-            all_regs_dict[reg] = np.amax(np.array(all_r_dm),axis=0)
-                
-        ## stack DM in array         
-        self.FA_visual_DM = np.stack((all_regs_dict[k].astype(np.float64) for k in regs),axis = 0)
+            ## stack DM in array         
+            tmp_visual_DM.append(np.stack((tmp_dict[k].astype(np.float64) for k in regs),axis = 0))
+        
+        self.FA_visual_DM = np.array(tmp_visual_DM)
         
         return all_regs_dict # return dict
+    
     
     def make_FA_DM(self, pars_dict,
                hrf_params = [1,1,0], 
@@ -484,43 +508,58 @@ class FA_GainModel(FA_model):
                            hrf_params = [1,1,0], 
                            cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []}, nuisance_regressors = []):
         
-        ## set up actual DM that goes into fitting
         
-        # turn Parameters into dict (if not already), for simplification
-        if type(fit_pars) is dict:
-            fit_pars_dict = fit_pars
+        if len(timecourse.shape) < 2: ## reshape data if needed, so everything is coherent 
+            timecourse = timecourse[np.newaxis,...]
+            
+        ## also make params list
+        if isinstance(fit_pars, list):
+            print("list of parameters provided")
+            fit_pars = fit_pars 
         else:
-            fit_pars_dict = fit_pars.valuesdict()
+            fit_pars = [fit_pars]
+            
+        ## loop over concatenated data 
+        ## (also fine for single timecourse, with shape (1, #TRs))
+        resid = []
+        for r in range(timecourse.shape[0]):
+            
+            ## set up actual DM that goes into fitting
         
-        ## set up actual DM that goes into fitting
-        FA_design_matrix, all_regressor_keys  = self.make_FA_DM(fit_pars_dict,
-                                                           hrf_params = hrf_params, 
-                                                           cue_regressors = cue_regressors,
-                                                           nuisance_regressors = nuisance_regressors,
-                                                           weight_stim = True)
-        
-        self.all_regressor_keys = all_regressor_keys
+            # turn Parameters into dict (if not already), for simplification
+            if type(fit_pars[r]) is dict:
+                fit_pars_dict = fit_pars[r]
+            else:
+                fit_pars_dict = fit_pars[r].valuesdict()
 
-        ## Fit GLM on FA data
-        prediction, betas , r2, _ = mri_utils.fit_glm(timecourse, FA_design_matrix)
+            ## set up actual DM that goes into fitting
+            FA_design_matrix, all_regressor_keys  = self.make_FA_DM(fit_pars_dict,
+                                                               hrf_params = hrf_params, 
+                                                               cue_regressors = cue_regressors,
+                                                               nuisance_regressors = nuisance_regressors,
+                                                               weight_stim = True)
+
+            ## Fit GLM on FA data
+            prediction, betas , r2, _ = mri_utils.fit_glm(timecourse[r], FA_design_matrix)
+
+            # update values obtained by GLM
+            if type(fit_pars[r]) is not dict and type(fit_pars[r]) is not pd.DataFrame: # if input params was Parameters object
+
+                for i, val in enumerate(all_regressor_keys):
+
+                    if 'intercept' in val:
+                        fit_pars[r]['intercept'].set(betas[i])
+                    else:
+                        fit_pars[r]['beta_{key}'.format(key = val)].set(betas[i])
+
+                # also save rsq for quick check
+                fit_pars[r]['rsq'].set(r2)
         
-        # update values obtained by GLM
-        if type(fit_pars) is not dict and type(fit_pars) is not pd.DataFrame: # if input params was Parameters object
-            
-            for i, val in enumerate(self.all_regressor_keys):
-                
-                if 'intercept' in val:
-                    fit_pars['intercept'].set(betas[i])
-                else:
-                    fit_pars['beta_{key}'.format(key = val)].set(betas[i])
-            
-            # also save rsq for quick check
-            fit_pars['rsq'].set(r2)
-        
-        # make function that makes DM? or just stack regressors
+            ## append residuals
+            resid.append(timecourse[r] - prediction)
         
         # return error "timecourse", that will be used by minimize
-        return timecourse - prediction
+        return np.array(resid).flatten()
     
     
     def get_grid_params(self, timecourse, starting_params, 
@@ -530,11 +569,16 @@ class FA_GainModel(FA_model):
                          cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []},
                          nuisance_regressors = []):
         
+        ## reshape data if needed, so everything is coherent 
+        if len(timecourse.shape) < 2:
+            timecourse = timecourse[np.newaxis,...]
+        
         ## set parameters 
         # (for example, that are vertex specific)
-        for key in set_params.keys():
-            starting_params[key].set(set_params[key])
-            
+        for r in range(timecourse.shape[0]):
+            for key in set_params.keys():
+                starting_params[r][key].set(set_params[key])
+
         
         ## minimize residuals
         out = minimize(self.get_gain_residuals, starting_params, args = [timecourse],
@@ -548,28 +592,38 @@ class FA_GainModel(FA_model):
     def grid_fit(self, data, starting_params, 
                       hrf_params = None, mask_ind = [], nr_cue_regs = 4, nuisance_regressors = []):
         
+        ## reshape data if needed, so everything is coherent 
+        if len(data.shape) < 3:
+            data = data[np.newaxis,...]
+        
         ## set mask indices to all, if not specified
         if len(mask_ind) == 0:
-            mask_ind = np.arange(data.shape[0])
+            mask_ind = np.arange(data.shape[1])
         
         ## set starting params, also includes bounds and if are varied
-        self.starting_params = starting_params 
+        if isinstance(starting_params, list):
+            print("list of parameters provided")
+            self.starting_params = starting_params 
+        else:
+            self.starting_params = [starting_params]
         
         ## hrf params - should be (3, #vertices)
         self.hrf_params = hrf_params
         
-        
         ## get cue regressor(s)
         if not hasattr(self, 'cue_regressors'):
-            self.cue_regressors = np.stack((mri_utils.get_cue_regressor(self.trial_info, 
-                                                        hrf_params = self.hrf_params, cues = [i],
+            cue_regressors = np.stack((mri_utils.get_cue_regressor(self.trial_info[0], 
+                                                        hrf_params = self.hrf_params[..., mask_ind], cues = [i],
                                                         TR = self.TR, oversampling_time = self.osf, 
                                                         baseline = self.pRF_estimates['baseline'],
                                                         crop_unit = 'sec', crop = self.fa_crop, 
                                                         crop_TR = self.fa_crop_TRs, 
                                                         shift_TRs = self.fa_shift_TRs, 
                                                         shift_TR_num = self.fa_shift_TR_num) for i in range(nr_cue_regs)), axis = 0)
-
+            
+            # to account for whole surface
+            self.cue_regressors = np.zeros((nr_cue_regs, self.hrf_params.shape[-1], cue_regressors.shape[-1]))
+            self.cue_regressors[:, mask_ind, :] = cue_regressors
         
         # save cue regressor names (for bookeeping)
         self.cue_regressors_keys = np.stack(('cue_{num}'.format(num = num) for num in range(nr_cue_regs)), axis = 0)
@@ -579,7 +633,7 @@ class FA_GainModel(FA_model):
         
         ## get indices when bar was on screen
         # (useful for upsampling)
-        self.bar_on_screen_ind = np.where(np.sum(self.FA_visual_DM, axis=0).reshape(-1, self.FA_visual_DM.shape[-1]).sum(axis=0)>0)[0]
+        self.bar_on_screen_ind = np.where(np.sum(self.FA_visual_DM[0], axis=0).reshape(-1, self.FA_visual_DM[0].shape[-1]).sum(axis=0)>0)[0]
 
         ## if using nuisance regressor
         if self.use_nuisance_reg:
@@ -587,8 +641,7 @@ class FA_GainModel(FA_model):
  
         ## actually fit vertices
         # and output relevant params + rsq of model fit in dataframe
-        
-        results = np.array(Parallel(n_jobs=16)(delayed(self.get_grid_params)(data[vertex], self.starting_params, 
+        results = np.array(Parallel(n_jobs=16)(delayed(self.get_grid_params)(data[:,vertex,:], self.starting_params, 
                                                                                  hrf_params = self.hrf_params[...,vertex],
                                                                                  set_params = {'pRF_x': self.pRF_estimates['x'][vertex], 
                                                                                                'pRF_y': self.pRF_estimates['y'][vertex], 
@@ -602,13 +655,18 @@ class FA_GainModel(FA_model):
                                                                                                    'cue_3': self.cue_regressors[3][vertex]},
                                                                                  nuisance_regressors = self.nuisance_regressors[vertex])
                                                                        for _,vertex in enumerate(tqdm(mask_ind))))
-            
-        ## save fitted params list of dicts as Dataframe
-        fitted_params_df = pd.DataFrame(d for d in results)
         
-        # and add vertex number for bookeeping
-        fitted_params_df['vertex'] = mask_ind
+        # output list of fitted params dataframe
+        fitted_params_list = []
+        
+        for r in range(len(self.starting_params)):
+            ## save fitted params list of dicts as Dataframe
+            fitted_params_df = pd.DataFrame(d for d in results[r])
 
-        
-        return fitted_params_df
+            # and add vertex number for bookeeping
+            fitted_params_df['vertex'] = mask_ind
+            
+            fitted_params_list.append(fitted_params_df)
+
+        return fitted_params_list
         

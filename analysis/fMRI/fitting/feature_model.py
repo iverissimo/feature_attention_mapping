@@ -17,7 +17,7 @@ from joblib import Parallel, delayed
 
 from tqdm import tqdm
 
-from lmfit import minimize
+from lmfit import minimize, Parameters
 
 
 class FA_model:
@@ -511,29 +511,25 @@ class FA_GainModel(FA_model):
         
         if len(timecourse.shape) < 2: ## reshape data if needed, so everything is coherent 
             timecourse = timecourse[np.newaxis,...]
-            
-        ## also make params list
-        if isinstance(fit_pars, list):
-            print("list of parameters provided")
-            fit_pars = fit_pars 
+
+        # turn Parameters into dict (if not already), for simplification
+        if type(fit_pars) is dict:
+            fit_pars_dict = fit_pars
         else:
-            fit_pars = [fit_pars]
-            
+            fit_pars_dict = fit_pars.valuesdict()
+
         ## loop over concatenated data 
         ## (also fine for single timecourse, with shape (1, #TRs))
         resid = []
+
         for r in range(timecourse.shape[0]):
-            
-            ## set up actual DM that goes into fitting
-        
-            # turn Parameters into dict (if not already), for simplification
-            if type(fit_pars[r]) is dict:
-                fit_pars_dict = fit_pars[r]
-            else:
-                fit_pars_dict = fit_pars[r].valuesdict()
+
+            # convert params key names
+            run_keys = np.array([k for k in fit_pars_dict.keys() if k.endswith('_{r}'.format(r = r))])
+            run_pars_dict = {key.replace('_{r}'.format(r = r), ''): value  for key, value in fit_pars_dict.items() if key in run_keys}
 
             ## set up actual DM that goes into fitting
-            FA_design_matrix, all_regressor_keys  = self.make_FA_DM(fit_pars_dict,
+            FA_design_matrix, all_regressor_keys  = self.make_FA_DM(run_pars_dict,
                                                                hrf_params = hrf_params, 
                                                                cue_regressors = cue_regressors,
                                                                nuisance_regressors = nuisance_regressors,
@@ -543,17 +539,17 @@ class FA_GainModel(FA_model):
             prediction, betas , r2, _ = mri_utils.fit_glm(timecourse[r], FA_design_matrix)
 
             # update values obtained by GLM
-            if type(fit_pars[r]) is not dict and type(fit_pars[r]) is not pd.DataFrame: # if input params was Parameters object
+            if type(fit_pars) is not dict and type(fit_pars) is not pd.DataFrame: # if input params was Parameters object
 
                 for i, val in enumerate(all_regressor_keys):
 
                     if 'intercept' in val:
-                        fit_pars[r]['intercept'].set(betas[i])
+                        fit_pars['intercept_{r}'.format(r = r)].set(value = betas[i])
                     else:
-                        fit_pars[r]['beta_{key}'.format(key = val)].set(betas[i])
+                        fit_pars['beta_{k}_{r}'.format(k = val, r = r)].set(value = betas[i])
 
                 # also save rsq for quick check
-                fit_pars[r]['rsq'].set(r2)
+                fit_pars['rsq_{r}'.format(r = r)].set(value = r2)
         
             ## append residuals
             resid.append(timecourse[r] - prediction)
@@ -567,26 +563,54 @@ class FA_GainModel(FA_model):
                          set_params = {'pRF_x': None, 'pRF_y': None, 'pRF_beta': None, 
                                        'pRF_size': None, 'pRF_baseline': None, 'pRF_n': None},
                          cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []},
-                         nuisance_regressors = []):
+                         nuisance_regressors = [], constrained_vars = ['gain_ACAO', 'gain_ACUO', 'gain_UCAO', 'gain_UCUO']):
         
         ## reshape data if needed, so everything is coherent 
         if len(timecourse.shape) < 2:
             timecourse = timecourse[np.newaxis,...]
         
         ## set parameters 
-        # (for example, that are vertex specific)
+        fit_params = Parameters() # initialize to make substitution easier
+
         for r in range(timecourse.shape[0]):
-            for key in set_params.keys():
-                starting_params[r][key].set(set_params[key])
+            
+            # dict with values for the run
+            run_dict = starting_params[r].valuesdict().copy()
+            
+            # original keys used
+            orig_keys = list(run_dict.keys())
+            
+            # new keys for multiple data fitting (as lmfit needs)
+            new_keys = np.array([key if '{key}_{r}'.format(key = key, r = r) in key else '{key}_{r}'.format(key = key, r = r) for key in orig_keys])
+            
+            # fill new params with parameter objects
+            for i, key in enumerate(new_keys):
+                
+                fit_params.add(key,
+                                value = starting_params[r][orig_keys[i]].value,
+                                vary = starting_params[r][orig_keys[i]].vary, 
+                                min = starting_params[r][orig_keys[i]].min, 
+                                max = starting_params[r][orig_keys[i]].max, 
+                                brute_step = starting_params[r][orig_keys[i]].brute_step)
+
+            # set those that are vertex specific)
+            for rep_key in set_params.keys():
+                fit_params['{key}_{r}'.format(key = rep_key, r = r)].set(value = set_params[rep_key]) 
+
+        ## constrain gain values to be the same for all runs, if more than 1 run provided 
+        if  timecourse.shape[0]>1: 
+            for r in range(timecourse.shape[0]-1):
+                for c in constrained_vars:
+                    fit_params['{c}_{r}'.format(c = c, r = r+1)].expr = '{c}_0'.format(c = c)
 
         
         ## minimize residuals
-        out = minimize(self.get_gain_residuals, starting_params, args = [timecourse],
-                       kws={'hrf_params': hrf_params, 'cue_regressors': cue_regressors, 'nuisance_regressors':nuisance_regressors}, 
-                       method = 'brute')
+        out = minimize(self.get_gain_residuals, fit_params, args = [timecourse],
+                       kws={'hrf_params': hrf_params, 'cue_regressors': cue_regressors, 'nuisance_regressors': nuisance_regressors}, 
+                       method = 'brute')#, Ns = 8)
         
         # return best fitting params
-        return out.params.valuesdict()
+        return out#.params.valuesdict()
     
     
     def grid_fit(self, data, starting_params, 
@@ -615,7 +639,7 @@ class FA_GainModel(FA_model):
             cue_regressors = np.stack((mri_utils.get_cue_regressor(self.trial_info[0], 
                                                         hrf_params = self.hrf_params[..., mask_ind], cues = [i],
                                                         TR = self.TR, oversampling_time = self.osf, 
-                                                        baseline = self.pRF_estimates['baseline'],
+                                                        baseline = self.pRF_estimates['baseline'][mask_ind],
                                                         crop_unit = 'sec', crop = self.fa_crop, 
                                                         crop_TR = self.fa_crop_TRs, 
                                                         shift_TRs = self.fa_shift_TRs, 
@@ -656,17 +680,17 @@ class FA_GainModel(FA_model):
                                                                                  nuisance_regressors = self.nuisance_regressors[vertex])
                                                                        for _,vertex in enumerate(tqdm(mask_ind))))
         
-        # output list of fitted params dataframe
-        fitted_params_list = []
+        # # output list of fitted params dataframe
+        # fitted_params_list = []
         
-        for r in range(len(self.starting_params)):
-            ## save fitted params list of dicts as Dataframe
-            fitted_params_df = pd.DataFrame(d for d in results[r])
+        # for r in range(len(self.starting_params)):
+        #     ## save fitted params list of dicts as Dataframe
+        #     fitted_params_df = pd.DataFrame(d for d in results[r])
 
-            # and add vertex number for bookeeping
-            fitted_params_df['vertex'] = mask_ind
+        #     # and add vertex number for bookeeping
+        #     fitted_params_df['vertex'] = mask_ind
             
-            fitted_params_list.append(fitted_params_df)
+        #     fitted_params_list.append(fitted_params_df)
 
-        return fitted_params_list
+        return results #fitted_params_list
         

@@ -193,41 +193,38 @@ if use_nuisance_reg:
     nuisance_regressors = np.load(op.join(derivatives_dir, 'block_nuisance', 'sub-{sj}'.format(sj=sj), 
                                             space,'nuisance_regressor.npy'))
 
-
 ##set all necessary parameters used for 
 # gain fit - also setting which ones we fit or not
-fa_pars = Parameters()
+pars = Parameters()
 
 # add pRF parameters - will not vary
-fa_pars.add('pRF_x', value = 0, vary = False)
-fa_pars.add('pRF_y', value = 0, vary = False)
-fa_pars.add('pRF_size', value = 0, vary = False)
-fa_pars.add('pRF_beta', value = 0, vary = False)
-fa_pars.add('pRF_baseline', value = 0, vary = False)
-fa_pars.add('pRF_n', value = 1, vary = False)
+pars.add('pRF_x', value = 0, vary = False)
+pars.add('pRF_y', value = 0, vary = False)
+pars.add('pRF_size', value = 0, vary = False)
+pars.add('pRF_beta', value = 0, vary = False)
+pars.add('pRF_baseline', value = 0, vary = False)
+pars.add('pRF_n', value = 1, vary = False)
 
 # add gain params for each bar - will vary
-fa_pars.add('gain_ACAO', value = 1, vary = False) # attended condition doesnt vary - pRF task was attended to bar
-fa_pars.add('gain_ACUO', value = 0, vary = True, min = 0, max = 1)
-fa_pars.add('gain_UCAO', value = 0, vary = True, min = 0, max = 1)
-fa_pars.add('gain_UCUO', value = 0, vary = True, min = 0, max = 1)
+pars.add('gain_ACAO', value = 1, vary = False) # attended condition doesnt vary - pRF task was attended to bar
+pars.add('gain_ACUO', value = 0, vary = True, min = 0.1, max = 1, brute_step = .2)
+pars.add('gain_UCAO', value = 0, vary = True, min = 0.1, max = 1, brute_step = .2)
+pars.add('gain_UCUO', value = 0, vary = True, min = 0.1, max = 1, brute_step = .2)
 
 # add params that will be filled by GLM - will not vary
-fa_pars.add('beta_cue_0', value = 0, vary = False)
-fa_pars.add('beta_cue_1', value = 0, vary = False)
-fa_pars.add('beta_cue_2', value = 0, vary = False)
-fa_pars.add('beta_cue_3', value = 0, vary = False)
-fa_pars.add('beta_bar_stim', value = 0, vary = False)
-fa_pars.add('beta_nuisance', value = 0, vary = False)
-fa_pars.add('intercept', value = 1, vary = False)
-fa_pars.add('rsq', value = 0, vary = False)
+pars.add('beta_cue_0', value = 0, vary = False)
+pars.add('beta_cue_1', value = 0, vary = False)
+pars.add('beta_cue_2', value = 0, vary = False)
+pars.add('beta_cue_3', value = 0, vary = False)
+pars.add('beta_bar_stim', value = 0, vary = False)
+pars.add('beta_nuisance', value = 0, vary = False)
+pars.add('intercept', value = 1, vary = False)
+pars.add('rsq', value = 0, vary = False)
 
-## fit it!
+fa_pars = []
+for i,r in enumerate(runs2fit):
+    fa_pars.append(pars)
 
-## set grid params
-fa_pars['gain_ACUO'].set(min = .1, max = 1, brute_step = .2) #.05)
-fa_pars['gain_UCAO'].set(min = .1, max = 1, brute_step = .2) #.05)
-fa_pars['gain_UCUO'].set(min = .1, max = 1, brute_step = .2) #.05)
 
 print('grid fitting params')
 grid_results = fa_model.grid_fit(data, fa_pars, 

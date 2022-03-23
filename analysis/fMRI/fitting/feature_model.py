@@ -525,8 +525,10 @@ class FA_GainModel(FA_model):
         for r in range(timecourse.shape[0]):
 
             # convert params key names
-            run_keys = np.array([k for k in fit_pars_dict.keys() if k.endswith('_{r}'.format(r = r))])
-            run_pars_dict = {key.replace('_{r}'.format(r = r), ''): value  for key, value in fit_pars_dict.items() if key in run_keys}
+            run_keys = np.array([k for k in fit_pars_dict.keys() if k.endswith('_i{r}'.format(r = r))])
+            if len(run_keys) == 0: # in case we use this out of fitting procedure
+                run_keys = list(fit_pars_dict.keys()) 
+            run_pars_dict = {key.replace('_i{r}'.format(r = r), ''): value  for key, value in fit_pars_dict.items() if key in run_keys}
 
             ## set up actual DM that goes into fitting
             FA_design_matrix, all_regressor_keys  = self.make_FA_DM(run_pars_dict,
@@ -544,12 +546,12 @@ class FA_GainModel(FA_model):
                 for i, val in enumerate(all_regressor_keys):
 
                     if 'intercept' in val:
-                        fit_pars['intercept_{r}'.format(r = r)].set(value = betas[i])
+                        fit_pars[[s for s in run_keys if 'intercept' in s][0]].set(value = betas[i])
                     else:
-                        fit_pars['beta_{k}_{r}'.format(k = val, r = r)].set(value = betas[i])
+                        fit_pars[[s for s in run_keys if 'beta_{k}'.format(k = val) in s][0]].set(value = betas[i])
 
                 # also save rsq for quick check
-                fit_pars['rsq_{r}'.format(r = r)].set(value = r2)
+                fit_pars[[s for s in run_keys if 'rsq' in s][0]].set(value = r2)
         
             ## append residuals
             resid.append(timecourse[r] - prediction)
@@ -581,7 +583,7 @@ class FA_GainModel(FA_model):
             orig_keys = list(run_dict.keys())
             
             # new keys for multiple data fitting (as lmfit needs)
-            new_keys = np.array([key if '{key}_{r}'.format(key = key, r = r) in key else '{key}_{r}'.format(key = key, r = r) for key in orig_keys])
+            new_keys = np.array([key if '{key}_i{r}'.format(key = key, r = r) in key else '{key}_i{r}'.format(key = key, r = r) for key in orig_keys])
             
             # fill new params with parameter objects
             for i, key in enumerate(new_keys):
@@ -595,13 +597,13 @@ class FA_GainModel(FA_model):
 
             # set those that are vertex specific)
             for rep_key in set_params.keys():
-                fit_params['{key}_{r}'.format(key = rep_key, r = r)].set(value = set_params[rep_key]) 
+                fit_params['{key}_i{r}'.format(key = rep_key, r = r)].set(value = set_params[rep_key]) 
 
         ## constrain gain values to be the same for all runs, if more than 1 run provided 
         if  timecourse.shape[0]>1: 
             for r in range(timecourse.shape[0]-1):
                 for c in constrained_vars:
-                    fit_params['{c}_{r}'.format(c = c, r = r+1)].expr = '{c}_0'.format(c = c)
+                    fit_params['{c}_i{r}'.format(c = c, r = r+1)].expr = '{c}_0'.format(c = c)
 
         
         ## minimize residuals

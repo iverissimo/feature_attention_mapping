@@ -224,21 +224,22 @@ fa_pars = []
 for i,r in enumerate(runs2fit):
     fa_pars.append(pars)
 
+# some optimizer params
+xtol = 1e-7
+ftol = 1e-6
+solver_type = 'trust-constr' #'lbfgsb' ##'trust-constr'
+n_jobs = 16 # for paralell
 
 print('grid fitting params')
 grid_results = fa_model.grid_fit(data, fa_pars, 
                              hrf_params = hrf_params, 
                              mask_ind = mask_ind,
-                             nuisance_regressors = nuisance_regressors, workers = 1)
+                             nuisance_regressors = nuisance_regressors, workers = 1, n_jobs = n_jobs)
     
 ## save fitted params Dataframe
 for i,r in enumerate(runs2fit):
     grid_results[i].to_csv(op.join(output_dir,'run-%s_grid_params.csv'%r), index = False)
 
-# some optimizer params
-xtol = 1e-7
-ftol = 1e-6
-solver_type = 'lbfgsb' ##'trust-constr'
 
 ## fit it!
 print('iterative fitting params')
@@ -246,7 +247,7 @@ results = fa_model.iterative_fit(data, fa_pars,
                                      hrf_params = hrf_params, 
                                      mask_ind = mask_ind,
                                      nuisance_regressors = nuisance_regressors,
-                                     xtol = xtol, ftol = ftol, method = solver_type,
+                                     xtol = xtol, ftol = ftol, method = solver_type, n_jobs = n_jobs,
                                      prev_fit_params = np.stack((np.array(grid_results[r].to_dict('r')) for r in range(len(runs2fit))), axis = 0)) # using grid fit outcome as starting point
 
 ## save fitted params Dataframe
@@ -256,45 +257,53 @@ for i,r in enumerate(runs2fit):
 ## save DM given fitted params for all relevant vertices
 # others will be nan
 print('saving design matrix')
+all_dms = [] # append for all runs, to use to model predictions
 
-dm = np.array(Parallel(n_jobs=16)(delayed(fa_model.make_FA_DM)(results.to_dict('r')[ind],
-                                                   hrf_params = hrf_params[..., vert], 
-                                                   cue_regressors = {'cue_0': fa_model.cue_regressors[0][vert], 
-                                                                   'cue_1': fa_model.cue_regressors[1][vert], 
-                                                                   'cue_2': fa_model.cue_regressors[2][vert], 
-                                                                   'cue_3': fa_model.cue_regressors[3][vert]},
-                                                   nuisance_regressors = nuisance_regressors[vert],
-                                                   weight_stim = True)
-                                       for ind, vert in enumerate(tqdm(results['vertex'].values))))
+for i, r in enumerate(runs2fit):
+    dm = np.array(Parallel(n_jobs=16)(delayed(fa_model.make_FA_DM)(results[i].to_dict('r')[ind],
+                                                       hrf_params = hrf_params[..., vert], 
+                                                       cue_regressors = {'cue_0': fa_model.cue_regressors[0][vert], 
+                                                                       'cue_1': fa_model.cue_regressors[1][vert], 
+                                                                       'cue_2': fa_model.cue_regressors[2][vert], 
+                                                                       'cue_3': fa_model.cue_regressors[3][vert]},
+                                                       nuisance_regressors = nuisance_regressors[vert],
+                                                        visual_dm = fa_model.FA_visual_DM[i],
+                                                       weight_stim = True)
+                                           for ind, vert in enumerate(tqdm(results[i]['vertex'].values))))
+    
+    # get all regressor key names to save out as well
+    all_regressor_keys = dm[0][1]
 
-# get all regressor key names to save out as well
-all_regressor_keys = dm[0][1]
+    # reshape dm 
+    dm_reshape = np.stack((dm[ind][0] for ind in range(len(mask_ind))), axis = 0)
 
-# reshape dm 
-dm_reshape = np.stack((dm[ind][0] for ind in range(len(mask_ind))), axis = 0)
+    dm_surf = np.zeros((data.shape[1], data.shape[2], len(all_regressor_keys))); dm_surf[:] = np.nan
+    dm_surf[mask_ind, ...] = dm_reshape
+    
+    fa_dm_filename = op.join(output_dir,'DM_FA_iterative_gain_run-{r}.npz'.format(r = r))
+    np.savez(fa_dm_filename,
+            dm = dm_surf,
+            reg_names = all_regressor_keys)
 
-dm_surf = np.zeros((data.shape[0], data.shape[1], len(all_regressor_keys))); dm_surf[:] = np.nan
-dm_surf[mask_ind, ...] = dm_reshape
-
-fa_dm_filename = op.join(output_dir,'DM_FA_iterative_gain_run-{run}.npz'.format(run=run))
-np.savez(fa_dm_filename,
-        dm = dm_surf,
-        reg_names = all_regressor_keys)
+    all_dms.append(dm_surf)
 
 ## save also model predictions for whole surface
 print('saving model timecourses')
+for i, r in enumerate(runs2fit):
+    ## save also model predictions for whole surface
+    print('saving model timecourses')
 
-model_tc_surf = np.zeros((data.shape[0], data.shape[1])); model_tc_surf[:] = np.nan
+    model_tc_surf = np.zeros((data.shape[1], data.shape[2])); model_tc_surf[:] = np.nan
 
-model_tc = np.array(Parallel(n_jobs=16)(delayed(mri_utils.get_fa_prediction_tc)(dm_reshape[ind],
-                                                   np.concatenate(([results.iloc[ind]['intercept']],
-                                                                    [results.iloc[ind]['beta_%s'%val] for val in all_regressor_keys if val != 'intercept']
-                                                                   )),
-                                                                timecourse = data[vert],
-                                                                r2 = results.iloc[ind]['rsq'], viz_model = False)
-                                       for ind, vert in enumerate(tqdm(results['vertex'].values))))
+    model_tc = np.array(Parallel(n_jobs=16)(delayed(mri_utils.get_fa_prediction_tc)(all_dms[i][vert],
+                                                       np.concatenate(([results[i].iloc[ind]['intercept']],
+                                                                        [results[i].iloc[ind]['beta_%s'%val] for val in all_regressor_keys if val != 'intercept']
+                                                                       )),
+                                                                    timecourse = data[i][vert],
+                                                                    r2 = results[i].iloc[ind]['rsq'], viz_model = False)
+                                           for ind, vert in enumerate(tqdm(results[i]['vertex'].values))))
 
-model_tc_surf[mask_ind, ...] = model_tc
+    model_tc_surf[mask_ind, ...] = model_tc
 
-model_tc_filename = op.join(output_dir,'prediction_FA_iterative_gain_run-{run}.npy'.format(run=run))
-np.save(model_tc_filename, model_tc_surf)
+    model_tc_filename = op.join(output_dir,'prediction_FA_iterative_gain_run-{r}.npy'.format(r = r))
+    np.save(model_tc_filename, model_tc_surf)

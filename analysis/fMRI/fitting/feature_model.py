@@ -403,13 +403,15 @@ class FA_GainModel(FA_model):
         
     
     def iterative_fit(self, data, starting_params, 
-                      hrf_params = None, mask_ind = [], nr_cue_regs = 4, nuisance_regressors = [], xtol = 1e-3, ftol = 1e-3, method = 'lbfgsb',
+                      hrf_params = None, mask_ind = [], nr_cue_regs = 4, nuisance_regressors = [], 
+                      xtol = 1e-3, ftol = 1e-3, method = 'lbfgsb', n_jobs = 16,
                     prev_fit_params = []):
 
         ## scipy optimizer args
         self.xtol = xtol
         self.ftol = ftol
         self.method = method
+        self.n_jobs = n_jobs
         
         ## reshape data if needed, so everything is coherent 
         if len(data.shape) < 3:
@@ -423,14 +425,14 @@ class FA_GainModel(FA_model):
         self.starting_params = starting_params if isinstance(starting_params, list) else [starting_params]
 
         if len(prev_fit_params) == 0: # if no previously fitted params
-            prev_fit_params = np.full(data[...,0].shape, None) # make None array
+            prev_fit_params = np.full((data.shape[0],len(mask_ind)), None) # make None array
         
         ## hrf params - should be (3, #vertices)
         self.hrf_params = hrf_params
         
         ## get cue regressor(s)
         if not hasattr(self, 'cue_regressors'):
-            self.cue_regressors = np.stack((mri_utils.get_cue_regressor(self.trial_info[0], 
+            cue_regressors = np.stack((mri_utils.get_cue_regressor(self.trial_info[0], 
                                                         hrf_params = self.hrf_params[..., mask_ind], cues = [i],
                                                         TR = self.TR, oversampling_time = self.osf, 
                                                         baseline = self.pRF_estimates['baseline'][mask_ind],
@@ -462,7 +464,7 @@ class FA_GainModel(FA_model):
         ## actually fit vertices
         # and output relevant params + rsq of model fit in dataframe
         
-        results = np.array(Parallel(n_jobs=16)(delayed(self.get_iterative_params)(data[vertex], self.starting_params, 
+        results = np.array(Parallel(n_jobs = self.n_jobs)(delayed(self.get_iterative_params)(data[:,vertex,:], self.starting_params, 
                                                                                  hrf_params = self.hrf_params[...,vertex],
                                                                                  set_params = {'pRF_x': self.pRF_estimates['x'][vertex], 
                                                                                                'pRF_y': self.pRF_estimates['y'][vertex], 
@@ -498,7 +500,7 @@ class FA_GainModel(FA_model):
                              set_params = {'pRF_x': None, 'pRF_y': None, 'pRF_beta': None, 
                                            'pRF_size': None, 'pRF_baseline': None, 'pRF_n': None},
                              cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []},
-                             nuisance_regressors = [], prev_fit_params = None, constrained_vars = ['gain_ACAO', 'gain_ACUO', 'gain_UCAO', 'gain_UCUO'],
+                             nuisance_regressors = [], prev_fit_params = [None], constrained_vars = ['gain_ACAO', 'gain_ACUO', 'gain_UCAO', 'gain_UCUO'],
                              **kwargs):
         
         ## reshape data if needed, so everything is coherent 
@@ -509,13 +511,15 @@ class FA_GainModel(FA_model):
         fit_params = Parameters() # initialize to make substitution easier
         orig_keys = [] # to save original keys, for later replacement
 
-        # if previous params provided, override starting params
-        init_pars = prev_fit_params if None not in prev_fit_params else starting_params 
-
         for r in range(timecourse.shape[0]):
 
+            # if previous params provided, override starting params
+            if None not in prev_fit_params[r]:
+                for key in starting_params[r].keys():
+                    starting_params[r][key].set(prev_fit_params[r][key])
+
             # dict with values for the run
-            run_dict = init_pars[r].valuesdict().copy()
+            run_dict = starting_params[r].valuesdict().copy()
 
             # original keys used
             orig_keys.append(list(run_dict.keys()))
@@ -526,11 +530,11 @@ class FA_GainModel(FA_model):
             # fill new params with parameter objects
             for i, key in enumerate(new_keys):
                 fit_params.add(key,
-                                value = init_pars[r][orig_keys[r][i]].value,
-                                vary = init_pars[r][orig_keys[r][i]].vary, 
-                                min = init_pars[r][orig_keys[r][i]].min, 
-                                max = init_pars[r][orig_keys[r][i]].max, 
-                                brute_step = init_pars[r][orig_keys[r][i]].brute_step)
+                                value = starting_params[r][orig_keys[r][i]].value,
+                                vary = starting_params[r][orig_keys[r][i]].vary, 
+                                min = starting_params[r][orig_keys[r][i]].min, 
+                                max = starting_params[r][orig_keys[r][i]].max, 
+                                brute_step = starting_params[r][orig_keys[r][i]].brute_step)
 
             # set those that are vertex specific)
             for rep_key in set_params.keys():
@@ -542,11 +546,17 @@ class FA_GainModel(FA_model):
                 for c in constrained_vars:
                     fit_params['{c}_i{r}'.format(c = c, r = r+1)].expr = '{c}_i0'.format(c = c)
             
-        
         ## minimize residuals
-        out = minimize(self.get_gain_residuals, fit_params, args = [timecourse],
-                       kws={'hrf_params': hrf_params, 'cue_regressors': cue_regressors, 'nuisance_regressors':nuisance_regressors}, 
-                       method = self.method, ftol = self.ftol) 
+        if self.method == 'lbfgsb': 
+            
+            out = minimize(self.get_gain_residuals, fit_params, args = [timecourse],
+                        kws={'hrf_params': hrf_params, 'cue_regressors': cue_regressors, 'nuisance_regressors':nuisance_regressors}, 
+                        method = self.method, options = dict(ftol = self.ftol))
+
+        elif self.method == 'trust-constr':
+            out = minimize(self.get_gain_residuals, fit_params, args = [timecourse],
+                        kws={'hrf_params': hrf_params, 'cue_regressors': cue_regressors, 'nuisance_regressors':nuisance_regressors}, 
+                        method = self.method, tol = self.ftol, options = dict(xtol = self.xtol))
 
         # output list of dicts, with original keys
         out_dict = out.params.valuesdict() 
@@ -679,10 +689,11 @@ class FA_GainModel(FA_model):
     
     
     def grid_fit(self, data, starting_params, 
-                      hrf_params = None, mask_ind = [], nr_cue_regs = 4, nuisance_regressors = [], workers = 1):
+                      hrf_params = None, mask_ind = [], nr_cue_regs = 4, nuisance_regressors = [], workers = 1, n_jobs=16):
 
         ## optimizer args
         self.workers = workers
+        self.n_jobs = n_jobs
         
         ## reshape data if needed, so everything is coherent 
         if len(data.shape) < 3:
@@ -729,7 +740,7 @@ class FA_GainModel(FA_model):
  
         ## actually fit vertices
         # and output relevant params + rsq of model fit in dataframe
-        results = np.array(Parallel(n_jobs=16)(delayed(self.get_grid_params)(data[:,vertex,:], self.starting_params, 
+        results = np.array(Parallel(n_jobs = self.n_jobs)(delayed(self.get_grid_params)(data[:,vertex,:], self.starting_params, 
                                                                                  hrf_params = self.hrf_params[...,vertex],
                                                                                  set_params = {'pRF_x': self.pRF_estimates['x'][vertex], 
                                                                                                'pRF_y': self.pRF_estimates['y'][vertex], 

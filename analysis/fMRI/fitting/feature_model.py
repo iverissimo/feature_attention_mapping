@@ -246,6 +246,7 @@ class FA_model:
                cue_regressors = {'cue_0': [], 'cue_1': [], 'cue_2': [], 'cue_3': []},
                weight_stim = False,
                nuisance_regressors = [],
+               visual_dm = [],
                **kwargs):
     
         # if we want to weight bar stim
@@ -254,9 +255,9 @@ class FA_model:
             weights_arr = np.array([pars_dict['gain_{key}'.format(key = name)] for name in self.unique_cond.keys()]).astype(np.float64)
 
             # taking the max value of the spatial position at each time point (to account for overlaps)
-            dm = mri_utils.weight_dm(self.FA_visual_DM, weights_arr)
+            dm = mri_utils.weight_dm(visual_dm, weights_arr)
         else:
-            dm = self.FA_visual_DM
+            dm = visual_dm
 
         if len(dm.shape) == 3:
             new_dm = dm[np.newaxis,...]
@@ -535,6 +536,7 @@ class FA_GainModel(FA_model):
                                                                hrf_params = hrf_params, 
                                                                cue_regressors = cue_regressors,
                                                                nuisance_regressors = nuisance_regressors,
+                                                               visual_dm = self.FA_visual_DM[r],
                                                                weight_stim = True)
 
             ## Fit GLM on FA data
@@ -555,6 +557,7 @@ class FA_GainModel(FA_model):
         
             ## append residuals
             resid.append(timecourse[r] - prediction)
+            print(r2)
         
         # return error "timecourse", that will be used by minimize
         return np.array(resid).flatten()
@@ -603,13 +606,13 @@ class FA_GainModel(FA_model):
         if  timecourse.shape[0]>1: 
             for r in range(timecourse.shape[0]-1):
                 for c in constrained_vars:
-                    fit_params['{c}_i{r}'.format(c = c, r = r+1)].expr = '{c}_0'.format(c = c)
+                    fit_params['{c}_i{r}'.format(c = c, r = r+1)].expr = '{c}_i0'.format(c = c)
 
         
         ## minimize residuals
         out = minimize(self.get_gain_residuals, fit_params, args = [timecourse],
                        kws={'hrf_params': hrf_params, 'cue_regressors': cue_regressors, 'nuisance_regressors': nuisance_regressors}, 
-                       method = 'brute')#, Ns = 8)
+                       method = 'brute', workers = 16) #, Ns = 8)
         
         # return best fitting params
         return out#.params.valuesdict()

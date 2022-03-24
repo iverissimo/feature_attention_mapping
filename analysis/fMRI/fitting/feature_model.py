@@ -576,6 +576,7 @@ class FA_GainModel(FA_model):
         
         ## set parameters 
         fit_params = Parameters() # initialize to make substitution easier
+        orig_keys = [] # to save original keys, for later replacement
 
         for r in range(timecourse.shape[0]):
             
@@ -583,20 +584,20 @@ class FA_GainModel(FA_model):
             run_dict = starting_params[r].valuesdict().copy()
             
             # original keys used
-            orig_keys = list(run_dict.keys())
+            orig_keys.append(list(run_dict.keys()))
             
             # new keys for multiple data fitting (as lmfit needs)
-            new_keys = np.array([key if '{key}_i{r}'.format(key = key, r = r) in key else '{key}_i{r}'.format(key = key, r = r) for key in orig_keys])
+            new_keys = np.array([key if '{key}_i{r}'.format(key = key, r = r) in key else '{key}_i{r}'.format(key = key, r = r) for key in orig_keys[r]])
             
             # fill new params with parameter objects
             for i, key in enumerate(new_keys):
                 
                 fit_params.add(key,
-                                value = starting_params[r][orig_keys[i]].value,
-                                vary = starting_params[r][orig_keys[i]].vary, 
-                                min = starting_params[r][orig_keys[i]].min, 
-                                max = starting_params[r][orig_keys[i]].max, 
-                                brute_step = starting_params[r][orig_keys[i]].brute_step)
+                                value = starting_params[r][orig_keys[r][i]].value,
+                                vary = starting_params[r][orig_keys[r][i]].vary, 
+                                min = starting_params[r][orig_keys[r][i]].min, 
+                                max = starting_params[r][orig_keys[r][i]].max, 
+                                brute_step = starting_params[r][orig_keys[r][i]].brute_step)
 
             # set those that are vertex specific)
             for rep_key in set_params.keys():
@@ -613,9 +614,15 @@ class FA_GainModel(FA_model):
         out = minimize(self.get_gain_residuals, fit_params, args = [timecourse],
                        kws={'hrf_params': hrf_params, 'cue_regressors': cue_regressors, 'nuisance_regressors': nuisance_regressors}, 
                        method = 'brute', workers = 16) #, Ns = 8)
+
+        # output list of dicts, with original keys
+        out_dict = out.params.valuesdict() 
+        output_list = []
+        for r in range(timecourse.shape[0]): 
+            output_list.append({ k: out_dict['{key}_i{r}'.format(key = k, r = r)] for k in orig_keys[r]})
         
-        # return best fitting params
-        return out#.params.valuesdict()
+        # return best fitting params in list
+        return output_list
     
     
     def grid_fit(self, data, starting_params, 
@@ -630,11 +637,7 @@ class FA_GainModel(FA_model):
             mask_ind = np.arange(data.shape[1])
         
         ## set starting params, also includes bounds and if are varied
-        if isinstance(starting_params, list):
-            print("list of parameters provided")
-            self.starting_params = starting_params 
-        else:
-            self.starting_params = [starting_params]
+        self.starting_params = starting_params if isinstance(starting_params, list) else [starting_params]
         
         ## hrf params - should be (3, #vertices)
         self.hrf_params = hrf_params
@@ -685,17 +688,17 @@ class FA_GainModel(FA_model):
                                                                                  nuisance_regressors = self.nuisance_regressors[vertex])
                                                                        for _,vertex in enumerate(tqdm(mask_ind))))
         
-        # # output list of fitted params dataframe
-        # fitted_params_list = []
+        # output list of fitted params dataframe
+        fitted_params_list = []
         
-        # for r in range(len(self.starting_params)):
-        #     ## save fitted params list of dicts as Dataframe
-        #     fitted_params_df = pd.DataFrame(d for d in results[r])
+        for r in range(len(self.starting_params)):
+            ## save fitted params list of dicts as Dataframe
+            fitted_params_df = pd.DataFrame(d for d in results[...,r])
 
-        #     # and add vertex number for bookeeping
-        #     fitted_params_df['vertex'] = mask_ind
+            # and add vertex number for bookeeping
+            fitted_params_df['vertex'] = mask_ind
             
-        #     fitted_params_list.append(fitted_params_df)
+            fitted_params_list.append(fitted_params_df)
 
-        return results #fitted_params_list
+        return fitted_params_list
         

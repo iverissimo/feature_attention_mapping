@@ -233,7 +233,8 @@ grid_results = fa_model.grid_fit(data, fa_pars,
                              nuisance_regressors = nuisance_regressors)
     
 ## save fitted params Dataframe
-grid_results.to_csv(op.join(output_dir,'grid_params.csv'), index = False)
+for i,r in enumerate(runs2fit):
+    grid_results[i].to_csv(op.join(output_dir,'run-%s_grid_params.csv'%r), index = False)
 
 
 ## fit it!

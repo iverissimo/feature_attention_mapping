@@ -31,7 +31,6 @@ from lmfit import Parameters
 
 from feature_model import FA_GainModel
 
-
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
             params = yaml.safe_load(f_in)
@@ -230,12 +229,16 @@ print('grid fitting params')
 grid_results = fa_model.grid_fit(data, fa_pars, 
                              hrf_params = hrf_params, 
                              mask_ind = mask_ind,
-                             nuisance_regressors = nuisance_regressors)
+                             nuisance_regressors = nuisance_regressors, workers = 1)
     
 ## save fitted params Dataframe
 for i,r in enumerate(runs2fit):
     grid_results[i].to_csv(op.join(output_dir,'run-%s_grid_params.csv'%r), index = False)
 
+# some optimizer params
+xtol = 1e-7
+ftol = 1e-6
+solver_type = 'lbfgsb' ##'trust-constr'
 
 ## fit it!
 print('iterative fitting params')
@@ -243,10 +246,12 @@ results = fa_model.iterative_fit(data, fa_pars,
                                      hrf_params = hrf_params, 
                                      mask_ind = mask_ind,
                                      nuisance_regressors = nuisance_regressors,
-                                     prev_fit_params = np.array(grid_results.to_dict('r'))) # using grid fit outcome as starting point
+                                     xtol = xtol, ftol = ftol, method = solver_type,
+                                     prev_fit_params = np.stack((np.array(grid_results[r].to_dict('r')) for r in range(len(runs2fit))), axis = 0)) # using grid fit outcome as starting point
 
 ## save fitted params Dataframe
-results.to_csv(op.join(output_dir,'iterative_params.csv'), index = False)
+for i,r in enumerate(runs2fit):
+    results[i].to_csv(op.join(output_dir,'run-%s_iterative_params.csv'%r), index = False)
 
 ## save DM given fitted params for all relevant vertices
 # others will be nan

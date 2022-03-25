@@ -265,8 +265,8 @@ class FA_model:
             new_dm = dm
 
         ## set some relevant attributes, if not existing already
-        if not hasattr(self, 'self.bar_on_screen_ind '):
-            np.where(np.sum(self.FA_visual_DM[0], axis=0).reshape(-1, self.FA_visual_DM[0].shape[-1]).sum(axis=0)>0)[0]
+        if not hasattr(self, 'bar_on_screen_ind '):
+            self.bar_on_screen_ind = np.where(np.sum(self.FA_visual_DM[0], axis=0).reshape(-1, self.FA_visual_DM[0].shape[-1]).sum(axis=0)>0)[0]
 
         # get FA regressor
         bar_stim_regressors = {}

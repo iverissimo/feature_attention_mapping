@@ -277,6 +277,7 @@ else:
 
 # set cue regressors, in case we just loaded estimates
 if not hasattr(fa_model, 'cue_regressors'):
+    fa_model.bar_stim_regressors_keys = np.array(['bar_stim'])
     nr_cue_regs = 4
     fa_model.cue_regressors = np.stack((mri_utils.get_cue_regressor(fa_model.trial_info[0], 
                                                     hrf_params = hrf_params, cues = [i],

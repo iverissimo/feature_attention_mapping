@@ -230,29 +230,62 @@ ftol = 1e-6
 solver_type = 'trust-constr' #'lbfgsb' ##'trust-constr'
 n_jobs = 16 # for paralell
 
-print('grid fitting params')
-grid_results = fa_model.grid_fit(data, fa_pars, 
-                             hrf_params = hrf_params, 
-                             mask_ind = mask_ind,
-                             nuisance_regressors = nuisance_regressors, workers = 1, n_jobs = n_jobs)
-    
-## save fitted params Dataframe
-for i,r in enumerate(runs2fit):
-    grid_results[i].to_csv(op.join(output_dir,'run-%s_grid_params.csv'%r), index = False)
+## if already in dir, load
+# otherwise fit
+grid_filename = op.join(output_dir,'run-%s_grid_params.csv'%run)
+                        
+if op.exists(grid_filename):
+    print('loading %s'%grid_filename)
+    grid_results = [pd.read_csv(grid_filename)]
+else:
+    if len(runs2fit)>1 and op.exists(op.join(output_dir,'run-%s_grid_params.csv'%runs2fit[0])):
+        grid_results = [pd.read_csv(op.join(output_dir,'run-%s_grid_params.csv'%r)) for r in runs2fit]
+    else:
+        print('grid fitting params')
+        grid_results = fa_model.grid_fit(data, fa_pars, 
+                                     hrf_params = hrf_params, 
+                                     mask_ind = mask_ind,
+                                     nuisance_regressors = nuisance_regressors, workers = 1, n_jobs = n_jobs)
+        ## save fitted params Dataframe
+        for i,r in enumerate(runs2fit):
+            grid_results[i].to_csv(op.join(output_dir,'run-%s_grid_params.csv'%r), index = False)
 
 
-## fit it!
-print('iterative fitting params')
-results = fa_model.iterative_fit(data, fa_pars, 
+## same logic for iterative fit
+# 
+it_filename = op.join(output_dir,'run-%s_iterative_params.csv'%run)
+                        
+if op.exists(it_filename):
+    print('loading %s'%it_filename)
+    it_results = [pd.read_csv(it_filename)]
+else:
+    if len(runs2fit)>1 and op.exists(op.join(output_dir,'run-%s_iterative_params.csv'%runs2fit[0])):
+        it_results = [pd.read_csv(op.join(output_dir,'run-%s_iterative_params.csv'%r)) for r in runs2fit]
+    else:
+        print('iterative fitting params')
+        it_results = fa_model.iterative_fit(data, fa_pars, 
                                      hrf_params = hrf_params, 
                                      mask_ind = mask_ind,
                                      nuisance_regressors = nuisance_regressors,
                                      xtol = xtol, ftol = ftol, method = solver_type, n_jobs = n_jobs,
                                      prev_fit_params = np.stack((np.array(grid_results[r].to_dict('r')) for r in range(len(runs2fit))), axis = 0)) # using grid fit outcome as starting point
 
-## save fitted params Dataframe
-for i,r in enumerate(runs2fit):
-    results[i].to_csv(op.join(output_dir,'run-%s_iterative_params.csv'%r), index = False)
+        ## save fitted params Dataframe
+        for i,r in enumerate(runs2fit):
+            it_results[i].to_csv(op.join(output_dir,'run-%s_iterative_params.csv'%r), index = False)
+
+
+# set cue regressors, in case we just loaded estimates
+if not hasattr(fa_model, 'cue_regressors'):
+    nr_cue_regs = 4
+    fa_model.cue_regressors = np.stack((mri_utils.get_cue_regressor(fa_model.trial_info[0], 
+                                                    hrf_params = hrf_params, cues = [i],
+                                                    TR = fa_model.TR, oversampling_time = fa_model.osf, 
+                                                    baseline = fa_model.pRF_estimates['baseline'],
+                                                    crop_unit = 'sec', crop = fa_model.fa_crop, 
+                                                    crop_TR = fa_model.fa_crop_TRs, 
+                                                    shift_TRs = fa_model.fa_shift_TRs, 
+                                                    shift_TR_num = fa_model.fa_shift_TR_num) for i in range(nr_cue_regs)), axis = 0)
 
 ## save DM given fitted params for all relevant vertices
 # others will be nan
@@ -260,16 +293,16 @@ print('saving design matrix')
 all_dms = [] # append for all runs, to use to model predictions
 
 for i, r in enumerate(runs2fit):
-    dm = np.array(Parallel(n_jobs=16)(delayed(fa_model.make_FA_DM)(results[i].to_dict('r')[ind],
-                                                       hrf_params = hrf_params[..., vert], 
-                                                       cue_regressors = {'cue_0': fa_model.cue_regressors[0][vert], 
-                                                                       'cue_1': fa_model.cue_regressors[1][vert], 
-                                                                       'cue_2': fa_model.cue_regressors[2][vert], 
-                                                                       'cue_3': fa_model.cue_regressors[3][vert]},
-                                                       nuisance_regressors = nuisance_regressors[vert],
-                                                        visual_dm = fa_model.FA_visual_DM[i],
-                                                       weight_stim = True)
-                                           for ind, vert in enumerate(tqdm(results[i]['vertex'].values))))
+    dm = np.array(Parallel(n_jobs = 16, backend ='threading')(delayed(fa_model.make_FA_DM)(it_results[i].to_dict('r')[ind],
+                                                                                            hrf_params = hrf_params[..., vert], 
+                                                                                            cue_regressors = {'cue_0': fa_model.cue_regressors[0][vert], 
+                                                                                                            'cue_1': fa_model.cue_regressors[1][vert], 
+                                                                                                            'cue_2': fa_model.cue_regressors[2][vert], 
+                                                                                                            'cue_3': fa_model.cue_regressors[3][vert]},
+                                                                                            nuisance_regressors = nuisance_regressors[vert],
+                                                                                                visual_dm = fa_model.FA_visual_DM[i],
+                                                                                            weight_stim = True)
+                                                                                for ind, vert in enumerate(tqdm(it_results[i]['vertex'].values))))
     
     # get all regressor key names to save out as well
     all_regressor_keys = dm[0][1]
@@ -295,13 +328,13 @@ for i, r in enumerate(runs2fit):
 
     model_tc_surf = np.zeros((data.shape[1], data.shape[2])); model_tc_surf[:] = np.nan
 
-    model_tc = np.array(Parallel(n_jobs=16)(delayed(mri_utils.get_fa_prediction_tc)(all_dms[i][vert],
-                                                       np.concatenate(([results[i].iloc[ind]['intercept']],
-                                                                        [results[i].iloc[ind]['beta_%s'%val] for val in all_regressor_keys if val != 'intercept']
-                                                                       )),
-                                                                    timecourse = data[i][vert],
-                                                                    r2 = results[i].iloc[ind]['rsq'], viz_model = False)
-                                           for ind, vert in enumerate(tqdm(results[i]['vertex'].values))))
+    model_tc = np.array(Parallel(n_jobs = 16, backend ='threading')(delayed(mri_utils.get_fa_prediction_tc)(all_dms[i][vert],
+                                                                                            np.concatenate(([it_results[i].iloc[ind]['intercept']],
+                                                                                                                [it_results[i].iloc[ind]['beta_%s'%val] for val in all_regressor_keys if val != 'intercept']
+                                                                                                            )),
+                                                                                                            timecourse = data[i][vert],
+                                                                                                            r2 = it_results[i].iloc[ind]['rsq'], viz_model = False)
+                                                                                for ind, vert in enumerate(tqdm(it_results[i]['vertex'].values))))
 
     model_tc_surf[mask_ind, ...] = model_tc
 

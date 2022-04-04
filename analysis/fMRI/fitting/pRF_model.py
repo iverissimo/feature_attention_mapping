@@ -105,35 +105,41 @@ DM_mask_beh = mri_utils.get_beh_mask(behav_files,params)
 ### define filenames for grid and search estimates
 
 # absolute filename for the estimates of the grid fit
-grid_estimates_filename = file.replace('.npy',
+grid_gauss_filename = file.replace('.npy',
                                         '_chunk-%s_of_%s_gauss_estimates.npz'%(str(chunk_num).zfill(3), str(total_chunks).zfill(3)))
-grid_estimates_filename = op.join(output_dir.replace(model_type,'gauss'), op.split(grid_estimates_filename)[-1])
+grid_gauss_filename = op.join(output_dir.replace(model_type,'gauss'), op.split(grid_gauss_filename)[-1])
 
 # absolute filename for the estimates of the iterative fit
-it_estimates_filename = grid_estimates_filename.replace('gauss_estimates.npz', 'itgauss_estimates.npz')
-it_estimates_filename = op.join(output_dir.replace('/'+model_type,'/iterative_gauss'), op.split(it_estimates_filename)[-1])
+it_gauss_filename = grid_gauss_filename.replace('gauss_estimates.npz', 'itgauss_estimates.npz')
+it_gauss_filename = op.join(output_dir.replace('/'+model_type,'/iterative_gauss'), op.split(it_gauss_filename)[-1])
 
-if not op.exists(op.split(it_estimates_filename)[0]): # check if path to save iterative files exist
-    os.makedirs(op.split(it_estimates_filename)[0]) 
+if not op.exists(op.split(it_gauss_filename)[0]): # check if path to save iterative files exist
+    os.makedirs(op.split(it_gauss_filename)[0]) 
 
-if model_type == 'css':
-    #filename the estimates of the css fit
-    css_grid_estimates_filename = op.join(output_dir,
-                                    op.split(grid_estimates_filename)[-1].replace('gauss_estimates.npz', 'css_estimates.npz'))
+
+# set absolute filename for the estimates, if model type other that gauss (so CSS or DN)
+if model_type != 'gauss':
     
-    css_it_estimates_filename = it_estimates_filename.replace('itgauss_estimates.npz', 'itcss_estimates.npz')
-    css_it_estimates_filename = op.join(output_dir.replace('/'+model_type,'/iterative_css'), op.split(css_it_estimates_filename)[-1])
+    #filename for grid estimates 
+    grid_fitmodel_filename = op.join(output_dir,
+                                    op.split(grid_gauss_filename)[-1].replace('gauss_estimates.npz', '%s_estimates.npz'%model_type))
+    
+    #filename for iterative estimates 
+    it_fitmodel_filename = it_gauss_filename.replace('itgauss_estimates.npz', 'it%s_estimates.npz'%model_type)
+    it_fitmodel_filename = op.join(output_dir.replace('/'+model_type,'/iterative_css'), op.split(it_fitmodel_filename)[-1])
 
-    if not op.exists(op.split(css_it_estimates_filename)[0]): # check if path to save iterative files exist
-        os.makedirs(op.split(css_it_estimates_filename)[0]) 
+    if not op.exists(op.split(it_fitmodel_filename)[0]): # check if path to save iterative files exist
+        os.makedirs(op.split(it_fitmodel_filename)[0])
+
+    
     
 ### now actually fit the data, if it was not fit before
 
-if (op.exists(it_estimates_filename) and model_type != 'css'): # if iterative fit exists, then gaussian was run
-    print('already exists %s'%it_estimates_filename)
+if (op.exists(it_gauss_filename) and model_type == 'gauss'): # if iterative fit exists, then gaussian was run
+    print('already exists %s'%it_gauss_filename)
 
-elif (model_type == 'css' and op.exists(css_it_estimates_filename)):
-    print('already exists %s'%css_it_estimates_filename)
+elif (model_type != 'gauss' and op.exists(it_fitmodel_filename)):
+    print('already exists %s'%it_fitmodel_filename)
     
 else:
     # masked data
@@ -158,12 +164,12 @@ else:
     if len(not_nan_vox)==0: # if all voxels nan, skip fitting completely
 
         print('all nan voxel/vertex, skipping') 
-        estimates_grid = np.zeros((orig_shape[0],6)); estimates_grid[:] = np.nan
-        estimates_it = np.zeros((orig_shape[0],6)); estimates_it[:] = np.nan
+        estimates_grid_gauss = np.zeros((orig_shape[0],6)); estimates_grid_gauss[:] = np.nan
+        estimates_it_gauss = np.zeros((orig_shape[0],6)); estimates_it_gauss[:] = np.nan
         
-        if model_type == 'css':
-            estimates_css_grid = np.zeros((orig_shape[0],7)); estimates_css_grid[:] = np.nan
-            estimates_css_it = np.zeros((orig_shape[0],7)); estimates_css_it[:] = np.nan
+        if model_type != 'gauss':
+            estimates_grid_fitmodel = np.zeros((orig_shape[0],7)); estimates_grid_fitmodel[:] = np.nan
+            estimates_it_fitmodel = np.zeros((orig_shape[0],7)); estimates_it_fitmodel[:] = np.nan
             
     else:
         # define design matrix 
@@ -208,7 +214,7 @@ else:
                                 pos_prfs_only = True)
 
 
-        estimates_grid = gauss_fitter.gridsearch_params
+        estimates_grid_gauss = gauss_fitter.gridsearch_params
         
         
         ## ITERATIVE FIT
@@ -238,12 +244,12 @@ else:
                                     ftol = ftol)
 
 
-        estimates_it = gauss_fitter.iterative_search_params
+        estimates_it_gauss = gauss_fitter.iterative_search_params
 
     # save grid estimates
-    mri_utils.save_estimates(grid_estimates_filename, estimates_grid, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
+    mri_utils.save_estimates(grid_gauss_filename, estimates_grid_gauss, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss')
     # for it
-    mri_utils.save_estimates(it_estimates_filename, estimates_it, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss',fit_hrf=fit_hrf)
+    mri_utils.save_estimates(it_gauss_filename, estimates_it_gauss, not_nan_vox, orig_shape = orig_shape, model_type = 'gauss',fit_hrf=fit_hrf)
     
     if model_type == 'css':
         
@@ -275,7 +281,7 @@ else:
                                 pos_prfs_only = True)
 
 
-            estimates_css_grid = css_fitter.gridsearch_params
+            estimates_grid_fitmodel = css_fitter.gridsearch_params
 
             ## ITERATIVE FIT
 
@@ -299,13 +305,13 @@ else:
                                         ftol = ftol)
 
 
-            estimates_css_it = css_fitter.iterative_search_params
+            estimates_it_fitmodel = css_fitter.iterative_search_params
 
         # save estimates
         # for grid
-        mri_utils.save_estimates(css_grid_estimates_filename, estimates_css_grid, not_nan_vox, orig_shape, model_type = 'css')
+        mri_utils.save_estimates(grid_fitmodel_filename, estimates_grid_fitmodel, not_nan_vox, orig_shape, model_type = 'css')
         # for it
-        mri_utils.save_estimates(css_it_estimates_filename, estimates_css_it, not_nan_vox, orig_shape, model_type = 'css',fit_hrf=fit_hrf)
+        mri_utils.save_estimates(it_fitmodel_filename, estimates_it_fitmodel, not_nan_vox, orig_shape, model_type = 'css',fit_hrf=fit_hrf)
 
 
 # Print duration

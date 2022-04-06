@@ -2717,7 +2717,7 @@ def baseline_correction(data, params, num_baseline_TRs = 6, baseline_interval = 
         interval_ind = interval_ind - shift_TR_num
 
     # get baseline values
-    baseline_arr = np.hstack((data[..., ind[0]:ind[1]] for ind in interval_ind))
+    baseline_arr = np.hstack([data[..., ind[0]:ind[1]] for ind in interval_ind])
 
     # average
     if avg_type == 'median':

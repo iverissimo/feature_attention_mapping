@@ -325,78 +325,78 @@ else:
 
             estimates_it_fitmodel = css_fitter.iterative_search_params
 
-    elif model_type == 'dn':
+        elif model_type == 'dn':
 
-        ## set grid for new params
+            ## set grid for new params
 
-        # Surround amplitude (Normalization parameter C)
-        surround_amplitude_grid = np.array([0.05,0.2,0.4,0.7,1,3]) 
-        
-        # Surround size (gauss sigma_2)
-        surround_size_grid = np.array([3,5,8,12,18])
-        
-        # Neural baseline (Normalization parameter B)
-        neural_baseline_grid = np.array([0,1,10,100])
+            # Surround amplitude (Normalization parameter C)
+            surround_amplitude_grid = np.array([0.05,0.2,0.4,0.7,1,3]) 
+            
+            # Surround size (gauss sigma_2)
+            surround_size_grid = np.array([3,5,8,12,18])
+            
+            # Neural baseline (Normalization parameter B)
+            neural_baseline_grid = np.array([0,1,10,100])
 
-        # Surround baseline (Normalization parameter D)
-        surround_baseline_grid = np.array([0.1,1.0,10.0,100.0])
+            # Surround baseline (Normalization parameter D)
+            surround_baseline_grid = np.array([0.1,1.0,10.0,100.0])
 
-        # define model 
-        dn_model =  Norm_Iso2DGaussianModel(stimulus = prf_stim,
-                                            filter_predictions = True,
-                                            filter_type = params['mri']['filtering']['type'],
-                                            filter_params = {'highpass': params['mri']['filtering']['highpass'],
-                                                            'add_mean': params['mri']['filtering']['add_mean'],
-                                                            'window_length': params['mri']['filtering']['window_length'],
-                                                            'polyorder': params['mri']['filtering']['polyorder']}
-                                        )
+            # define model 
+            dn_model =  Norm_Iso2DGaussianModel(stimulus = prf_stim,
+                                                filter_predictions = True,
+                                                filter_type = params['mri']['filtering']['type'],
+                                                filter_params = {'highpass': params['mri']['filtering']['highpass'],
+                                                                'add_mean': params['mri']['filtering']['add_mean'],
+                                                                'window_length': params['mri']['filtering']['window_length'],
+                                                                'polyorder': params['mri']['filtering']['polyorder']}
+                                            )
 
-        ## GRID FIT
-        print("DN model GRID fit")
-        dn_fitter = Norm_Iso2DGaussianFitter(data = masked_data, 
-                                            model = dn_model, 
-                                            n_jobs = 16,
-                                            fit_hrf = fit_hrf,
-                                            previous_gaussian_fitter = gauss_fitter)
+            ## GRID FIT
+            print("DN model GRID fit")
+            dn_fitter = Norm_Iso2DGaussianFitter(data = masked_data, 
+                                                model = dn_model, 
+                                                n_jobs = 16,
+                                                fit_hrf = fit_hrf,
+                                                previous_gaussian_fitter = gauss_fitter)
 
-        dn_fitter.grid_fit(surround_amplitude_grid,
-                            surround_size_grid,
-                            neural_baseline_grid,
-                            surround_baseline_grid,
-                            rsq_threshold = 0.1, 
-                            pos_prfs_only = True)
+            dn_fitter.grid_fit(surround_amplitude_grid,
+                                surround_size_grid,
+                                neural_baseline_grid,
+                                surround_baseline_grid,
+                                rsq_threshold = 0.1, 
+                                pos_prfs_only = True)
 
-        estimates_grid_fitmodel = dn_fitter.gridsearch_params
+            estimates_grid_fitmodel = dn_fitter.gridsearch_params
 
-        ## ITERATIVE FIT
+            ## ITERATIVE FIT
 
-        # model parameter bounds
-        dn_bounds = [(-1.5*ss, 1.5*ss),  # x
-                    (-1.5*ss, 1.5*ss),  # y
-                    (eps, 1.5*ss),  # prf size
-                    (0, 1000),  # prf amplitude
-                    (0, 1000),  # bold baseline
-                    (0, 1000),  # surround amplitude
-                    (eps, 3*ss),  # surround size
-                    (0, 1000),  # neural baseline
-                    (1e-6, 1000)]  # surround baseline
+            # model parameter bounds
+            dn_bounds = [(-1.5*ss, 1.5*ss),  # x
+                        (-1.5*ss, 1.5*ss),  # y
+                        (eps, 1.5*ss),  # prf size
+                        (0, 1000),  # prf amplitude
+                        (0, 1000),  # bold baseline
+                        (0, 1000),  # surround amplitude
+                        (eps, 3*ss),  # surround size
+                        (0, 1000),  # neural baseline
+                        (1e-6, 1000)]  # surround baseline
 
-        if fit_hrf:
-            dn_bounds += [(0,10),(0,0)]
-        
-        if fix_bold_baseline:
-            dn_bounds[4] = (0,0)  
+            if fit_hrf:
+                dn_bounds += [(0,10),(0,0)]
+            
+            if fix_bold_baseline:
+                dn_bounds[4] = (0,0)  
 
-        # iterative fit
-        print("DN model ITERATIVE fit")
-        dn_fitter.iterative_fit(rsq_threshold = 0.1, 
-                                    verbose = False,
-                                    bounds = dn_bounds,
-                                    xtol = xtol,
-                                    ftol = ftol)
+            # iterative fit
+            print("DN model ITERATIVE fit")
+            dn_fitter.iterative_fit(rsq_threshold = 0.1, 
+                                        verbose = False,
+                                        bounds = dn_bounds,
+                                        xtol = xtol,
+                                        ftol = ftol)
 
 
-        estimates_it_fitmodel = dn_fitter.iterative_search_params
+            estimates_it_fitmodel = dn_fitter.iterative_search_params
 
     # save estimates
     # for grid

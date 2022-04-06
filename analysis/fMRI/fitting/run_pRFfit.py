@@ -45,7 +45,7 @@ batch_string = """#!/bin/bash
 # call the programs
 echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
-conda activate i36
+conda activate i38
 
 # make derivatives dir in node
 mkdir -p $TMPDIR/derivatives/{post_fmriprep,pRF_fit}/sub-$SJ_NR

@@ -777,7 +777,7 @@ def save_estimates(filename, estimates, mask_indices, orig_shape = np.array([197
     mask_indices : arr
         array with voxel indices that were NOT masked out
     orig_shape: tuple/arr
-        orginal data shape 
+        original data shape 
     model_type: str
         model type used for fitting
         
@@ -835,6 +835,36 @@ def save_estimates(filename, estimates, mask_indices, orig_shape = np.array([197
                     baseline = final_estimates[..., 4],
                     ns = final_estimates[..., 5],
                     r2 = final_estimates[..., 6])
+
+    elif model_type == 'dn':
+
+        if fit_hrf:
+            np.savez(filename,
+                    x = final_estimates[..., 0],
+                    y = final_estimates[..., 1],
+                    size = final_estimates[..., 2],
+                    betas = final_estimates[...,3],
+                    baseline = final_estimates[..., 4],
+                    sa = final_estimates[..., 5],
+                    ss = final_estimates[..., 6], 
+                    nb = final_estimates[..., 7], 
+                    sb = final_estimates[..., 8], 
+                    hrf_derivative = final_estimates[..., 9],
+                    hrf_dispersion = final_estimates[..., 10], 
+                    r2 = final_estimates[..., 11])
+        
+        else:
+            np.savez(filename,
+                    x = final_estimates[..., 0],
+                    y = final_estimates[..., 1],
+                    size = final_estimates[..., 2],
+                    betas = final_estimates[...,3],
+                    baseline = final_estimates[..., 4],
+                    sa = final_estimates[..., 5],
+                    ss = final_estimates[..., 6], 
+                    nb = final_estimates[..., 7], 
+                    sb = final_estimates[..., 8], 
+                    r2 = final_estimates[..., 9])
         
 
 def combine_slices(file_list,outdir,num_slices=89, ax=2):
@@ -2633,3 +2663,66 @@ def get_weighted_bins(data_df, x_key = 'ecc', y_key = 'size', weight_key = 'rsq'
                                                   weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
 
     return mean_x, mean_x_std, mean_y, mean_y_std
+
+
+def baseline_correction(data, params, num_baseline_TRs = 6, baseline_interval = 'empty_long', 
+                        avg_type = 'median', crop = False, crop_TR = 8, shift_TRs = True, shift_TR_num = 1):
+    
+    """Do baseline correction to timecourse
+     Useful when we want a fix baseline during fitting
+
+    Parameters
+    ----------
+    data : array
+       2D array with data timecourses
+    params : yml dict
+        with experiment params
+    num_baseline_TRs: int
+        number of baseline TRs to consider (will always be the last X TRs of the interval)
+    baseline_interval : str
+       name of the condition to get baseline values
+    avg_type: str
+        type of averaging done
+    crop: bool
+        if data is cropped or not
+    crop_TR: int
+        how many TRs from beginning were cropped (=/= from dummy)
+
+    """
+
+    # number TRs per condition
+    TR_conditions = {'L-R': params['prf']['num_TRs']['L-R'],
+                    'R-L': params['prf']['num_TRs']['R-L'],
+                    'U-D': params['prf']['num_TRs']['U-D'],
+                    'D-U': params['prf']['num_TRs']['D-U'],
+                    'empty': params['prf']['num_TRs']['empty'],
+                    'empty_long': params['prf']['num_TRs']['empty_long']}
+
+    # order of conditions in run
+    bar_pass_direction = params['prf']['bar_pass_direction']
+
+    num_TRs = 0
+    interval_ind = [] # indices for baseline intervals
+    for _,bartype in enumerate(bar_pass_direction):
+
+        num_TRs += TR_conditions[bartype]
+
+        if bartype == baseline_interval:
+            interval_ind.append([num_TRs - num_baseline_TRs, num_TRs - 1]) # -1 because python is 0 index
+
+    if crop:
+        interval_ind = np.array(interval_ind) - crop_TR
+
+    if shift_TRs:
+        interval_ind = interval_ind - shift_TR_num
+
+    # get baseline values
+    baseline_arr = np.hstack((data[..., ind[0]:ind[1]] for ind in interval_ind))
+
+    # average
+    if avg_type == 'median':
+        avg_baseline = np.median(baseline_arr, axis = -1)
+    else:
+        avg_baseline = np.mean(baseline_arr, axis = -1)
+
+    return data - avg_baseline[...,np.newaxis]

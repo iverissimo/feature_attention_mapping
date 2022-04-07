@@ -299,7 +299,7 @@ else:
                                                     previous_gaussian_fitter = gauss_fitter)
 
                 css_fitter.grid_fit(exponent_grid = css_n_grid,
-                                    rsq_threshold = 0.1, 
+                                    rsq_threshold = 0.05, 
                                     pos_prfs_only = True)
 
 
@@ -323,7 +323,7 @@ else:
 
                 # iterative fit
                 print("CSS model ITERATIVE fit")
-                css_fitter.iterative_fit(rsq_threshold = 0.1, 
+                css_fitter.iterative_fit(rsq_threshold = 0.05, 
                                             verbose = False,
                                             bounds = css_bounds,
                                             xtol = xtol,
@@ -337,7 +337,7 @@ else:
                 ## set grid for new params
 
                 # Surround amplitude (Normalization parameter C)
-                surround_amplitude_grid = np.array([0.05,0.2,0.4,0.7,1,3]) 
+                surround_amplitude_grid = np.array([0.1,0.2,0.4,0.7,1,3]) 
                 
                 # Surround size (gauss sigma_2)
                 surround_size_grid = np.array([3,5,8,12,18])
@@ -370,7 +370,7 @@ else:
                                     surround_size_grid,
                                     neural_baseline_grid,
                                     surround_baseline_grid,
-                                    rsq_threshold = 0.1, 
+                                    rsq_threshold = 0.05, 
                                     pos_prfs_only = True)
 
                 estimates_grid_fitmodel = dn_fitter.gridsearch_params
@@ -396,7 +396,7 @@ else:
 
                 # iterative fit
                 print("DN model ITERATIVE fit")
-                dn_fitter.iterative_fit(rsq_threshold = 0.1, 
+                dn_fitter.iterative_fit(rsq_threshold = 0.05, 
                                             verbose = False,
                                             bounds = dn_bounds,
                                             xtol = xtol,

@@ -1126,8 +1126,8 @@ def dva_per_pix(height_cm,distance_cm,vert_res_pix):
     return deg_per_px 
 
 
-def mask_estimates(estimates, ROI = 'None', fit_model = 'gauss', x_ecc_lim = [-6,6], y_ecc_lim = [-6,6],
-                    max_size = 20, space = 'fsaverage'):
+def mask_estimates(estimates, ROI = 'None', x_ecc_lim = [-6,6], y_ecc_lim = [-6,6],
+                    max_size = 20, space = 'fsaverage', estimate_keys = ['x','y','size','betas','baseline','r2']):
     
     """ mask estimates, to be positive RF, within screen limits
     and for a certain ROI (if the case)
@@ -1137,8 +1137,8 @@ def mask_estimates(estimates, ROI = 'None', fit_model = 'gauss', x_ecc_lim = [-6
         list of estimates.npz for both hemispheres
     ROI : str
         roi to mask estimates (eg. 'V1', default 'None')
-    fit_model: str
-        fit model of estimates
+    estimate_keys: list/arr
+        list or array of strings with keys of estimates to mask
     
     Outputs
     -------
@@ -1147,72 +1147,41 @@ def mask_estimates(estimates, ROI = 'None', fit_model = 'gauss', x_ecc_lim = [-6
     
     """
     
-    xx = estimates['x']
-    yy = estimates['y']
-       
-    size = estimates['size']
+    # make new variables that are masked 
+    masked_dict = {}
     
-    beta = estimates['betas']
-    baseline = estimates['baseline']
-    
-    ns = estimates['ns']
+    for k in estimate_keys: 
+        masked_dict[k] = np.zeros(estimates[k].shape)
+        masked_dict[k][:] = np.nan
 
-    hrf_derivative = estimates['hrf_derivative']
-    hrf_dispersion = estimates['hrf_dispersion']
-
-    rsq = estimates['r2']
     
     # set limits for xx and yy, forcing it to be within the screen boundaries
     # also for max fitting size used and for positive pRFs
 
-    # make new variables that are masked 
-    masked_xx = np.zeros(xx.shape); masked_xx[:]=np.nan
-    masked_yy = np.zeros(yy.shape); masked_yy[:]=np.nan
-    masked_size = np.zeros(size.shape); masked_size[:]=np.nan
-    masked_beta = np.zeros(beta.shape); masked_beta[:]=np.nan
-    masked_baseline = np.zeros(baseline.shape); masked_baseline[:]=np.nan
-    masked_ns = np.zeros(ns.shape); masked_ns[:]=np.nan
-    masked_hrf_derivative = np.zeros(hrf_derivative.shape); masked_hrf_derivative[:]=np.nan
-    masked_hrf_dispersion = np.zeros(hrf_dispersion.shape); masked_hrf_dispersion[:]=np.nan
-    masked_rsq = np.zeros(rsq.shape); masked_rsq[:]=np.nan
+    indices = np.where((~np.isnan(estimates['r2']))& \
+                       (estimates['x'] <= np.max(x_ecc_lim))& \
+                      (estimates['x'] >= np.min(x_ecc_lim))& \
+                      (estimates['y'] <= np.max(y_ecc_lim))& \
+                       (estimates['y'] >= np.min(y_ecc_lim))& \
+                       (estimates['betas']>=0)& \
+                       (estimates['size']<=max_size)
+                      )[0]
+                        
+    # save values
+    for k in estimate_keys:
+        masked_dict[k][indices] = estimates[k][indices]
 
-    for i in range(len(xx)): #for all vertices
-        if xx[i] <= np.max(x_ecc_lim) and xx[i] >= np.min(x_ecc_lim): # if x within horizontal screen dim
-            if yy[i] <= np.max(y_ecc_lim)and yy[i] >= np.min(y_ecc_lim): # if y within vertical screen dim
-                if beta[i]>=0: # only account for positive RF
-                    if size[i]<=max_size: # limit size to max size defined in fit
-
-                        # save values
-                        masked_xx[i] = xx[i]
-                        masked_yy[i] = yy[i]
-                        masked_size[i] = size[i]
-                        masked_beta[i] = beta[i]
-                        masked_baseline[i] = baseline[i]
-                        masked_rsq[i] = rsq[i]
-                        masked_ns[i] = ns[i]
-                        masked_hrf_derivative[i] = hrf_derivative[i]
-                        masked_hrf_dispersion[i] =  hrf_dispersion[i]
 
     if ROI != 'None':
         
         roi_ind = cortex.get_roi_verts(space, ROI) # get indices for that ROI
         
         # mask for roi
-        masked_xx = masked_xx[roi_ind[ROI]]
-        masked_yy = masked_yy[roi_ind[ROI]]
-        masked_size = masked_size[roi_ind[ROI]]
-        masked_beta = masked_beta[roi_ind[ROI]]
-        masked_baseline = masked_baseline[roi_ind[ROI]]
-        masked_rsq = masked_rsq[roi_ind[ROI]]
-        masked_ns = masked_ns[roi_ind[ROI]]
-        masked_hrf_derivative = masked_hrf_derivative[roi_ind[ROI]]
-        masked_hrf_dispersion = masked_hrf_dispersion[roi_ind[ROI]]
-
-    masked_estimates = {'x': masked_xx,'y': masked_yy,'size': masked_size,
-                        'beta': masked_beta,'baseline': masked_baseline,'ns': masked_ns,
-                        'rsq': masked_rsq, 'hrf_derivative': masked_hrf_derivative, 'hrf_dispersion': masked_hrf_dispersion}
+        for k in estimate_keys:
+            masked_dict[k] = masked_dict[k][roi_ind[ROI]]
     
-    return masked_estimates
+    return masked_dict
+
 
 def normalize(M):
     """

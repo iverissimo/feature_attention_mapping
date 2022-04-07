@@ -56,6 +56,13 @@ TR = params['mri']['TR']
 # type of model to fit
 model_type = params['mri']['fitting']['pRF']['fit_model']
 
+# set estimate key names
+estimate_keys = ['x','y','size','betas','baseline','r2']
+if model_type == 'css':
+    estimate_keys += ['ns']
+elif model_type == 'dn':
+    estimate_keys += ['sa','ss','nb','sb']
+
 # define file extension that we want to use, 
 # should include processing key words
 file_ext = ''
@@ -84,38 +91,51 @@ if not os.path.exists(figures_pth):
 
 if task == 'pRF':
 
-    # path to pRF fits 
-    fits_pth =  op.join(derivatives_dir,'{task}_fit'.format(task=task),'sub-{sj}'.format(sj=sj), space, 'iterative_{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
-    #fits_pth =  op.join(derivatives_dir,'{task}_fit'.format(task=task),'sub-{sj}'.format(sj=sj), space, '{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
+    # path to iterative and grid pRF fits 
+    fits_pth = {'iterative': op.join(derivatives_dir,'{task}_fit'.format(task=task),'sub-{sj}'.format(sj=sj), space, 
+                                     'iterative_{model}'.format(model=model_type),'run-{run}'.format(run=run_type)),
+               'grid': op.join(derivatives_dir,'{task}_fit'.format(task=task),'sub-{sj}'.format(sj=sj), space, 
+                               '{model}'.format(model=model_type),'run-{run}'.format(run=run_type))}
     
-    ## Load pRF estimates 
-    
-    # path to combined estimates
-    estimates_pth = op.join(fits_pth,'combined')
-        
-    # combined estimates filename
-    est_name = [x for _,x in enumerate(os.listdir(fits_pth)) if 'chunk-001' in x][0]
-    est_name = est_name.replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
-    
-    # total path to estimates path
-    estimates_combi = op.join(estimates_pth,est_name)
-    
-    if op.isfile(estimates_combi): # if combined estimates exists
-            
-            print('loading %s'%estimates_combi)
-            estimates = np.load(estimates_combi) # load it
-    
-    else: # if not join chunks and save file
-        if not op.exists(estimates_pth):
-            os.makedirs(estimates_pth) 
+    # grid fitting doesnt include hrf
+    fit_hrf = {'iterative': params['mri']['fitting']['pRF']['fit_hrf'], 'grid': False}
 
-        estimates = mri_utils.join_chunks(fits_pth, estimates_combi, fit_hrf = params['mri']['fitting']['pRF']['fit_hrf'],
-                                chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
+     
+    ## Load pRF estimates 
+        
+    # combined estimates filename + np array dict
+    estimates_combi = {'iterative': None, 'grid': None}
+    estimates = {'iterative': None, 'grid': None}
+    
+    for k in fits_pth.keys():
+        
+        est_name = [x for _,x in enumerate(os.listdir(fits_pth[k])) if 'chunk-001' in x][0]
+        est_name = est_name.replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
+        
+        # total path to estimates path
+        estimates_combi[k] = op.join(fits_pth[k],'combined', est_name)
+    
+        if op.isfile(estimates_combi[k]): # if combined estimates exists
+
+                print('loading %s'%estimates_combi[k])
+                estimates[k] = np.load(estimates_combi[k]) # load it
+
+        else: # if not join chunks and save file
+            if not op.exists(op.join(fits_pth[k],'combined')):
+                os.makedirs(op.join(fits_pth[k],'combined')) 
+
+            # model name to use as input for func
+            mod_name = 'it{model}'.format(model=model_type) if k == 'iterative' else '{model}'.format(model=model_type)
+            
+            # combine estimate chunks
+            estimates[k] = mri_utils.join_chunks(fits_pth[k], estimates_combi[k], fit_hrf = fit_hrf[k],
+                                    chunk_num = total_chunks, fit_model = mod_name) 
 
     
     # define design matrix 
-    visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, save_imgs=False, downsample=0.1, 
-                                            crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=False)
+    visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
+                                     save_imgs = False, res_scaling = 0.1, crop = params['prf']['crop'] , 
+                                     crop_TR = params['prf']['crop_TR'], overwrite=False)
 
     # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
     prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -127,20 +147,22 @@ if task == 'pRF':
     # to mask estimates
     x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
 
-    rsq = estimates['r2'] 
+    rsq = estimates['iterative']['r2'] 
 
     # mask estimates
     print('masking estimates')
-    masked_est = mri_utils.mask_estimates(estimates, fit_model = model_type,
-                                x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
+    masked_est = mri_utils.mask_estimates(estimates['iterative'], 
+                                          estimate_keys = estimate_keys+['hrf_derivative','hrf_dispersion'],
+                                          x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
 
-    masked_rsq = masked_est['rsq']
+    masked_rsq = masked_est['r2']
 
     # saved masked rsq, useful for FA plots
-    np.save(op.join(fits_pth,'combined','masked_rsq.npy'), masked_rsq)
+    np.save(op.join(fits_pth['iterative'],'combined','masked_rsq.npy'), masked_rsq)
 
     plot_lims_dist = [0,1] # axis value for plotting
     plot_lims_flat = [0,.8] # axis value for plotting
+
 
 elif task == 'FA':
     

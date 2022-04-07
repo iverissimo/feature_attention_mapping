@@ -245,7 +245,7 @@ plt.xlabel('ROI',fontsize = 20,labelpad=18)
 plt.ylabel('RSQ',fontsize = 20,labelpad=18)
 plt.ylim(plot_lims_dist[0],plot_lims_dist[1])
 
-fig.savefig(op.join(figures_pth,'rsq_visual_violinplot.svg'), dpi=100)
+fig.savefig(op.join(figures_pth,'rsq_%s_violinplot.svg'%model_type), dpi=100)
 
 images = {}
 
@@ -256,7 +256,7 @@ images['rsq'] = cortex.Vertex(rsq,
                             cmap='Reds')
 #cortex.quickshow(images['rsq'],with_curvature=True,with_sulci=True)
 
-filename = op.join(figures_pth,'flatmap_space-{space}_type-rsq_visual.svg'.format(space=pysub))
+filename = op.join(figures_pth,'flatmap_space-{space}_type-rsq_{model}.svg'.format(space=pysub, model=model_type))
 print('saving %s' %filename)
 _ = cortex.quickflat.make_png(filename, images['rsq'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
@@ -270,9 +270,64 @@ images['rsq_masked'] = cortex.Vertex(new_rsq,
                                     cmap='Reds')
 #cortex.quickshow(images['rsq_masked'],with_curvature=True,with_sulci=True)
 
-filename = op.join(figures_pth,'flatmap_space-{space}_type-rsq_masked_visual.svg'.format(space=pysub))
+filename = op.join(figures_pth,'flatmap_space-{space}_type-rsq_masked_{model}.svg'.format(space=pysub, model=model_type))
 print('saving %s' %filename)
 _ = cortex.quickflat.make_png(filename, images['rsq_masked'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
+## compare pRF model rsq's
+if task == 'pRF':
+    
+    ## compare grid and iterative
+    # mask also
+    grid_r2 = estimates['grid']['r2'].copy()
+    grid_r2[new_rsq == 0] = 0
+    
+    ## plot percentage increase from grid to iterative
+    images['rsq_grid_iter_change'] = cortex.Vertex((new_rsq - grid_r2)/grid_r2 * 100, 
+                                    pysub,
+                                    vmin = -100, vmax = 100,
+                                    cmap='BuBkRd')
+    #cortex.quickshow(images['rsq_grid_iter_change'],with_curvature=True,with_sulci=True)
+
+    filename = op.join(figures_pth,'flatmap_space-{space}_percent_change_grid2iterative_type-rsq_masked_{model}.svg'.format(space=pysub, model=model_type))
+    print('saving %s' %filename)
+    _ = cortex.quickflat.make_png(filename, images['rsq_grid_iter_change'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
+    # if not gauss, compare rsq of model with gauss rsq
+    if model_type != 'gauss':
+        
+        gauss_est_filename = estimates_combi['iterative'].replace(model_type, 'gauss')
+        
+        if op.isfile(gauss_est_filename): # if combined estimates exists
+
+                print('loading %s'%gauss_est_filename)
+                estimates_gauss = np.load(gauss_est_filename) # load it
+
+        else: # if not join chunks and save file
+            if not op.exists(op.split(gauss_est_filename)[0]):
+                os.makedirs(op.split(gauss_est_filename)[0]) 
+
+            # combine estimate chunks
+            estimates_gauss = mri_utils.join_chunks(op.split(gauss_est_filename)[0], gauss_est_filename, 
+                                                    fit_hrf = fit_hrf['iterative'],
+                                                chunk_num = total_chunks, fit_model = 'itgauss') 
+        
+        ## compare gauss and current model
+        # mask also
+        gauss_r2 = estimates_gauss['r2'].copy()
+        gauss_r2[new_rsq == 0] = 0
+
+        ## plot percentage increase from grid to iterative
+        images['rsq_gauss_%s_change'%model_type] = cortex.Vertex((new_rsq - gauss_r2)/gauss_r2 * 100, 
+                                        pysub,
+                                        vmin = -100, vmax = 100,
+                                        cmap='BuBkRd')
+        #cortex.quickshow(images['rsq_gauss_%s_change'%model_type],with_curvature=True,with_sulci=True)
+        
+        filename = op.join(figures_pth,'flatmap_space-{space}_percent_change_gauss2{model}_type-rsq_masked_{model}.svg'.format(space=pysub, model=model_type))
+        print('saving %s' %filename)
+        _ = cortex.quickflat.make_png(filename, images['rsq_gauss_%s_change'%model_type], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
 
 
 

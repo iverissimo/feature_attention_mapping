@@ -57,11 +57,7 @@ TR = params['mri']['TR']
 model_type = params['mri']['fitting']['pRF']['fit_model']
 
 # set estimate key names
-estimate_keys = ['x','y','size','betas','baseline','r2']
-if model_type == 'css':
-    estimate_keys += ['ns']
-elif model_type == 'dn':
-    estimate_keys += ['sa','ss','nb','sb']
+estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][model_type]
 
 # define file extension that we want to use, 
 # should include processing key words
@@ -100,7 +96,6 @@ if task == 'pRF':
     # grid fitting doesnt include hrf
     fit_hrf = {'iterative': params['mri']['fitting']['pRF']['fit_hrf'], 'grid': False}
 
-     
     ## Load pRF estimates 
         
     # combined estimates filename + np array dict

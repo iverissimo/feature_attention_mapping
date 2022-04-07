@@ -159,7 +159,12 @@ mri: # refers to the Psychopy SyncGenerator class
 
       fit_model: 'css' #'dn' #'gauss' #'css'
 
+      estimate_keys: {'gauss': ['x','y','size','betas','baseline','r2'],
+                      'css': ['x','y','size','betas','baseline','ns', 'r2'],
+                      'dn': ['x','y','size','betas','baseline', 'sa', 'ss', 'nb', 'sb', 'r2']} # to keep track of variables throughout scripts
+
       fit_hrf: True #True
+      fix_bold_baseline: True
 
       grid_nr: 40 # number of grid steps
       min_eccen: 0.2

@@ -60,8 +60,11 @@ TR = params['mri']['TR']
 model_type = params['mri']['fitting']['pRF']['fit_model']
 fit_hrf = params['mri']['fitting']['pRF']['fit_hrf']
 
+# set estimate key names
+estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][model_type]
+
 # if we are keeping baseline fixed at 0
-fix_bold_baseline = True
+fix_bold_baseline = params['mri']['fitting']['pRF']['fix_bold_baseline']
 
 # define file extension that we want to use, 
 # should include processing key words
@@ -134,7 +137,7 @@ if model_type != 'gauss':
     
     #filename for iterative estimates 
     it_fitmodel_filename = it_gauss_filename.replace('itgauss_estimates.npz', 'it%s_estimates.npz'%model_type)
-    it_fitmodel_filename = op.join(output_dir.replace('/'+model_type,'/iterative_css'), op.split(it_fitmodel_filename)[-1])
+    it_fitmodel_filename = op.join(output_dir.replace('/'+model_type,'/iterative_%s'%model_type), op.split(it_fitmodel_filename)[-1])
 
     if not op.exists(op.split(it_fitmodel_filename)[0]): # check if path to save iterative files exist
         os.makedirs(op.split(it_fitmodel_filename)[0])
@@ -172,13 +175,11 @@ else:
     if len(not_nan_vox) == 0: # if all voxels nan, skip fitting completely
 
         print('all nan voxel/vertex, skipping') 
-        estimates_grid_gauss = np.zeros((orig_shape[0],6)); estimates_grid_gauss[:] = np.nan
-        estimates_it_gauss = np.zeros((orig_shape[0],6)); estimates_it_gauss[:] = np.nan
+        estimates_grid_gauss = np.zeros((orig_shape[0], len(params['mri']['fitting']['pRF']['estimate_keys']['gauss'])))
+        estimates_grid_gauss[:] = np.nan
+        estimates_it_gauss = np.zeros(estimates_grid_gauss.shape) if fit_hrf == False else np.zeros(orig_shape[0], estimates_grid_gauss.shape[-1]+2) 
+        estimates_it_gauss[:] = np.nan
         
-        if model_type != 'gauss':
-            estimates_grid_fitmodel = np.zeros((orig_shape[0],7)); estimates_grid_fitmodel[:] = np.nan
-            estimates_it_fitmodel = np.zeros((orig_shape[0],7)); estimates_it_fitmodel[:] = np.nan
-            
     else:
         # define design matrix 
         visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, save_imgs=False, 
@@ -265,146 +266,152 @@ else:
                             orig_shape = orig_shape, model_type = 'gauss', fit_hrf = fit_hrf)
     
     ## Now fit model of interest (if not gauss)
-    if len(not_nan_vox)>0:
+    if model_type != 'gauss':
 
-        if model_type == 'css':
-    
-            # grid exponent parameter
-            css_n_grid = np.linspace(params['mri']['fitting']['pRF']['min_n'], 
-                                        params['mri']['fitting']['pRF']['max_n'], 12)
+        if len(not_nan_vox) == 0:
+            estimates_grid_fitmodel = np.zeros((orig_shape[0], len(estimate_keys)))
+            estimates_grid_fitmodel[:] = np.nan
+            estimates_it_fitmodel = np.zeros(estimates_grid_fitmodel.shape) if fit_hrf == False else np.zeros(orig_shape[0], estimates_grid_fitmodel.shape[-1]+2)
+            estimates_it_fitmodel[:] = np.nan
+        else:
+            if model_type == 'css':
+        
+                # grid exponent parameter
+                css_n_grid = np.linspace(params['mri']['fitting']['pRF']['min_n'], 
+                                            params['mri']['fitting']['pRF']['max_n'], 12)
 
-            # define model 
-            css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
-                                                filter_predictions = True,
-                                                filter_type = params['mri']['filtering']['type'],
-                                                filter_params = {'highpass': params['mri']['filtering']['highpass'],
-                                                                'add_mean': params['mri']['filtering']['add_mean'],
-                                                                'window_length': params['mri']['filtering']['window_length'],
-                                                                'polyorder': params['mri']['filtering']['polyorder']}
-                                            )
+                # define model 
+                css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
+                                                    filter_predictions = True,
+                                                    filter_type = params['mri']['filtering']['type'],
+                                                    filter_params = {'highpass': params['mri']['filtering']['highpass'],
+                                                                    'add_mean': params['mri']['filtering']['add_mean'],
+                                                                    'window_length': params['mri']['filtering']['window_length'],
+                                                                    'polyorder': params['mri']['filtering']['polyorder']}
+                                                )
 
-            ## GRID FIT
-            print("CSS model GRID fit")
-            css_fitter = CSS_Iso2DGaussianFitter(data = masked_data, 
-                                                model = css_model, 
-                                                n_jobs = 16,
-                                                fit_hrf = fit_hrf,
-                                                previous_gaussian_fitter = gauss_fitter)
+                ## GRID FIT
+                print("CSS model GRID fit")
+                css_fitter = CSS_Iso2DGaussianFitter(data = masked_data, 
+                                                    model = css_model, 
+                                                    n_jobs = 16,
+                                                    fit_hrf = fit_hrf,
+                                                    previous_gaussian_fitter = gauss_fitter)
 
-            css_fitter.grid_fit(exponent_grid = css_n_grid,
-                                rsq_threshold = 0.1, 
-                                pos_prfs_only = True)
-
-
-            estimates_grid_fitmodel = css_fitter.gridsearch_params
-
-            ## ITERATIVE FIT
-
-            # model parameter bounds
-            css_bounds = [(-1.5*ss, 1.5*ss),  # x
-                        (-1.5*ss, 1.5*ss),  # y
-                        (eps, 1.5*ss),  # prf size
-                        (0, 1000),  # prf amplitude
-                        (0, 1000),  # bold baseline
-                        (0.01, 1)]  # CSS exponent
-
-            if fit_hrf:
-                css_bounds += [(0,10),(0,0)]
-
-            if fix_bold_baseline:
-                css_bounds[4] = (0,0) 
-
-            # iterative fit
-            print("CSS model ITERATIVE fit")
-            css_fitter.iterative_fit(rsq_threshold = 0.1, 
-                                        verbose = False,
-                                        bounds = css_bounds,
-                                        xtol = xtol,
-                                        ftol = ftol)
+                css_fitter.grid_fit(exponent_grid = css_n_grid,
+                                    rsq_threshold = 0.1, 
+                                    pos_prfs_only = True)
 
 
-            estimates_it_fitmodel = css_fitter.iterative_search_params
+                estimates_grid_fitmodel = css_fitter.gridsearch_params
 
-        elif model_type == 'dn':
+                ## ITERATIVE FIT
 
-            ## set grid for new params
+                # model parameter bounds
+                css_bounds = [(-1.5*ss, 1.5*ss),  # x
+                            (-1.5*ss, 1.5*ss),  # y
+                            (eps, 1.5*ss),  # prf size
+                            (0, 1000),  # prf amplitude
+                            (0, 1000),  # bold baseline
+                            (0.01, 1)]  # CSS exponent
 
-            # Surround amplitude (Normalization parameter C)
-            surround_amplitude_grid = np.array([0.05,0.2,0.4,0.7,1,3]) 
-            
-            # Surround size (gauss sigma_2)
-            surround_size_grid = np.array([3,5,8,12,18])
-            
-            # Neural baseline (Normalization parameter B)
-            neural_baseline_grid = np.array([0,1,10,100])
+                if fit_hrf:
+                    css_bounds += [(0,10),(0,0)]
 
-            # Surround baseline (Normalization parameter D)
-            surround_baseline_grid = np.array([0.1,1.0,10.0,100.0])
+                if fix_bold_baseline:
+                    css_bounds[4] = (0,0) 
 
-            # define model 
-            dn_model =  Norm_Iso2DGaussianModel(stimulus = prf_stim,
-                                                filter_predictions = True,
-                                                filter_type = params['mri']['filtering']['type'],
-                                                filter_params = {'highpass': params['mri']['filtering']['highpass'],
-                                                                'add_mean': params['mri']['filtering']['add_mean'],
-                                                                'window_length': params['mri']['filtering']['window_length'],
-                                                                'polyorder': params['mri']['filtering']['polyorder']}
-                                            )
-
-            ## GRID FIT
-            print("DN model GRID fit")
-            dn_fitter = Norm_Iso2DGaussianFitter(data = masked_data, 
-                                                model = dn_model, 
-                                                n_jobs = 16,
-                                                fit_hrf = fit_hrf,
-                                                previous_gaussian_fitter = gauss_fitter)
-
-            dn_fitter.grid_fit(surround_amplitude_grid,
-                                surround_size_grid,
-                                neural_baseline_grid,
-                                surround_baseline_grid,
-                                rsq_threshold = 0.1, 
-                                pos_prfs_only = True)
-
-            estimates_grid_fitmodel = dn_fitter.gridsearch_params
-
-            ## ITERATIVE FIT
-
-            # model parameter bounds
-            dn_bounds = [(-1.5*ss, 1.5*ss),  # x
-                        (-1.5*ss, 1.5*ss),  # y
-                        (eps, 1.5*ss),  # prf size
-                        (0, 1000),  # prf amplitude
-                        (0, 1000),  # bold baseline
-                        (0, 1000),  # surround amplitude
-                        (eps, 3*ss),  # surround size
-                        (0, 1000),  # neural baseline
-                        (1e-6, 1000)]  # surround baseline
-
-            if fit_hrf:
-                dn_bounds += [(0,10),(0,0)]
-            
-            if fix_bold_baseline:
-                dn_bounds[4] = (0,0)  
-
-            # iterative fit
-            print("DN model ITERATIVE fit")
-            dn_fitter.iterative_fit(rsq_threshold = 0.1, 
-                                        verbose = False,
-                                        bounds = dn_bounds,
-                                        xtol = xtol,
-                                        ftol = ftol)
+                # iterative fit
+                print("CSS model ITERATIVE fit")
+                css_fitter.iterative_fit(rsq_threshold = 0.1, 
+                                            verbose = False,
+                                            bounds = css_bounds,
+                                            xtol = xtol,
+                                            ftol = ftol)
 
 
-            estimates_it_fitmodel = dn_fitter.iterative_search_params
+                estimates_it_fitmodel = css_fitter.iterative_search_params
 
-    # save estimates
-    # for grid
-    mri_utils.save_estimates(grid_fitmodel_filename, estimates_grid_fitmodel, not_nan_vox, 
-                                orig_shape = orig_shape, model_type = model_type)
-    # for it
-    mri_utils.save_estimates(it_fitmodel_filename, estimates_it_fitmodel, not_nan_vox, 
-                                orig_shape = orig_shape, model_type = model_type, fit_hrf = fit_hrf)
+            elif model_type == 'dn':
+
+                ## set grid for new params
+
+                # Surround amplitude (Normalization parameter C)
+                surround_amplitude_grid = np.array([0.05,0.2,0.4,0.7,1,3]) 
+                
+                # Surround size (gauss sigma_2)
+                surround_size_grid = np.array([3,5,8,12,18])
+                
+                # Neural baseline (Normalization parameter B)
+                neural_baseline_grid = np.array([0,1,10,100])
+
+                # Surround baseline (Normalization parameter D)
+                surround_baseline_grid = np.array([0.1,1.0,10.0,100.0])
+
+                # define model 
+                dn_model =  Norm_Iso2DGaussianModel(stimulus = prf_stim,
+                                                    filter_predictions = True,
+                                                    filter_type = params['mri']['filtering']['type'],
+                                                    filter_params = {'highpass': params['mri']['filtering']['highpass'],
+                                                                    'add_mean': params['mri']['filtering']['add_mean'],
+                                                                    'window_length': params['mri']['filtering']['window_length'],
+                                                                    'polyorder': params['mri']['filtering']['polyorder']}
+                                                )
+
+                ## GRID FIT
+                print("DN model GRID fit")
+                dn_fitter = Norm_Iso2DGaussianFitter(data = masked_data, 
+                                                    model = dn_model, 
+                                                    n_jobs = 16,
+                                                    fit_hrf = fit_hrf,
+                                                    previous_gaussian_fitter = gauss_fitter)
+
+                dn_fitter.grid_fit(surround_amplitude_grid,
+                                    surround_size_grid,
+                                    neural_baseline_grid,
+                                    surround_baseline_grid,
+                                    rsq_threshold = 0.1, 
+                                    pos_prfs_only = True)
+
+                estimates_grid_fitmodel = dn_fitter.gridsearch_params
+
+                ## ITERATIVE FIT
+
+                # model parameter bounds
+                dn_bounds = [(-1.5*ss, 1.5*ss),  # x
+                            (-1.5*ss, 1.5*ss),  # y
+                            (eps, 1.5*ss),  # prf size
+                            (0, 1000),  # prf amplitude
+                            (0, 1000),  # bold baseline
+                            (0, 1000),  # surround amplitude
+                            (eps, 3*ss),  # surround size
+                            (0, 1000),  # neural baseline
+                            (1e-6, 1000)]  # surround baseline
+
+                if fit_hrf:
+                    dn_bounds += [(0,10),(0,0)]
+                
+                if fix_bold_baseline:
+                    dn_bounds[4] = (0,0)  
+
+                # iterative fit
+                print("DN model ITERATIVE fit")
+                dn_fitter.iterative_fit(rsq_threshold = 0.1, 
+                                            verbose = False,
+                                            bounds = dn_bounds,
+                                            xtol = xtol,
+                                            ftol = ftol)
+
+
+                estimates_it_fitmodel = dn_fitter.iterative_search_params
+
+        # save estimates
+        # for grid
+        mri_utils.save_estimates(grid_fitmodel_filename, estimates_grid_fitmodel, not_nan_vox, 
+                                    orig_shape = orig_shape, model_type = model_type)
+        # for it
+        mri_utils.save_estimates(it_fitmodel_filename, estimates_it_fitmodel, not_nan_vox, 
+                                    orig_shape = orig_shape, model_type = model_type, fit_hrf = fit_hrf)
 
 
 # Print duration

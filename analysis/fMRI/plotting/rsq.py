@@ -207,10 +207,21 @@ color_codes = {key: ROI_pal[key] for key in ROIs}
 # get pycortex sub
 pysub = params['plotting']['pycortex_sub'] 
 
+## get vertices from ROIs
+## of glasser atlas
+
+# Get Glasser atlas
+atlas_df, atlas_array = mri_utils.create_glasser_df(op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
+
+# ROI names
+ROIs = list(params['plotting']['ROIs']['glasser_atlas'].keys())
+# colors
+color_codes = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs}
+
 # get vertices for ROI
 roi_verts = {} #empty dictionary  
-for _,val in enumerate(ROIs):
-    roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
+for _,key in enumerate(ROIs):
+    roi_verts[key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
 
 
 for idx,rois_ks in enumerate(ROIs): 

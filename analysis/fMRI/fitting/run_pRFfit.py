@@ -54,6 +54,12 @@ wait
 cp -r $DERIV_DIR/post_fmriprep/sub-$SJ_NR/$SPACE $TMPDIR/derivatives/post_fmriprep/sub-$SJ_NR
 wait
 
+if [ -d "$DERIV_DIR/pRF_fit/sub-$SJ_NR/$SPACE" ] 
+then
+    cp -r $DERIV_DIR/pRF_fit/sub-$SJ_NR/$SPACE $TMPDIR/derivatives/pRF_fit/sub-$SJ_NR
+fi
+wait
+
 python pRF_model.py $SJ_NR $RUN_TYPE $CHUNK_NR
 
 wait          # wait until programs are finished

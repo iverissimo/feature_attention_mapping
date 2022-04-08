@@ -48,61 +48,73 @@ TR = params['mri']['TR']
 # type of model to fit
 model_type = params['mri']['fitting']['pRF']['fit_model']
 
+# set estimate key names
+estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][model_type]
+
 # define file extension that we want to use, 
 # should include processing key words
-file_ext = '_cropped_{filt}_{stand}.npy'.format(filt = params['mri']['filtering']['type'],
-                                                    stand = 'psc')
+file_ext = ''
+# if cropped first
+if params['feature']['crop']:
+    file_ext += '_{name}'.format(name='cropped')
+# type of filtering/denoising
+if params['feature']['regress_confounds']:
+    file_ext += '_{name}'.format(name='confound')
+else:
+    file_ext += '_{name}'.format(name = params['mri']['filtering']['type'])
+# type of standardization 
+file_ext += '_{name}'.format(name = params['feature']['standardize'])
+# don't forget its a numpy array
+file_ext += '.npy'
 
 # set paths
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
 postfmriprep_dir = op.join(derivatives_dir,'post_fmriprep','sub-{sj}'.format(sj=sj),space,'processed')
 
 # path to pRF fits 
-fits_pth =  op.join(derivatives_dir,'{task}_fit'.format(task=task),'sub-{sj}'.format(sj=sj), space, 'iterative_{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
-#fits_pth =  op.join(derivatives_dir,'{task}_fit'.format(task=task),'sub-{sj}'.format(sj=sj), space, '{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
+fits_pth =  op.join(derivatives_dir,'{task}_fit'.format(task=task),'sub-{sj}'.format(sj=sj), space, 
+                    'iterative_{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
 
 # output dir to save fit and plot
 figures_pth = op.join(derivatives_dir,'plots','polar_angle','{task}fit'.format(task=task),
                       'sub-{sj}'.format(sj=sj), space, model_type,'run-{run}'.format(run=run_type)) # path to save plots
 if not os.path.exists(figures_pth):
-    os.makedirs(figures_pth) 
+    os.makedirs(figures_pth)
 
-if task == 'pRF':
-    
-    ## Load pRF estimates 
-    
-    # path to combined estimates
-    estimates_pth = op.join(fits_pth,'combined')
-        
-    # combined estimates filename
-    est_name = [x for _,x in enumerate(os.listdir(fits_pth)) if 'chunk-001' in x][0]
-    est_name = est_name.replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
-    
-    # total path to estimates path
-    estimates_combi = op.join(estimates_pth,est_name)
-    
-    if op.isfile(estimates_combi): # if combined estimates exists
-            
-            print('loading %s'%estimates_combi)
-            estimates = np.load(estimates_combi) # load it
-    
-    else: # if not join chunks and save file
-        if not op.exists(estimates_pth):
-            os.makedirs(estimates_pth) 
+# if we fitted hrf
+fit_hrf = params['mri']['fitting']['pRF']['fit_hrf']
 
-        estimates = mri_utils.join_chunks(fits_pth, estimates_combi,
-                                chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
+## Load pRF estimates 
 
+est_name = [x for _,x in enumerate(os.listdir(fits_pth)) if 'chunk-001' in x][0]
+est_name = est_name.replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
+
+# total path to estimates path
+estimates_combi = op.join(fits_pth,'combined', est_name)
+
+if op.isfile(estimates_combi): # if combined estimates exists
+
+        print('loading %s'%estimates_combi)
+        estimates = np.load(estimates_combi) # load it
+
+else: # if not join chunks and save file
+    if not op.exists(op.join(fits_pth,'combined')):
+        os.makedirs(op.join(fits_pth,'combined')) 
+
+    # combine estimate chunks
+    estimates = mri_utils.join_chunks(fits_pth, estimates_combi, fit_hrf = fit_hrf,
+                            chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) 
 
 # define design matrix 
-visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, save_imgs=False, downsample=0.1, 
-                                            crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=False)
+visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
+                                 save_imgs = False, res_scaling = 0.1, crop = params['prf']['crop'] , 
+                                 crop_TR = params['prf']['crop_TR'], overwrite=False)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
-                         screen_distance_cm = params['monitor']['distance'],
-                         design_matrix = visual_dm,
-                         TR = TR)
+                        screen_distance_cm = params['monitor']['distance'],
+                        design_matrix = visual_dm,
+                        TR = TR)
 
 # get the ecc limits (in dva)
 # to mask estimates
@@ -110,15 +122,23 @@ x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg
 
 # mask estimates
 print('masking estimates')
-masked_est = mri_utils.mask_estimates(estimates, fit_model = model_type,
-                            x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
+masked_est = mri_utils.mask_estimates(estimates, 
+                                      estimate_keys = estimate_keys+['hrf_derivative','hrf_dispersion'],
+                                      x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
 
-rsq = masked_est['rsq']
+rsq = masked_est['r2']
 x = masked_est['x']
 y = masked_est['y']
 
 complex_location = x + y * 1j # calculate eccentricity values
 polar_angle = np.angle(complex_location)
+
+### make alpha level based on pRF rsquared ###
+
+alpha_level = mri_utils.normalize(np.clip(rsq, 0, .8))#mask, 0, .8)) # normalize 
+
+# number of bins for colormaps
+n_bins_colors = 256
 
 # set threshold for plotting
 rsq_threshold = params['plotting']['rsq_threshold']
@@ -131,94 +151,76 @@ ROI_pal = params['plotting']['ROI_pal']
 color_codes = {key: ROI_pal[key] for key in ROIs}
 
 # get pycortex sub
-pysub = params['plotting']['pycortex_sub'] 
+pysub = params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj)
 
 # get vertices for ROI
 roi_verts = {} #empty dictionary  
 for _,val in enumerate(ROIs):
     roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
 
-
 images = {}
 
-# normalize polar angles to have values in circle between 0 and 1
-polar_ang_norm = (polar_angle + np.pi) / (np.pi * 2.0)
+## plot pRF polar angle ##
 
-# make alpha level based on rsquared
-# normalize the distribution, for better visualization
-alpha_level = mri_utils.normalize(np.clip(rsq, 0, 0.8)) #rsq_threshold,.8))#np.clip(rsq,rsq_threshold,.3) 
+# only used voxels where pRF rsq bigger than 0
+pa4plot = np.zeros(rsq.shape); pa4plot[:] = np.nan
+pa4plot[rsq>0] = ((polar_angle + np.pi) / (np.pi * 2.0))[rsq>0]
 
-# make costum colormap, similar to curtis mackey paper
-# orange to red, counter clockwise
-n_bins = 256#8
-PA_colors = mri_utils.add_alpha2colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb',
-                              '#3d549f','#655099','#ad5a9b','#dd3933'],bins = n_bins, cmap_name = 'PA_mackey_costum',
-                              discrete = False)
+# get matplotlib color map from segmented colors
+PA_cmap = mri_utils.make_colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb',
+                              '#3d549f','#655099','#ad5a9b','#dd3933'], bins = n_bins_colors, 
+                                    cmap_name = 'PA_mackey_costum',
+                              discrete = False, add_alpha = False, return_cmap = True)
 
-# create costume colormp rainbow_r
-col2D_name = op.splitext(op.split(PA_colors)[-1])[0]
-print('created costum colormap %s'%col2D_name)
 
-images['PA'] = cortex.Vertex2D(polar_ang_norm, alpha_level,
-                                subject = pysub, 
-                                vmin = 0, vmax = 1,
-                                vmin2 = 0, vmax2 = np.nanmax(alpha_level),
-                                cmap = col2D_name)
+images['PA'] = mri_utils.make_raw_vertex_image(pa4plot, 
+                                               cmap = PA_cmap, vmin = 0, vmax = 1, 
+                                              data2 = alpha_level, vmin2 = 0, vmax2 = 1, 
+                                               subject = pysub, data2D = True)
 
-#cortex.quickshow(images['PA'],with_curvature=True,with_sulci=True,with_colorbar=True,
-#                 curvature_brightness = 0.4, curvature_contrast = 0.1)
+cortex.quickshow(images['PA'],with_curvature=True,with_sulci=True,with_colorbar=True,
+                 curvature_brightness = 0.4, curvature_contrast = 0.1)#, recache = True)
+
 
 filename = op.join(figures_pth,'flatmap_space-{space}_type-PA_mackey_colorwheel.svg'.format(space=pysub))
 print('saving %s' %filename)
 _ = cortex.quickflat.make_png(filename, images['PA'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
-## do the same but with a color wheel than spans just one hemifield,  
-## (non uniform color wheel)
+## plot polar angle in non uniform color wheel
 ## for better visualization of boundaries
-
-# shift radians in order to overrepresent red color
-# useful to make NON-REPRESENTED retinotopic hemifield per hemisphere red
-# then easier to define borders
-
-# create HSV array, with PA values (-pi to pi) that were obtained from estimates
-# saturation weighted by a shifted distribution of RSQ (better visualization)
-# value bolean (if I don't give it an rsq threshold then it's always 1)
 
 hsv_angle = []
 hsv_angle = np.ones((len(rsq), 3))
-hsv_angle[:, 0] = polar_angle.copy()
-#hsv_angle[:, 1] = np.clip(estimates_dict['rsq'] / np.nanmax(estimates_dict['rsq']) * 3, 0, 1)
-hsv_angle[:, 2] = mri_utils.normalize(np.clip(rsq,rsq_threshold,.3)) #rsq > rsq_threshold 
+# set normalized polar angle (0-1), and make nan irrelevant vertices
+hsv_angle[:, 0] = np.nan; hsv_angle[:, 0][rsq>0] = ((polar_angle + np.pi) / (np.pi * 2.0))[rsq>0]
+
+# set angle threshold for overepresentation
+angle_thresh = 3*np.pi/4 #value upon which to make it red for this hemifield (above it or below -angle will be red)
+# normalize it
+angle_thresh_norm = (angle_thresh + np.pi) / (np.pi * 2.0)
 
 
 # get mid vertex index (diving hemispheres)
 left_index = cortex.db.get_surfinfo(pysub).left.shape[0] 
 
-### take angles from LH (thus RVF)##
-angle_ = hsv_angle[:left_index, 0].copy()
-angle_thresh = 3*np.pi/4 #value upon which to make it red for this hemifield (above it or below -angle will be red)
+# set angles within threh interval to 0
+ind_thresh = np.where((hsv_angle[:left_index, 0] > angle_thresh_norm) | (hsv_angle[:left_index, 0] < 1-angle_thresh_norm))[0]
+hsv_angle[:left_index, 0][ind_thresh] = 0
 
-#normalized angles, between 0 and 1
-hsv_angle[:left_index, 0] = np.clip((angle_ + angle_thresh)/(2*angle_thresh), 0, 1)
+## now take angles from RH (thus LVF) 
+# ATENÇÃO -> minus sign to flip angles vertically (then order of colors same for both hemispheres)
+hsv_angle[left_index:, 0] = ((np.angle(-1*x + y * 1j ) + np.pi) / (np.pi * 2.0))[left_index:]
 
-### take angles from RH (thus LVF) ##
-angle_ = -hsv_angle[left_index:, 0].copy() # ATENÇÃO -> minus sign to flip angles vertically (then order of colors same for both hemispheres)
+# set angles within threh interval to 0
+ind_thresh = np.where((hsv_angle[left_index:, 0] > angle_thresh_norm) | (hsv_angle[left_index:, 0] < 1-angle_thresh_norm))[0]
 
-# sum 2pi to originally positive angles (now our trig circle goes from pi to 2pi to pi again, all positive)
-angle_[hsv_angle[left_index:, 0] > 0] += 2 * np.pi
+hsv_angle[left_index:, 0][ind_thresh] = 0
 
-#normalized angles, between 0 and 1
-angle_ = np.clip((angle_ + (angle_thresh-np.pi))/(2*angle_thresh), 0, 1) # ATENÇÃO -> we subtract -pi to angle thresh because now we want to rotate the whole thing -180 degrees
-
-hsv_angle[left_index:, 0] = angle_.copy()
-rgb_angle = []
-rgb_angle = colors.hsv_to_rgb(hsv_angle)
-
-# make alpha same as saturation, reduces clutter
-alpha_angle = hsv_angle[:, 2]
+rgb_angle = np.ones((len(rsq), 3)); rgb_angle[:] = np.nan;
+rgb_angle[rsq>0] = colors.hsv_to_rgb(hsv_angle[rsq>0])
 
 images['PA_half_hemi'] = cortex.VertexRGB(rgb_angle[:, 0], rgb_angle[:, 1], rgb_angle[:, 2],
-                                           alpha = alpha_angle,
+                                           alpha = alpha_level,
                                            subject = pysub)
 
 #cortex.quickshow(images['PA_half_hemi'],with_curvature=True,with_sulci=True,with_colorbar=True,

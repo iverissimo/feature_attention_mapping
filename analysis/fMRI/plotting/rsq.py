@@ -197,31 +197,41 @@ rsq_threshold = params['plotting']['rsq_threshold']
 
 ## make violin plots with values per ROI
 
-# get vertices for subject fsaverage
-ROIs = params['plotting']['ROIs'][space]
-
-# dictionary with one specific color per group - similar to fig3 colors
-ROI_pal = params['plotting']['ROI_pal']
-color_codes = {key: ROI_pal[key] for key in ROIs}
-
+# if using atlas to get ROIs 
+use_atlas = False 
 # get pycortex sub
-pysub = params['plotting']['pycortex_sub'] 
-
-## get vertices from ROIs
-## of glasser atlas
-
-# Get Glasser atlas
-atlas_df, atlas_array = mri_utils.create_glasser_df(op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
-
-# ROI names
-ROIs = list(params['plotting']['ROIs']['glasser_atlas'].keys())
-# colors
-color_codes = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs}
-
+pysub = params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
 # get vertices for ROI
 roi_verts = {} #empty dictionary  
-for _,key in enumerate(ROIs):
-    roi_verts[key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
+
+## get vertices and color palette, 
+# for consistency
+if use_atlas:
+    # Get Glasser atlas
+    atlas_df, atlas_array = mri_utils.create_glasser_df(op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
+
+    # ROI names
+    ROIs = list(params['plotting']['ROIs']['glasser_atlas'].keys())
+    # colors
+    color_codes = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs}
+
+    # get vertices for ROI
+    for _,key in enumerate(ROIs):
+        roi_verts[key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
+
+
+else:
+    # set ROI names
+    ROIs = params['plotting']['ROIs'][space]
+
+    # dictionary with one specific color per group - similar to fig3 colors
+    ROI_pal = params['plotting']['ROI_pal']
+    color_codes = {key: ROI_pal[key] for key in ROIs}
+
+    # get vertices for ROI
+    for _,val in enumerate(ROIs):
+        roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
+
 
 
 for idx,rois_ks in enumerate(ROIs): 

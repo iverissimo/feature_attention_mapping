@@ -1046,8 +1046,11 @@ def join_chunks(path, out_name, chunk_num = 83, fit_model = 'css', fit_hrf = Fal
 
             if 'css' in fit_model: 
                 ns = chunk['ns']
-            else: # assumes gauss
-                ns = np.ones(xx.shape)
+            elif 'dn' in fit_model:
+                sa = chunk['sa']
+                ss = chunk['ss']
+                nb = chunk['nb']
+                sb = chunk['sb']
 
             rsq = chunk['r2']
 
@@ -1069,8 +1072,11 @@ def join_chunks(path, out_name, chunk_num = 83, fit_model = 'css', fit_hrf = Fal
 
             if 'css' in fit_model:
                 ns = np.concatenate((ns, chunk['ns']))
-            else: # assumes gauss
-                ns = np.concatenate((ns, np.ones(xx.shape)))
+            elif 'dn' in fit_model:
+                sa = np.concatenate((sa, chunk['sa']))
+                ss = np.concatenate((ss, chunk['ss']))
+                nb = np.concatenate((nb, chunk['nb']))
+                sb = np.concatenate((sb, chunk['sb']))
 
             rsq = np.concatenate((rsq, chunk['r2']))
             
@@ -1087,16 +1093,43 @@ def join_chunks(path, out_name, chunk_num = 83, fit_model = 'css', fit_hrf = Fal
     output = op.join(out_name)
     print('saving %s'%output)
 
-    np.savez(output,
-              x = xx,
-              y = yy,
-              size = size,
-              betas = beta,
-              baseline = baseline,
-              hrf_derivative = hrf_derivative,
-              hrf_dispersion = hrf_dispersion,
-              ns = ns,
-              r2 = rsq)
+    if 'css' in fit_model:
+        np.savez(output,
+                x = xx,
+                y = yy,
+                size = size,
+                betas = beta,
+                baseline = baseline,
+                ns = ns,
+                hrf_derivative = hrf_derivative,
+                hrf_dispersion = hrf_dispersion,
+                r2 = rsq)
+
+    elif 'dn' in fit_model:
+        np.savez(output,
+                x = xx,
+                y = yy,
+                size = size,
+                betas = beta,
+                baseline = baseline,
+                sa = sa,
+                ss = ss,
+                nb = nb,
+                sb = sb,
+                hrf_derivative = hrf_derivative,
+                hrf_dispersion = hrf_dispersion,
+                r2 = rsq)
+    
+    else: # assumes gauss
+        np.savez(output,
+                x = xx,
+                y = yy,
+                size = size,
+                betas = beta,
+                baseline = baseline,
+                hrf_derivative = hrf_derivative,
+                hrf_dispersion = hrf_dispersion,
+                r2 = rsq)
      
     return np.load(output)
 

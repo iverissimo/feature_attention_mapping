@@ -157,7 +157,7 @@ mri: # refers to the Psychopy SyncGenerator class
       run: 'mean' 
       total_chunks: {'fsaverage': 83, 'T1w': 89, 'fsLR_den-170k': 54} # total number of chunks to split the data, depends on space of files
 
-      fit_model: 'css' #'dn' #'gauss' #'css'
+      fit_model: 'dn' #'dn' #'gauss' #'css'
 
       estimate_keys: {'gauss': ['x','y','size','betas','baseline','r2'],
                       'css': ['x','y','size','betas','baseline','ns', 'r2'],
@@ -226,11 +226,12 @@ plotting:
     IPS0: [0.99764706, 0.88235294, 0.52862745]
     IPS1: [0.99529412, 0.66901961, 0.2854902] 
     IPS2+: [0.83058824, 0.06117647, 0.1254902]
+    IPS: [0.99529412, 0.66901961, 0.2854902]
     sPCS: [0.88221453, 0.83252595, 0.91109573]
     iPCS: [0.87320261, 0.13071895, 0.47320261]
   
   ROIs: {'fsaverage': ['V1','V2','V3','V3AB','hV4','LO','IPS0','IPS1','IPS2+','sPCS','iPCS'], 
-        'fsLR_den-170k': ['V1','V2','V3'],
+        'fsLR_den-170k': ['V1', 'V2', 'V3', 'V3AB', 'hV4', 'LO', 'IPS'],
         'glasser_atlas':{'V1': {'ROI': ['L_V1', 'R_V1'], 'color': [0.03137255, 0.11372549, 0.34509804]},
                           'V2': {'ROI': ['L_V2', 'R_V2'], 'color': [0.14136101, 0.25623991, 0.60530565]},
                           'V3': {'ROI': ['L_V3', 'R_V3'], 'color': [0.12026144, 0.50196078, 0.72156863]},

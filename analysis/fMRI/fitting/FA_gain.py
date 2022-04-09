@@ -27,9 +27,11 @@ from joblib import Parallel, delayed
 import datetime
 from tqdm import tqdm
 
-from lmfit import Parameters
+from lmfit import Parameters, minimize
 
 from feature_model import FA_GainModel
+
+import cortex
 
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
@@ -137,19 +139,25 @@ if mask_prf:
     # behav boolean mask
     DM_mask_beh = mri_utils.get_beh_mask(behav_files,params)
 
-
-    pRF_estimates = fa_model.mask_pRF_estimates(prf_fits_pth.split(space)[0], DM_mask_beh)
+    # set estimate key names
+    estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][fa_model.prf_model_type]
+    if fa_model.fit_hrf:
+        estimate_keys = estimate_keys+['hrf_derivative','hrf_dispersion']
+    
+    # mask estimates
+    pRF_estimates = fa_model.mask_pRF_estimates(prf_fits_pth.split(space)[0], DM_mask_beh, 
+                                                estimate_keys = estimate_keys)
     fa_model.pRF_estimates = pRF_estimates
 
 
 ## rsq mask, get indices for vertices where pRF 
 # rsq is greater than threshold
-rsq_threshold = 0.12
-mask_ind = np.array([ind for ind,val in enumerate(pRF_estimates['rsq']) if val > rsq_threshold])
+rsq_threshold = 0.1
+mask_ind = np.array([ind for ind,val in enumerate(pRF_estimates['r2']) if val >= rsq_threshold])
 
 # saved masked pRF rsq in output dir (not rsq thresholded), for plotting purposes
 print('saving masked pRF rsq in %s'%op.split(output_dir)[0])
-np.save(op.join(op.split(output_dir)[0], 'masked_pRF_rsq.npy'), pRF_estimates['rsq'])   
+np.save(op.join(op.split(output_dir)[0], 'masked_pRF_rsq.npy'), pRF_estimates['r2'])   
 
 ##### load bar position for FA #####
 ##### and make DM for run #####
@@ -178,8 +186,8 @@ fa_model.trial_info = trial_info
 fa_model.make_FA_visual_DM(fa_model.unique_cond.keys(), crop = False, shift_TRs = False,
                           crop_unit = 'sec', oversampling_time = None)
 
-# create upsampled hrf
-hrf_params = np.ones((3, fa_model.pRF_estimates['rsq'].shape[0]))
+# create hrf, based on pRF estimates (if it was fit)
+hrf_params = np.ones((3, fa_model.pRF_estimates['r2'].shape[0]))
 
 if fa_model.fit_hrf: # use fitted hrf params
     hrf_params[1] = fa_model.pRF_estimates['hrf_derivative']
@@ -187,10 +195,44 @@ if fa_model.fit_hrf: # use fitted hrf params
 else:
     hrf_params[2] = 0
 
+# if using nuisance regressor, get/make it
 if use_nuisance_reg:
     fa_model.use_nuisance_reg = use_nuisance_reg
-    nuisance_regressors = np.load(op.join(derivatives_dir, 'block_nuisance', 'sub-{sj}'.format(sj=sj), 
-                                            space,'nuisance_regressor.npy'))
+    nuisance_reg_name = op.join(derivatives_dir,'FA_gain',
+                                'sub-{sj}'.format(sj=sj), space,'nuisance_regressor.npy')
+    
+    if not op.exists(nuisance_reg_name):
+        print('making nuisance regressor - accounts for start of block arousal effect')
+        
+        ## load data from all runs, and average
+        # to make regressor
+        all_data_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir) if 'task-FA' in h and
+                         'acq-{acq}'.format(acq=acq) in h and h.endswith(file_ext)]
+        all_data = np.mean(np.stack((np.load(file,allow_pickle=True) for file in all_data_files), axis = 0), axis = 0)
+        
+        ## get vertices for all relevant ROIs
+        roi_verts = {}
+        # set ROI names
+        ROIs = params['plotting']['ROIs'][space]
+        # get pycortex sub
+        pysub = params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
+        for _,val in enumerate(ROIs):
+            roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
+            
+        nuisance_regressors = mri_utils.make_blk_nuisance_regressor(all_data, 
+                                                                    params, 
+                                                                    fa_model.pRF_estimates['r2'], 
+                                                    TR = params['mri']['TR'], osf = 10, 
+                                                    hrf_estimates = {'hrf_derivative': fa_model.pRF_estimates['hrf_derivative'],
+                                                                     'hrf_dispersion': fa_model.pRF_estimates['hrf_dispersion']},
+                                                    pRF_rsq_threshold = .1, roi_verts = roi_verts)
+    
+        print('saving %s'%nuisance_reg_name)
+        np.save(nuisance_reg_name, nuisance_regressors)
+    else:
+        print('loading %s'%nuisance_reg_name)
+        nuisance_regressors = np.load(nuisance_reg_name)
+
 
 ##set all necessary parameters used for 
 # gain fit - also setting which ones we fit or not
@@ -227,7 +269,7 @@ for i,r in enumerate(runs2fit):
 # some optimizer params
 xtol = 1e-7
 ftol = 1e-6
-solver_type = 'trust-constr' #'lbfgsb' ##'trust-constr'
+solver_type = 'lbfgsb' #'trust-constr' #'lbfgsb' ##'trust-constr'
 n_jobs = 16 # for paralell
 
 ## if already in dir, load
@@ -253,6 +295,16 @@ else:
 
 ## same logic for iterative fit
 # 
+
+# first change bounds of relevant params, 
+#and remove brute_step
+for i,r in enumerate(runs2fit):
+    for key in ['gain_ACUO', 'gain_UCAO', 'gain_UCUO']:
+        fa_pars[i][key].min = 0
+        fa_pars[i][key].max = 1
+        fa_pars[i][key].brute_step = None
+
+
 it_filename = op.join(output_dir,'run-%s_iterative_params.csv'%run)
                         
 if op.exists(it_filename):

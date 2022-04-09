@@ -2541,27 +2541,57 @@ def create_glasser_df(path2file):
     return atlas_df, cifti_data
 
 
-def make_nuisance_regressor(pars, timecourse = [], onsets = [1], hrf = [], fit = True, osf = 10):
+def make_nuisance_tc(pars, timecourse = [], onsets = [1], hrf = [], fit = True, 
+                     osf = 10, blk_duration = 45):
     
+    """ helper function to make task on nuisance regressor timecourse
+    if fitting, returns residuals from model with block on + nuisance + intercept
+    if not fitting retuns the nuisance timecourse (good for visualization)
+    
+    Parameters
+    ----------
+    pars : Parameters object from lmfit
+        needs to include duration of nuisance regressor, and bounds
+    timecourse : array
+        data to be fitted
+    onset: list
+        list of onset times
+    hrf: list
+        hrf to use
+    blk_duration: int/float
+        duration of miniblock
+    
+    """
+    
+    # set nuisance regressor - that will be modeled
     nuisance_reg = np.zeros((timecourse.shape[0]*osf))
+    # set regressor that accounts for task being on-screen
+    blkON_reg = np.zeros((timecourse.shape[0]*osf))
     
     for t in onsets:
         nuisance_reg[t*osf:int((t+pars['duration'].value)*osf)] = 1
+        blkON_reg[t*osf:int((t+blk_duration)*osf)] = 1
 
-    # convolve regressor
+    ## convolve regressors
     pad_length = 20*osf
     pad = np.tile(0, pad_length).T
-    padded_tc = np.hstack((pad, nuisance_reg))
-
-    conv_reg = signal.fftconvolve(padded_tc, hrf)[pad_length:timecourse.shape[0]*osf+pad_length]
     
-    # donwsample again
-    conv_reg = resample_arr(conv_reg, osf = osf, final_sf = 1)
+    # nuisance
+    padded_tc = np.hstack((pad, nuisance_reg))
+    conv_nuisance_reg = signal.fftconvolve(padded_tc, hrf)[pad_length:timecourse.shape[0]*osf+pad_length]
+    # on-off
+    padded_tc = np.hstack((pad, blkON_reg))
+    conv_blkON_reg = signal.fftconvolve(padded_tc, hrf)[pad_length:timecourse.shape[0]*osf+pad_length]
+    
+    ## donwsample again
+    conv_nuisance_reg = resample_arr(conv_nuisance_reg, osf = osf, final_sf = 1)
+    conv_blkON_reg = resample_arr(conv_blkON_reg, osf = osf, final_sf = 1)
     
     if fit:
         # make dm
-        dm = np.ones((2, conv_reg.shape[0]))
-        dm[-1] = conv_reg
+        dm = np.ones((3, conv_nuisance_reg.shape[0]))
+        dm[-2] = conv_blkON_reg
+        dm[-1] = conv_nuisance_reg
 
         prediction, _ , r2, _ = fit_glm(timecourse, dm.T)
         print(r2)
@@ -2569,7 +2599,9 @@ def make_nuisance_regressor(pars, timecourse = [], onsets = [1], hrf = [], fit =
         return timecourse - prediction
     
     else:
-        return conv_reg
+        return conv_nuisance_reg
+
+
 
 def make_raw_vertex_image(data1, cmap = 'hot', vmin = 0, vmax = 1, 
                           data2 = [], vmin2 = 0, vmax2 = 1, subject = 'fsaverage', data2D = False):  
@@ -2728,3 +2760,138 @@ def baseline_correction(data, params, num_baseline_TRs = 6, baseline_interval = 
         avg_baseline = np.mean(baseline_arr, axis = -1)
 
     return data - avg_baseline[...,np.newaxis]
+
+
+def make_blk_nuisance_regressor(data, params, pRF_rsq, 
+                                TR = 1.6, osf = 10, hrf_estimates = {'hrf_derivative': [], 'hrf_dispersion': []},
+                                pRF_rsq_threshold = .1, roi_verts = {'V1': [], 'V2': []}):
+    
+    """ function to make task on nuisance regressor 
+    for whole surface!
+    if fitting, returns residuals from model with block on + nuisance + intercept
+    if not fitting retuns the model timecourse (good for visualization)
+    
+    Parameters
+    ----------
+    data: array
+        2D array of data(vertices, TRs)
+    params : dict
+        yaml dict with task related infos
+    pRF_rsq : array
+        rsq of the prf estimates - needed to fit only visually responsive vertices
+    roi_verts: dict
+        dict with roi vertices (indices) to use
+    
+    """
+    
+   ## first get events at each timepoint
+    all_evs = np.array([])
+    for ev in params['feature']['bar_pass_direction']:
+
+        if 'empty' in ev:
+            all_evs = np.concatenate((all_evs, np.tile(ev, params['feature']['empty_TR'])))
+        elif 'cue' in ev:
+            all_evs = np.concatenate((all_evs, np.tile(ev, params['feature']['cue_TR'])))
+        elif 'mini_block' in ev:
+            all_evs = np.concatenate((all_evs, np.tile(ev, np.prod(params['feature']['num_bar_position'])*2)))
+
+    # times where bar is on screen [1st on per miniblock]
+    bar_onset = np.array([i for i, name in enumerate(all_evs) if 'mini_block' in name and all_evs[i-1]=='empty'])
+    # times where cue is on screen [1st time point]
+    cue_onset = np.array([i for i, name in enumerate(all_evs) if 'cue' in name and all_evs[i-1]=='empty'])
+
+    # combined - 0 is nothing on screen, 1 is something there
+    stim_on_bool = np.array([1 if 'cue' in name or 'mini_block' in name else 0 for _, name in enumerate(all_evs) ])
+
+    ## if cropping
+    if params['feature']['crop']:
+        bar_onset = bar_onset - params['feature']['crop_TR']*TR - TR*1.5 ## NOTE - doing this subtraction because of shift+no slicetime correction, in future generalize
+        cue_onset = cue_onset - params['feature']['crop_TR']*TR - TR*1.5
+
+        ## resample stim_on array
+        tmp_arr = np.repeat(stim_on_bool, osf)
+        tmp_arr[:-int(TR*1.5*osf)] = np.repeat(stim_on_bool, osf)[int(TR*1.5*osf):]
+        stim_on_bool = tmp_arr.copy()[int(params['feature']['crop_TR']*TR*osf):]
+
+        stim_on_bool = resample_arr(stim_on_bool, osf = osf, final_sf = TR)
+
+    ## get indices where miniblock starts and ends (in TR!!)
+    stim_ind = np.where(stim_on_bool>=.5)[0]
+    miniblk_start_ind = []
+    miniblk_end_ind = []
+
+    for i, val in enumerate(stim_ind):
+        if i>0: 
+            if val - stim_ind[i-1] > 1:
+                miniblk_start_ind.append(val)
+
+                if stim_on_bool[stim_ind[i-1]+1]<1:
+                    miniblk_end_ind.append(stim_ind[i-1])
+
+    # remove cue start indices
+    miniblk_start_ind = np.array(miniblk_start_ind[::2])-1    
+    miniblk_end_ind = np.concatenate((miniblk_end_ind[1::2], np.array([stim_ind[-1]])))+1
+    
+    ## average timecourse across ROI
+    avg_roi = {} #empty dictionary  
+
+    for _,val in enumerate(roi_verts.keys()):
+
+        ind = np.array([vert for vert in roi_verts[val] if not np.isnan(pRF_rsq[vert]) and pRF_rsq[vert]>=pRF_rsq_threshold])
+        avg_roi[val] = np.mean(data[ind], axis=0)
+
+    ## now get average timecourse for miniblock
+    avg_miniblk =  {} #empty dictionary 
+    interv = 3 # average from begining of miniblk to end, +/- 5 sec
+
+    for _,val in enumerate(roi_verts.keys()):
+        avg_miniblk[val] = np.mean(np.stack((avg_roi[val][miniblk_start_ind[i]-interv:miniblk_end_ind[i]+interv] for i in range(len(miniblk_start_ind))), axis = 0), axis = 0)
+
+    ## average across rois and miniblocks
+    avg_minblk_tc =  np.mean(np.stack((avg_miniblk[val] for val in roi_verts.keys()), axis = 0), axis = 0)
+    
+    ## make nuisance regressor
+    # for the miniblock
+    pars = Parameters()
+    pars.add('duration', value = 0, min = 0, max = 6, vary = True, brute_step = .1) # duration in TR
+
+    ## minimize residuals
+    out = minimize(make_nuisance_tc, pars, 
+                   kws={'timecourse': avg_minblk_tc, 'onsets': [interv], 
+                        'hrf': create_hrf(hrf_params = [1.0, 1.0, 0.0], TR = TR, osf = osf)[0],
+                       'fit': True, 'osf': osf, 'blk_duration': miniblk_end_ind[0]-miniblk_start_ind[0]-1}, 
+                   method = 'brute')
+
+    # update nuisance regressor duration (in TR!)
+    pars['duration'].value = out.params.valuesdict()['duration']
+    print('modeled nuisance duration is %.2f TR'%out.params.valuesdict()['duration'])
+    
+    ## use subject specific hrf params (if provided)
+    hrf_params = np.ones((3, pRF_rsq.shape[0]))
+
+    if len(hrf_estimates['hrf_derivative'])==0: # if hrf not defined
+        hrf_params[2] = 0
+    
+    else: # use fitted hrf params
+        hrf_params[1] = hrf_estimates['hrf_derivative']
+        hrf_params[2] = hrf_estimates['hrf_dispersion']
+        
+    ## get indices that are relevant to create regressor (saves time)
+    mask_ind = np.array([ind for ind,val in enumerate(pRF_rsq) if val >= pRF_rsq_threshold])
+    
+    ## actually get regressors for surface
+    all_regs = np.array(Parallel(n_jobs=16)(delayed(make_nuisance_tc)(pars, 
+                                                                    timecourse = data[vert], 
+                                                                    onsets = miniblk_start_ind, 
+                                                                    hrf = create_hrf(hrf_params = hrf_params[..., vert], 
+                                                                                     TR = TR, 
+                                                                                     osf = osf)[0],
+                                                                    fit = False)
+                                        for _,vert in enumerate(tqdm(mask_ind)))) 
+
+
+    ## save in the same shape of data 
+    nuisance_regressor_surf = np.zeros(data.shape)
+    nuisance_regressor_surf[mask_ind] = all_regs 
+    
+    return nuisance_regressor_surf

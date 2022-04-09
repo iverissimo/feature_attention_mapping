@@ -109,7 +109,7 @@ class FA_model:
         return self.pRF_estimates
             
         
-    def mask_pRF_estimates(self, prf_root_path, prf_dm_mask):
+    def mask_pRF_estimates(self, prf_root_path, prf_dm_mask, estimate_keys = ['x','y','size','betas','baseline','r2']):
                 
         
         # define design matrix for pRF task
@@ -139,7 +139,7 @@ class FA_model:
         # mask estimates, to be within screen boundaries
         print('masking estimates')
         pRF_estimates_masked = mri_utils.mask_estimates(self.pRF_estimates, 
-                                                             fit_model = self.prf_model_type,
+                                                             estimate_keys = estimate_keys,
                                                              x_ecc_lim = self.x_ecc_lim, 
                                                              y_ecc_lim = self.y_ecc_lim)            
         

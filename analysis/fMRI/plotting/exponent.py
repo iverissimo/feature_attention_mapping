@@ -134,51 +134,73 @@ masked_est = mri_utils.mask_estimates(estimates,
 masked_rsq = masked_est['r2']
 masked_ns = masked_est['ns']
 
-# get vertices for subject fsaverage
-ROIs = params['plotting']['ROIs'][space]
+## make violin plots with exponent values per ROI
 
-# dictionary with one specific color per group - similar to fig3 colors
-ROI_pal = params['plotting']['ROI_pal']
-color_codes = {key: ROI_pal[key] for key in ROIs}
-
+# if using atlas to get ROIs 
+use_atlas = False 
 # get pycortex sub
-pysub = params['plotting']['pycortex_sub'] 
-
+pysub = params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
 # get vertices for ROI
 roi_verts = {} #empty dictionary  
-for _,val in enumerate(ROIs):
-    roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
+
+## get vertices and color palette, 
+# for consistency
+if use_atlas:
+    # Get Glasser atlas
+    atlas_df, atlas_array = mri_utils.create_glasser_df(op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
+
+    # ROI names
+    ROIs = list(params['plotting']['ROIs']['glasser_atlas'].keys())
+    # colors
+    color_codes = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs}
+
+    # get vertices for ROI
+    for _,key in enumerate(ROIs):
+        roi_verts[key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
+
+else:
+    # set ROI names
+    ROIs = params['plotting']['ROIs'][space]
+
+    # dictionary with one specific color per group - similar to fig3 colors
+    ROI_pal = params['plotting']['ROI_pal']
+    color_codes = {key: ROI_pal[key] for key in ROIs}
+
+    # get vertices for ROI
+    for _,val in enumerate(ROIs):
+        roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
 
 
+## make flatmap
 ## save flatmap
 images = {}
 
 alpha_level = mri_utils.normalize(np.clip(masked_rsq, 0, 0.8))
 
-## plot rsq before masking
+## plot masked estimate
 images['masked_ns'] = cortex.Vertex2D(masked_ns, alpha_level,
                             pysub,
                             vmin = 0, vmax = 1,
                             vmin2 = 0, vmax2 = 1,
                             cmap='plasma_alpha')
-cortex.quickshow(images['masked_ns'],with_curvature=True,with_sulci=True)
+#cortex.quickshow(images['masked_ns'],with_curvature=True,with_sulci=True)
 filename = op.join(figures_pth,'flatmap_space-{space}_type-exponent_visual_masked.svg'.format(space=pysub))
 print('saving %s' %filename)
 _ = cortex.quickflat.make_png(filename, images['masked_ns'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
-## plot rsq before masking
+## plot estimate before masking
 images['ns'] = cortex.Vertex2D(estimates['ns'], mri_utils.normalize(np.clip(rsq, 0, 0.8)),
                             pysub,
                             vmin = 0, vmax = 1,
                             vmin2 = 0, vmax2 = 1,
                             cmap='plasma_alpha')
-cortex.quickshow(images['ns'],with_curvature=True,with_sulci=True)
+#cortex.quickshow(images['ns'],with_curvature=True,with_sulci=True)
 filename = op.join(figures_pth,'flatmap_space-{space}_type-exponent_visual.svg'.format(space=pysub))
 print('saving %s' %filename)
 _ = cortex.quickflat.make_png(filename, images['ns'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
 # set threshold for plotting
-rsq_threshold = params['plotting']['rsq_threshold']
+rsq_threshold = .1 #params['plotting']['rsq_threshold']
 
 ## plot distribution
 for idx,rois_ks in enumerate(ROIs): 
@@ -192,9 +214,13 @@ for idx,rois_ks in enumerate(ROIs):
     roi_ns = roi_ns[roi_rsq >= rsq_threshold]
 
     if idx == 0:
-        df_ns = pd.DataFrame({'roi': np.tile(rois_ks,len(roi_ns)),'exponent': roi_ns})
+        df_ns = pd.DataFrame({'roi': np.tile(rois_ks,len(roi_ns)),
+                              'exponent': roi_ns,
+                             'r2': roi_rsq[roi_rsq >= rsq_threshold]})
     else:
-        df_ns = df_ns.append(pd.DataFrame({'roi': np.tile(rois_ks,len(roi_ns)),'exponent': roi_ns}),
+        df_ns = df_ns.append(pd.DataFrame({'roi': np.tile(rois_ks,len(roi_ns)),
+                                           'exponent': roi_ns,
+                                          'r2': roi_rsq[roi_rsq >= rsq_threshold]}),
                                                    ignore_index = True)
 
 # make figures
@@ -216,4 +242,24 @@ plt.ylim(0,1.1)
 
 fig.savefig(op.join(figures_pth,'exponent_visual_boxplot.svg'), dpi=100)
 
+## make value distribution plot
+sns.set(font_scale = 1.5)
+g = sns.FacetGrid(df_ns, #the dataframe to pull from
+                  col = "roi", #define the column for each subplot row to be differentiated by
+                  hue = "roi", #define the column for each subplot color to be differentiated by
+                  aspect = .65, #aspect * height = width
+                  height = 3.5, #height of each subplot
+                  palette = color_codes,
+                  col_wrap = 4
+                 )
+g.map(sns.histplot, "exponent", bins = 5, stat = 'percent')
+#g.set(label='big')#xlim=(0, 1))
+# flatten axes into a 1-d array
+axes = g.axes.flatten()
 
+# iterate through the axes
+for i, ax in enumerate(axes):
+    ax.axvline(df_ns.loc[df_ns['roi']==ROIs[i]]["exponent"].median(), ls='--', c='green')
+    
+g.set_titles("{col_name}")  # use this argument literally
+g.savefig(op.join(figures_pth,'exponent_visual_histogram.svg'), dpi=100)

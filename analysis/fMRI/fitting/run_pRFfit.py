@@ -45,6 +45,7 @@ batch_string = """#!/bin/bash
 # call the programs
 echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
+conda init bash
 conda activate i38
 
 # make derivatives dir in node

@@ -51,6 +51,9 @@ TR = params['mri']['TR']
 # type of model to fit
 model_type = 'css'
 
+# set estimate key names
+estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][model_type]
+
 # define file extension that we want to use, 
 # should include processing key words
 file_ext = ''
@@ -106,8 +109,9 @@ else: # if not join chunks and save file
 
 
 # define design matrix 
-visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, save_imgs=False, downsample=0.1, 
-                                        crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=False)
+visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
+                                 save_imgs = False, res_scaling = 0.1, crop = params['prf']['crop'] , 
+                                 crop_TR = params['prf']['crop_TR'], overwrite=False)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -123,10 +127,11 @@ rsq = estimates['r2']
 
 # mask estimates
 print('masking estimates')
-masked_est = mri_utils.mask_estimates(estimates, fit_model = model_type,
-                            x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
+masked_est = mri_utils.mask_estimates(estimates, 
+                                      estimate_keys = estimate_keys+['hrf_derivative','hrf_dispersion'],
+                                      x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
 
-masked_rsq = masked_est['rsq']
+masked_rsq = masked_est['r2']
 masked_ns = masked_est['ns']
 
 # get vertices for subject fsaverage

@@ -231,8 +231,8 @@ else:
         inf = np.inf
         eps = 1e-1
         ss = prf_stim.screen_size_degrees
-        xtol = 1e-7
-        ftol = 1e-6
+        xtol = 0.00001 #1e-7
+        ftol = 0.00001 #1e-6
 
         # model parameter bounds
         gauss_bounds = [(-1.5*ss, 1.5*ss),  # x
@@ -249,7 +249,7 @@ else:
 
         # iterative fit
         print("Gauss model ITERATIVE fit")
-        gauss_fitter.iterative_fit(rsq_threshold = 0.05, 
+        gauss_fitter.iterative_fit(rsq_threshold = 0.1, 
                                     verbose = True,
                                     bounds = gauss_bounds,
                                     xtol = xtol,
@@ -277,8 +277,7 @@ else:
             if model_type == 'css':
         
                 # grid exponent parameter
-                css_n_grid = np.linspace(params['mri']['fitting']['pRF']['min_n'], 
-                                            params['mri']['fitting']['pRF']['max_n'], 12)
+                css_n_grid = np.linspace(0.05, 1, 12)
 
                 # define model 
                 css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
@@ -299,7 +298,7 @@ else:
                                                     previous_gaussian_fitter = gauss_fitter)
 
                 css_fitter.grid_fit(exponent_grid = css_n_grid,
-                                    rsq_threshold = 0.05, 
+                                    rsq_threshold = 0.1, 
                                     pos_prfs_only = True)
 
 
@@ -313,7 +312,7 @@ else:
                             (eps, 1.5*ss),  # prf size
                             (0, 1000),  # prf amplitude
                             (0, 1000),  # bold baseline
-                            (0.01, 1)]  # CSS exponent
+                            (0.05, 1)]  # CSS exponent
 
                 if fit_hrf:
                     css_bounds += [(0,10),(0,0)]
@@ -323,7 +322,7 @@ else:
 
                 # iterative fit
                 print("CSS model ITERATIVE fit")
-                css_fitter.iterative_fit(rsq_threshold = 0.05, 
+                css_fitter.iterative_fit(rsq_threshold = 0.1, 
                                             verbose = False,
                                             bounds = css_bounds,
                                             xtol = xtol,

@@ -178,8 +178,8 @@ images['PA'] = mri_utils.make_raw_vertex_image(pa4plot,
                                               data2 = alpha_level, vmin2 = 0, vmax2 = 1, 
                                                subject = pysub, data2D = True)
 
-cortex.quickshow(images['PA'],with_curvature=True,with_sulci=True,with_colorbar=True,
-                 curvature_brightness = 0.4, curvature_contrast = 0.1)#, recache = True)
+#cortex.quickshow(images['PA'],with_curvature=True,with_sulci=True,with_colorbar=True,
+#                 curvature_brightness = 0.4, curvature_contrast = 0.1)#, recache = True)
 
 
 filename = op.join(figures_pth,'flatmap_space-{space}_type-PA_mackey_colorwheel.svg'.format(space=pysub))
@@ -264,7 +264,7 @@ plt.savefig(op.join(figures_pth,'color_wheel_4RH-LVF.svg'),dpi=100)
 
 # # make linear range of colors
 colormap = colors.ListedColormap(['#ec9b3f','#f3eb53','#7cb956','#82cbdb','#3d549f','#655099','#ad5a9b','#dd3933'])
-boundaries = np.linspace(0,1,n_bins)
+boundaries = np.linspace(0,1,8)
 norm = colors.BoundaryNorm(boundaries, colormap.N, clip=True)
 
 # # normalize between the point where we defined our color threshold

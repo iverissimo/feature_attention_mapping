@@ -138,6 +138,11 @@ x = masked_est['x']
 y = masked_est['y']
 size = masked_est['size']
 
+# non-linearity interacts with the Gaussian standard deviation to make an effective pRF size of σ/sqr(n)
+##### in future change plots to use FWHM - comparable across models ########
+if model_type == 'css': 
+    size = size/np.sqrt(masked_est['ns']) 
+
 complex_location = x + y * 1j # calculate eccentricity values
 ecc = np.abs(complex_location)
 
@@ -191,6 +196,7 @@ regions = {'occipital': ['V1','V2','V3','V3AB','hV4','LO'],
 min_ecc = 0.25
 max_ecc = 4 #3.3
 n_bins = 10
+max_size = 15
 
 # to also save unbinned data and compare
 unbinned_df = pd.DataFrame({'ecc': [], 'size': [], 'rsq': [], 'ROI': []})
@@ -210,7 +216,7 @@ for idx,roi in enumerate(ROIs): # go over ROIs
 
     # define indices of voxels within region to plot
     # with rsq > threshold, and where value not nan, ecc values between 0.25 and 3.3
-    indices4plot = np.where((new_ecc >= min_ecc) & (new_ecc<= max_ecc) & (new_rsq >= rsq_threshold) & (np.logical_not(np.isnan(new_size))))[0]
+    indices4plot = np.where((new_ecc >= min_ecc) & (new_ecc<= max_ecc) & (new_rsq >= rsq_threshold) & (new_size <= max_size) & (np.logical_not(np.isnan(new_size))))[0]
 
     df = pd.DataFrame({'ecc': new_ecc[indices4plot],'size': new_size[indices4plot],
                         'rsq': new_rsq[indices4plot]})

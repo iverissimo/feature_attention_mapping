@@ -127,12 +127,6 @@ prf_fits_pth =  op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), spac
 # load them into numpy dict
 pRF_estimates = fa_model.get_pRF_estimates(prf_fits_pth, params['mri']['fitting']['pRF']['total_chunks'][space])
 
-# make ns 1 for gauss, will need to change this later when implementing DN model
-if 'gauss' in fa_model.prf_model_type:
-    pRF_estimates = dict(pRF_estimates)
-    pRF_estimates['ns'] = np.ones(pRF_estimates['x'].shape)
-    fa_model.pRF_estimates = pRF_estimates
-
 # if we want to mask pRFs, given screen limits and behavior responses
 if mask_prf: 
     
@@ -153,6 +147,12 @@ if mask_prf:
     # mask estimates
     pRF_estimates = fa_model.mask_pRF_estimates(prf_fits_pth.split(space)[0], DM_mask_beh, 
                                                 estimate_keys = estimate_keys)
+    fa_model.pRF_estimates = pRF_estimates
+
+# make ns 1 for gauss, will need to change this later when implementing DN model
+if 'gauss' in fa_model.prf_model_type:
+    pRF_estimates = dict(pRF_estimates)
+    pRF_estimates['ns'] = np.ones(pRF_estimates['x'].shape)
     fa_model.pRF_estimates = pRF_estimates
 
 

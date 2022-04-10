@@ -78,7 +78,10 @@ TR = params['mri']['TR']
 
 # type of model to fit
 model_type = params['mri']['fitting']['pRF']['fit_model']
-fit_hrf = params['mri']['fitting']['pRF']['fit_hrf'] 
+fit_hrf = params['mri']['fitting']['pRF']['fit_hrf']
+
+# if we are keeping baseline fixed at 0
+fix_bold_baseline = params['mri']['fitting']['pRF']['fix_bold_baseline']
 
 # define file extension that we want to use, 
 # should include processing key words
@@ -181,6 +184,11 @@ proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir)
  
 ## load functional data
 data = np.load(proc_files[0],allow_pickle=True) # will be (vertex, TR)
+
+# if we want to keep baseline fix, we need to correct it
+if fix_bold_baseline:
+    data = mri_utils.baseline_correction(data, params, num_baseline_TRs = 7, baseline_interval = 'empty_long', 
+                            avg_type = 'median', crop = True, crop_TR = 8)
     
 if roi != 'None' and vertex not in ['max','min']:
     print('masking data for ROI %s'%roi)

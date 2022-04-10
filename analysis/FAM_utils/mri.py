@@ -1189,15 +1189,14 @@ def mask_estimates(estimates, ROI = 'None', x_ecc_lim = [-6,6], y_ecc_lim = [-6,
 
     
     # set limits for xx and yy, forcing it to be within the screen boundaries
-    # also for max fitting size used and for positive pRFs
+    # also for positive pRFs
 
     indices = np.where((~np.isnan(estimates['r2']))& \
                        (estimates['x'] <= np.max(x_ecc_lim))& \
                       (estimates['x'] >= np.min(x_ecc_lim))& \
                       (estimates['y'] <= np.max(y_ecc_lim))& \
                        (estimates['y'] >= np.min(y_ecc_lim))& \
-                       (estimates['betas']>=0)& \
-                       (estimates['size']<=max_size)
+                       (estimates['betas']>=0)
                       )[0]
                         
     # save values

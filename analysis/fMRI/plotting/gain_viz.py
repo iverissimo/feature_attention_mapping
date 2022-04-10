@@ -51,8 +51,12 @@ space = params['mri']['space'] # subject space
 TR = params['mri']['TR']
 model_type = params['mri']['fitting']['pRF']['fit_model']
 
+
+# set estimate key names
+estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][model_type]
+
 # get pycortex sub
-pysub = params['plotting']['pycortex_sub'] 
+pysub = params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
 
 mask_prf = True # if we're masking pRFs
 
@@ -88,6 +92,9 @@ figures_pth = op.join(derivatives_dir,'plots','FA_gain','sub-{sj}'.format(sj=sj)
 if not os.path.exists(figures_pth):
     os.makedirs(figures_pth) 
 
+# threshold for plotting
+rsq_threshold = 0.1 # params['plotting']['rsq_threshold']
+
 data = []
 results = []
 model_tc = []
@@ -95,12 +102,8 @@ dm = []
 
 for i, run in enumerate(all_runs):
     
-    #################### for now, because checking only iterative fit (no grid) #####################
-    # later not needed 'SP_null' part
-    FA_fit_dir = op.join(derivatives_dir,'FA_gain','sub-{sj}'.format(sj=sj), space, # 'SP_null', 
+    FA_fit_dir = op.join(derivatives_dir,'FA_gain','sub-{sj}'.format(sj=sj), space, 
                           fa_model.prf_model_type, 'run-{run}'.format(run=run))
-
-    ################################################################################################
 
     ## list with absolute file name to be fitted
     proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir) if 'task-FA' in h and
@@ -125,7 +128,8 @@ for i, run in enumerate(all_runs):
                                 'run-{run}'.format(run=fa_model.prf_run_type))
 
         # load them into numpy dict
-        pRF_estimates = fa_model.get_pRF_estimates(prf_fits_pth, params['mri']['fitting']['pRF']['total_chunks'][space])
+        pRF_estimates = fa_model.get_pRF_estimates(prf_fits_pth, 
+                                                   params['mri']['fitting']['pRF']['total_chunks'][space])
 
         # if we want to mask pRFs, given screen limits and behavior responses
         if mask_prf: 
@@ -138,22 +142,26 @@ for i, run in enumerate(all_runs):
                              h.endswith('events.tsv')]
             # behav boolean mask
             DM_mask_beh = mri_utils.get_beh_mask(behav_files,params)
-
-
-            pRF_estimates = fa_model.mask_pRF_estimates(prf_fits_pth.split(space)[0], DM_mask_beh)
+            
+            # include hrf extra estimates
+            if fa_model.fit_hrf:
+                estimate_keys = estimate_keys+['hrf_derivative','hrf_dispersion']
+        
+            # mask estimates
+            pRF_estimates = fa_model.mask_pRF_estimates(prf_fits_pth.split(space)[0], DM_mask_beh, 
+                                                        estimate_keys = estimate_keys)
             fa_model.pRF_estimates = pRF_estimates
 
 
         ## rsq mask, get indices for vertices where pRF 
         # rsq is greater than threshold
-        rsq_threshold = 0.12
-        mask_ind = np.array([ind for ind,val in enumerate(pRF_estimates['rsq']) if val > rsq_threshold])
+        mask_ind = np.array([ind for ind,val in enumerate(pRF_estimates['r2']) if val >= rsq_threshold])
 
         
     ## load results from iterative fit
 
     ## save fitted params Dataframe
-    results.append(pd.read_csv(op.join(FA_fit_dir,'iterative_params.csv'))) 
+    results.append(pd.read_csv(op.join(FA_fit_dir,'run-{run}_iterative_params.csv'.format(run=run)))) 
     
     # load DM
     dm_filename = op.join(FA_fit_dir,'DM_FA_iterative_gain_run-{run}.npz'.format(run=run))
@@ -161,7 +169,6 @@ for i, run in enumerate(all_runs):
     if op.isfile(dm_filename):
         dm.append(np.load(dm_filename))
         
-    
     ## load model predictions
     model_tc_filename = op.join(FA_fit_dir,'prediction_FA_iterative_gain_run-{run}.npy'.format(run=run))
     
@@ -180,12 +187,8 @@ for i in range(np.array(results).shape[0]):
     
 rsq_gain = np.array(rsq_gain)
 
-
 ### make alpha level based on pRF rsquared ###
-#mask = np.zeros(pRF_estimates['rsq'].shape); mask[:] = np.nan
-#mask[mask_ind] = pRF_estimates['rsq'][mask_ind]
-
-alpha_level = mri_utils.normalize(np.clip(pRF_estimates['rsq'], 0, .8))#mask, 0, .8)) # normalize 
+alpha_level = mri_utils.normalize(np.clip(pRF_estimates['r2'], 0, .8))#mask, 0, .8)) # normalize 
 
 # number of bins for colormaps
 n_bins_colors = 256
@@ -216,10 +219,12 @@ _ = cortex.quickflat.make_png(filename,
                                               vmin = 0, vmax = .3, vmin2 = 0, vmax2 = 1,
                                                 cmap = col2D_name), 
                               recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
 ### now plot gain values
 
 ## reunite them all in dict, according to condition
 gain_all = {}
+surf_gain_all = {}
 
 for i, cond in enumerate(fa_model.unique_cond.keys()):
     
@@ -229,19 +234,14 @@ for i, cond in enumerate(fa_model.unique_cond.keys()):
             gain_all[cond] = results[r]['gain_%s'%cond].values
         else:
             gain_all[cond] = np.vstack((gain_all[cond], results[r]['gain_%s'%cond].values))
-
-surf_gain_all = {}
-
-for i, cond in enumerate(fa_model.unique_cond.keys()):
     
+    # average across runs and put in surface array
     gc = np.zeros(np.array(data).shape[1]); gc[:] = np.nan
-    gc[results[0]['vertex'].values] = np.nanmean(gain_all[cond], axis= 0)
-
+    gc[results[i]['vertex'].values] = np.nanmean(gain_all[cond], axis= 0)
+    
     surf_gain_all[cond] = gc
     
-# plot gain on surface
-for _, cond in enumerate(fa_model.unique_cond.keys()):
-    
+    # plot gain on surface
     images['gain_%s'%cond] = mri_utils.make_raw_vertex_image(surf_gain_all[cond], 
                                                        cmap = 'plasma', vmin = 0, vmax = 1, 
                                                       data2 = alpha_level, vmin2 = 0, vmax2 = 1, 
@@ -263,24 +263,24 @@ for _, cond in enumerate(fa_model.unique_cond.keys()):
                                                   vmin = 0, vmax = 1, vmin2 = 0, vmax2 = 1,
                                                     cmap = col2D_name), 
                                   recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-## get vertices from ROIs
-## of glasser atlas
-
-# Get Glasser atlas
-atlas_df, atlas_array = mri_utils.create_glasser_df(op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
-
-# ROI names
-ROIs = list(params['plotting']['ROIs']['glasser_atlas'].keys())
-# colors
-color_codes = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs}
-
+       
 # get vertices for ROI
 roi_verts = {} #empty dictionary  
-for _,key in enumerate(ROIs):
-    roi_verts[key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
 
+# set ROI names
+ROIs = params['plotting']['ROIs'][space]
 
-### make bar chart, per ROI 
+# dictionary with one specific color per group - similar to fig3 colors
+ROI_pal = params['plotting']['ROI_pal']
+color_codes = {key: ROI_pal[key] for key in ROIs}
+
+# get vertices for ROI
+for _,val in enumerate(ROIs):
+    roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
+
+### make bar chart  
+# of mean gain per ROI  
+# weighted by model rsq
 avg_gain_df = pd.DataFrame(columns = ['condition','run','gain','roi'])
 
 for roi in ROIs:
@@ -288,32 +288,16 @@ for roi in ROIs:
         for r, run in enumerate(all_runs):
             
             # roi vertices 
-            ind = np.array([i for i, vert in enumerate(results[r]['vertex'].values) if vert in roi_verts[roi]]) #and vert in mask_ind])
+            ind = np.array([i for i, vert in enumerate(results[r]['vertex'].values) if vert in roi_verts[roi]])
+            print(len(ind))
             
             avg_gain_df = avg_gain_df.append(pd.DataFrame({'condition': [cond],
                                              'run': [run],
                                              'gain': [weightstats.DescrStatsW(gain_all[cond][r][ind], 
-                                                                        weights = mri_utils.normalize(results[r]['rsq'].values[ind])).mean], #pRF_estimates['rsq'][results[r]['vertex'].values[ind]]).mean], #
+                                                                        weights = mri_utils.normalize(pRF_estimates['r2'][results[r]['vertex'].values[ind]])).mean],
+                                                                        #weights = mri_utils.normalize(results[r]['rsq'].values[ind])).mean], 
                                              'roi': [roi]
                                         }))
-
-for roi in ROIs:
-    
-    sns.set(font_scale=1.3)
-    sns.set_style("ticks")
-
-    fig_dims = (20, 10)
-    fig, ax = plt.subplots(figsize=fig_dims)
-    sns.barplot(y='condition', x='gain', data = avg_gain_df[avg_gain_df['roi']==roi])
-
-    ax = plt.gca()
-    plt.xticks(fontsize = 20, fontweight = "bold")
-    plt.yticks(fontsize = 20, fontweight = "bold")
-    ax.axes.tick_params(labelsize=18)
-    sns.despine(offset=15)
-    fig1 = plt.gcf()
-    
-    fig1.savefig(op.join(figures_pth,'gain_barplot_ROI-%s.svg'%(roi)), dpi=100,bbox_inches = 'tight')
 
 ## make figure with all ROIs
 
@@ -331,9 +315,61 @@ plt.yticks(fontsize = 20, fontweight = "bold")
 ax.axes.tick_params(labelsize=18)
 sns.despine(offset=15)
 fig1 = plt.gcf()
+fig1.savefig(op.join(figures_pth,'gain_barplot_ROI-all_weighted_by_pRFr2.svg'), dpi=100,bbox_inches = 'tight')
 
-fig1.savefig(op.join(figures_pth,'gain_barplot_ROI-all.svg'), dpi=100,bbox_inches = 'tight')
+### make dataframe
+# with all gain values
+# and model rsqs
+# to plot distributions
+gain_df = pd.DataFrame(columns = ['condition','run','gain','roi', 'vertex', 'FA_rsq', 'pRF_rsq'])
+avg_run_gain_df = pd.DataFrame(columns = ['condition','gain','roi', 'vertex', 'FA_rsq', 'pRF_rsq'])
 
+for roi in ROIs:
+    for cond in fa_model.unique_cond.keys():
+        for r, run in enumerate(all_runs):
+            
+            # roi vertices 
+            ind = np.array([i for i, vert in enumerate(results[r]['vertex'].values) if vert in roi_verts[roi]])
+            #print(len(ind))
+            
+            gain_df = gain_df.append(pd.DataFrame({'condition': np.tile(cond, len(ind)),
+                                             'run': np.tile(run, len(ind)),
+                                             'gain': gain_all[cond][r][ind],
+                                             'vertex': results[r]['vertex'].values[ind],
+                                             'FA_rsq': results[r]['rsq'].values[ind],
+                                             'pRF_rsq': pRF_estimates['r2'][results[r]['vertex'].values[ind]],
+                                             'roi': np.tile(roi, len(ind))
+                                        }))
+        # average across runs
+        avg_run_gain_df = avg_run_gain_df.append(pd.DataFrame({'condition': np.tile(cond, len(ind)),
+                                             'gain': np.mean(gain_all[cond], axis = 0)[ind],
+                                             'vertex': results[r]['vertex'].values[ind],
+                                             'FA_rsq': np.mean(rsq_gain, axis = 0)[results[r]['vertex'].values[ind]],
+                                             'pRF_rsq': pRF_estimates['r2'][results[r]['vertex'].values[ind]],
+                                             'roi': np.tile(roi, len(ind))
+                                        }))
+
+# Draw a nested boxplot 
+# to show distribution of gain values 
+# NOTE - this is average across runs, ditribution is across vertices
+sns.set(font_scale=1.3)
+sns.set_style("ticks")
+
+fig = plt.figure(num=None, figsize=(15,7.5), dpi=100, facecolor='w', edgecolor='k')
+sns.boxplot(x = "condition", y = "gain",
+            hue = "roi", palette = color_codes,
+            data = avg_run_gain_df)
+sns.despine(offset=10, trim=True)
+
+ax = plt.gca()
+plt.xticks(fontsize = 20, fontweight = "bold")
+plt.yticks(fontsize = 20, fontweight = "bold")
+ax.axes.tick_params(labelsize=18)
+fig2 = plt.gcf()
+fig2.savefig(op.join(figures_pth,'gain_boxplot_ROI-all_average_runs.svg'), dpi=100,bbox_inches = 'tight')
+
+
+#### NEED TO RE CHECK ############
 ## calculate ecc and polar angle
 
 complex_location = pRF_estimates['x'] + pRF_estimates['y'] * 1j # calculate eccentricity values

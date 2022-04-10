@@ -126,10 +126,6 @@ prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
 # to mask estimates
 x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
 
-# non-linearity interacts with the Gaussian standard deviation to make an effective pRF size of σ/sqr(n)
-if model_type == 'css': 
-    estimates = dict(estimates)
-    estimates['size'] = estimates['size']/np.sqrt(estimates['ns']) 
 
 # mask estimates
 print('masking estimates')

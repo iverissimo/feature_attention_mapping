@@ -65,6 +65,8 @@ estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][model_type]
 
 # if we are keeping baseline fixed at 0
 fix_bold_baseline = params['mri']['fitting']['pRF']['fix_bold_baseline']
+# if we want to do bold baseline correction
+correct_baseline = params['mri']['fitting']['pRF']['correct_baseline'] 
 
 # define file extension that we want to use, 
 # should include processing key words
@@ -95,10 +97,11 @@ proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir)
 file = proc_files[0]
 data = np.load(file,allow_pickle=True) # will be (vertex, TR)
 
-# if we want to keep baseline fix, we need to correct it
-if fix_bold_baseline:
+# if we want to keep baseline fix, we need to correct it!
+if correct_baseline:
     data = mri_utils.baseline_correction(data, params, num_baseline_TRs = 7, baseline_interval = 'empty_long', 
-                            avg_type = 'median', crop = True, crop_TR = 8)
+                            avg_type = 'median', crop = params['prf']['crop'], 
+                            crop_TR = params['prf']['crop_TR'])
 
 ## make DM mask, according to sub responses
 # sourcedata dir
@@ -204,7 +207,7 @@ else:
         
         # and parameters
         grid_nr = params['mri']['fitting']['pRF']['grid_nr']
-        max_ecc_size = params['mri']['fitting']['pRF']['max_eccen'] #prf_stim.screen_size_degrees/2.0
+        max_ecc_size = prf_stim.screen_size_degrees/2.0 #params['mri']['fitting']['pRF']['max_eccen'] #
         sizes, eccs, polars = max_ecc_size * np.linspace(0.25, 1, grid_nr)**2, \
             max_ecc_size * np.linspace(0.1, 1, grid_nr)**2, \
             np.linspace(0, 2*np.pi, grid_nr)
@@ -231,8 +234,8 @@ else:
         inf = np.inf
         eps = 1e-1
         ss = prf_stim.screen_size_degrees
-        xtol = 0.00001 #1e-7
-        ftol = 0.00001 #1e-6
+        xtol = 1e-7
+        ftol = 1e-6
 
         # model parameter bounds
         gauss_bounds = [(-1.5*ss, 1.5*ss),  # x
@@ -277,7 +280,9 @@ else:
             if model_type == 'css':
         
                 # grid exponent parameter
-                css_n_grid = np.linspace(0.05, 1, 12)
+                css_n_grid = np.linspace(params['mri']['fitting']['pRF']['min_n'], 
+                                        params['mri']['fitting']['pRF']['max_n'], 
+                                        params['mri']['fitting']['pRF']['grid_nr'], dtype='float32')
 
                 # define model 
                 css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
@@ -312,7 +317,7 @@ else:
                             (eps, 1.5*ss),  # prf size
                             (0, 1000),  # prf amplitude
                             (0, 1000),  # bold baseline
-                            (0.05, 1)]  # CSS exponent
+                            (0.01, 1)]  # CSS exponent
 
                 if fit_hrf:
                     css_bounds += [(0,10),(0,0)]
@@ -369,7 +374,7 @@ else:
                                     surround_size_grid,
                                     neural_baseline_grid,
                                     surround_baseline_grid,
-                                    rsq_threshold = 0.05, 
+                                    rsq_threshold = 0.1, 
                                     pos_prfs_only = True)
 
                 estimates_grid_fitmodel = dn_fitter.gridsearch_params
@@ -395,7 +400,7 @@ else:
 
                 # iterative fit
                 print("DN model ITERATIVE fit")
-                dn_fitter.iterative_fit(rsq_threshold = 0.05, 
+                dn_fitter.iterative_fit(rsq_threshold = 0.1, 
                                             verbose = False,
                                             bounds = dn_bounds,
                                             xtol = xtol,

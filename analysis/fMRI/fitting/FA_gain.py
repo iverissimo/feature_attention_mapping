@@ -152,7 +152,7 @@ if mask_prf:
 
 ## rsq mask, get indices for vertices where pRF 
 # rsq is greater than threshold
-rsq_threshold = 0.1
+rsq_threshold = params['mri']['fitting']['FA']['rsq_threshold']
 mask_ind = np.array([ind for ind,val in enumerate(pRF_estimates['r2']) if val >= rsq_threshold])
 
 # saved masked pRF rsq in output dir (not rsq thresholded), for plotting purposes
@@ -269,7 +269,7 @@ for i,r in enumerate(runs2fit):
 # some optimizer params
 xtol = 1e-7
 ftol = 1e-6
-solver_type = 'lbfgsb' #'trust-constr' #'lbfgsb' ##'trust-constr'
+solver_type = 'trust-constr' #'lbfgsb' ##'trust-constr'
 n_jobs = 16 # for paralell
 
 ## if already in dir, load

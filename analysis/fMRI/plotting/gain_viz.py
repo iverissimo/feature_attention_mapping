@@ -93,7 +93,7 @@ if not os.path.exists(figures_pth):
     os.makedirs(figures_pth) 
 
 # threshold for plotting
-rsq_threshold = 0.1 # params['plotting']['rsq_threshold']
+rsq_threshold = params['mri']['fitting']['FA']['rsq_threshold']
 
 data = []
 results = []
@@ -288,7 +288,7 @@ for roi in ROIs:
         for r, run in enumerate(all_runs):
             
             # roi vertices 
-            ind = np.array([i for i, vert in enumerate(results[r]['vertex'].values) if vert in roi_verts[roi]])
+            ind = np.array([i for i, vert in enumerate(results[r]['vertex'].values) if vert in roi_verts[roi] and vert in mask_ind])
             print(len(ind))
             
             avg_gain_df = avg_gain_df.append(pd.DataFrame({'condition': [cond],
@@ -329,7 +329,7 @@ for roi in ROIs:
         for r, run in enumerate(all_runs):
             
             # roi vertices 
-            ind = np.array([i for i, vert in enumerate(results[r]['vertex'].values) if vert in roi_verts[roi]])
+            ind = np.array([i for i, vert in enumerate(results[r]['vertex'].values) if vert in roi_verts[roi] and vert in mask_ind])
             #print(len(ind))
             
             gain_df = gain_df.append(pd.DataFrame({'condition': np.tile(cond, len(ind)),
@@ -372,20 +372,26 @@ fig2.savefig(op.join(figures_pth,'gain_boxplot_ROI-all_average_runs.svg'), dpi=1
 #### NEED TO RE CHECK ############
 ## calculate ecc and polar angle
 
-complex_location = pRF_estimates['x'] + pRF_estimates['y'] * 1j # calculate eccentricity values
+complex_location = fa_model.pRF_estimates['x'] + fa_model.pRF_estimates['y'] * 1j # calculate eccentricity values
 polar_angle = np.angle(complex_location)
 eccentricity = np.abs(complex_location)
+size = fa_model.pRF_estimates['size']
 
+# non-linearity interacts with the Gaussian standard deviation to make an effective pRF size of σ/sqr(n)
+if fa_model.prf_model_type == 'css': 
+    size = fa_model.pRF_estimates['size']/np.sqrt(fa_model.pRF_estimates['ns']) 
+                
 # make ecc vs gain plots
 # weighted by the model rsq
 
 min_ecc = 0.25
 max_ecc = 4 #3.3
 min_size = .25
-max_size = 6
+max_size = 17
 n_bins = 10
 
 all_roi = pd.DataFrame(columns = ['mean_ecc','mean_gain','ROI','run', 'condition'])
+unbinned_df = pd.DataFrame(columns = ['mean_ecc','mean_gain','ROI','condition'])
 
 for cond in fa_model.unique_cond.keys():
     for idx, roi in enumerate(ROIs): # go over ROIs
@@ -398,7 +404,8 @@ for cond in fa_model.unique_cond.keys():
             # get relevant indices for plot 
             indices4plot = np.where((eccentricity >= min_ecc) & \
                                     (eccentricity <= max_ecc) & \
-                                    (pRF_estimates['rsq'] >= rsq_threshold))[0]
+                                    (size <= max_size) & \
+                                    (fa_model.pRF_estimates['r2'] >= rsq_threshold))[0]
 
             # get roi indices
             ind = np.array([i for i, vert in enumerate(results[r]['vertex'].values) if vert in roi_verts[roi] and vert in indices4plot])
@@ -406,7 +413,7 @@ for cond in fa_model.unique_cond.keys():
             df = pd.DataFrame({'ecc': eccentricity[results[r]['vertex'].values[ind]],
                                #'size': pRF_estimates['size'][results[r]['vertex'].values[ind]],
                                'gain': gain_all[cond][r][ind],
-                                'pRF_rsq': pRF_estimates['rsq'][results[r]['vertex'].values[ind]],
+                                'pRF_rsq': pRF_estimates['r2'][results[r]['vertex'].values[ind]],
                                 'FA_rsq': results[r]['rsq'].values[ind],
                                  'run': np.tile(r+1, len(ind))})
 
@@ -419,6 +426,24 @@ for cond in fa_model.unique_cond.keys():
                                                    'ROI': np.tile(roi,n_bins),
                                                    'condition': np.tile(cond,n_bins),
                                                   'run': np.tile(r+1,n_bins)}), ignore_index=True)
+
+        # also 
+        ## save in unbinned dataframe
+        # get relevant indices for plot 
+        indices4plot = np.where((eccentricity >= min_ecc) & \
+                                (eccentricity <= max_ecc) & \
+                                (~np.isnan(surf_gain_all[cond])) & \
+                                (size <= max_size) & \
+                                (fa_model.pRF_estimates['r2'] >= rsq_threshold))[0]
+        # get roi indices
+        ind = np.array([vert for vert in roi_verts[roi] if vert in indices4plot])
+
+            
+        unbinned_df = unbinned_df.append(pd.DataFrame({'mean_ecc': eccentricity[ind],
+                                               'mean_gain': surf_gain_all[cond][ind],
+                                               'ROI': np.tile(roi, len(ind)),
+                                               'condition': np.tile(cond, len(ind))}), ignore_index=True)
+
 
 ## plot gain vs ecc
 
@@ -443,6 +468,37 @@ for cond in fa_model.unique_cond.keys():
     fig1 = plt.gcf()
     fig1.savefig(op.join(figures_pth,'gain_vs_ecc_ROIs_cond-%s'%cond), dpi=100,bbox_inches = 'tight')
 
+# unbinned
+
+# quick fix
+unbinned_df['mean_ecc'] = unbinned_df['mean_ecc'].astype('float')
+unbinned_df['mean_gain'] = unbinned_df['mean_gain'].astype('float')
+
+for cond in fa_model.unique_cond.keys():
+    sns.set(font_scale=1.3)
+    sns.set_style("ticks")
+    
+    g = sns.lmplot(x = 'mean_ecc', y = 'mean_gain', hue = 'ROI', data = unbinned_df.loc[unbinned_df['condition']==cond],
+                    scatter_kws={'alpha':0.05},
+              scatter=True, palette = color_codes, markers=['^','s','o', 'v','D','h','P'])
+
+    ax = plt.gca()
+    plt.xticks(fontsize = 18)
+    plt.yticks(fontsize = 18)
+    #ax.axes.tick_params(labelsize=16)
+    ax.axes.set_xlim(min_ecc,max_ecc)
+    ax.axes.set_ylim(0,1)
+
+    ax.set_xlabel('pRF eccentricity [dva]', fontsize = 20, labelpad = 15)
+    ax.set_ylabel('gain %s'%cond, fontsize = 20, labelpad = 15)
+    #ax.set_title('ecc vs size plot, %d bins from %.2f-%.2f ecc [dva]'%(n_bins,min_ecc,max_ecc),fontsize=12)
+    sns.despine(offset=15)
+    # to make legend full alpha
+    for lh in g._legend.legendHandles: 
+        lh.set_alpha(1)
+    fig2 = plt.gcf()
+
+
 # make size vs gain plots
 # weighted by the model rsq
 
@@ -459,14 +515,14 @@ for cond in fa_model.unique_cond.keys():
             # get relevant indices for plot 
             indices4plot = np.where((pRF_estimates['size'] >= min_size) & \
                                     (pRF_estimates['size'] <= max_size) & \
-                                    (pRF_estimates['rsq'] >= rsq_threshold))[0]
+                                    (pRF_estimates['r2'] >= rsq_threshold))[0]
 
             # get roi indices
             ind = np.array([i for i, vert in enumerate(results[r]['vertex'].values) if vert in roi_verts[roi] and vert in indices4plot])
 
             df = pd.DataFrame({'size': pRF_estimates['size'][results[r]['vertex'].values[ind]],
                                'gain': gain_all[cond][r][ind],
-                                'pRF_rsq': pRF_estimates['rsq'][results[r]['vertex'].values[ind]],
+                                'pRF_rsq': pRF_estimates['r2'][results[r]['vertex'].values[ind]],
                                 'FA_rsq': results[r]['rsq'].values[ind],
                                  'run': np.tile(r+1, len(ind))})
 
@@ -506,8 +562,8 @@ for cond in fa_model.unique_cond.keys():
 ## plot pRF ecc ##
 
 # only used voxels where pRF rsq bigger than 0
-ecc4plot = np.zeros(pRF_estimates['rsq'].shape); ecc4plot[:] = np.nan
-ecc4plot[pRF_estimates['rsq']>0] = eccentricity[pRF_estimates['rsq']>0]
+ecc4plot = np.zeros(fa_model.pRF_estimates['r2'].shape); ecc4plot[:] = np.nan
+ecc4plot[fa_model.pRF_estimates['r2']>0] = eccentricity[fa_model.pRF_estimates['r2']>0]
 
 # get matplotlib color map from segmented colors
 ecc_cmap = mri_utils.make_colormap(colormap = ['#dd3933','#f3eb53','#7cb956','#82cbdb','#3d549f'],
@@ -525,8 +581,8 @@ cortex.quickshow(images['ecc'],with_curvature=True,with_sulci=True,with_labels=F
 ## plot pRF size ##
 
 # only used voxels where pRF rsq bigger than 0
-size4plot = np.zeros(pRF_estimates['rsq'].shape); size4plot[:] = np.nan
-size4plot[pRF_estimates['rsq']>0] = (pRF_estimates['size']/np.sqrt(pRF_estimates['ns']))[pRF_estimates['rsq']>0]
+size4plot = np.zeros(fa_model.pRF_estimates['r2'].shape); size4plot[:] = np.nan
+size4plot[fa_model.pRF_estimates['r2']>0] = size[fa_model.pRF_estimates['r2']>0]
 
 images['size'] = mri_utils.make_raw_vertex_image(size4plot, 
                                                cmap = 'hot', vmin = 0, vmax = 7, 
@@ -539,8 +595,8 @@ cortex.quickshow(images['size'],with_curvature=True,with_sulci=True,with_labels=
 ## plot pRF polar angle ##
 
 # only used voxels where pRF rsq bigger than 0
-pa4plot = np.zeros(pRF_estimates['rsq'].shape); pa4plot[:] = np.nan
-pa4plot[pRF_estimates['rsq']>0] = ((polar_angle + np.pi) / (np.pi * 2.0))[pRF_estimates['rsq']>0]
+pa4plot = np.zeros(fa_model.pRF_estimates['r2'].shape); pa4plot[:] = np.nan
+pa4plot[fa_model.pRF_estimates['r2']>0] = ((polar_angle + np.pi) / (np.pi * 2.0))[fa_model.pRF_estimates['r2']>0]
 
 # get matplotlib color map from segmented colors
 PA_cmap = mri_utils.make_colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb',
@@ -559,18 +615,18 @@ cortex.quickshow(images['PA'],with_curvature=True,with_sulci=True,with_colorbar=
 
 ## plot pRF polar angle ##
 
-# only used voxels where pRF rsq bigger than 0
-n4plot = np.zeros(pRF_estimates['rsq'].shape); n4plot[:] = np.nan
-n4plot[pRF_estimates['rsq']>0] = pRF_estimates['ns'][pRF_estimates['rsq']>0]
+# # only used voxels where pRF rsq bigger than 0
+# n4plot = np.zeros(pRF_estimates['rsq'].shape); n4plot[:] = np.nan
+# n4plot[pRF_estimates['rsq']>0] = pRF_estimates['ns'][pRF_estimates['rsq']>0]
 
-images['ns'] = mri_utils.make_raw_vertex_image(n4plot, cmap = 'plasma', vmin = 0, vmax = 1, 
-                          data2 = alpha_level, vmin2 = 0, vmax2 = 1, subject = pysub, data2D = True)
+# images['ns'] = mri_utils.make_raw_vertex_image(n4plot, cmap = 'plasma', vmin = 0, vmax = 1, 
+#                           data2 = alpha_level, vmin2 = 0, vmax2 = 1, subject = pysub, data2D = True)
 
 
-cortex.quickshow(images['ns'],with_curvature=True,with_sulci=True,with_colorbar=True,
-                 curvature_brightness = 0.4, curvature_contrast = 0.1)                
+# cortex.quickshow(images['ns'],with_curvature=True,with_sulci=True,with_colorbar=True,
+#                  curvature_brightness = 0.4, curvature_contrast = 0.1)                
 
-#cortex.webshow(images)
+cortex.webshow(images)
 #viewer_path = '/Users/verissimo/Documents/Projects/iverissimo.github.io'
 #print(viewer_path)
 #cortex.webgl.make_static(viewer_path, data = images, recache=False)

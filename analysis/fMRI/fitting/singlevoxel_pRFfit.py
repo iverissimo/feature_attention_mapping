@@ -15,8 +15,8 @@ from pathlib import Path
 from prfpy.rf import *
 from prfpy.timecourse import *
 from prfpy.stimulus import PRFStimulus2D
-from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
-from prfpy.fit import Iso2DGaussianFitter, CSS_Iso2DGaussianFitter
+from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel, Norm_Iso2DGaussianModel
+from prfpy.fit import Iso2DGaussianFitter, CSS_Iso2DGaussianFitter, Norm_Iso2DGaussianFitter
 
 from FAM_utils import mri as mri_utils
 import cortex
@@ -82,6 +82,8 @@ fit_hrf = params['mri']['fitting']['pRF']['fit_hrf']
 
 # if we are keeping baseline fixed at 0
 fix_bold_baseline = params['mri']['fitting']['pRF']['fix_bold_baseline']
+# if we want to do bold baseline correction
+correct_baseline = params['mri']['fitting']['pRF']['correct_baseline'] 
 
 # define file extension that we want to use, 
 # should include processing key words
@@ -174,6 +176,19 @@ css_bounds = [(-1.5*ss, 1.5*ss),  # x
             (-1000, 1000),  # bold baseline
             (0.01, 1)]  # CSS exponent
 
+# define DN model
+
+# define model 
+dn_model =  Norm_Iso2DGaussianModel(stimulus = prf_stim,
+                                    filter_predictions = True,
+                                    filter_type = params['mri']['filtering']['type'],
+                                    filter_params = {'highpass': params['mri']['filtering']['highpass'],
+                                                    'add_mean': params['mri']['filtering']['add_mean'],
+                                                    'window_length': params['mri']['filtering']['window_length'],
+                                                    'polyorder': params['mri']['filtering']['polyorder']}
+                                )
+
+
 if fit_hrf:
     gauss_bounds += [(0,10),(0,0)]
     css_bounds += [(0,10),(0,0)]
@@ -185,14 +200,14 @@ proc_files = [op.join(postfmriprep_dir, h) for h in os.listdir(postfmriprep_dir)
 ## load functional data
 data = np.load(proc_files[0],allow_pickle=True) # will be (vertex, TR)
 
-# if we want to keep baseline fix, we need to correct it
-if fix_bold_baseline:
+# if we want to keep baseline fix, we need to correct it!
+if correct_baseline:
     data = mri_utils.baseline_correction(data, params, num_baseline_TRs = 7, baseline_interval = 'empty_long', 
                             avg_type = 'median', crop = True, crop_TR = 8)
     
 if roi != 'None' and vertex not in ['max','min']:
     print('masking data for ROI %s'%roi)
-    roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub'],roi) # get indices for that ROI
+    roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj),roi) # get indices for that ROI
     data = data[roi_ind[roi]]
 
 if vertex not in ['max','min']:
@@ -309,8 +324,9 @@ else:
 
     if roi != 'None':
         print('masking data for ROI %s'%roi)
-        roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub'],roi) # get indices for that ROI
-        data = data[roi_ind[roi]]
+        #roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub'],roi) # get indices for that ROI
+        #roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj),roi) # get indices for that ROI
+        #data = data[roi_ind[roi]]
 
         if vertex == 'max':
             vertex = np.where(estimates['r2'][roi_ind[roi]] == np.nanmax(estimates['r2'][roi_ind[roi]]))[0][0]
@@ -326,6 +342,13 @@ else:
         baseline = estimates['baseline'][roi_ind[roi]][vertex]
         if 'css' in model_type:
             ns = estimates['ns'][roi_ind[roi]][vertex]
+        
+        if 'dn' in model_type:
+            sa = estimates['sa'][roi_ind[roi]][vertex]
+            ss = estimates['ss'][roi_ind[roi]][vertex] 
+            nb = estimates['nb'][roi_ind[roi]][vertex] 
+            sb = estimates['sb'][roi_ind[roi]][vertex]
+
         rsq = estimates['r2'][roi_ind[roi]][vertex] 
 
         if fit_hrf:
@@ -344,6 +367,12 @@ else:
         if 'css' in model_type:
             ns = estimates['ns'][vertex]
 
+        if 'dn' in model_type:
+            sa = estimates['sa'][vertex]
+            ss = estimates['ss'][vertex] 
+            nb = estimates['nb'][vertex] 
+            sb = estimates['sb'][vertex]
+
         rsq = estimates['r2'][vertex]
 
         if fit_hrf:
@@ -354,6 +383,7 @@ if fit_hrf:
     hrf = mri_utils.create_hrf(hrf_params=[1.0,hrf_deriv,hrf_disp],TR=TR)
     gauss_model.hrf = hrf
     css_model.hrf = hrf
+    dn_model.hrf = hrf
 
 # get prediction
 if model_type == 'css':
@@ -362,6 +392,12 @@ if model_type == 'css':
                                             baseline, ns)
 
     print('exponent for vertex is %.2f'%ns)
+
+elif model_type == 'dn':
+    model_fit = dn_model.return_prediction(xx,yy,
+                                            size, beta,
+                                            baseline,
+                                            sa, ss, nb, sb) 
 
 else:
     model_fit = gauss_model.return_prediction(xx,yy,

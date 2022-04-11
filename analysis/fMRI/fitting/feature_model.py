@@ -104,7 +104,7 @@ class FA_model:
 
             self.pRF_estimates = mri_utils.join_chunks(prf_path, prf_estimates_combi, 
                                                   fit_hrf = self.fit_hrf, chunk_num = nr_chunks, 
-                                                  fit_model = 'it{model}'.format(model = self.prf_model_type)) #'{model}'.format(model=model_type)))#
+                                                  fit_model = 'it{model}'.format(model = self.prf_model_type)) 
             
         return self.pRF_estimates
             

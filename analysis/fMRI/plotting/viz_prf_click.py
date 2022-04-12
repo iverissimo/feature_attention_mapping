@@ -158,11 +158,79 @@ if correct_baseline:
 
 ##
 ## set cortex flatmaps to show
-rsq_flat = cortex.Vertex(fa_model.pRF_estimates['r2'], 
-                  subject = pysub, 
-                  vmin = 0, vmax = .8,
-                    cmap = 'Reds') 
+# rsq_flat = cortex.Vertex(fa_model.pRF_estimates['r2'], 
+#                   subject = pysub, 
+#                   vmin = 0, vmax = .8,
+#                     cmap = 'Reds')
 
+## make alpha level based on pRF rsquared 
+alpha_level = mri_utils.normalize(np.clip(fa_model.pRF_estimates['r2'], 0, .8))#mask, 0, .8)) # normalize 
+# number of bins for custom colormaps
+n_bins_colors = 256
+images = {}
+
+## pRF rsq
+# mask out 0 to nans, for prettier plot
+prf_rsq4plot = np.zeros(fa_model.pRF_estimates['r2'].shape); prf_rsq4plot[:] = np.nan
+prf_rsq4plot[fa_model.pRF_estimates['r2']>0] = fa_model.pRF_estimates['r2'][fa_model.pRF_estimates['r2']>0] 
+images['pRF_rsq'] = cortex.Vertex(prf_rsq4plot, 
+                                subject = pysub, 
+                                vmin = 0, vmax = .8,
+                                cmap = 'Reds')
+
+## FA rsq
+FA_rsq4plot = np.zeros(fa_model.pRF_estimates['r2'].shape); FA_rsq4plot[:] = np.nan
+FA_rsq4plot[it_FA_results['vertex'].values] = it_FA_results['rsq'].values
+images['FA_rsq'] = cortex.Vertex(FA_rsq4plot, 
+                                subject = pysub, 
+                                vmin = 0, vmax = .3,
+                                cmap = 'Reds')
+
+## calculate pa + ecc + size
+complex_location = fa_model.pRF_estimates['x'] + fa_model.pRF_estimates['y'] * 1j # calculate eccentricity values
+polar_angle = np.angle(complex_location)
+eccentricity = np.abs(complex_location)
+size = fa_model.pRF_estimates['size']
+# non-linearity interacts with the Gaussian standard deviation to make an effective pRF size of σ/sqr(n)
+if fa_model.prf_model_type == 'css': 
+    size = fa_model.pRF_estimates['size']/np.sqrt(fa_model.pRF_estimates['ns']) 
+
+## pRF Eccentricity
+ecc4plot = np.zeros(fa_model.pRF_estimates['r2'].shape); ecc4plot[:] = np.nan
+ecc4plot[fa_model.pRF_estimates['r2']>0] = eccentricity[fa_model.pRF_estimates['r2']>0]
+
+ecc_cmap = mri_utils.make_colormap(colormap = ['#dd3933','#f3eb53','#7cb956','#82cbdb','#3d549f'],
+                               bins = n_bins_colors, cmap_name = 'ECC_mackey_costum', 
+                                   discrete = False, add_alpha = False, return_cmap = True)
+
+images['ecc'] = mri_utils.make_raw_vertex_image(ecc4plot, 
+                                               cmap = ecc_cmap, vmin = 0, vmax = 6, 
+                                              data2 = alpha_level, vmin2 = 0, vmax2 = 1, 
+                                               subject = pysub, data2D = True)
+
+## pRF Size
+size4plot = np.zeros(fa_model.pRF_estimates['r2'].shape); size4plot[:] = np.nan
+size4plot[fa_model.pRF_estimates['r2']>0] = size[fa_model.pRF_estimates['r2']>0]
+
+images['size'] = mri_utils.make_raw_vertex_image(size4plot, 
+                                               cmap = 'hot', vmin = 0, vmax = 7, 
+                                              data2 = alpha_level, vmin2 = 0, vmax2 = 1, 
+                                               subject = pysub, data2D = True)
+
+## pRF Polar Angle
+pa4plot = np.zeros(fa_model.pRF_estimates['r2'].shape); pa4plot[:] = np.nan
+pa4plot[fa_model.pRF_estimates['r2']>0] = ((polar_angle + np.pi) / (np.pi * 2.0))[fa_model.pRF_estimates['r2']>0]
+
+# get matplotlib color map from segmented colors
+PA_cmap = mri_utils.make_colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb',
+                              '#3d549f','#655099','#ad5a9b','#dd3933'], bins = n_bins_colors, 
+                                    cmap_name = 'PA_mackey_costum',
+                              discrete = False, add_alpha = False, return_cmap = True)
+
+images['PA'] = mri_utils.make_raw_vertex_image(pa4plot, 
+                                               cmap = PA_cmap, vmin = 0, vmax = 1, 
+                                              data2 = alpha_level, vmin2 = 0, vmax2 = 1, 
+                                               subject = pysub, data2D = True)
 
 ## initialize interactive figure
 
@@ -171,11 +239,15 @@ plot_obj = plot_utils.visualize_on_click(params, fa_model.pRF_estimates,
                                     max_ecc_ext = np.max(fa_model.x_ecc_lim),
                                     pRF_data = pRF_data)
 
+# set flatmaps in object class
+plot_obj.images = images
+
 plot_obj.set_figure()
 
-cortex.quickshow(rsq_flat, fig = plot_obj.flatmap_ax,
+cortex.quickshow(images['pRF_rsq'], fig = plot_obj.flatmap_ax,
                  with_rois = False, with_curvature = True, with_colorbar=False)
 
 plot_obj.full_fig.canvas.mpl_connect('button_press_event', plot_obj.onclick)
+plot_obj.full_fig.canvas.mpl_connect('key_press_event', plot_obj.onkey)
 
 plt.show()

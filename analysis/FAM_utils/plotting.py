@@ -29,6 +29,7 @@ class visualize_on_click:
         ## figure settings
         self.flatmap_height = flatmap_height
         self.full_figsize = full_figsize
+        self.images = {}
         
         ## create pycortex vars
         self.mask, extents = cortex.quickflat.utils.get_flatmask(pysub, height = self.flatmap_height)
@@ -227,4 +228,40 @@ class visualize_on_click:
             print(clicked_vertex)
             self.redraw_vertex_plots(clicked_vertex.indices[0], refresh_fig)
             plt.draw()
+
+    def onkey(self, event):
+        if event.key == '1':  # pRF rsq
+            cortex.quickshow(self.images['pRF_rsq'], with_rois = False, with_curvature = True,
+                        fig = self.flatmap_ax, with_colorbar = False)
+            self.flatmap_ax.set_title('pRF rsq')
+        elif event.key == '2':  # FA rsq
+            cortex.quickshow(self.images['FA_rsq'], with_rois = False, with_curvature = True,
+                        fig = self.flatmap_ax, with_colorbar = False)
+            self.flatmap_ax.set_title('FA rsq')
+        elif event.key == '3':  # pRF eccentricity
+            cortex.quickshow(self.images['ecc'], with_rois = False, with_curvature = True,
+                        fig = self.flatmap_ax, with_colorbar = False)
+            self.flatmap_ax.set_title('pRF eccentricity')
+        elif event.key == '4':  # pRF Size
+            cortex.quickshow(self.images['size'], with_rois = False, with_curvature = True,
+                        fig = self.flatmap_ax, with_colorbar = False)
+            self.flatmap_ax.set_title('pRF size')
+        elif event.key == '5':  # pRF PA
+            cortex.quickshow(self.images['PA'], with_rois = False, with_curvature = True,
+                        fig = self.flatmap_ax, with_colorbar = False)
+            self.flatmap_ax.set_title('pRF PA')
+        # elif event.key == '3':  # polar angle
+        #     cx.quickshow(size_v, with_rois=True, with_curvature=True,
+        #                 fig=flatmap_ax, with_colorbar=False)
+        #     flatmap_ax.set_title('pRF Size')
+        # elif event.key == '4':  # polar angle
+        #     cx.quickshow(x_v, with_rois=True, with_curvature=True,
+        #                 fig=flatmap_ax, with_colorbar=False)
+        #     flatmap_ax.set_title('pRF X')
+        # elif event.key == '5':  # polar angle
+        #     cx.quickshow(y_v, with_rois=True, with_curvature=True,
+        #                 fig=flatmap_ax, with_colorbar=False)
+        #     flatmap_ax.set_title('pRF Y')        
+        plt.draw()
+    
  

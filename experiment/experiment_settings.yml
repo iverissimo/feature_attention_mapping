@@ -78,10 +78,9 @@ stimuli:
 
   feature:
     bar_width_ratio: 0.125 # ratio of the screen res
-    mini_blocks: 4
 
-    empty_TR: 12 #5
-    cue_TR: 3
+    empty_TR: 20 #5 # number of TRs during empty period
+    task_trial_TR: 2 # number of TRs per trial of actual task
 
     bars_phase_dur: 0.5 # phase duration for displaying bars (in seconds) 
 
@@ -89,15 +88,12 @@ stimuli:
     cue_height: .5 #1.1
     cue_contrast: 0.6
 
-    num_bars: 4
+    num_bars: 2
     num_bar_position: [6,6] #[8,8]
 
-    conditions: ['red_vertical','red_horizontal','green_vertical','green_horizontal'] # all conditions to be attended during feature trial
+    conditions: ['color_red', 'color_green'] # all conditions to be attended during feature trial
 
-    bar_pass_direction: ['empty','cue_0','empty','mini_block_0',
-                         'empty','cue_1','empty','mini_block_1',
-                         'empty','cue_2','empty','mini_block_2',
-                         'empty','cue_3','empty','mini_block_3','empty']
+    bar_pass_direction: ['empty', 'task', 'empty']
 
     sync_scanner: False 
 

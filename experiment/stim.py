@@ -161,33 +161,6 @@ class FeatureStim(Stim):
                                                                 contrs = self.element_contrast, 
                                                                 colors = self.element_color, 
                                                                 colorSpace = self.session.settings['stimuli']['colorSpace']) 
-        
-        self.session.bar2_array = visual.ElementArrayStim(win = self.session.win, 
-                                                                nElements = self.nElements,
-                                                                units = 'pix', 
-                                                                elementTex = 'sin', 
-                                                                elementMask = 'gauss',
-                                                                sizes = self.element_sizes, 
-                                                                sfs = self.element_sfs, 
-                                                                xys = self.element_positions, 
-                                                                oris = self.element_ori,
-                                                                contrs = self.element_contrast, 
-                                                                colors = self.element_color, 
-                                                                colorSpace = self.session.settings['stimuli']['colorSpace']) 
-        
-        self.session.bar3_array = visual.ElementArrayStim(win = self.session.win, 
-                                                                nElements = self.nElements,
-                                                                units = 'pix', 
-                                                                elementTex = 'sin', 
-                                                                elementMask = 'gauss',
-                                                                sizes = self.element_sizes, 
-                                                                sfs = self.element_sfs, 
-                                                                xys = self.element_positions, 
-                                                                oris = self.element_ori,
-                                                                contrs = self.element_contrast, 
-                                                                colors = self.element_color, 
-                                                                colorSpace = self.session.settings['stimuli']['colorSpace']) 
-
 
 
     def draw(self, bar_midpoint_at_TR, bar_pass_direction_at_TR, this_phase, position_dictionary, orientation = True, drawing_ind = [0,1,2,3]):
@@ -229,36 +202,13 @@ class FeatureStim(Stim):
                                                         monitor = self.session.monitor, 
                                                         screen = self.session.screen)
 
-            self.session.bar2_array =  update_elements(ElementArrayStim = self.session.bar2_array,
-                                                        condition_settings = self.condition_settings, 
-                                                        position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation = orientation,
-                                                        this_phase = this_phase[2], 
-                                                        elem_positions = position_dictionary['bar2']['xys'], 
-                                                        grid_pos = self.grid_pos,
-                                                        monitor = self.session.monitor, 
-                                                        screen = self.session.screen)
-
-            self.session.bar3_array =  update_elements(ElementArrayStim = self.session.bar3_array,
-                                                        condition_settings = self.condition_settings, 
-                                                        position_jitter = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['pos_jitter'], self.session.monitor),
-                                                        orientation = orientation,
-                                                        this_phase = this_phase[3], 
-                                                        elem_positions = position_dictionary['bar3']['xys'], 
-                                                        grid_pos = self.grid_pos,
-                                                        monitor = self.session.monitor, 
-                                                        screen = self.session.screen)
-
-
         # actually draw
         if this_phase != 'background':
             
-            bars2plot = [self.session.bar0_array,self.session.bar1_array,self.session.bar2_array,self.session.bar3_array]
+            bars2plot = [self.session.bar0_array,self.session.bar1_array]
 
             bars2plot[drawing_ind[0]].draw()
             bars2plot[drawing_ind[1]].draw()
-            bars2plot[drawing_ind[2]].draw()
-            bars2plot[drawing_ind[3]].draw()
             
 
 class FlickerStim(Stim):

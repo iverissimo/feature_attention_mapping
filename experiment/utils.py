@@ -350,131 +350,80 @@ def repeat_random_lists(arr,num_rep):
 
 
 
-def set_bar_positions(attend_block_conditions,horizontal_pos,vertical_pos,
-                         mini_blocks = 4, num_bars = 4, num_ver_bars = 2, num_hor_bars = 2):
+def set_bar_positions(pos_dict = {'horizontal': [], 'vertical': []},
+                     attend_condition = 'color_red', unattend_condition = 'color_green',
+                      attend_orientation = ['vertical','horizontal'],
+                      unattend_orientation = ['vertical','horizontal']):
     
     """ set bar positions for all feature trials
     
     Parameters
     ----------
-    attend_block_conditions : arr
-        array of strings with attended condition for each block (will then be the first condition of each block
-        of the return dictionary)
-    horizontal_pos: arr
-        array of shape (H,2) -> (number of possible horizontal positions, [x,y])
+    pos_dict: dict
+        dictionary with bars positions
+        "horizontal" array of shape (H,2) -> (number of possible horizontal positions, [x,y])
         with midpoint coordinates for horizontal bars
-    vertical_pos: arr
-        array of shape (V,2) -> (number of possible vertical positions, [x,y])
+        "vertical" array of shape (H,2) -> (number of possible vertical positions, [x,y])
         with midpoint coordinates for vertical bars
-    mini_blocks: int
-        number of mini blocks in run
-    num_bars: int
-        number of bars to be displayed simultaneously
-    num_ver_bars: int
-        number of vertical bars to be displayed simultaneously
-    num_hor_bars:
-        number of horizontal bars to be displayed simultaneously
+    attend_condition: str
+        name of attended condition (color)
+    unattend_condition: str
+        name of UNattended condition (color)
+    attend_orientation: list/array
+        possible bar orientations for attended condition
+    unattend_orientation: list/array
+        possible bar orientations for UNattended condition
         
     """
     
-    # make list of bar conditon names per mini block
-    # to associate names to position
-    bar_list = np.empty([mini_blocks, num_bars], dtype=list)
+    # total number of trials
+    num_trials = len(attend_orientation)*(pos_dict['horizontal'].shape[0] * pos_dict['vertical'].shape[0] + \
+                                          pos_dict['horizontal'].shape[0] * (pos_dict['horizontal'].shape[0]-1))
 
-    for b in range(mini_blocks):
-        # get name of non attended positions for that block
-        non_attend_cond = [x for x in attend_block_conditions if x != attend_block_conditions[b]]
-
-        for c in range(num_bars):
-            if c == 0:
-                bar_list[b][c] = attend_block_conditions[b]
-            else:
-                bar_list[b][c] = non_attend_cond[c-1]
-
+    print('number of bar trials is %i'%num_trials)
+    
     # define dictionary to save positions and directions
     # of all bars
-    output_dict = {}
-    for blk in range(mini_blocks):
-        output_dict['mini_block_%i'%blk] = {}
+    output_dict = {'attended_bar': {'color': attend_condition,
+                                   'bar_midpoint_at_TR': [],
+                                   'bar_pass_direction_at_TR': []},
+                   'unattended_bar': {'color': unattend_condition,
+                                      'bar_midpoint_at_TR': [],
+                                      'bar_pass_direction_at_TR': []}
+                  }
 
-    num_trials = horizontal_pos.shape[0] * vertical_pos.shape[0] # all trials
-    num_conditions = horizontal_pos.shape[1] + vertical_pos.shape[1] # all conditions
+    # append all postions in dict 
+    for att_ori in attend_orientation:
+
+        for unatt_ori in unattend_orientation:
+
+            if att_ori != unatt_ori: # if bar orientations orthogonal
+
+                indice_pairs = list((x,y) for x in np.arange(pos_dict[att_ori].shape[0]) for y in np.arange(pos_dict[unatt_ori].shape[0]))
+
+            else: # if bar orientations the same
+
+                indice_pairs = list(itertools.permutations(np.arange(pos_dict[att_ori].shape[0]), 2))
+
+            # fill attended dict
+            output_dict['attended_bar']['bar_midpoint_at_TR'].append(np.array([pos_dict[att_ori][i] for i in np.array(indice_pairs)[...,0]]))
+            output_dict['attended_bar']['bar_pass_direction_at_TR'].append(np.tile(att_ori, np.array(indice_pairs).shape[0]))
+
+            # fill unattended dict
+            output_dict['unattended_bar']['bar_midpoint_at_TR'].append(np.array([pos_dict[unatt_ori][i] for i in np.array(indice_pairs)[...,-1]]))
+            output_dict['unattended_bar']['bar_pass_direction_at_TR'].append(np.tile(unatt_ori, np.array(indice_pairs).shape[0]))
+
+    ## reshape and reorder arrays
+
+    # make random indices
+    random_ind = np.arange(num_trials)
+    np.random.shuffle(random_ind)  
+
+    for key in output_dict.keys():
+
+        output_dict[key]['bar_midpoint_at_TR'] = np.vstack((v for v in output_dict[key]['bar_midpoint_at_TR']))[random_ind]
+        output_dict[key]['bar_pass_direction_at_TR'] = np.hstack((v for v in output_dict[key]['bar_pass_direction_at_TR']))[random_ind]
     
-    # actually store positions
-    for blk in range(mini_blocks):
-
-        # first define for all conditions in block, which will be 
-        # vertical bar pass, which will be horizontal bar pass
-        for k,cond in enumerate(bar_list[blk]):
-
-            cond_position = []
-
-            if 'vertical' in cond:
-                cond_direction = np.repeat('horizontal',num_trials)
-            elif 'horizontal' in cond:
-                cond_direction = np.repeat('vertical',num_trials)
-
-            # append to dictionary 
-            output_dict['mini_block_%i'%blk][cond] = {'bar_midpoint_at_TR': cond_position, 
-                                                     'bar_pass_direction_at_TR': cond_direction}  
-
-        # now according to bar direction (horizontal vs vertical)
-        # set x,y coordinates for bar midpoint
-
-        ## get non overlapping indices for vertical and horizontal bar positions
-        # initialize empty lists for indices
-        cond_ind_ver = np.empty([num_ver_bars, vertical_pos.shape[0]], dtype=list)
-        cond_ind_hor = np.empty([num_hor_bars, horizontal_pos.shape[0]], dtype=list)
-
-        # get non-overlapping indices for vertical, throughout trials
-        for v in range(vertical_pos.shape[0]):
-
-            cond_ind_ver[0][v], cond_ind_ver[1][v] = get_non_overlapping_indices(arr_shape=[num_ver_bars,vertical_pos.shape[0]])
-
-        # get non-overlapping indices for horizontal, throughout trials
-        hor1, hor2 = get_non_overlapping_indices(arr_shape=[num_hor_bars,horizontal_pos.shape[0]])
-
-        for h in range(len(hor1)):
-
-            cond_ind_hor[0][h] = np.repeat(hor1[h],horizontal_pos.shape[0])
-            cond_ind_hor[1][h] = np.repeat(hor2[h],horizontal_pos.shape[0])
-
-        # reshape the indice arrays, and put in new arrays
-        ind_ver = np.empty([num_ver_bars, ], dtype=list)
-        ind_hor = np.empty([num_hor_bars, ], dtype=list)
-
-        ind_hor[0] = np.concatenate(cond_ind_hor[0]).ravel()
-        ind_hor[1] = np.concatenate(cond_ind_hor[1]).ravel()
-        ind_ver[0] = np.concatenate(cond_ind_ver[0]).ravel()
-        ind_ver[1] = np.concatenate(cond_ind_ver[1]).ravel()
-
-        # make indice array, that is shuffled, to randomly draw positions
-        random_ind = np.arange(num_trials)
-        np.random.shuffle(random_ind)
-
-        for trl in range(num_trials): # for each trial
-    
-            vert_bool = False # boolean markers to keep track of conditions
-            hor_bool = False
-
-            for k,cond in enumerate(bar_list[blk]): # iterate per condition
-
-                # get coordinates for vertical bars
-                if output_dict['mini_block_%i'%blk][cond]['bar_pass_direction_at_TR'][trl] == 'vertical':
-
-                    m = 0 if vert_bool == False else 1
-                    coord = vertical_pos[ind_ver[m][random_ind[trl]]] # save coordinates
-                    vert_bool = True # update bool marker
-
-                # get coordinates for horizontal bars
-                elif output_dict['mini_block_%i'%blk][cond]['bar_pass_direction_at_TR'][trl] == 'horizontal':
-
-                    m = 0 if hor_bool == False else 1
-                    coord = horizontal_pos[ind_hor[m][random_ind[trl]]] # save coordinates
-                    hor_bool = True # update bool marker
-
-                # now append coordinates to corresponding condition list
-                output_dict['mini_block_%i'%blk][cond]['bar_midpoint_at_TR'].append(coord)
 
 
     return(output_dict)
@@ -622,7 +571,7 @@ def randomize_conditions(cond_list):
     return np.array(key_list)
 
 
-def save_bar_position(bar_dict,num_miniblock, output_path):
+def save_bar_position(bar_dict, output_path):
     
     """ get bar position dictionary (with all positions for whole run), convert to pandas df and 
     save into appropriate output folder
@@ -638,21 +587,17 @@ def save_bar_position(bar_dict,num_miniblock, output_path):
         
     """
     
-    df_bar_position = pd.DataFrame(columns=['mini_block','attend_condition', 'condition', 'bar_midpoint_at_TR', 'bar_pass_direction_at_TR'])
+    df_bar_position = pd.DataFrame(columns=['attend_condition', 'color', 'bar_midpoint_at_TR', 'bar_pass_direction_at_TR'])
 
-    for blk in range(num_miniblock):
-    
-        for i,cond in enumerate(bar_dict['mini_block_%i'%blk].keys()):
+    for key in bar_dict.keys():
 
-            attend = 1 if i==0 else 0
+        attend = 1 if key == 'attended_bar' else 0 
 
-            df_bar_position = df_bar_position.append({'mini_block': blk, 
-                                                      'attend_condition': attend,
-                                                      'condition': cond,
-                                                      'bar_midpoint_at_TR': bar_dict['mini_block_%i'%blk][cond]['bar_midpoint_at_TR'],
-                                                      'bar_pass_direction_at_TR': bar_dict['mini_block_%i'%blk][cond]['bar_pass_direction_at_TR']
-                                                     }, ignore_index=True) 
-
+        df_bar_position = df_bar_position.append({'attend_condition': attend,
+                                                'color': bar_dict[key]['color'],
+                                                'bar_midpoint_at_TR': bar_dict[key]['bar_midpoint_at_TR'],
+                                                'bar_pass_direction_at_TR': bar_dict[key]['bar_pass_direction_at_TR']
+                                                    }, ignore_index=True)  
 
     df_bar_position.to_pickle(output_path)
 

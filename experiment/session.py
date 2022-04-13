@@ -451,10 +451,10 @@ class FeatureSession(ExpSession):
         self.correct_responses = 0
         self.bar_counter = 0
 
-        ## get condition names and randomize them 
-        ## setting order for what condition to attend per mini block 
-        self.attend_block_conditions = randomize_conditions(self.settings['stimuli']['feature']['conditions'])
-        print('Conditions to attend throughout blocks will be %s'%str(self.attend_block_conditions))
+        ## set attended bar color 
+        att_color = 'red' ####### MAKE THIS USER INPUT
+        self.att_condition = [val for val in self.settings['stimuli']['feature']['conditions'] if att_color in val][0]
+        self.unatt_condition = [val for val in self.settings['stimuli']['feature']['conditions'] if att_color not in val][0]
 
 
         ## get all possible bar positions
@@ -481,32 +481,24 @@ class FeatureSession(ExpSession):
 
 
         # set bar midpoint position and direction for each condition
-        # for all mini blocks
-        self.all_bar_pos = set_bar_positions(attend_block_conditions = self.attend_block_conditions,
-                                            horizontal_pos = hor_bar_pos_pix,
-                                            vertical_pos = ver_bar_pos_pix,
-                                            mini_blocks = self.settings['stimuli']['feature']['mini_blocks'], 
-                                            num_bars = len(self.attend_block_conditions), 
-                                            num_ver_bars = 2, 
-                                            num_hor_bars = 2)
+        self.all_bar_pos = set_bar_positions(pos_dict = {'horizontal': hor_bar_pos_pix, 'vertical': ver_bar_pos_pix},
+                                                attend_condition = self.att_condition, 
+                                                unattend_condition = self.unatt_condition,
+                                                attend_orientation = ['vertical','horizontal'],
+                                                unattend_orientation = ['vertical','horizontal'])
 
         # save bar positions for run in output folder
-        save_bar_position(self.all_bar_pos, self.settings['stimuli']['feature']['mini_blocks'], 
+        save_bar_position(self.all_bar_pos, 
                           os.path.join(self.output_dir, self.output_str+'_bar_positions.pkl'))
 
 
         # number of TRs per "type of stimuli"
-        cue_TR = self.settings['stimuli']['feature']['cue_TR']
         empty_TR = self.settings['stimuli']['feature']['empty_TR']
-        # get info from first block, to know how many trials in a mini block (all miniblocks have same length)
-        dict_blk0 = self.all_bar_pos['mini_block_0'][list(self.all_bar_pos['mini_block_0'].keys())[0]]
-        mini_block_trials = np.array(dict_blk0[list(dict_blk0.keys())[0]]).shape[0]
+        task_trial_TR = self.settings['stimuli']['feature']['task_trial_TR'] 
 
-        # list with order of "type of stimuli" throught experiment (called bar direction to make analogous with other class)
-        bar_pass_direction = self.settings['stimuli']['feature']['bar_pass_direction'] 
 
         # set number of trials,
-        # list of type of trial (cue, empty, miniblock) for all TRs,
+        # list of type of trial (empty, task) for all TRs,
         # list of strings/lists with bar direction/orientation or 'empty',
         # list of midpoint position (x,y) of bars for all TRs (if empty, then nan)
         self.trial_number, self.trial_type_all, self.bar_pass_direction_all, self.bar_midpoint_all = define_feature_trials(bar_pass_direction, 

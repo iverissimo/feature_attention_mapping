@@ -14,7 +14,7 @@ from matplotlib.backend_bases import MouseButton
 class visualize_on_click:
     
     def __init__(self, exp_params, prf_pars_dict, 
-                         prf_dm = [], max_ecc_ext = 5.5, pRF_data = [], 
+                         prf_dm = [], max_ecc_ext = 5.5, pRF_data = [], FA_data = [], FA_model = [],
                          pysub = 'hcp_999999', flatmap_height = 2048, full_figsize = (12, 8)):
         
         ## general experiment settings
@@ -25,6 +25,10 @@ class visualize_on_click:
         
         ## data to be plotted 
         self.pRF_data = pRF_data
+        self.FA_data = FA_data
+
+        ## FA model (now used as input, in future should make it here in plotting class)
+        self.FA_model = FA_model
         
         ## figure settings
         self.flatmap_height = flatmap_height
@@ -165,7 +169,27 @@ class visualize_on_click:
         if plot_model:
             prediction, r2 = self.get_prf_model(self.vertex, model_type = self.prf_model_type, fit_hrf = self.fit_hrf)
             axis.plot(time_sec, prediction, c = 'red',lw=3,label='model R$^2$ = %.2f'%r2,zorder=1)
-            print('model R$^2$ = %.2f'%r2)
+            print('pRF model R$^2$ = %.2f'%r2)
+            
+
+        axis.set_xlabel('Time (s)')#,fontsize=20, labelpad=20)
+        axis.set_ylabel('BOLD signal change (%)')#,fontsize=20, labelpad=10)
+        axis.set_xlim(0, len(timecourse)*self.TR)
+        #axis.legend(loc='upper left',fontsize=10)  # doing this to guarantee that legend is how I want it
+        
+        return axis
+
+    def plot_fa_tc(self, axis, timecourse = None, plot_model = True):
+        
+        # plotting will be in seconds
+        time_sec = np.linspace(0, len(timecourse)*self.TR,
+                               num = len(timecourse)) 
+        
+        axis.plot(time_sec, timecourse,'k--', label = 'data')
+        
+        if plot_model:
+            axis.plot(time_sec, self.FA_model[self.vertex], c = 'blue',lw=3)
+            #print('FA model R$^2$ = %.2f'%r2)
             
 
         axis.set_xlabel('Time (s)')#,fontsize=20, labelpad=20)
@@ -187,6 +211,12 @@ class visualize_on_click:
             self.prf_timecourse_ax.clear()
             
         self.prf_timecourse_ax = self.plot_prf_tc(self.prf_timecourse_ax, timecourse = self.pRF_data[vertex])
+
+        # plot fa data (and model if provided) 
+        if len(self.FA_model)>0:
+            self.fa_timecourse_ax = self.plot_fa_tc(self.fa_timecourse_ax, timecourse = self.FA_data[vertex])
+        elif len(self.FA_data)>0:
+            self.fa_timecourse_ax = self.plot_fa_tc(self.fa_timecourse_ax, timecourse = self.FA_data[vertex], plot_model = False) 
 
 
         prf = gauss2D_iso_cart(self.point_grid_2D[0],

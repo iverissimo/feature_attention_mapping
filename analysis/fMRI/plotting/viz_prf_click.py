@@ -158,10 +158,6 @@ if correct_baseline:
 
 ##
 ## set cortex flatmaps to show
-# rsq_flat = cortex.Vertex(fa_model.pRF_estimates['r2'], 
-#                   subject = pysub, 
-#                   vmin = 0, vmax = .8,
-#                     cmap = 'Reds')
 
 ## make alpha level based on pRF rsquared 
 alpha_level = mri_utils.normalize(np.clip(fa_model.pRF_estimates['r2'], 0, .8))#mask, 0, .8)) # normalize 
@@ -237,7 +233,8 @@ images['PA'] = mri_utils.make_raw_vertex_image(pa4plot,
 plot_obj = plot_utils.visualize_on_click(params, fa_model.pRF_estimates, 
                                     prf_dm = fa_model.prf_dm, 
                                     max_ecc_ext = np.max(fa_model.x_ecc_lim),
-                                    pRF_data = pRF_data)
+                                    pRF_data = pRF_data,
+                                    FA_data = FA_data, FA_model = FA_model_predictions)
 
 # set flatmaps in object class
 plot_obj.images = images

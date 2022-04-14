@@ -1,5 +1,6 @@
 
 import os
+import os.path as op
 import numpy as np
 
 from exptools2.core import Session, PylinkEyetrackerSession
@@ -489,8 +490,10 @@ class FeatureSession(ExpSession):
 
         # save bar positions for run in output folder
         save_bar_position(self.all_bar_pos, 
-                          os.path.join(self.output_dir, self.output_str+'_bar_positions.pkl'))
+                          op.join(self.output_dir, self.output_str+'_bar_positions.pkl'))
 
+        # list with order of "type of stimuli" throught experiment (called bar direction to make analogous with other class)
+        bar_pass_direction = self.settings['stimuli']['feature']['bar_pass_direction'] 
 
         # number of TRs per "type of stimuli"
         empty_TR = self.settings['stimuli']['feature']['empty_TR']
@@ -502,10 +505,9 @@ class FeatureSession(ExpSession):
         # list of strings/lists with bar direction/orientation or 'empty',
         # list of midpoint position (x,y) of bars for all TRs (if empty, then nan)
         self.trial_number, self.trial_type_all, self.bar_pass_direction_all, self.bar_midpoint_all = define_feature_trials(bar_pass_direction, 
-                                                                                                                      self.all_bar_pos, 
-                                                                                                                      empty_TR = empty_TR, 
-                                                                                                                      cue_TR = cue_TR, 
-                                                                                                                      mini_block_trials = mini_block_trials)
+                                                                                                                            self.all_bar_pos, 
+                                                                                                                            empty_TR = empty_TR, 
+                                                                                                                            task_trial_TR = task_trial_TR)
                 
         print("Total number of (expected) TRs: %d"%self.trial_number)
 
@@ -516,7 +518,7 @@ class FeatureSession(ExpSession):
 
         for indx, val in enumerate(self.trial_type_all):
             
-            if 'mini_block' in val:
+            if 'task' in val:
                 ind_list = np.arange(self.settings['stimuli']['feature']['num_bars'])
                 np.random.shuffle(ind_list)
                 
@@ -524,33 +526,27 @@ class FeatureSession(ExpSession):
 
                 if self.bar_pass_direction_all[indx][0] == 'horizontal': # if attended bar vertical (horizontal bar pass)
 
-                    if self.bar_midpoint_all[indx][0][0] < 0: # append hemifield
-                        
+                    if self.bar_midpoint_all[indx][0][0] < 0: # append hemifield 
                         self.hemifield.append('left')
-                    
                     else:
-
                         self.hemifield.append('right')
 
                 elif self.bar_pass_direction_all[indx][0] == 'vertical': # if attended bar horizontal (vertical bar pass)
 
-                    if self.bar_midpoint_all[indx][0][-1] < 0: # append hemifield
-                        
-                        self.hemifield.append('down')
-                    
-                    else:
-                        
+                    if self.bar_midpoint_all[indx][0][-1] < 0: # append hemifield     
+                        self.hemifield.append('down') 
+                    else:  
                         self.hemifield.append('up')
                     
-                
             else: # if not in miniblock, these are nan
                 self.drawing_ind.append([np.nan])
                 self.hemifield.append(np.nan)
 
 
         # save relevant trial info in df (for later analysis)
-        save_all_TR_info(self.all_bar_pos, self.trial_type_all, self.attend_block_conditions, 
-                        self.hemifield, self.drawing_ind, os.path.join(self.output_dir, self.output_str+'_trial_info.csv'))
+        save_all_TR_info(self.all_bar_pos, self.trial_type_all, 
+                        self.hemifield, self.drawing_ind, 
+                        op.join(self.output_dir, self.output_str+'_trial_info.csv'))
                          
         # if in scanner, we want it to be synced to trigger, so lets increase trial time (in seconds, like TR)
         max_trial_time = 5 if self.settings['stimuli']['feature']['sync_scanner']==True else self.settings['mri']['TR']
@@ -561,7 +557,7 @@ class FeatureSession(ExpSession):
         for i in range(self.trial_number):
 
             # set phase conditions (for logging) and durations
-            if 'mini_block' in self.trial_type_all[i]:
+            if 'task' in self.trial_type_all[i]:
                 phase_cond = tuple(['stim','background'])
                 phase_dur = tuple([self.settings['stimuli']['feature']['bars_phase_dur'],
                                     max_trial_time-self.settings['stimuli']['feature']['bars_phase_dur']])
@@ -573,11 +569,11 @@ class FeatureSession(ExpSession):
             self.all_trials.append(FeatureTrial(session = self,
                                                 trial_nr = i, 
                                                 phase_durations = phase_dur,
-                                                phase_names = phase_cond,
-                                                attend_block_conditions = self.attend_block_conditions, 
+                                                phase_names = phase_cond, 
                                                 bar_pass_direction_at_TR = self.bar_pass_direction_all[i],
                                                 bar_midpoint_at_TR = self.bar_midpoint_all[i],
                                                 trial_type_at_TR = self.trial_type_all[i],
+                                                num_bars_on_screen = self.settings['stimuli']['feature']['num_bars'],
                                                 ))
 
 
@@ -599,12 +595,9 @@ class FeatureSession(ExpSession):
         # make boolean array to see which trials are stim trials
         hemi_bool = [True if type(x)==str else False for _,x in enumerate(self.hemifield)]
         # time in seconds for when bar trial on screen
-        bar_timing = [x*self.settings['mri']['TR'] for _,x in enumerate(np.where(hemi_bool)[0])]
-        self.bar_timing = np.array([x for _,x in enumerate(bar_timing) if x not in bar_timing[0::mini_block_trials]])
-
-        self.true_responses = get_true_responses(np.array(self.hemifield)[hemi_bool],
-                                                self.settings['stimuli']['feature']['mini_blocks'],
-                                                drop_nan=True)
+        self.bar_timing = [x * self.settings['mri']['TR'] for x in np.where(hemi_bool)[0]]
+        
+        self.true_responses = get_true_responses(np.array(self.hemifield)[hemi_bool], drop_nan = True)
 
         # print window size just to check, not actually needed
         print(self.screen)

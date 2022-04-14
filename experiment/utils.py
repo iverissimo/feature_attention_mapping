@@ -603,8 +603,7 @@ def save_bar_position(bar_dict, output_path):
 
 
 
-
-def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, cue_TR = 3, mini_block_trials = 64):
+def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, task_trial_TR = 2):
     
     """ create feature trials based on order of "type of stimuli" throught experiment  
     and bar positions in run. Outputs number and type of trials, and bar direction and midpoint position
@@ -618,14 +617,17 @@ def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, cue_TR = 
         position dictionary
     empty_TR: int
         number of TRs for empty intervals of experiment
-    cue_TR: int
-        number of TRs for cue intervals of experiment
+    task_trial_TR: int
+        number of TRs for task trials of experiment (bar presentation + ITI)
     mini_block_trials: int
         number of trials for a miniblock of experiment
         
     """
     
-    #create as many trials as TRs
+    # number of trials for actual task (Note - can be different than TR)
+    num_task_trials = len(bar_dict['attended_bar']['bar_pass_direction_at_TR'])
+    
+    # create as many trials as TRs
     trial_number = 0
     bar_pass_direction_all = [] # list of lists with bar orientation at all TRs
     bar_pos_array = [] # list of lists with bar midpoint (x,y) for all TRs (if nan, then show background)
@@ -638,43 +640,43 @@ def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, cue_TR = 
             bar_pass_direction_all = bar_pass_direction_all + np.repeat(bartype,empty_TR).tolist()
 
             for i in range(empty_TR):
-                bar_pos_array.append(np.array([np.nan,np.nan]))
+                temp_pos_list = []
+                for _,key in enumerate(bar_dict.keys()):
+                    temp_pos_list.append(np.array([np.nan,np.nan], dtype=float)) 
+                bar_pos_array.append(np.array(temp_pos_list).astype('float'))
 
-        elif 'cue' in bartype: # cue on screen
-            trial_number += cue_TR
-            trial_type_all = trial_type_all + np.repeat(bartype,cue_TR).tolist()
-            bar_pass_direction_all = bar_pass_direction_all + np.repeat('empty',cue_TR).tolist()
+        elif 'task' in bartype: # bars on screen
+            trial_number += task_trial_TR * num_task_trials # NOTE one feature trial is 1TR of bar display + 1TR of empty screen
+            trial_type_all = trial_type_all + list([bartype]+list(np.tile('empty', task_trial_TR-1))) * num_task_trials
 
-            for i in range(cue_TR):
-                bar_pos_array.append(np.array([np.nan,np.nan]))
-
-        elif 'mini_block' in bartype: # bars on screen
-            trial_number += 2*mini_block_trials  # NOTE one feature trial is 1TR of bar display + 1TR of empty screen
-            trial_type_all = trial_type_all + list([bartype,'empty'])*mini_block_trials
-
-            # get mini block condition keys
-            miniblock_cond_keys = list(bar_dict[bartype].keys())
-
-            for t in range(mini_block_trials):
+            for t in range(num_task_trials):
 
                 temp_dir_list = [] # temporary helper lists
                 temp_pos_list = [] 
 
-                for _,key in enumerate(miniblock_cond_keys):
-                    temp_dir_list.append(bar_dict[bartype][key]['bar_pass_direction_at_TR'][t])
-                    temp_pos_list.append(bar_dict[bartype][key]['bar_midpoint_at_TR'][t])
+                for _,key in enumerate(bar_dict.keys()):
+                    temp_dir_list.append(bar_dict[key]['bar_pass_direction_at_TR'][t])
+                    temp_pos_list.append(bar_dict[key]['bar_midpoint_at_TR'][t])
 
 
                 bar_pass_direction_all.append(temp_dir_list)
-                bar_pass_direction_all.append('empty')
-                bar_pos_array.append(temp_pos_list)
-                bar_pos_array.append(np.array([np.nan,np.nan]))
+                bar_pos_array.append(np.array(temp_pos_list).astype('float'))
+                
+                # rest of TRs will be empty
+                for i in range(task_trial_TR-1):
+                    bar_pass_direction_all.append('empty')
+                    
+                    temp_pos_list = []
+                    for _,key in enumerate(bar_dict.keys()):
+                        temp_pos_list.append(np.array([np.nan,np.nan], dtype=float)) 
+                    bar_pos_array.append(np.array(temp_pos_list).astype('float'))
 
     
     return trial_number, np.array(trial_type_all), np.array(bar_pass_direction_all), np.array(bar_pos_array)
 
 
-def save_all_TR_info(bar_dict, trial_type, attend_block_conditions, hemifield, crossing_ind, output_path):
+
+def save_all_TR_info(bar_dict, trial_type, hemifield, crossing_ind, output_path):
     
     """ save all relevant trial infos in pandas df and 
     save into appropriate output folder
@@ -684,9 +686,9 @@ def save_all_TR_info(bar_dict, trial_type, attend_block_conditions, hemifield, c
     bar_dict : dict
         position dictionary
     trial_type : list/arr
-        list of type of trial ('cue', 'empty', 'miniblock') for all TRs
-    attend_block_conditions: list/arr
-        list of strings to attend in each miniblock
+        list of type of trial ('empty', 'task') for all TRs
+    attend_color: str
+        name of color that is attended
     output_path: str
         absolute path to output file
     hemifield: list/arr
@@ -698,26 +700,19 @@ def save_all_TR_info(bar_dict, trial_type, attend_block_conditions, hemifield, c
     """
     
     df_out = pd.DataFrame(columns=['trial_num','trial_type', 
-                                   'attend_condition', 'bars', 
+                                   'attend_color', 'bars', 
                                    'hemifield', 'crossing_ind'])
-
-    counter = 0
     
     for trl in range(len(trial_type)):
         
-        if trial_type[trl] == 'cue_%i'%(counter+1):
-            counter += 1
-        
         df_out = df_out.append({'trial_num': trl, 
                                 'trial_type': trial_type[trl],
-                                'attend_condition': attend_block_conditions[counter],
-                                'bars': bar_dict['mini_block_%i'%counter].keys(),
+                                'attend_color': bar_dict['attended_bar']['color'],
+                                'bars': bar_dict.keys(),
                                 'hemifield': hemifield[trl],
                                 'crossing_ind': crossing_ind[trl],
                               }, ignore_index=True) 
         
-        
-
     df_out.to_csv(output_path, index = False, header=True)
 
 
@@ -842,18 +837,18 @@ def get_average_color(filedir,settings,task='pRF'):
     return(settings)
 
 
-def get_true_responses(bar_responses,num_miniblk,drop_nan=False):
+def get_true_responses(bar_responses,drop_nan = False):
     
     """
     given array of trial position of attended bar
     output array of true responses for run
-    (same vs dif, nan for first trial if drop_nan=False)
+    (same vs dif, nan for first trial if drop_nan = False)
     """
     
     true_responses = []
     for i in range(len(bar_responses)):
 
-        if i in np.linspace(0, len(bar_responses), num = num_miniblk+1):
+        if i == 0:
             if drop_nan == False:
                 true_responses.append(np.nan)
 

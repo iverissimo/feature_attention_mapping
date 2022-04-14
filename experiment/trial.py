@@ -152,7 +152,7 @@ class PRFTrial(Trial):
 class FeatureTrial(Trial):
 
     def __init__(self, session, trial_nr, phase_durations, phase_names,
-        attend_block_conditions, bar_pass_direction_at_TR, bar_midpoint_at_TR, trial_type_at_TR, timing='seconds', *args, **kwargs):
+        bar_pass_direction_at_TR, bar_midpoint_at_TR, trial_type_at_TR, num_bars_on_screen = 2, timing='seconds', *args, **kwargs):
 
 
         """ Initializes a FeatureTrial object. 
@@ -185,7 +185,6 @@ class FeatureTrial(Trial):
         self.bar_pass_direction_at_TR = bar_pass_direction_at_TR
         self.bar_midpoint_at_TR = bar_midpoint_at_TR
         self.trial_type_at_TR = trial_type_at_TR
-        self.attend_block_conditions = attend_block_conditions
         self.session = session
 
         # phase durations for each condition 
@@ -198,7 +197,7 @@ class FeatureTrial(Trial):
         # get bar and background positions for this trial
         self.position_dictionary = get_object_positions(self.session.grid_pos, self.bar_midpoint_at_TR, self.bar_pass_direction_at_TR,
                                                     self.session.bar_width_pix, screen = self.session.screen, 
-                                                    num_bar = len(self.session.attend_block_conditions))
+                                                    num_bar = num_bars_on_screen)
 
 
     def draw(self): 
@@ -221,47 +220,14 @@ class FeatureTrial(Trial):
 
 
         ## draw stim
-        if 'cue' in self.trial_type_at_TR: # if cue at TR, draw background and word cue
-
-            # define appropriate cue string for the upcoming mini block
-            attend_cond = self.attend_block_conditions[int(self.trial_type_at_TR[-1])]
-
-            # define cue direction
-            if 'vertical' in attend_cond:
-                cue_width = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['feature']['cue_width'], self.session.monitor)
-                cue_height = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['feature']['cue_height'], self.session.monitor)
-
-            else:
-                cue_width = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['feature']['cue_height'], self.session.monitor)
-                cue_height = tools.monitorunittools.deg2pix(self.session.settings['stimuli']['feature']['cue_width'], self.session.monitor)
-
-            # get cue condition name, to use in local elements
-            cue_condition = 'color_red' if 'red' in attend_cond else 'color_green'
-
-
-            self.cue_stim = visual.Rect(win = self.session.win,
-                                        units = "pix",
-                                        width = cue_width,
-                                        height = cue_height,
-                                        fillColor = self.session.settings['stimuli']['conditions'][cue_condition]['element_color'],
-                                        lineColor = self.session.settings['stimuli']['conditions'][cue_condition]['element_color'],
-                                        contrast = self.session.settings['stimuli']['feature']['cue_contrast'],
-                                        opacity = 1.0,
-                                        pos = [0, 0],
-                                        fillColorSpace = 'rgb255',
-                                        lineColorSpace = 'rgb255'
-                                        )
-            self.cue_stim.draw()
-
-            print('cue '+attend_cond)
-                    
-
-        elif 'mini_block' in self.trial_type_at_TR: # if cue at TR, draw background and word cue: # if bar pass at TR, then draw bar
+        if 'task' in self.trial_type_at_TR: # # if bar pass at TR, then draw bar
 
             if self.phase_names[int(self.phase)] == 'stim': 
 
                 # get list of condition names (as defined in yml) for this phase
-                this_phase = list(self.session.all_bar_pos[self.trial_type_at_TR].keys())
+                this_phase = [self.session.all_bar_pos['attended_bar']['color'],
+                                self.session.all_bar_pos['unattended_bar']['color']
+                            ]
                 this_phase = ['color_red' if 'red' in p else 'color_green' for _,p in enumerate(this_phase)]
 
                 self.session.feature_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 

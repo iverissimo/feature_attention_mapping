@@ -34,6 +34,12 @@ def main():
     while exp_type not in ('standard','feature','flicker'):
         exp_type = input('Standard pRF mapping or Feature mapping (standard/feature/flicker)?: ')
 
+    if exp_type == 'feature':
+        att_color = ''
+        while att_color not in ('red', 'green'):
+            att_color = input('Color of attended bar for run (red/green)?: ') 
+        print('Attending color %s'%att_color)
+
     print('Running %s pRF mapping for subject-%s, run-%s'%(exp_type,sj_num,run_num))
 
     
@@ -74,7 +80,8 @@ def main():
          exp_sess = FeatureSession(output_str = output_str,
                                   output_dir = output_dir,
                                   settings_file = 'experiment_settings.yml',
-                                  eyetracker_on = False)
+                                  eyetracker_on = False,
+                                  att_color = att_color)
 
     elif exp_type == 'flicker': # run feature pRF mapper
          exp_sess = FlickerSession(output_str = output_str,

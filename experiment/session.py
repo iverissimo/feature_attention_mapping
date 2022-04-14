@@ -409,7 +409,7 @@ class PRFSession(ExpSession):
 
 class FeatureSession(ExpSession):
     
-    def __init__(self, output_str, output_dir, settings_file, eyetracker_on): # initialize child class
+    def __init__(self, output_str, output_dir, settings_file, eyetracker_on, att_color = 'green'): # initialize child class
 
         """ Initializes FeatureSession object. 
       
@@ -429,7 +429,7 @@ class FeatureSession(ExpSession):
         super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, 
                         eyetracker_on = eyetracker_on)
         
-
+        self.att_color = att_color
     
     def create_stimuli(self):
 
@@ -453,9 +453,8 @@ class FeatureSession(ExpSession):
         self.bar_counter = 0
 
         ## set attended bar color 
-        att_color = 'red' ####### MAKE THIS USER INPUT
-        self.att_condition = [val for val in self.settings['stimuli']['feature']['conditions'] if att_color in val][0]
-        self.unatt_condition = [val for val in self.settings['stimuli']['feature']['conditions'] if att_color not in val][0]
+        self.att_condition = [val for val in self.settings['stimuli']['feature']['conditions'] if self.att_color in val][0]
+        self.unatt_condition = [val for val in self.settings['stimuli']['feature']['conditions'] if self.att_color not in val][0]
 
 
         ## get all possible bar positions

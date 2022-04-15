@@ -39,6 +39,7 @@ def main():
         while att_color not in ('red', 'green'):
             att_color = input('Color of attended bar for run (red/green)?: ') 
         print('Attending color %s'%att_color)
+        att_color = 'color_'+att_color
 
     print('Running %s pRF mapping for subject-%s, run-%s'%(exp_type,sj_num,run_num))
 

@@ -230,12 +230,17 @@ class FeatureTrial(Trial):
                             ]
                 this_phase = ['color_red' if 'red' in p else 'color_green' for _,p in enumerate(this_phase)]
 
+                # get new colors from staircase values
+                staircase_colors = self.get_staircase_color(this_phase = this_phase)
+
                 self.session.feature_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
                                                bar_pass_direction_at_TR = self.bar_pass_direction_at_TR,
                                                this_phase = this_phase,
                                                position_dictionary = self.position_dictionary,
                                                orientation = self.session.ori_bool,
-                                               drawing_ind = self.session.drawing_ind[self.ID]) 
+                                               drawing_ind = self.session.drawing_ind[self.ID],
+                                               new_colors = staircase_colors
+                                               ) 
 
 
         print(self.phase_names[int(self.phase)]) #print(self.phase_names[int(self.phase)])
@@ -250,8 +255,48 @@ class FeatureTrial(Trial):
 
         # fixation lines
         self.session.line1.draw() 
-        self.session.line2.draw() 
-            
+        self.session.line2.draw()
+
+
+    def get_staircase_color(self, this_phase = []):
+
+        """ Get bars colors given staircase values """
+
+        new_colors = []
+        
+        ## loop through bars on screen
+        for p in this_phase:
+            # eccentricity of bar in trial
+            ecc_ind_at_TR = self.session.ecc_ind_all[p][self.session.bar_counter]
+
+            # color value obtained from quest staircase
+            color_quest_sample = self.session.staircases['ecc_ind_{e}'.format(e = ecc_ind_at_TR)].quantile()
+            print(color_quest_sample)
+
+            # get task colors key name for current trial
+            current_color = self.session.task_colors[p][self.session.ctask_ind_all[p][self.session.bar_counter]]
+
+            # current phase color (in RGB255!)
+            phase_color = self.session.settings['stimuli']['conditions'][p]['element_color'].copy()
+
+            # update them
+            if 'orange' in current_color:
+
+               phase_color[1] = color_quest_sample ## red to orange --> adds value to green channel
+
+            elif 'pink' in current_color or 'blue' in current_color:
+
+                phase_color[-1] = color_quest_sample ## red to pink OR green to blue --> adds value to blue channel
+
+            elif 'yellow' in current_color:
+
+                phase_color[0] = color_quest_sample ## green to yellow --> adds value to red channel
+
+            new_colors.append(phase_color)
+
+        #print('new rgb255 are %s'%str(new_colors))
+
+        return np.array(new_colors) 
 
 
     def get_events(self):
@@ -260,7 +305,7 @@ class FeatureTrial(Trial):
             if len(ev) > 0:
                 if ev in ['q']:
                     print('trial canceled by user')  
-                    self.session.close()
+                    self.session.close_all()
                     self.session.quit()
 
                 elif (ev == self.session.mri_trigger) and (self.session.settings['stimuli']['feature']['sync_scanner']==True): # TR pulse
@@ -273,15 +318,30 @@ class FeatureTrial(Trial):
 
                     if t >= self.session.bar_timing[self.session.bar_counter]:
 
-                        if (ev in self.session.settings['keys']['left_index']) and (self.session.true_responses[self.session.bar_counter] == 'same'):
+                        if (ev in self.session.settings['keys']['left_index']) and (self.session.task_colors[self.session.att_condition][1]):
                             self.session.correct_responses += 1
+                            self.session.thisResp.append(1)
+
                             if self.session.bar_counter<len(self.session.true_responses)-1:
                                 self.session.bar_counter += 1 
-                        elif (ev in self.session.settings['keys']['right_index']) and (self.session.true_responses[self.session.bar_counter] == 'different'): 
+                        elif (ev in self.session.settings['keys']['right_index']) and (self.session.task_colors[self.session.att_condition][0]): 
                             self.session.correct_responses += 1
+                            self.session.thisResp.append(1)
+
+                            if self.session.bar_counter<len(self.session.true_responses)-1:
+                                self.session.bar_counter += 1 
+                        else:
+                            self.session.thisResp.append(0)
+                            
                             if self.session.bar_counter<len(self.session.true_responses)-1:
                                 self.session.bar_counter += 1 
 
+                    else:
+                        if len(self.session.thisResp)>0:
+                            # update staircase
+                            self.session.staircases['ecc_ind_{e}'.format(e = self.session.ecc_ind_all[self.session.att_condition][self.session.bar_counter])].addResponse(self.session.thisResp[-1])
+                            # reset response again
+                            self.session.thisResp = []
 
 
                 # log everything into session data frame

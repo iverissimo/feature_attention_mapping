@@ -186,7 +186,7 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_pass_direction_at_TR,
 
 def update_elements(ElementArrayStim, condition_settings, this_phase, elem_positions, grid_pos,
                    	monitor, screen = np.array([1680,1050]), position_jitter = None, orientation = True, 
-                    background_contrast = None, luminance = None, update_settings = False):
+                    background_contrast = None, luminance = None, update_settings = False, new_color = False):
     
     """ update element array settings
     
@@ -211,6 +211,8 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
         luminance increment to alter color (used for flicker task)
     update_settings: bool
         choose if we want to update settings or not (mainly for color changes)
+    new_color: array
+        if we are changing color to be one not represented in settings (ca also be False if no new color used)
         
     """
     
@@ -219,9 +221,13 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
 
     ## to make colored gabor, need to do it a bit differently (psychopy forces colors to be opposite)
     # get rgb color and convert to hsv
-    hsv_color = rgb255_2_hsv(condition_settings[this_phase]['element_color'])
+    if np.array(new_color).any():
+        hsv_color = rgb255_2_hsv(new_color)
+        print('new hsv is %s'%str(hsv_color))
+    else:
+        hsv_color = rgb255_2_hsv(condition_settings[this_phase]['element_color'])
 
-    if luminance != None: # if we want to make color more or less luminate
+    if luminance != None: # if we want to make color more or less luminant
 
         hsv_color[-1] = luminance
         hsv_color[-1] = np.clip(hsv_color[-1],0.00001,1) # clip it so it doesn't go above 100% or below 0.0001% (latter avoids 0 division)
@@ -862,3 +868,33 @@ def get_true_responses(bar_responses,drop_nan = False):
     return true_responses
 
     
+def get_bar_eccentricity(all_bar_pos, 
+                        hor_bar_pos_pix = [], 
+                        ver_bar_pos_pix = [], 
+                        bar_key = 'attended_bar'):
+
+    """
+    get eccentricity indice for bars on all trials
+    returns array of ecc, with 0 - nearest and 2 being furthest
+    """
+
+    ecc_trials = []
+
+    for t, bpos in enumerate(all_bar_pos[bar_key]['bar_midpoint_at_TR']):
+
+        if all_bar_pos[bar_key]['bar_pass_direction_at_TR'][t] == 'horizontal':
+
+            ind_pos = np.where(np.sum(hor_bar_pos_pix == bpos, axis = -1) == 2)[0][0]
+
+        elif all_bar_pos[bar_key]['bar_pass_direction_at_TR'][t] == 'vertical':
+
+            ind_pos = np.where(np.sum(ver_bar_pos_pix == bpos, axis = -1) == 2)[0][0]
+
+        # adjust ecc indice to be between 0 and 2 (0 - nearest, 2 - furthest)
+        val = ind_pos - len(ver_bar_pos_pix)/2
+        if val < 0: 
+            val = np.abs(val)-1
+
+        ecc_trials.append(int(val))
+        
+    return np.array(ecc_trials)

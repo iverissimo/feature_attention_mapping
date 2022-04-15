@@ -9,8 +9,10 @@ from trial import PRFTrial, FeatureTrial, FlickerTrial
 from stim import PRFStim, FeatureStim, FlickerStim
 
 from psychopy import visual, tools
+from psychopy.data import QuestHandler
 
 import itertools
+import pickle
 
 from utils import *
 
@@ -409,7 +411,7 @@ class PRFSession(ExpSession):
 
 class FeatureSession(ExpSession):
     
-    def __init__(self, output_str, output_dir, settings_file, eyetracker_on, att_color = 'green'): # initialize child class
+    def __init__(self, output_str, output_dir, settings_file, eyetracker_on, att_color = 'color_green'): # initialize child class
 
         """ Initializes FeatureSession object. 
       
@@ -430,6 +432,10 @@ class FeatureSession(ExpSession):
                         eyetracker_on = eyetracker_on)
         
         self.att_color = att_color
+        self.staircase_file_name = output_str + '_staircase_quest' 
+
+        ## set task colors
+        self.task_colors = self.settings['stimuli']['feature']['task_colors']
     
     def create_stimuli(self):
 
@@ -451,6 +457,7 @@ class FeatureSession(ExpSession):
         self.total_responses = 0
         self.correct_responses = 0
         self.bar_counter = 0
+        self.thisResp = []
 
         ## set attended bar color 
         self.att_condition = [val for val in self.settings['stimuli']['feature']['conditions'] if self.att_color in val][0]
@@ -491,7 +498,7 @@ class FeatureSession(ExpSession):
         save_bar_position(self.all_bar_pos, 
                           op.join(self.output_dir, self.output_str+'_bar_positions.pkl'))
 
-        # list with order of "type of stimuli" throught experiment (called bar direction to make analogous with other class)
+        # list with order of "type of stimuli" throughout experiment (called bar direction to make analogous with other class)
         bar_pass_direction = self.settings['stimuli']['feature']['bar_pass_direction'] 
 
         # number of TRs per "type of stimuli"
@@ -509,6 +516,25 @@ class FeatureSession(ExpSession):
                                                                                                                             task_trial_TR = task_trial_TR)
                 
         print("Total number of (expected) TRs: %d"%self.trial_number)
+
+        ## get eccentricity indice for all trials
+        # of attended and UNattended bar
+        self.ecc_ind_all = {}
+        self.ecc_ind_all[self.att_condition] = get_bar_eccentricity(self.all_bar_pos, 
+                                                        hor_bar_pos_pix = hor_bar_pos_pix, 
+                                                        ver_bar_pos_pix = ver_bar_pos_pix, 
+                                                        bar_key = 'attended_bar')
+        self.ecc_ind_all[self.unatt_condition] = get_bar_eccentricity(self.all_bar_pos, 
+                                                        hor_bar_pos_pix = hor_bar_pos_pix, 
+                                                        ver_bar_pos_pix = ver_bar_pos_pix, 
+                                                        bar_key = 'unattended_bar')
+
+        ## randomly assign which color the bar will have, 
+        # for target bar (attended color)
+        self.ctask_ind_all = {}
+        self.ctask_ind_all[self.att_condition] = np.random.randint(2, size = len(self.all_bar_pos['attended_bar']['bar_pass_direction_at_TR']))
+        # for distractor bar (unattended color)
+        self.ctask_ind_all[self.unatt_condition] = np.random.randint(2, size = len(self.all_bar_pos['unattended_bar']['bar_pass_direction_at_TR']))
 
         # set plotting order index, to randomize which bars appear on top, for all trials in all miniblocks
         # and get hemifield position of attended bar
@@ -602,6 +628,53 @@ class FeatureSession(ExpSession):
         print(self.screen)
 
 
+    def create_staircase(self, num_ecc = 3, att_color = 'color_red',
+                            initial_values = {'color_red': [50, 50, 50], 'color_green': [50, 50, 50]},
+                            pThreshold = 0.83, minVal = 0, maxVal = 90):
+    
+        """ Creates staircases (before running the session) """
+        
+        self.num_ecc_staircase = num_ecc
+        self.initial_values = initial_values
+        
+        self.staircases = {}
+        
+        for ind in range(self.num_ecc_staircase):
+            
+            self.staircases['ecc_ind_%i'%ind] = QuestHandler(initial_values[att_color][ind],
+                                                            initial_values[att_color][ind]*.5,
+                                                            pThreshold = pThreshold,
+                                                            #nTrials = 20,
+                                                            stopInterval = None,
+                                                            beta = 3.5,
+                                                            delta = 0.05,
+                                                            gamma = 0,
+                                                            grain = 0.01,
+                                                            range = None,
+                                                            extraInfo = None,
+                                                            minVal = minVal, 
+                                                            maxVal = maxVal 
+                                                            )
+
+    def close_all(self):
+        
+        """ to guarantee that when closing, everything is saved """
+
+        super(FeatureSession, self).close()
+
+        
+
+        for e in self.staircases.keys():
+            abs_filename = op.join(self.output_dir, self.staircase_file_name.replace('_quest', '_quest_{e}'.format(e = e)))
+            #with open(abs_filename, 'w') as f:
+            #    pickle.dump(self.staircases[e], f)
+
+            self.staircases[e].saveAsPickle(abs_filename)
+            print('Staircase of {ecc}, has mean {stair_mean}, and standard deviation {stair_std}'.format(ecc = e, 
+                                                                                                        stair_mean = self.staircases[e].mean(), 
+                                                                                                        stair_std = self.staircases[e].sd()
+                                                                                                        ))
+
     def run(self):
         """ Loops over trials and runs them """
 
@@ -610,7 +683,10 @@ class FeatureSession(ExpSession):
 
         # create trials before running!
         self.create_stimuli()
-        self.create_trials() 
+        self.create_trials()
+
+        # create staircase
+        self.create_staircase(att_color = self.att_color) ### NEED TO DEFINE MORE INPUTS FROM YML
 
         # if eyetracking then calibrate
         if self.eyetracker_on:
@@ -701,7 +777,7 @@ class FeatureSession(ExpSession):
         print('Correct responses: %d'%self.correct_responses)
           
 
-        self.close() # close session
+        self.close_all() # close session
 
 
 

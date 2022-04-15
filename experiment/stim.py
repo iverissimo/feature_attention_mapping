@@ -163,7 +163,7 @@ class FeatureStim(Stim):
                                                                 colorSpace = self.session.settings['stimuli']['colorSpace']) 
 
 
-    def draw(self, bar_midpoint_at_TR, bar_pass_direction_at_TR, this_phase, position_dictionary, orientation = True, drawing_ind = [0,1,2,3]):
+    def draw(self, bar_midpoint_at_TR, bar_pass_direction_at_TR, this_phase, position_dictionary, orientation = True, drawing_ind = [0,1], new_colors = [False, False]):
         
         """ Draw stimuli - pRF bars - for each trial 
         
@@ -190,7 +190,8 @@ class FeatureStim(Stim):
                                                         elem_positions = position_dictionary['bar0']['xys'], 
                                                         grid_pos = self.grid_pos,
                                                         monitor = self.session.monitor, 
-                                                        screen = self.session.screen)
+                                                        screen = self.session.screen,
+                                                        new_color = new_colors[0])
 
             self.session.bar1_array =  update_elements(ElementArrayStim = self.session.bar1_array,
                                                         condition_settings = self.condition_settings, 
@@ -200,12 +201,12 @@ class FeatureStim(Stim):
                                                         elem_positions = position_dictionary['bar1']['xys'], 
                                                         grid_pos = self.grid_pos,
                                                         monitor = self.session.monitor, 
-                                                        screen = self.session.screen)
+                                                        screen = self.session.screen,
+                                                        new_color = new_colors[1])
 
-        # actually draw
-        if this_phase != 'background':
             
-            bars2plot = [self.session.bar0_array,self.session.bar1_array]
+            # actually draw
+            bars2plot = [self.session.bar0_array, self.session.bar1_array]
 
             bars2plot[drawing_ind[0]].draw()
             bars2plot[drawing_ind[1]].draw()

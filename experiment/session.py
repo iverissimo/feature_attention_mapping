@@ -505,7 +505,6 @@ class FeatureSession(ExpSession):
         empty_TR = self.settings['stimuli']['feature']['empty_TR']
         task_trial_TR = self.settings['stimuli']['feature']['task_trial_TR'] 
 
-
         # set number of trials,
         # list of type of trial (empty, task) for all TRs,
         # list of strings/lists with bar direction/orientation or 'empty',
@@ -576,9 +575,9 @@ class FeatureSession(ExpSession):
         # if in scanner, we want it to be synced to trigger, so lets increase trial time (in seconds, like TR)
         max_trial_time = 5 if self.settings['stimuli']['feature']['sync_scanner']==True else self.settings['mri']['TR']
 
-
         # append all trials
         self.all_trials = []
+
         for i in range(self.trial_number):
 
             # set phase conditions (for logging) and durations
@@ -586,10 +585,10 @@ class FeatureSession(ExpSession):
                 phase_cond = tuple(['stim','background'])
                 phase_dur = tuple([self.settings['stimuli']['feature']['bars_phase_dur'],
                                     max_trial_time-self.settings['stimuli']['feature']['bars_phase_dur']])
+                            
             else:
                 phase_cond = tuple([self.trial_type_all[i]])
                 phase_dur = tuple([max_trial_time])
-
 
             self.all_trials.append(FeatureTrial(session = self,
                                                 trial_nr = i, 
@@ -618,19 +617,17 @@ class FeatureSession(ExpSession):
         self.ori_ind = 0
 
         # make boolean array to see which trials are stim trials
-        hemi_bool = [True if type(x)==str else False for _,x in enumerate(self.hemifield)]
+        self.bar_bool = [True if type(x)==str else False for _,x in enumerate(self.hemifield)]
         # time in seconds for when bar trial on screen
-        self.bar_timing = [x * self.settings['mri']['TR'] for x in np.where(hemi_bool)[0]]
-        
-        self.true_responses = get_true_responses(np.array(self.hemifield)[hemi_bool], drop_nan = True)
+        self.bar_timing = [x * self.settings['mri']['TR'] for x in np.where(self.bar_bool)[0]]
 
         # print window size just to check, not actually needed
         print(self.screen)
 
 
     def create_staircase(self, num_ecc = 3, att_color = 'color_red',
-                            initial_values = {'color_red': [50, 50, 50], 'color_green': [50, 50, 50]},
-                            pThreshold = 0.83, minVal = 0, maxVal = 90):
+                            initial_values = {'color_red': [.5, .5, .5], 'color_green': [.5, .5, .5]},
+                            pThreshold = 0.83, minVal = 0, maxVal = 1):
     
         """ Creates staircases (before running the session) """
         
@@ -662,12 +659,10 @@ class FeatureSession(ExpSession):
 
         super(FeatureSession, self).close()
 
-        
-
         for e in self.staircases.keys():
-            abs_filename = op.join(self.output_dir, self.staircase_file_name.replace('_quest', '_quest_{e}'.format(e = e)))
-            #with open(abs_filename, 'w') as f:
-            #    pickle.dump(self.staircases[e], f)
+            abs_filename = op.join(self.output_dir, self.staircase_file_name.replace('_quest', '_quest_{e}.pickle'.format(e = e)))
+            with open(abs_filename, 'wb') as f:
+                pickle.dump(self.staircases[e], f)
 
             self.staircases[e].saveAsPickle(abs_filename)
             print('Staircase of {ecc}, has mean {stair_mean}, and standard deviation {stair_std}'.format(ecc = e, 
@@ -772,7 +767,7 @@ class FeatureSession(ExpSession):
             trl.run() # run forrest run
 
 
-        print('Expected number of responses: %d'%(len(self.true_responses)))
+        #print('Expected number of responses: %d'%(len(self.true_responses)))
         print('Total subject responses: %d'%self.total_responses)
         print('Correct responses: %d'%self.correct_responses)
           

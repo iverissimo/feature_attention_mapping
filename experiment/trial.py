@@ -214,10 +214,9 @@ class FeatureTrial(Trial):
                 self.session.ori_counter += 1
 
         ## bar counter, for responses sanity check
-        if self.session.bar_counter<len(self.session.true_responses)-1:
+        if self.session.bar_counter<len(self.session.bar_timing)-1:
             if current_time >= (self.session.bar_timing[self.session.bar_counter] + self.session.settings['mri']['TR']): # if no valid reply in this window, increment
                 self.session.bar_counter += 1 
-
 
         ## draw stim
         if 'task' in self.trial_type_at_TR: # # if bar pass at TR, then draw bar
@@ -258,23 +257,28 @@ class FeatureTrial(Trial):
         self.session.line2.draw()
 
 
-    def get_staircase_color(self, this_phase = []):
+    def get_staircase_color(self, this_phase = [], max_color_val = 90):
 
         """ Get bars colors given staircase values """
 
         new_colors = []
+
+        # get bar indice - used to know which ecc and color to use in that trial
+        bar_ind = np.where(np.where(self.session.bar_bool)[0] == self.ID)[0][0]
         
         ## loop through bars on screen
         for p in this_phase:
             # eccentricity of bar in trial
-            ecc_ind_at_TR = self.session.ecc_ind_all[p][self.session.bar_counter]
+            ecc_ind_at_TR = self.session.ecc_ind_all[p][bar_ind] 
 
             # color value obtained from quest staircase
-            color_quest_sample = self.session.staircases['ecc_ind_{e}'.format(e = ecc_ind_at_TR)].quantile()
+            # quest will have a ratio that is multiplied by max_color val (set a max limit)
+            # Note - clipping to avoid negative values
+            color_quest_sample = max_color_val * np.clip(self.session.staircases['ecc_ind_{e}'.format(e = ecc_ind_at_TR)].quantile(), 0, 1)
             print(color_quest_sample)
 
             # get task colors key name for current trial
-            current_color = self.session.task_colors[p][self.session.ctask_ind_all[p][self.session.bar_counter]]
+            current_color = self.session.task_colors[p][self.session.ctask_ind_all[p][bar_ind]]
 
             # current phase color (in RGB255!)
             phase_color = self.session.settings['stimuli']['conditions'][p]['element_color'].copy()
@@ -316,33 +320,43 @@ class FeatureTrial(Trial):
                     event_type = 'response'
                     self.session.total_responses += 1
 
-                    if t >= self.session.bar_timing[self.session.bar_counter]:
+                    if t >= self.session.bar_timing[self.session.bar_counter]:   
 
+                        # update color with answer
+                        if len(self.session.thisResp) > 0: # update with answer
+                            # update staircase
+                            self.session.staircases['ecc_ind_{e}'.format(e = self.session.ecc_ind_all[self.session.att_condition][self.session.bar_counter])].addResponse(self.session.thisResp[-1])
+                            print('The threshold is {s}'.format(s=self.session.staircases['ecc_ind_{e}'.format(e = self.session.ecc_ind_all[self.session.att_condition][self.session.bar_counter])].quantile()))
+                            # reset response again
+                            self.session.thisResp = [] 
+
+                        # correct response
                         if (ev in self.session.settings['keys']['left_index']) and (self.session.task_colors[self.session.att_condition][1]):
                             self.session.correct_responses += 1
                             self.session.thisResp.append(1)
 
-                            if self.session.bar_counter<len(self.session.true_responses)-1:
+                            if self.session.bar_counter<len(self.session.bar_timing)-1:
                                 self.session.bar_counter += 1 
+
+                        # correct response
                         elif (ev in self.session.settings['keys']['right_index']) and (self.session.task_colors[self.session.att_condition][0]): 
                             self.session.correct_responses += 1
                             self.session.thisResp.append(1)
 
-                            if self.session.bar_counter<len(self.session.true_responses)-1:
-                                self.session.bar_counter += 1 
-                        else:
-                            self.session.thisResp.append(0)
-                            
-                            if self.session.bar_counter<len(self.session.true_responses)-1:
+                            if self.session.bar_counter<len(self.session.bar_timing)-1:
                                 self.session.bar_counter += 1 
 
-                    else:
-                        if len(self.session.thisResp)>0:
-                            # update staircase
-                            self.session.staircases['ecc_ind_{e}'.format(e = self.session.ecc_ind_all[self.session.att_condition][self.session.bar_counter])].addResponse(self.session.thisResp[-1])
-                            # reset response again
-                            self.session.thisResp = []
+                        # incorrect responses 
+                        elif ((ev in self.session.settings['keys']['left_index']) and \
+                            (self.session.task_colors[self.session.att_condition][0])) or \
+                                ((ev in self.session.settings['keys']['right_index']) and \
+                                    (self.session.task_colors[self.session.att_condition][1])):
 
+                                    self.session.thisResp.append(0)
+                                    print('WRONG')
+                                    
+                                    if self.session.bar_counter<len(self.session.bar_timing)-1:
+                                        self.session.bar_counter += 1                         
 
                 # log everything into session data frame
                 idx = self.session.global_log.shape[0]

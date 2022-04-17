@@ -303,6 +303,24 @@ class FeatureTrial(Trial):
         return np.array(new_colors) 
 
 
+    def get_response4staircase(self, event_key = [], task_color = []):
+
+        """ helper function """
+
+        if (event_key in self.session.settings['keys']['left_index']) and (task_color in ['blue', 'pink']):
+            response = 1
+            print('correct')
+        elif (event_key in self.session.settings['keys']['right_index']) and (task_color in ['yellow', 'orange']):
+            response = 1
+            print('correct')
+        else:
+            response = 0
+            print('wrong')
+
+        return response 
+
+
+
     def get_events(self):
         """ Logs responses/triggers """
         for ev, t in event.getKeys(timeStamped=self.session.clock): # list of of (keyname, time) relative to Clock’s last reset
@@ -326,37 +344,19 @@ class FeatureTrial(Trial):
                         if len(self.session.thisResp) > 0: # update with answer
                             # update staircase
                             self.session.staircases['ecc_ind_{e}'.format(e = self.session.ecc_ind_all[self.session.att_condition][self.session.bar_counter])].addResponse(self.session.thisResp[-1])
-                            print('The threshold is {s}'.format(s=self.session.staircases['ecc_ind_{e}'.format(e = self.session.ecc_ind_all[self.session.att_condition][self.session.bar_counter])].quantile()))
+                            #print('The threshold is {s}'.format(s=self.session.staircases['ecc_ind_{e}'.format(e = self.session.ecc_ind_all[self.session.att_condition][self.session.bar_counter])].quantile()))
                             # reset response again
-                            self.session.thisResp = [] 
+                            self.session.thisResp = []
 
-                        # correct response
-                        if (ev in self.session.settings['keys']['left_index']) and (self.session.task_colors[self.session.att_condition][1]):
-                            self.session.correct_responses += 1
-                            self.session.thisResp.append(1)
+                        ## get user response!
+                        user_response = self.get_response4staircase(event_key = ev, 
+                                                                    task_color = self.session.task_colors[self.session.att_condition][self.session.ctask_ind_all[self.session.att_condition][self.session.bar_counter]])
 
-                            if self.session.bar_counter<len(self.session.bar_timing)-1:
-                                self.session.bar_counter += 1 
+                        self.session.thisResp.append(user_response)
+                        self.session.correct_responses += user_response
 
-                        # correct response
-                        elif (ev in self.session.settings['keys']['right_index']) and (self.session.task_colors[self.session.att_condition][0]): 
-                            self.session.correct_responses += 1
-                            self.session.thisResp.append(1)
-
-                            if self.session.bar_counter<len(self.session.bar_timing)-1:
-                                self.session.bar_counter += 1 
-
-                        # incorrect responses 
-                        elif ((ev in self.session.settings['keys']['left_index']) and \
-                            (self.session.task_colors[self.session.att_condition][0])) or \
-                                ((ev in self.session.settings['keys']['right_index']) and \
-                                    (self.session.task_colors[self.session.att_condition][1])):
-
-                                    self.session.thisResp.append(0)
-                                    print('WRONG')
-                                    
-                                    if self.session.bar_counter<len(self.session.bar_timing)-1:
-                                        self.session.bar_counter += 1                         
+                        if self.session.bar_counter<len(self.session.bar_timing)-1:
+                            self.session.bar_counter += 1                        
 
                 # log everything into session data frame
                 idx = self.session.global_log.shape[0]

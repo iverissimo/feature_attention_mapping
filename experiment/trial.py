@@ -257,7 +257,7 @@ class FeatureTrial(Trial):
         self.session.line2.draw()
 
 
-    def get_staircase_color(self, this_phase = [], max_color_val = 90):
+    def get_staircase_color(self, this_phase = [], max_color_val = 60):
 
         """ Get bars colors given staircase values """
 
@@ -353,7 +353,7 @@ class FeatureTrial(Trial):
                                                                     task_color = self.session.task_colors[self.session.att_condition][self.session.ctask_ind_all[self.session.att_condition][self.session.bar_counter]])
 
                         self.session.thisResp.append(user_response)
-                        self.session.correct_responses += user_response
+                        self.session.correct_responses[self.ID] = user_response
 
                         if self.session.bar_counter<len(self.session.bar_timing)-1:
                             self.session.bar_counter += 1                        

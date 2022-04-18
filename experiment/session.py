@@ -452,17 +452,13 @@ class FeatureSession(ExpSession):
 
         """ Creates trials (before running the session) """
 
-        #
-        # counter for responses
-        self.total_responses = 0
-        self.correct_responses = 0
+        # some counters for internal bookeeping
         self.bar_counter = 0
         self.thisResp = []
 
         ## set attended bar color 
         self.att_condition = [val for val in self.settings['stimuli']['feature']['conditions'] if self.att_color in val][0]
         self.unatt_condition = [val for val in self.settings['stimuli']['feature']['conditions'] if self.att_color not in val][0]
-
 
         ## get all possible bar positions
 
@@ -497,6 +493,10 @@ class FeatureSession(ExpSession):
         # save bar positions for run in output folder
         save_bar_position(self.all_bar_pos, 
                           op.join(self.output_dir, self.output_str+'_bar_positions.pkl'))
+
+        ## response counters
+        self.total_responses = 0
+        self.correct_responses = np.zeros(len(self.all_bar_pos['attended_bar']['bar_pass_direction_at_TR']))
 
         # list with order of "type of stimuli" throughout experiment (called bar direction to make analogous with other class)
         bar_pass_direction = self.settings['stimuli']['feature']['bar_pass_direction'] 
@@ -536,11 +536,9 @@ class FeatureSession(ExpSession):
         self.ctask_ind_all[self.unatt_condition] = np.random.randint(2, size = len(self.all_bar_pos['unattended_bar']['bar_pass_direction_at_TR']))
 
         # set plotting order index, to randomize which bars appear on top, for all trials in all miniblocks
-        # and get hemifield position of attended bar
         self.drawing_ind = []
-        self.hemifield = []
 
-        for indx, val in enumerate(self.trial_type_all):
+        for _, val in enumerate(self.trial_type_all):
             
             if 'task' in val:
                 ind_list = np.arange(self.settings['stimuli']['feature']['num_bars'])
@@ -548,29 +546,15 @@ class FeatureSession(ExpSession):
                 
                 self.drawing_ind.append(ind_list)
 
-                if self.bar_pass_direction_all[indx][0] == 'horizontal': # if attended bar vertical (horizontal bar pass)
-
-                    if self.bar_midpoint_all[indx][0][0] < 0: # append hemifield 
-                        self.hemifield.append('left')
-                    else:
-                        self.hemifield.append('right')
-
-                elif self.bar_pass_direction_all[indx][0] == 'vertical': # if attended bar horizontal (vertical bar pass)
-
-                    if self.bar_midpoint_all[indx][0][-1] < 0: # append hemifield     
-                        self.hemifield.append('down') 
-                    else:  
-                        self.hemifield.append('up')
-                    
             else: # if not in miniblock, these are nan
                 self.drawing_ind.append([np.nan])
-                self.hemifield.append(np.nan)
-
 
         # save relevant trial info in df (for later analysis)
-        save_all_TR_info(self.all_bar_pos, self.trial_type_all, 
-                        self.hemifield, self.drawing_ind, 
-                        op.join(self.output_dir, self.output_str+'_trial_info.csv'))
+        save_all_TR_info(bar_dict = self.all_bar_pos, trial_type = self.trial_type_all, 
+                        task_colors = self.task_colors, task_color_ind = self.ctask_ind_all,
+                        crossing_ind = self.drawing_ind,
+                        ecc_ind = self.ecc_ind_all,
+                        output_path = op.join(self.output_dir, self.output_str+'_trial_info.csv'))
                          
         # if in scanner, we want it to be synced to trigger, so lets increase trial time (in seconds, like TR)
         max_trial_time = 5 if self.settings['stimuli']['feature']['sync_scanner']==True else self.settings['mri']['TR']
@@ -617,7 +601,7 @@ class FeatureSession(ExpSession):
         self.ori_ind = 0
 
         # make boolean array to see which trials are stim trials
-        self.bar_bool = [True if type(x)==str else False for _,x in enumerate(self.hemifield)]
+        self.bar_bool = [True if x == 'task' else False for _,x in enumerate(self.trial_type_all)]
         # time in seconds for when bar trial on screen
         self.bar_timing = [x * self.settings['mri']['TR'] for x in np.where(self.bar_bool)[0]]
 
@@ -664,11 +648,13 @@ class FeatureSession(ExpSession):
             with open(abs_filename, 'wb') as f:
                 pickle.dump(self.staircases[e], f)
 
-            self.staircases[e].saveAsPickle(abs_filename)
+            #self.staircases[e].saveAsPickle(abs_filename)
             print('Staircase of {ecc}, has mean {stair_mean}, and standard deviation {stair_std}'.format(ecc = e, 
                                                                                                         stair_mean = self.staircases[e].mean(), 
                                                                                                         stair_std = self.staircases[e].sd()
                                                                                                         ))
+
+        ## call func to plot staircase outputs
 
     def run(self):
         """ Loops over trials and runs them """
@@ -767,7 +753,7 @@ class FeatureSession(ExpSession):
             trl.run() # run forrest run
 
 
-        #print('Expected number of responses: %d'%(len(self.true_responses)))
+        print('Expected number of responses: %d'%(sum(self.bar_bool)))
         print('Total subject responses: %d'%self.total_responses)
         print('Correct responses: %d'%self.correct_responses)
           

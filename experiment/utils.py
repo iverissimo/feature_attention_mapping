@@ -682,7 +682,8 @@ def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, task_tria
 
 
 
-def save_all_TR_info(bar_dict, trial_type, hemifield, crossing_ind, output_path):
+def save_all_TR_info(bar_dict = [], trial_type = [], ecc_ind = {},
+                     task_colors = {}, task_color_ind = {}, crossing_ind = [], output_path = ''):
     
     """ save all relevant trial infos in pandas df and 
     save into appropriate output folder
@@ -705,17 +706,43 @@ def save_all_TR_info(bar_dict, trial_type, hemifield, crossing_ind, output_path)
         
     """
     
+    # get colors for attended task
+    c_att = np.array([task_colors[bar_dict['attended_bar']['color']][v] for v in task_color_ind[bar_dict['attended_bar']['color']]])
+    attend_task_color = np.full(len(trial_type), None)
+    attend_task_color[np.where(trial_type == 'task')[0]] = c_att
+
+    # do same for unattended task
+    c_unatt = np.array([task_colors[bar_dict['unattended_bar']['color']][v] for v in task_color_ind[bar_dict['unattended_bar']['color']]])
+    unattend_task_color = np.full(len(trial_type), None)
+    unattend_task_color[np.where(trial_type == 'task')[0]] = c_unatt
+    
+    # get ecc - attended
+    ecc_att = ecc_ind[bar_dict['attended_bar']['color']]
+    attend_ecc = np.full(len(trial_type), None)
+    attend_ecc[np.where(trial_type == 'task')[0]] = ecc_att
+
+    # get ecc - unattended
+    ecc_unatt = ecc_ind[bar_dict['unattended_bar']['color']]
+    unattend_ecc = np.full(len(trial_type), None)
+    unattend_ecc[np.where(trial_type == 'task')[0]] = ecc_unatt
+
+    
     df_out = pd.DataFrame(columns=['trial_num','trial_type', 
-                                   'attend_color', 'bars', 
-                                   'hemifield', 'crossing_ind'])
+                                   'attend_color', 'attend_task_color',
+                                   'unattend_color', 'unattend_task_color',
+                                   'bars', 'attend_ecc_ind', 'unattend_ecc_ind', 'crossing_ind'])
     
     for trl in range(len(trial_type)):
         
         df_out = df_out.append({'trial_num': trl, 
                                 'trial_type': trial_type[trl],
                                 'attend_color': bar_dict['attended_bar']['color'],
+                                'attend_task_color' : attend_task_color[trl],
+                                'unattend_color': bar_dict['unattended_bar']['color'],
+                                'unattend_task_color': unattend_task_color[trl],
                                 'bars': bar_dict.keys(),
-                                'hemifield': hemifield[trl],
+                                'attend_ecc_ind': attend_ecc[trl], 
+                                'unattend_ecc_ind': unattend_ecc[trl],
                                 'crossing_ind': crossing_ind[trl],
                               }, ignore_index=True) 
         

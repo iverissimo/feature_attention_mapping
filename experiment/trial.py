@@ -230,7 +230,7 @@ class FeatureTrial(Trial):
                 this_phase = ['color_red' if 'red' in p else 'color_green' for _,p in enumerate(this_phase)]
 
                 # get new colors from staircase values
-                staircase_colors = self.get_staircase_color(this_phase = this_phase, quest_stair = True)
+                staircase_colors = self.get_staircase_color(this_phase = this_phase, quest_stair = self.session.settings['stimuli']['feature']['quest_stair'])
 
                 self.session.feature_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
                                                bar_pass_direction_at_TR = self.bar_pass_direction_at_TR,

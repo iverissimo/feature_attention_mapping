@@ -4,6 +4,18 @@ preferences:
     units: deg
 
 window: # refers to the parameters for the Psychopy Window class
+  units: pix
+
+monitor:
+  name: default
+  width: 69.8 #69  # width of monitor (in cm)
+  distance: 210 #225  # distance of participant from monitor (in cm)
+  gamma: 1 # specific value for gamma correction
+
+mouse:
+  visible: False
+
+window_extra: # refers to the parameters for the OLD Psychopy Window class (new version breaks)
   size: [1920, 1080] #[1680, 1050]
   pos: [0, 0]
   color: [0, 0, 0] # psychopy rgb
@@ -16,16 +28,8 @@ window: # refers to the parameters for the Psychopy Window class
   colorSpace: 'rgb' #'hsv' #'rgb255'
   #units: pix
   display: 'square' # or 'rectangle', defines if square [vRes vRes] or rectangle [hRes vRes] display
-  mac_bool: False
+  mac_bool: True #False
 
-monitor:
-  name: default
-  width: 69.8 #69  # width of monitor (in cm)
-  distance: 210 #225  # distance of participant from monitor (in cm)
-  gamma: 1 # specific value for gamma correction
-
-mouse:
-  visible: False
 
 keys: # keys to press, valid for laptop, scanner and behav lab
   right_index: ['right','b', 2, '2','num_2']
@@ -99,6 +103,13 @@ stimuli:
                   'color_green': ['yellow', 'blue']}
 
     sync_scanner: False 
+
+    quest_stair: True # if using quest staircase or costum
+    
+    initial_values: {'color_red': [.5, .5, .5], 
+                    'color_green': [.5, .5, .5]} # value to start staircase, per ecc
+    
+    max_color_level: 60 # max RGB channel value, that staircase will present
 
   flicker:
     bar_width_ratio: 0.125 # ratio of the screen res

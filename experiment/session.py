@@ -38,15 +38,15 @@ class ExpSession(PylinkEyetrackerSession):
             super().__init__(output_str = output_str, output_dir = output_dir, settings_file = settings_file, eyetracker_on = eyetracker_on)
 
             # set size of display
-            if self.settings['window']['display'] == 'square':
+            if self.settings['window_extra']['display'] == 'square':
                 self.screen = np.array([self.win.size[1], self.win.size[1]])
                 rect_contrast = 1
             
-            elif self.settings['window']['display'] == 'rectangle':
+            elif self.settings['window_extra']['display'] == 'rectangle':
                 self.screen = np.array([self.win.size[0], self.win.size[1]])
                 rect_contrast = 0 # then rectangles will be hidden
 
-            if self.settings['window']['mac_bool']: # to compensate for macbook retina display
+            if self.settings['window_extra']['mac_bool']: # to compensate for macbook retina display
                 self.screen = self.screen/2
                 print('Running experiment on macbook, defining display accordingly')
 
@@ -677,7 +677,10 @@ class FeatureSession(ExpSession):
         self.create_trials()
 
         # create staircase
-        self.create_staircase(att_color = self.att_color, quest_stair = True) ### NEED TO DEFINE MORE INPUTS FROM YML
+        ### NEED TO DEFINE MORE INPUTS FROM YML - also update initial values based on previous run? or behav file
+        self.create_staircase(att_color = self.att_color, 
+                              initial_values = self.settings['stimuli']['feature']['initial_values'], 
+                              quest_stair = self.settings['stimuli']['feature']['quest_stair']) 
 
         # if eyetracking then calibrate
         if self.eyetracker_on:
@@ -695,10 +698,10 @@ class FeatureSession(ExpSession):
         if key_pressed[0] not in self.settings['keys']['left_index']: #if instructions not skipped
 
             # draw instructions wait a few seconds
-            this_instruction_string = ('These bars can be\n'
-                                        'on the right/left side\n'
-                                        'or above/below the\n'
-                                        'central fixation cross\n\n\n'
+            this_instruction_string = ('At the beggining of the experiment\n'
+                                        'you will be told which\n'
+                                        'bar color (red/green)\n\n'
+                                        'you have to search for.\n\n\n'
                                         '[Press right index finger\nto continue]\n\n')
             
 
@@ -706,35 +709,13 @@ class FeatureSession(ExpSession):
 
             this_instruction_string = ('Your task is to fixate\n'
                                         'at the center of the screen,\n'
-                                        'and indicate if one of the bars\n'
-                                        'is on the SAME side of the dot\n'
-                                        'relative to the PREVIOUS trial\n\n\n'
+                                        'and indicate if the attended bar\n'
+                                        'is more orange/pink (red bar)\n'
+                                        'or blue/yellow (green bar)\n\n\n'
                                         '[Press right index finger\nto continue]\n\n')
             
 
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
-
-            this_instruction_string = ('The experiment is divided\n'
-                                        'into different mini-blocks.\n\n'
-                                        'At the beggining of each\n'
-                                        'you will see a single bar,\n'
-                                        'at the center of the screen.\n\n\n'
-                                        '[Press right index finger\nto continue]\n\n')
-            
-
-            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
-
-
-            this_instruction_string = ('This bar will be\n'
-                                        'vertical/horizontal and\n'
-                                        'green/red\n\n'
-                                        'That will be the bar\n'
-                                        'that you have to search for.\n\n\n'
-                                        '[Press right index finger\nto continue]\n\n')
-            
-
-            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
-
 
             # draw instructions wait a few seconds
             this_instruction_string = ('Do NOT look at the bars!\n'
@@ -746,8 +727,8 @@ class FeatureSession(ExpSession):
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = ('Left index finger - same side\n\n'
-                                    'Right index finger - different side\n\n\n'
+        this_instruction_string = ('Left index finger - blue/pink\n\n'
+                                    'Right index finger - yellow/orange\n\n\n'
                                     '[waiting for scanner]')
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])

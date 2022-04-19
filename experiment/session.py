@@ -9,7 +9,7 @@ from trial import PRFTrial, FeatureTrial, FlickerTrial
 from stim import PRFStim, FeatureStim, FlickerStim
 
 from psychopy import visual, tools
-from psychopy.data import QuestHandler
+from psychopy.data import QuestHandler, StairHandler
 
 import itertools
 import pickle
@@ -453,6 +453,8 @@ class FeatureSession(ExpSession):
         """ Creates trials (before running the session) """
 
         # some counters for internal bookeeping
+        self.total_responses = 0
+        self.correct_responses = 0
         self.bar_counter = 0
         self.thisResp = []
 
@@ -493,10 +495,6 @@ class FeatureSession(ExpSession):
         # save bar positions for run in output folder
         save_bar_position(self.all_bar_pos, 
                           op.join(self.output_dir, self.output_str+'_bar_positions.pkl'))
-
-        ## response counters
-        self.total_responses = 0
-        self.correct_responses = np.zeros(len(self.all_bar_pos['attended_bar']['bar_pass_direction_at_TR']))
 
         # list with order of "type of stimuli" throughout experiment (called bar direction to make analogous with other class)
         bar_pass_direction = self.settings['stimuli']['feature']['bar_pass_direction'] 
@@ -611,7 +609,7 @@ class FeatureSession(ExpSession):
 
     def create_staircase(self, num_ecc = 3, att_color = 'color_red',
                             initial_values = {'color_red': [.5, .5, .5], 'color_green': [.5, .5, .5]},
-                            pThreshold = 0.83, minVal = 0, maxVal = 1):
+                            pThreshold = 0.83, minVal = 0, maxVal = 1, quest_stair = True):
     
         """ Creates staircases (before running the session) """
         
@@ -621,21 +619,32 @@ class FeatureSession(ExpSession):
         self.staircases = {}
         
         for ind in range(self.num_ecc_staircase):
-            
-            self.staircases['ecc_ind_%i'%ind] = QuestHandler(initial_values[att_color][ind],
-                                                            initial_values[att_color][ind]*.5,
-                                                            pThreshold = pThreshold,
-                                                            #nTrials = 20,
-                                                            stopInterval = None,
-                                                            beta = 3.5,
-                                                            delta = 0.05,
-                                                            gamma = 0,
-                                                            grain = 0.01,
-                                                            range = None,
-                                                            extraInfo = None,
-                                                            minVal = minVal, 
-                                                            maxVal = maxVal 
-                                                            )
+
+            if quest_stair:
+                self.staircases['ecc_ind_%i'%ind] = QuestHandler(initial_values[att_color][ind],
+                                                                initial_values[att_color][ind]*.5,
+                                                                pThreshold = pThreshold,
+                                                                #nTrials = 20,
+                                                                stopInterval = None,
+                                                                beta = 3.5,
+                                                                delta = 0.05,
+                                                                gamma = 0,
+                                                                grain = 0.01,
+                                                                range = None,
+                                                                extraInfo = None,
+                                                                minVal = minVal, 
+                                                                maxVal = maxVal 
+                                                                )
+            else: 
+                # just make 3 down - 1 up staircase
+                self.staircases['ecc_ind_%i'%ind] = StaircaseCostum(initial_values[att_color][ind],
+                                                                stepSize = .05,
+                                                                nUp = 1, 
+                                                                nDown = 3,
+                                                                minVal = minVal, 
+                                                                maxVal = maxVal 
+                                                                )
+
 
     def close_all(self):
         
@@ -653,6 +662,7 @@ class FeatureSession(ExpSession):
                                                                                                         stair_mean = self.staircases[e].mean(), 
                                                                                                         stair_std = self.staircases[e].sd()
                                                                                                         ))
+            print('Accuracy is %.2f %%'%(sum(self.staircases[e].data)/(sum(self.bar_bool)/3)*100))
 
         ## call func to plot staircase outputs
 
@@ -667,7 +677,7 @@ class FeatureSession(ExpSession):
         self.create_trials()
 
         # create staircase
-        self.create_staircase(att_color = self.att_color) ### NEED TO DEFINE MORE INPUTS FROM YML
+        self.create_staircase(att_color = self.att_color, quest_stair = True) ### NEED TO DEFINE MORE INPUTS FROM YML
 
         # if eyetracking then calibrate
         if self.eyetracker_on:
@@ -756,6 +766,7 @@ class FeatureSession(ExpSession):
         print('Expected number of responses: %d'%(sum(self.bar_bool)))
         print('Total subject responses: %d'%self.total_responses)
         print('Correct responses: %d'%self.correct_responses)
+        print('Overall accuracy %.2f %%'%(self.correct_responses/sum(self.bar_bool)*100))
           
 
         self.close_all() # close session

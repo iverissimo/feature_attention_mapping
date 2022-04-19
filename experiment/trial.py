@@ -230,7 +230,7 @@ class FeatureTrial(Trial):
                 this_phase = ['color_red' if 'red' in p else 'color_green' for _,p in enumerate(this_phase)]
 
                 # get new colors from staircase values
-                staircase_colors = self.get_staircase_color(this_phase = this_phase)
+                staircase_colors = self.get_staircase_color(this_phase = this_phase, quest_stair = True)
 
                 self.session.feature_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
                                                bar_pass_direction_at_TR = self.bar_pass_direction_at_TR,
@@ -257,7 +257,7 @@ class FeatureTrial(Trial):
         self.session.line2.draw()
 
 
-    def get_staircase_color(self, this_phase = [], max_color_val = 60):
+    def get_staircase_color(self, this_phase = [], max_color_val = 60, quest_stair = True):
 
         """ Get bars colors given staircase values """
 
@@ -274,7 +274,10 @@ class FeatureTrial(Trial):
             # color value obtained from quest staircase
             # quest will have a ratio that is multiplied by max_color val (set a max limit)
             # Note - clipping to avoid negative values
-            color_quest_sample = max_color_val * np.clip(self.session.staircases['ecc_ind_{e}'.format(e = ecc_ind_at_TR)].quantile(), 0, 1)
+            if quest_stair:
+                color_quest_sample = max_color_val * (np.clip(self.session.staircases['ecc_ind_{e}'.format(e = ecc_ind_at_TR)].quantile(), 0, 1)) #._nextIntensity, 0, 1)) 
+            else:
+                color_quest_sample = max_color_val * (np.clip(self.session.staircases['ecc_ind_{e}'.format(e = ecc_ind_at_TR)]._nextIntensity, 0, 1))
             print(color_quest_sample)
 
             # get task colors key name for current trial
@@ -353,7 +356,7 @@ class FeatureTrial(Trial):
                                                                     task_color = self.session.task_colors[self.session.att_condition][self.session.ctask_ind_all[self.session.att_condition][self.session.bar_counter]])
 
                         self.session.thisResp.append(user_response)
-                        self.session.correct_responses[self.ID] = user_response
+                        self.session.correct_responses += user_response
 
                         if self.session.bar_counter<len(self.session.bar_timing)-1:
                             self.session.bar_counter += 1                        

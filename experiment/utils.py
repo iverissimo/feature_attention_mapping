@@ -925,3 +925,112 @@ def get_bar_eccentricity(all_bar_pos,
         ecc_trials.append(int(val))
         
     return np.array(ecc_trials)
+
+
+class StaircaseCostum():
+    
+    def __init__(self,
+                 startVal,
+                 stepSize = .1,  # stepsize
+                 nUp = 1,
+                 nDown = 3,  # correct responses before stim goes down
+                 minVal = 0,
+                 maxVal = 1):
+        
+        # input variables
+        self.startVal = startVal
+        
+        self.nUp = nUp
+        self.nDown = nDown
+        
+        self.stepSize = stepSize
+        
+        self.minVal = minVal
+        self.maxVal = maxVal
+    
+
+        self.data = []
+        self.intensities = [startVal]
+        self.reversalIntensities = []
+        
+        # correct since last stim change (minus are incorrect):
+        self.correctCounter = 0
+        self.incorrectCounter = 0
+        self._nextIntensity = startVal
+        
+        self.increase = False
+        self.decrease = False
+        
+        
+    def addResponse(self, result):
+        
+        # add response to data
+        self.data.append(result)
+        
+        # increment the counter of correct scores
+        if result == 1:
+            
+            self.correctCounter += 1
+            
+            if self.correctCounter >= self.nDown:
+                    
+                self.decrease = True
+                # reset counter
+                self.correctCounter = 0
+                    
+        elif result == 0:
+            
+            self.incorrectCounter += 1
+            
+            if self.incorrectCounter >= self.nUp:
+            
+                self.increase = True
+                # reset both counters
+                self.correctCounter = 0
+                self.incorrectCounter = 0
+                
+                    
+        # calculate next intensity
+        self.calculateNextIntensity()
+        
+        
+    def calculateNextIntensity(self):
+        
+            
+        # add reversal info
+        if self.increase or self.decrease:
+            self.reversalIntensities.append(self.intensities[-1])
+            
+        if self.increase:
+            
+            self._nextIntensity += self.stepSize
+        
+            # check we haven't gone out of the legal range
+            if (self.maxVal is not None) and (self._nextIntensity > self.maxVal):
+                self._nextIntensity = self.maxVal
+                
+            self.increase = False
+            
+        elif self.decrease:
+            
+            self._nextIntensity -= self.stepSize
+        
+            # check we haven't gone out of the legal range
+            if (self.minVal is not None) and (self._nextIntensity < self.minVal):
+                self._nextIntensity = self.minVal
+                
+            self.decrease = False
+        
+        # append intensities
+        self.intensities.append(self._nextIntensity)
+              
+            
+    def mean(self):
+        
+        return np.array(self.intensities).mean()
+    
+    def sd(self):
+        
+        return np.array(self.intensities).std()
+    
+        

@@ -8,6 +8,7 @@ import pandas as pd
 import yaml
 
 from psychopy import visual, tools, colors, event
+import psychopy.tools.colorspacetools as ct
 import itertools
 
 import time
@@ -252,7 +253,7 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     colored_grating[..., 1] = hsv_color[1]
     colored_grating[..., 2] = grating_norm * hsv_color[2]
 
-    elementTex = colors.hsv2rgb(colored_grating) # convert back to rgb
+    elementTex = ct.hsv2rgb(colored_grating) # convert back to rgb
 
     # update element colors to color of the patch 
     element_color = np.ones((int(np.round(nElements)),3)) 
@@ -292,10 +293,10 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
 
     # set all of the above settings
     ElementArrayStim.setTex(elementTex)
-    ElementArrayStim.setContrs(element_contrast)
     ElementArrayStim.setSfs(element_sfs)
-    ElementArrayStim.setColors(element_color)
     ElementArrayStim.setOpacities(element_opacities)
+    ElementArrayStim.setColors(element_color)
+    ElementArrayStim.setContrs(element_contrast)
 
     # return updated settings, if such is the case
     if update_settings == True: 
@@ -514,7 +515,7 @@ def gradual_shift(curr_point,
     
 
 def draw_instructions(win, instructions, keys = ['b'], visual_obj = [], 
-                      color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), height = .65,
+                      color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), height = 30, #.65,
                         italic = True, alignHoriz = 'center', alignVert = 'center'):
     
     """ draw instructions on screen

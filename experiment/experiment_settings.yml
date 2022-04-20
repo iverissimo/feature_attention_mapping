@@ -28,7 +28,7 @@ window_extra: # refers to the parameters for the OLD Psychopy Window class (new 
   colorSpace: 'rgb' #'hsv' #'rgb255'
   #units: pix
   display: 'square' # or 'rectangle', defines if square [vRes vRes] or rectangle [hRes vRes] display
-  mac_bool: True #False
+  mac_bool: False
 
 
 keys: # keys to press, valid for laptop, scanner and behav lab
@@ -79,6 +79,7 @@ stimuli:
     color_categories: ['color_red','color_green']
     task_colors: {'color_red': ['orange', 'pink'], 
                   'color_green': ['yellow', 'blue']}
+    task_on_main_categories: False # if false, then task uses color variants
 
     bar_pass_direction: ['empty_long','L-R','U-D','empty','R-L','D-U','empty_long','D-U','R-L','empty','U-D','L-R','empty_long']
 
@@ -152,9 +153,9 @@ stimuli:
       ori_jitter_min: 0 # min value for element orientation jitter range
       task_color: 
         orange:
-          element_color: [255, 50, 0] #[204,0,60] #[255, 0, 0] # rgb255 
+          element_color: [204, 50, 0] #[204,0,60] #[255, 0, 0] # rgb255 
         pink:
-          element_color: [255,0,80] #[204,0,60] #[255, 0, 0] # rgb255  
+          element_color: [204, 0, 70] #[204,0,60] #[255, 0, 0] # rgb255  
 
     color_green:
       element_sf: 6 # cycles/gabor width

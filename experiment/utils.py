@@ -187,7 +187,8 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_pass_direction_at_TR,
 
 def update_elements(ElementArrayStim, condition_settings, this_phase, elem_positions, grid_pos,
                    	monitor, screen = np.array([1680,1050]), position_jitter = None, orientation = True, 
-                    background_contrast = None, luminance = None, update_settings = False, new_color = False):
+                    background_contrast = None, luminance = None, update_settings = False, new_color = False, 
+                    override_contrast = False, contrast_val = 1):
     
     """ update element array settings
     
@@ -293,7 +294,10 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
 
     # set element contrasts
     element_contrast =  np.zeros(len(grid_pos))
-    element_contrast[list_indices] = condition_settings[main_color]['element_contrast']
+    if override_contrast:
+        element_contrast[list_indices] = contrast_val
+    else:
+        element_contrast[list_indices] = condition_settings[main_color]['element_contrast']
     #element_contrast[list_indices] = background_contrast if background_contrast != None else condition_settings[main_color]['element_contrast']
     
     # set opacities

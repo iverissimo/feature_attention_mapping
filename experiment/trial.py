@@ -127,10 +127,12 @@ class PRFTrial(Trial):
 
                     if t >= self.session.bar_timing[self.session.bar_counter]:
 
-                        if (ev in self.session.settings['keys']['right_index']) and ('color_green' in self.phase_names):
+                        if (ev in self.session.settings['keys']['right_index']) and \
+                            (('color_green' in self.phase_names) or ('yellow' in self.phase_names) or ('blue' in self.phase_names)):
                             self.session.correct_responses += 1
 
-                        elif (ev in self.session.settings['keys']['left_index']) and ('color_red' in self.phase_names):
+                        elif (ev in self.session.settings['keys']['left_index']) and \
+                            (('color_red' in self.phase_names) or ('orange' in self.phase_names) or ('pink' in self.phase_names)):
                             self.session.correct_responses += 1
                         
                         if self.session.bar_counter<len(self.session.bar_timing)-1:

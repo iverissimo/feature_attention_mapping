@@ -121,8 +121,9 @@ class PRFStim(Stim):
         if this_phase != 'background':
 
             # change contrast of elements
+            override_contrast = True
             condition_settings = self.condition_settings 
-            condition_settings[this_phase]['element_contrast'] = self.session.settings['stimuli']['prf']['element_contrast']  
+            contrast_val = self.session.settings['stimuli']['prf']['element_contrast']  
 
             # update bar elements
             self.session.bar0_array = update_elements(ElementArrayStim = self.session.bar0_array,
@@ -133,7 +134,9 @@ class PRFStim(Stim):
                                                         elem_positions = position_dictionary['bar0']['xys'], 
                                                         grid_pos = self.grid_pos,
                                                         monitor = self.session.monitor, 
-                                                        screen = self.session.screen)
+                                                        screen = self.session.screen,
+                                                        override_contrast = override_contrast,
+                                                        contrast_val = contrast_val)
 
 
         # actually draw

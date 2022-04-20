@@ -237,13 +237,8 @@ class PRFSession(ExpSession):
         # list of midpoint position (x,y) of bar for all TRs (if empty, then nan)
         self.bar_midpoint_all = np.array([val for sublist in bar_pos_array for val in sublist])
 
-        
-        # get condition names and randomize them for each trial 
-        key_list = []
-        for key in self.settings['stimuli']['conditions']:
-            if key != 'background': # we don't want to show background gabors in background
-                key_list.append(key)
-
+        # make boolean array to see which trials are stim trials
+        self.bar_bool = [False if x == 'empty' else True for _,x in enumerate(self.bar_pass_direction_all)]
 
         # if in scanner, we want it to be synced to trigger, so lets increase trial time (in seconds, like TR)
         max_trial_time = 5 if self.settings['stimuli']['prf']['sync_scanner']==True else self.settings['mri']['TR']
@@ -254,48 +249,67 @@ class PRFSession(ExpSession):
         # number of samples in trial
         n_samples = max_trial_time * flick_rate
 
+        ## get condition names and randomize them for each trial 
+        
+        key_list = []
+        for key in self.settings['stimuli']['prf']['color_categories']:  
+            # if showing red and green bars
+            if self.settings['stimuli']['prf']['task_on_main_categories']: 
+                key_list.append(key)
+            
+            else: # other color variants
+                for name in self.settings['stimuli']['prf']['task_colors'][key]:
+                    key_list.append(name)
+
         # define how many times bar features switch during TR, according to flick rate defined 
         if self.settings['stimuli']['prf']['flick_stim_rate'] == 'TR': # if changing features at every TR
 
-            phase_conditions = np.repeat(key_list, self.trial_number/len(key_list))
+            phase_conditions = np.repeat(key_list, sum(self.bar_bool)/len(key_list)) # only do this for bar showing trials
             np.random.shuffle(phase_conditions) # randomized conditions, for attention to bar task
 
             if self.settings['stimuli']['prf']['flick_on_off'] == True: # interleave with background if we want and on-off bar
-                
+
                 self.phase_conditions = np.array([list(np.tile([val,'background'],int(np.round(n_samples)))) for _,val in enumerate(phase_conditions)])
-                
+
             else:
                 self.phase_conditions = np.array([list(np.tile(val,int(np.round(n_samples)))) for _,val in enumerate(phase_conditions)])
-                
+
             # define list with number of phases and their duration (duration of each must be the same)
             self.phase_durations = np.repeat(max_trial_time/self.phase_conditions.shape[-1], self.phase_conditions.shape[-1])   
-            
+
         else: # if changing features randomly at flick rate
 
             # repeat keys, so for each bar pass it shows each condition X times
             key_list = np.array(key_list*round(n_samples/len(key_list))) 
 
             if self.settings['stimuli']['prf']['flick_on_off'] == True: # interleave with background if we want and on-off bar
-                
+
                 on_list = list(key_list)
                 off_list = list(np.tile('background',len(on_list)))
-                
+
                 key_list = on_list + off_list
                 key_list[::2] = on_list
                 key_list[1::2] = off_list
             else:
                 key_list = list(key_list) + list(key_list) 
-                
+
             phase_conditions = key_list
 
             # stack them in trial
-            for r in range(self.trial_number-1):            
+            for r in range(sum(self.bar_bool)-1):            
                 phase_conditions = np.vstack((phase_conditions,key_list))
-                
+
             self.phase_conditions = phase_conditions
 
             # define list with number of phases and their duration (duration of each must be the same)
             self.phase_durations = np.repeat(max_trial_time/self.phase_conditions.shape[-1], self.phase_conditions.shape[-1])
+
+        ## now make phase condition array the same size as task, 
+        # i.e. fill non bar trials with background
+        all_phase_conditions = (np.stack(np.tile('background', self.phase_conditions.shape[-1]) for i in range(self.trial_number)))
+        all_phase_conditions[self.bar_bool] = self.phase_conditions.copy()
+
+        self.phase_conditions = all_phase_conditions.copy() 
 
         # total experiment time (in seconds)
         self.total_time = self.trial_number * max_trial_time  

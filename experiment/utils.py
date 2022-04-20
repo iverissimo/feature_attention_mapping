@@ -875,6 +875,7 @@ def get_average_color(filedir, settings, updated_color_names = ['orange','yellow
     
     # get settings files for all trials of flicker task
     flicker_files = [op.join(filedir,x) for _,x in enumerate(os.listdir(filedir)) if 'trial' in x and x.endswith('_updated_settings.yml')]
+    all_trials = []
         
     for col in updated_color_names:
         
@@ -922,13 +923,14 @@ def get_average_color(filedir, settings, updated_color_names = ['orange','yellow
                         print('new rgb255 for %s is %s'%(col,str(settings['stimuli']['conditions']['color_green']['task_color'][col]['element_color'])))
 
                 else:
+                    all_trials.append(ecc_color)
                     print('NOT IMPLEMENTED YET - decide where to store ecc colors!!')
         
     ###### for now, to check, NEED TO CHANGE #######
     if average_ecc: 
         return settings
     else: 
-        return new_color 
+        return all_trials 
 
 
 def get_true_responses(bar_responses,drop_nan = False):

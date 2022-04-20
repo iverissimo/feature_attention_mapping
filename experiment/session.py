@@ -447,7 +447,6 @@ class FeatureSession(ExpSession):
                         eyetracker_on = eyetracker_on)
         
         self.att_color = att_color
-        self.staircase_file_name = output_str + '_staircase_quest' 
 
         ## set task colors
         self.task_colors = self.settings['stimuli']['feature']['task_colors']
@@ -622,80 +621,16 @@ class FeatureSession(ExpSession):
         print(self.screen)
 
 
-    def create_staircase(self, num_ecc = 3, att_color = 'color_red',
-                            initial_values = {'color_red': [.5, .5, .5], 'color_green': [.5, .5, .5]},
-                            pThreshold = 0.83, minVal = 0, maxVal = 1, quest_stair = True):
-    
-        """ Creates staircases (before running the session) """
-        
-        self.num_ecc_staircase = num_ecc
-        self.initial_values = initial_values
-        
-        self.staircases = {}
-        
-        for ind in range(self.num_ecc_staircase):
-
-            if quest_stair:
-                self.staircases['ecc_ind_%i'%ind] = QuestHandler(initial_values[att_color][ind],
-                                                                initial_values[att_color][ind]*.5,
-                                                                pThreshold = pThreshold,
-                                                                #nTrials = 20,
-                                                                stopInterval = None,
-                                                                beta = 3.5,
-                                                                delta = 0.05,
-                                                                gamma = 0,
-                                                                grain = 0.01,
-                                                                range = None,
-                                                                extraInfo = None,
-                                                                minVal = minVal, 
-                                                                maxVal = maxVal 
-                                                                )
-            else: 
-                # just make 3 down - 1 up staircase
-                self.staircases['ecc_ind_%i'%ind] = StaircaseCostum(initial_values[att_color][ind],
-                                                                stepSize = .05,
-                                                                nUp = 1, 
-                                                                nDown = 3,
-                                                                minVal = minVal, 
-                                                                maxVal = maxVal 
-                                                                )
-
-
-    def close_all(self):
-        
-        """ to guarantee that when closing, everything is saved """
-
-        super(FeatureSession, self).close()
-
-        for e in self.staircases.keys():
-            abs_filename = op.join(self.output_dir, self.staircase_file_name.replace('_quest', '_quest_{e}.pickle'.format(e = e)))
-            with open(abs_filename, 'wb') as f:
-                pickle.dump(self.staircases[e], f)
-
-            #self.staircases[e].saveAsPickle(abs_filename)
-            print('Staircase of {ecc}, has mean {stair_mean}, and standard deviation {stair_std}'.format(ecc = e, 
-                                                                                                        stair_mean = self.staircases[e].mean(), 
-                                                                                                        stair_std = self.staircases[e].sd()
-                                                                                                        ))
-            print('Accuracy is %.2f %%'%(sum(self.staircases[e].data)/(sum(self.bar_bool)/3)*100))
-
-        ## call func to plot staircase outputs
-
     def run(self):
         """ Loops over trials and runs them """
 
         # update color of settings
-        self.settings = get_average_color(self.output_dir, self.settings, task = 'FA')
+        self.settings = get_average_color(self.output_dir, self.settings,
+                    updated_color_names = ['pink', 'orange', 'yellow', 'blue'])
 
         # create trials before running!
         self.create_stimuli()
         self.create_trials()
-
-        # create staircase
-        ### NEED TO DEFINE MORE INPUTS FROM YML - also update initial values based on previous run? or behav file
-        self.create_staircase(att_color = self.att_color, 
-                              initial_values = self.settings['stimuli']['feature']['initial_values'], 
-                              quest_stair = self.settings['stimuli']['feature']['quest_stair']) 
 
         # if eyetracking then calibrate
         if self.eyetracker_on:

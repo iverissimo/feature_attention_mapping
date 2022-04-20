@@ -231,8 +231,8 @@ class FeatureTrial(Trial):
                             ]
                 this_phase = ['color_red' if 'red' in p else 'color_green' for _,p in enumerate(this_phase)]
 
-                # get new colors from staircase values
-                staircase_colors = self.get_staircase_color(this_phase = this_phase, quest_stair = self.session.settings['stimuli']['feature']['quest_stair'])
+                # get task colors
+                task_color_array = self.get_FAtask_color(this_phase = this_phase)
 
                 self.session.feature_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
                                                bar_pass_direction_at_TR = self.bar_pass_direction_at_TR,
@@ -240,7 +240,7 @@ class FeatureTrial(Trial):
                                                position_dictionary = self.position_dictionary,
                                                orientation = self.session.ori_bool,
                                                drawing_ind = self.session.drawing_ind[self.ID],
-                                               new_colors = staircase_colors
+                                               new_colors = task_color_array
                                                ) 
 
 
@@ -259,7 +259,7 @@ class FeatureTrial(Trial):
         self.session.line2.draw()
 
 
-    def get_staircase_color(self, this_phase = [], max_color_val = 60, quest_stair = True):
+    def get_FAtask_color(self, this_phase = []):
 
         """ Get bars colors given staircase values """
 
@@ -267,48 +267,23 @@ class FeatureTrial(Trial):
 
         # get bar indice - used to know which ecc and color to use in that trial
         bar_ind = np.where(np.where(self.session.bar_bool)[0] == self.ID)[0][0]
-        
+
         ## loop through bars on screen
         for p in this_phase:
             # eccentricity of bar in trial
-            ecc_ind_at_TR = self.session.ecc_ind_all[p][bar_ind] 
-
-            # color value obtained from quest staircase
-            # quest will have a ratio that is multiplied by max_color val (set a max limit)
-            # Note - clipping to avoid negative values
-            if quest_stair:
-                color_quest_sample = max_color_val * (np.clip(self.session.staircases['ecc_ind_{e}'.format(e = ecc_ind_at_TR)].quantile(), 0, 1)) #._nextIntensity, 0, 1)) 
-            else:
-                color_quest_sample = max_color_val * (np.clip(self.session.staircases['ecc_ind_{e}'.format(e = ecc_ind_at_TR)]._nextIntensity, 0, 1))
-            print(color_quest_sample)
+            #ecc_ind_at_TR = self.session.ecc_ind_all[p][bar_ind] 
 
             # get task colors key name for current trial
             current_color = self.session.task_colors[p][self.session.ctask_ind_all[p][bar_ind]]
 
-            # current phase color (in RGB255!)
-            phase_color = self.session.settings['stimuli']['conditions'][p]['element_color'].copy()
+            # get actual color value
+            new_colors.append(self.session.settings['stimuli']['conditions'][p]['task_color'][current_color]['element_color'])
+        
 
-            # update them
-            if 'orange' in current_color:
-
-               phase_color[1] = color_quest_sample ## red to orange --> adds value to green channel
-
-            elif 'pink' in current_color or 'blue' in current_color:
-
-                phase_color[-1] = color_quest_sample ## red to pink OR green to blue --> adds value to blue channel
-
-            elif 'yellow' in current_color:
-
-                phase_color[0] = color_quest_sample ## green to yellow --> adds value to red channel
-
-            new_colors.append(phase_color)
-
-        #print('new rgb255 are %s'%str(new_colors))
-
-        return np.array(new_colors) 
+        return np.array(new_colors)
 
 
-    def get_response4staircase(self, event_key = [], task_color = []):
+    def get_pp_response(self, event_key = [], task_color = []):
 
         """ helper function """
 
@@ -345,19 +320,10 @@ class FeatureTrial(Trial):
 
                     if t >= self.session.bar_timing[self.session.bar_counter]:   
 
-                        # update color with answer
-                        if len(self.session.thisResp) > 0: # update with answer
-                            # update staircase
-                            self.session.staircases['ecc_ind_{e}'.format(e = self.session.ecc_ind_all[self.session.att_condition][self.session.bar_counter])].addResponse(self.session.thisResp[-1])
-                            #print('The threshold is {s}'.format(s=self.session.staircases['ecc_ind_{e}'.format(e = self.session.ecc_ind_all[self.session.att_condition][self.session.bar_counter])].quantile()))
-                            # reset response again
-                            self.session.thisResp = []
-
                         ## get user response!
-                        user_response = self.get_response4staircase(event_key = ev, 
-                                                                    task_color = self.session.task_colors[self.session.att_condition][self.session.ctask_ind_all[self.session.att_condition][self.session.bar_counter]])
+                        user_response = self.get_pp_response(event_key = ev, 
+                                                            task_color = self.session.task_colors[self.session.att_condition][self.session.ctask_ind_all[self.session.att_condition][self.session.bar_counter]])
 
-                        self.session.thisResp.append(user_response)
                         self.session.correct_responses += user_response
 
                         if self.session.bar_counter<len(self.session.bar_timing)-1:
@@ -373,8 +339,6 @@ class FeatureTrial(Trial):
 
                 for param, val in self.parameters.items():
                     self.session.global_log.loc[idx, param] = val
-
-
 
 
 class FlickerTrial(Trial):

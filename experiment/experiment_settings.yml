@@ -76,6 +76,10 @@ stimuli:
 
     element_contrast: 1 # do full contrast during prf task
 
+    color_categories: ['color_red','color_green']
+    task_colors: {'color_red': ['orange', 'pink'], 
+                  'color_green': ['yellow', 'blue']}
+
     bar_pass_direction: ['empty_long','L-R','U-D','empty','R-L','D-U','empty_long','D-U','R-L','empty','U-D','L-R','empty_long']
 
     sync_scanner: True 

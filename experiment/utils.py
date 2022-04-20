@@ -847,7 +847,8 @@ def get_square_positions(grid_pos, ecc_midpoint_at_trial, bar_width_pix, screen=
 
 
 
-def get_average_color(filedir,settings,task='pRF'):
+def get_average_color(filedir, settings, updated_color_names = ['orange','yellow','blue'],
+                     color_categories = ['color_red', 'color_green'], average_ecc = True, ecc_ind = [0,1,2]):
     
     """ get average color 
     
@@ -857,35 +858,73 @@ def get_average_color(filedir,settings,task='pRF'):
         absolute directory where the new settings files are
     settings: dict
         settings dict, to be updated
-    task: str
-        name of task ('standard' vs 'feature')
+    updated_color_names: array/list
+        array of strings with names of colors to be updated
+    color_categories: array/list
+        names of general color categories, for bookeeping
+    average_ecc: bool
+        average over eccentricities?
+    ecc_ind: array/list
+        eccentricity indices to consider
             
     """
     
     # get settings files for all trials of flicker task
-    flicker_path = op.join(op.split(filedir)[0],op.join(op.split(filedir)[-1].replace('{task}'.format(task = task),'flicker')))
-
-    updt_color_files = [op.join(flicker_path,x) for _,x in enumerate(os.listdir(flicker_path)) if 'trial' in x and x.endswith('_updated_settings.yml')]
-    updt_color_files.sort()
-    
-    # for each updated color
-    for _,col in enumerate(settings['stimuli']['flicker']['modulated_condition']) :
-    
+    flicker_files = [op.join(filedir,x) for _,x in enumerate(os.listdir(filedir)) if 'trial' in x and x.endswith('_updated_settings.yml')]
+        
+    for col in updated_color_names:
+        
         new_color = []
+        
+        # loop over eccentricities
+        for e in ecc_ind:
+            
+            # filenames for that color and ecc
+            c_files = [file for file in flicker_files if col in file and 'ecc-%i'%e in file]
 
-        for _,file in enumerate(updt_color_files):
+            if len(c_files) == 0:
+                print('No files found for color %s and ecc %i, keeping initial settings'%(col, e))
+            else:
+                ecc_color = []
+                for file in c_files:
+                
+                    # load updated settings for each trial 
+                    with open(file, 'r', encoding='utf8') as f_in:
+                        updated_settings = yaml.safe_load(f_in)
 
-            # load updated settings for each trial 
-            with open(file, 'r', encoding='utf8') as f_in:
-                updated_settings = yaml.safe_load(f_in)
+                    if col in color_categories: # if general color category (red, green)
+                        ecc_color.append(updated_settings[col]['element_color'])
+                    
+                    elif col in ['pink','orange']: # if color variant from red
+                        ecc_color.append(updated_settings['color_red']['task_color'][col]['element_color'])
+                    
+                    elif col in ['yellow','blue']: # if color variant from red
+                        ecc_color.append(updated_settings['color_green']['task_color'][col]['element_color'])
+                
+                new_color.append(list(np.mean(ecc_color, axis=0)))
+            
+                # if we want to average over eccentricities
+                if average_ecc: 
+                    # actually update color in settings file
+                    mean_col = list(np.mean(new_color, axis=0))
+                    if col in color_categories:
+                        settings['stimuli']['conditions'][col]['element_color'] = mean_col
+                        print('new rgb255 for %s is %s'%(col,str(settings['stimuli']['conditions'][col]['element_color'])))
+                    elif col in ['pink','orange']:
+                        settings['stimuli']['conditions']['color_red']['task_color'][col]['element_color'] = mean_col
+                        print('new rgb255 for %s is %s'%(col,str(settings['stimuli']['conditions']['color_red']['task_color'][col]['element_color'])))
+                    elif col in ['yellow','blue']:
+                        settings['stimuli']['conditions']['color_green']['task_color'][col]['element_color'] = mean_col
+                        print('new rgb255 for %s is %s'%(col,str(settings['stimuli']['conditions']['color_green']['task_color'][col]['element_color'])))
 
-            new_color.append(updated_settings[col]['element_color'])
-
-        # actually update color:
-        settings['stimuli']['conditions'][col]['element_color'] = list(np.mean(new_color, axis=0))
-        print('new rgb255 for %s is %s'%(col,str(settings['stimuli']['conditions'][col]['element_color'])))
-
-    return(settings)
+                else:
+                    print('NOT IMPLEMENTED YET - decide where to store ecc colors!!')
+        
+    ###### for now, to check, NEED TO CHANGE #######
+    if average_ecc: 
+        return settings
+    else: 
+        return new_color 
 
 
 def get_true_responses(bar_responses,drop_nan = False):

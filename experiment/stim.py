@@ -233,9 +233,8 @@ class FlickerStim(Stim):
         """
         
 
-        # we dial up or down luminance of green only
-        luminance = self.session.lum_responses if this_phase == 'color_green' else None
-
+        # we dial up or down luminance of NON reference color only
+        luminance = None if this_phase == self.session.ref_color else self.session.lum_responses
 
         self.session.bar0_array, self.session.updated_settings = update_elements(ElementArrayStim = self.session.bar0_array,
                                                                                 condition_settings = self.condition_settings, 

@@ -817,57 +817,114 @@ class FlickerSession(ExpSession):
 
         ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(ver_y)])
 
+        # bar eccentricities we want to go through
+        self.bar_ecc_ind = self.settings['stimuli']['flicker']['bar_ecc_index']
+        # number of repetitions per ecc
+        self.num_rep_ecc = self.settings['stimuli']['flicker']['num_rep_ecc']
 
-        # positions to put bars of square, per trial
-        # eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
-        self.bar_ecc_index_all = self.settings['stimuli']['flicker']['bar_ecc_index']
+        ## positions to put bars of square, per trial
+        # we swap so that 0 - furthest ecc; 3 - closest ecc (different from yml)
+        # to save coding hassle for now
+        bar_ecc_index_arr = np.tile(np.abs(np.array(self.bar_ecc_ind) - 3), self.num_rep_ecc)
 
-        # eccentricity (in pixels) of bar position for trial (if empty, then nan) 
-        self.ecc_midpoint_all = ver_bar_pos_pix[self.bar_ecc_index_all][...,1]
+        ## make it a dict, for bookeeping
+        # set color comparisons first
+        self.ref_color = self.settings['stimuli']['flicker']['ref_color']
 
-        # one eccentricity for trial
-        self.trial_number = len(self.bar_ecc_index_all)
+        if self.ref_color in list(self.settings['stimuli']['conditions'].keys()): # if comparing red and green
+            updat_colors_keys = [c for c in list(self.settings['stimuli']['conditions'].keys()) if c not in ['background', self.ref_color] ]
+            
+        else:
+            updat_colors_keys = []
+            for key in list(self.settings['stimuli']['feature']['task_colors'].keys()):
+                for name in self.settings['stimuli']['feature']['task_colors'][key]:
+                    if name != self.ref_color:
+                        updat_colors_keys.append(name) # update all task colors that are not reference color
 
+        # color names to be updated
+        self.updat_colors_keys = np.array(updat_colors_keys)
+                        
+        # now make bar ecc index dictionary
+        bar_ecc_index_dict = {}
+        # and get eccentricity (in pixels) of bar position for trial (if empty, then nan) 
+        ecc_midpoint_dict = {}
+
+        for col in self.updat_colors_keys:
+            
+            bar_ecc_index_dict[col] = bar_ecc_index_arr.copy()
+            # shuffle it to make it random
+            np.random.shuffle(bar_ecc_index_dict[col]) 
+
+            ecc_midpoint_dict[col] = ver_bar_pos_pix[bar_ecc_index_dict[col]][...,1]
+
+        # save here so accessible throughout
+        self.bar_ecc_index_dict = bar_ecc_index_dict
+        self.ecc_midpoint_dict = ecc_midpoint_dict
+
+        ## save eccentricities in array, to use in file naming
+        all_ecc_array = (np.hstack(self.bar_ecc_index_dict[x] for x in self.bar_ecc_index_dict.keys()))
+        self.all_ecc_array = all_ecc_array*-1 +3
+
+        # save total number of trials (one eccentricity per trial) 
+        self.trial_number = len(bar_ecc_index_arr)*len(updat_colors_keys)
         print("Total number of trials: %d"%self.trial_number)
-
-        # get condition names and randomize them for each trial 
-        key_list = []
-        for key in self.settings['stimuli']['conditions']:
-            if key != 'background': # we don't want to show background gabors in background
-                key_list.append(key)
 
         # max trial time
         max_trial_time = self.settings['stimuli']['flicker']['max_trial_time']*60
-        
+
         # define how many times square colors switch, according to flick rate defined 
         flick_rate = self.settings['stimuli']['flicker']['flick_rate']
 
         # number of samples in trial
         n_samples = max_trial_time * flick_rate
 
-        # repeat keys, so for each trial it shows each condition X times
-        key_list = np.array(key_list*round(n_samples/len(key_list)))
-        key_list = list(key_list) + list(key_list)
-        phase_conditions = key_list
-        
-        for r in range(self.trial_number-1):            
-            phase_conditions = np.vstack((phase_conditions,key_list))
+        # get condition names for each trial
+        for i, cname in enumerate(updat_colors_keys):
+            
+            key_list = []
 
-        self.phase_conditions = phase_conditions
-        
+            if self.ref_color in list(self.settings['stimuli']['conditions'].keys()): # if comparing red and green
+                
+                for key in self.settings['stimuli']['conditions']:
+                    if key != 'background': 
+                        key_list.append(key)
+                        
+            else: # other color variants
+                key_list = [self.ref_color, cname]
+                
+            # repeat keys, so for each trial it shows each condition X times
+            key_list = np.array(key_list*round(n_samples/len(key_list)))
+            key_list = list(key_list) + list(key_list)
+            phase_conditions = key_list
+            
+            for r in range(len(bar_ecc_index_arr)-1):            
+                phase_conditions = np.vstack((phase_conditions,key_list))
+            
+            if i == 0:  
+                all_phase_conditions = phase_conditions.copy()
+            else:
+                all_phase_conditions = np.vstack((all_phase_conditions,phase_conditions))
+            
         # define list with number of phases and their duration (duration of each must be the same)
-        self.phase_durations = np.repeat(max_trial_time/self.phase_conditions.shape[-1], self.phase_conditions.shape[-1])
+        phase_durations = np.repeat(max_trial_time/all_phase_conditions.shape[-1], all_phase_conditions.shape[-1])
+
+        ## again make so that we can access phase throughout
+        self.phase_conditions = all_phase_conditions
+        self.phase_durations = phase_durations
 
         # append all trials
         self.all_trials = []
+        c_counter = 0
         for i in range(self.trial_number):
+            if i in [int(len(bar_ecc_index_arr)*d) for d in np.arange(len(updat_colors_keys)) if d]:
+                c_counter += 1 # cheap trick to not worry about colors and trial numbers
 
             self.all_trials.append(FlickerTrial(session = self,
                                                 trial_nr = i, 
                                                 phase_durations = self.phase_durations,
                                                 phase_names = self.phase_conditions[i],
-                                                bar_ecc_index_at_trial = self.bar_ecc_index_all[i],
-                                                ecc_midpoint_at_trial = self.ecc_midpoint_all[i]
+                                                bar_ecc_index_at_trial = self.bar_ecc_index_dict[updat_colors_keys[c_counter]][int(i-len(bar_ecc_index_arr)*c_counter)],
+                                                ecc_midpoint_at_trial = self.ecc_midpoint_dict[updat_colors_keys[c_counter]][int(i-len(bar_ecc_index_arr)*c_counter)]
                                                 ))
 
 

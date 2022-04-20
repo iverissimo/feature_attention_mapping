@@ -465,14 +465,17 @@ class FlickerTrial(Trial):
                     # save updated condition settings per trial
                     # so color is used for other tasks
                     settings_out = os.path.join(self.session.output_dir, self.session.output_str + '_updated_settings.yml')
-                    settings_out = re.sub(r'run-.+?,?(\_|$)', "trial-{ID}_".format(ID = str(self.ID)), settings_out)
+                    settings_out = re.sub(r'run-.+?,?(\_|$)', "trial-{ID}_color-{col}_ecc-{ecc}-_".format(ID = str(self.ID),
+                                                                                                        col = self.session.phase_conditions[self.ID][1],
+                                                                                                        ecc = self.session.all_ecc_array[self.ID]), 
+                                                                                                        settings_out)
                     
 
                     with open(settings_out, 'w') as f_out:  # write settings to disk
                         yaml.dump(self.session.updated_settings, f_out, indent=4, default_flow_style=False)
 
 
-                    if self.ID == (len(self.session.settings['stimuli']['flicker']['bar_ecc_index'])-1): # if last trial                        
+                    if self.ID == self.session.trial_number - 1: #(len(self.session.settings['stimuli']['flicker']['bar_ecc_index'])-1): # if last trial                        
                         self.session.close()
                         self.session.quit()
                     else:

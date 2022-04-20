@@ -114,7 +114,11 @@ stimuli:
   flicker:
     bar_width_ratio: 0.125 # ratio of the screen res
 
-    bar_ecc_index: [1,2,2,1,1,2,1,2] # eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
+    num_rep_ecc: 4
+
+    ref_color: 'pink' # reference color is less luminance one - so red + blue
+
+    bar_ecc_index: [0,1,2] #[3,3,1,2,2,1,1,2,1,2] # eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
 
     flick_rate: 15 #30 #15 # Hz, flicker rate of color for square
 
@@ -142,14 +146,24 @@ stimuli:
       element_contrast: 0.6 #1
       ori_jitter_max: 1.0 # max value for element orientation jitter range
       ori_jitter_min: 0 # min value for element orientation jitter range
+      task_color: 
+        orange:
+          element_color: [255, 50, 0] #[204,0,60] #[255, 0, 0] # rgb255 
+        pink:
+          element_color: [255,0,80] #[204,0,60] #[255, 0, 0] # rgb255  
 
     color_green:
       element_sf: 6 # cycles/gabor width
-      element_color: [0, 255, 0] #rgb255
+      element_color:  [0, 255, 0] #rgb255
       element_ori: [45,135] # [right, left]
       element_contrast: 0.6 #1
       ori_jitter_max: 1.0 # max value for element orientation jitter range
       ori_jitter_min: 0 # min value for element orientation jitter range
+      task_color: 
+        yellow:
+          element_color: [200,255, 0] #[204,0,60] #[255, 0, 0] # rgb255 
+        blue:
+          element_color: [0,255,130] #[204,0,60] #[255, 0, 0] # rgb255  
 
   
 eyetracker:

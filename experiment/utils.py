@@ -216,6 +216,17 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
         if we are changing color to be one not represented in settings (ca also be False if no new color used)
         
     """
+
+    # we might be using diferent colors than the main 2, so set that straight
+    if this_phase in list(condition_settings.keys()):
+        main_color = this_phase 
+        color_arr = condition_settings[this_phase]['element_color']
+    else: 
+        if this_phase in list(condition_settings['color_red']['task_color'].keys()):
+            main_color = 'color_red'
+        elif this_phase in list(condition_settings['color_green']['task_color'].keys()):
+            main_color = 'color_green'
+        color_arr = condition_settings[main_color]['task_color'][this_phase]['element_color']
     
     # set number of elements
     nElements = grid_pos.shape[0]
@@ -226,7 +237,7 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
         hsv_color = rgb255_2_hsv(new_color)
         print('new hsv is %s'%str(hsv_color))
     else:
-        hsv_color = rgb255_2_hsv(condition_settings[this_phase]['element_color'])
+        hsv_color = rgb255_2_hsv(color_arr)
 
     if luminance != None: # if we want to make color more or less luminant
 
@@ -235,7 +246,11 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
         print(hsv_color)
 
         # update settings dict with new color 
-        condition_settings[this_phase]['element_color'] = [float(x*255.) for x in colorsys.hsv_to_rgb(hsv_color[0]/360.,hsv_color[1],hsv_color[2])]
+        updat_color_arr = [float(x*255.) for x in colorsys.hsv_to_rgb(hsv_color[0]/360.,hsv_color[1],hsv_color[2])]
+        if this_phase in list(condition_settings.keys()):
+            condition_settings[this_phase]['element_color'] = updat_color_arr
+        else:
+            condition_settings[main_color]['task_color'][this_phase]['element_color'] = updat_color_arr 
 
 
     grat_res = near_power_of_2(ElementArrayStim.sizes[0][0],near='previous') # use power of 2 as grating res, to avoid error
@@ -259,7 +274,7 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     element_color = np.ones((int(np.round(nElements)),3)) 
     
     # update element spatial frequency
-    element_sfs = np.ones((nElements)) * condition_settings[this_phase]['element_sf'] # in cycles/gabor width
+    element_sfs = np.ones((nElements)) * condition_settings[main_color]['element_sf'] # in cycles/gabor width
 
     # update element orientation randomly
     if orientation == True:
@@ -278,7 +293,8 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
 
     # set element contrasts
     element_contrast =  np.zeros(len(grid_pos))
-    element_contrast[list_indices] = background_contrast if background_contrast != None else condition_settings[this_phase]['element_contrast']
+    element_contrast[list_indices] = condition_settings[main_color]['element_contrast']
+    #element_contrast[list_indices] = background_contrast if background_contrast != None else condition_settings[main_color]['element_contrast']
     
     # set opacities
     element_opacities = np.zeros(len(grid_pos))
@@ -297,6 +313,7 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     ElementArrayStim.setOpacities(element_opacities)
     ElementArrayStim.setColors(element_color)
     ElementArrayStim.setContrs(element_contrast)
+    print(element_contrast[list_indices[0]])
 
     # return updated settings, if such is the case
     if update_settings == True: 

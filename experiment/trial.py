@@ -307,7 +307,7 @@ class FeatureTrial(Trial):
             if len(ev) > 0:
                 if ev in ['q']:
                     print('trial canceled by user')  
-                    self.session.close_all()
+                    self.session.close()
                     self.session.quit()
 
                 elif (ev == self.session.mri_trigger) and (self.session.settings['stimuli']['feature']['sync_scanner']==True): # TR pulse

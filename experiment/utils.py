@@ -13,6 +13,7 @@ import itertools
 
 import time
 import colorsys
+import seaborn as sns
 
 
 def jitter(arr,max_val=1,min_val=0.5):
@@ -1095,5 +1096,40 @@ class StaircaseCostum():
     def sd(self):
         
         return np.array(self.intensities).std()
+
+
+def make_lum_plots(all_ecc_colors, out_dir = '', updated_color_names = ['orange','yellow','blue'], num_ecc = 3):
     
+    # tile the keys, to make it easier to make dataframe
+    color_names = np.repeat(updated_color_names, num_ecc)
+    
+    all_ecc_dict = {'color': [], 'ecc': [], 'R': [], 'G': [], 'B': [], 'luminance': []}
+    for i, name in enumerate(color_names):
+        
+        if name == 'orange':
+            ecc = i
+        elif name == 'yellow':
+            ecc = i-3
+        elif name == 'blue':
+            ecc = i-3*2
+        
+        for t in range(np.array(all_ecc_colors[i]).shape[0]):
+
+            all_ecc_dict['color'].append(name)
+            all_ecc_dict['ecc'].append(int(ecc))
+            all_ecc_dict['R'].append(np.array(all_ecc_colors[i])[...,0][t])
+            all_ecc_dict['G'].append(np.array(all_ecc_colors[i])[...,1][t])
+            all_ecc_dict['B'].append(np.array(all_ecc_colors[i])[...,2][t])
+            all_ecc_dict['luminance'].append(rgb255_2_hsv(all_ecc_colors[i][t])[-1])
+        
+    # convert to dataframe
+    df_colors = pd.DataFrame(all_ecc_dict)
+    
+    ## make quick bar plot
+    ax = sns.barplot(x = 'color', y = 'luminance', data = df_colors, hue = 'ecc')
+    fig = ax.get_figure()
+    fig.savefig(op.join(out_dir,"luminance_across_ecc.png")) 
+
+    return df_colors
+ 
         

@@ -83,7 +83,7 @@ stimuli:
 
     bar_pass_direction: ['empty_long','L-R','U-D','empty','R-L','D-U','empty_long','D-U','R-L','empty','U-D','L-R','empty_long']
 
-    sync_scanner: True 
+    sync_scanner: False #True 
 
   feature:
     bar_width_ratio: 0.125 # ratio of the screen res
@@ -119,7 +119,7 @@ stimuli:
   flicker:
     bar_width_ratio: 0.125 # ratio of the screen res
 
-    num_rep_ecc: 4
+    num_rep_ecc: 4 #12
 
     ref_color: 'pink' # reference color is less luminance one - so red + blue
 

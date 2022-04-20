@@ -380,12 +380,20 @@ class PRFSession(ExpSession):
             this_instruction_string = ('Your task is to fixate\n'
                                         'at the center of the screen,\n'
                                         'and indicate the\n'
-                                        'bar color\n'
+                                        'bar color category\n'
                                         'every time the bar moves\n\n\n'
                                         '[Press right index finger\nto continue]')
             
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
 
+            # draw instructions wait a few seconds
+            this_instruction_string = ('The RED category includes\n'
+                                        'pink and orange tones.\n\n'
+                                        'The GREEN category includes\n'
+                                        'blue and yellow tones\n\n\n'
+                                        '[Press right index finger\nto continue]')
+            
+            draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
             
             # draw instructions wait a few seconds
             this_instruction_string = ('Do NOT look at the bars!\n'
@@ -396,8 +404,8 @@ class PRFSession(ExpSession):
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = ('Left index finger - Red color\n'
-                                    'Right index finger - Green color\n\n\n'
+        this_instruction_string = ('Left index finger - RED color category\n'
+                                    'Right index finger - GREEN color category\n\n\n'
                                     '[waiting for scanner]')
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
@@ -637,7 +645,7 @@ class FeatureSession(ExpSession):
             self.calibrate_eyetracker()
 
         # draw instructions wait a few seconds
-        this_instruction_string = ('During the experiment\nyou will see green and red bars\n'
+        this_instruction_string = ('During the experiment\nyou will see 2 bars\n'
                                 'oriented vertically or horizontally\n'
                                 'throughout the screen\n\n\n'
                                 '[Press right index finger\nto continue]\n\n'
@@ -650,7 +658,7 @@ class FeatureSession(ExpSession):
             # draw instructions wait a few seconds
             this_instruction_string = ('At the beggining of the experiment\n'
                                         'you will be told which\n'
-                                        'bar color (red/green)\n\n'
+                                        'bar color category (red/green)\n\n'
                                         'you have to search for.\n\n\n'
                                         '[Press right index finger\nto continue]\n\n')
             
@@ -660,8 +668,8 @@ class FeatureSession(ExpSession):
             this_instruction_string = ('Your task is to fixate\n'
                                         'at the center of the screen,\n'
                                         'and indicate if the attended bar\n'
-                                        'is more orange/pink (red bar)\n'
-                                        'or blue/yellow (green bar)\n\n\n'
+                                        'is orange/pink (red category)\n'
+                                        'or blue/yellow (green category)\n\n\n'
                                         '[Press right index finger\nto continue]\n\n')
             
 
@@ -677,8 +685,15 @@ class FeatureSession(ExpSession):
             draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
 
         # draw instructions wait for scanner t trigger
-        this_instruction_string = ('Left index finger - blue/pink\n\n'
-                                    'Right index finger - yellow/orange\n\n\n'
+        if self.att_color == 'color_red':
+            this_instruction_string = ('Pay attention to the RED bar\n\n'
+                                    'Left index finger - pink\n\n'
+                                    'Right index finger - orange\n\n\n'
+                                    '[waiting for scanner]')
+        elif self.att_color == 'color_green':
+            this_instruction_string = ('Pay attention to the GREEN bar\n\n'
+                                    'Left index finger - blue\n\n'
+                                    'Right index finger - yellow\n\n\n'
                                     '[waiting for scanner]')
         
         draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
@@ -700,7 +715,7 @@ class FeatureSession(ExpSession):
         print('Overall accuracy %.2f %%'%(self.correct_responses/sum(self.bar_bool)*100))
           
 
-        self.close_all() # close session
+        self.close() # close session
 
 
 
@@ -911,7 +926,7 @@ class FlickerSession(ExpSession):
         # draw instructions wait a few seconds
         this_instruction_string = ('Welcome to this experiment!\n\n'
                                 'In the first task, you will see a\n'
-                                'flickering red/green square\n\n\n'
+                                'flickering square\n\n\n'
                                 '[Press right index finger\nto continue]\n\n'
                                 '[Press left index finger\nto skip]\n\n')
 
@@ -967,6 +982,11 @@ class FlickerSession(ExpSession):
         # cycle through trials
         for trl in self.all_trials: 
             trl.run() # run forrest run
+
+        ## make plots (need to improve this)
+        #all_ecc_colors = get_average_color(self.output_dir, self.settings, updated_color_names = ['orange','yellow','blue'],
+        #                          average_ecc = False)
+        #make_lum_plots(all_ecc_colors, out_dir = self.output_dir)
           
         self.close() # close session
 

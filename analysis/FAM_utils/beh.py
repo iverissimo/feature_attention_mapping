@@ -66,3 +66,23 @@ def get_pp_responses(trial_IDs,events,params):
                 responses_onset.append(response_df['onset'].values[0])
     
     return responses,responses_onset
+
+
+
+def rgb255_2_hsv(arr):
+    
+    """ convert RGB 255 to HSV
+    
+    Parameters
+    ----------
+    arr: list/array
+        1D list of rgb values
+        
+    """
+    
+    rgb_norm = np.array(arr)/255
+    
+    hsv_color = np.array(colorsys.rgb_to_hsv(rgb_norm[0],rgb_norm[1],rgb_norm[2]))
+    hsv_color[0] = hsv_color[0] * 360
+    
+    return hsv_color

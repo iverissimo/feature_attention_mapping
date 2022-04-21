@@ -153,9 +153,9 @@ stimuli:
       ori_jitter_min: 0 # min value for element orientation jitter range
       task_color: 
         orange:
-          element_color: [204, 50, 0] #[204,0,60] #[255, 0, 0] # rgb255 
+          element_color: [255, 60, 0] #[204, 50, 0] #[204,0,60] #[255, 0, 0] # rgb255 
         pink:
-          element_color: [204, 0, 70] #[204,0,60] #[255, 0, 0] # rgb255  
+          element_color: [255, 0, 60] #[204, 0, 70] #[204,0,60] #[255, 0, 0] # rgb255  
 
     color_green:
       element_sf: 6 # cycles/gabor width
@@ -166,9 +166,9 @@ stimuli:
       ori_jitter_min: 0 # min value for element orientation jitter range
       task_color: 
         yellow:
-          element_color: [200,255, 0] #[204,0,60] #[255, 0, 0] # rgb255 
+          element_color: [60, 255, 0] #[200,255, 0] #[204,0,60] #[255, 0, 0] # rgb255 
         blue:
-          element_color: [0,255,130] #[204,0,60] #[255, 0, 0] # rgb255  
+          element_color: [0, 255, 60] #[0,255,130] #[204,0,60] #[255, 0, 0] # rgb255  
 
   
 eyetracker:

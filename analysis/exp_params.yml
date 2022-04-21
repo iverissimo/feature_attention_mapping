@@ -1,7 +1,9 @@
 
 general:
   tasks: ['pRF','FA', 'flicker']
-  colors: ['color_green', 'color_red']
+  color_categories: ['color_green', 'color_red']
+  task_colors: {'color_red': ['orange', 'pink'], 
+                  'color_green': ['yellow', 'blue']}
   current_dir: 'local' #'local' #'behav_lab' #local'
 
 window: # refers to the parameters for the Psychopy Window class
@@ -27,11 +29,11 @@ feature:
   bar_width_ratio: 0.125 # ratio of the screen res
   mini_blocks: 4
 
-  empty_TR: 12 #5
-  cue_TR: 3
+  empty_TR: 20 #5 # number of TRs during empty period
+  task_trial_TR: 2 # number of TRs per trial of actual task
 
-  total_number_trials: 408  
-  total_number_TR: 255 #408 # of task
+  total_number_trials: 132 #408  
+  total_number_TR: 309 #408 # of task
   dummy_TR: 5 # we used extra 5 TRs in beginning that should be disregarded, so file will be 413
 
   crop: True # if we want to crop the functionals further
@@ -43,23 +45,16 @@ feature:
 
   sync_scanner: False
 
-  task_rate: 1 # 'TR' # seconds or 'TR' if synced to TR
+  task_rate: 'TR' # seconds or 'TR' if synced to TR
 
   bars_phase_dur: 0.5 # phase duration for displaying bars (in seconds) 
 
-  cue_width: .2 #.55
-  cue_height: .5 #1.1
-  cue_contrast: 0.6
-
-  num_bars: 4
+  num_bars: 2
   num_bar_position: [6,6] #[8,8]
 
-  conditions: ['red_vertical','red_horizontal','green_vertical','green_horizontal'] # all conditions to be attended during feature trial
+  conditions: ['color_red', 'color_green'] # all conditions to be attended during feature trial
 
-  bar_pass_direction: ['empty','cue_0','empty','mini_block_0',
-                       'empty','cue_1','empty','mini_block_1',
-                       'empty','cue_2','empty','mini_block_2',
-                       'empty','cue_3','empty','mini_block_3','empty']
+  bar_pass_direction: ['empty', 'task', 'empty']
 
 prf:
   bar_width_ratio: 0.125 #0.0625 # ratio of the screen res
@@ -88,6 +83,8 @@ prf:
 
   element_contrast: 1 # do full contrast during prf task
 
+  task_on_main_categories: False # if false, then task uses color variants
+
   bar_pass_direction: ['empty_long','L-R','U-D','empty','R-L','D-U','empty_long','D-U','R-L','empty','U-D','L-R','empty_long'] 
 
   sync_scanner: True
@@ -97,16 +94,18 @@ prf:
 flicker:
   bar_width_ratio: 0.125 # ratio of the screen res
 
-  bar_ecc_index: [1,2,2,1,1,2,1,2] # eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
+  num_rep_ecc: 4 #12
 
-  flick_rate: 15 # Hz, flicker rate of color for square
+  ref_color: 'pink' # reference color is less luminance one - so red + blue
+
+  bar_ecc_index: [0,1,2] #[3,3,1,2,2,1,1,2,1,2] # eccentricity index for bar positions: 0 - furthest ecc; 3 - closest ecc
+
+  flick_rate: 15 #30 #15 # Hz, flicker rate of color for square
 
   max_trial_time: 5 # max trial time (in minutes)
 
   backgr_contrast: 0 # contrast for elements, 0 = no background elements shown
   increment: 0.025 # increment value for luminance per button press
-
-  modulated_condition: ['color_green'] # color condition modulated by flicker task
 
 
 mri: # refers to the Psychopy SyncGenerator class

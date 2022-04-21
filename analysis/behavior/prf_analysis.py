@@ -78,9 +78,9 @@ for _,ses in enumerate(ses_type):
             total_trials = df_run.iloc[-1]['trial_nr']+1
             
             # to save number of participant responses, differentiating by color to check
-            corr_responses = {'color_green': 0, 'color_red': 0}
-            total_responses = {'color_green': 0, 'color_red': 0}
-            incorr_responses = {'color_green': [], 'color_red': []}
+            corr_responses = {'color_green': 0, 'color_red': 0, 'pink': 0, 'orange': 0, 'yellow': 0, 'blue': 0}
+            total_responses = {'color_green': 0, 'color_red': 0, 'pink': 0, 'orange': 0, 'yellow': 0, 'blue': 0}
+            incorr_responses = {'color_green': [], 'color_red': [], 'pink': [], 'orange': [], 'yellow': [], 'blue': []}
                         
             for t in range(total_trials):
                 
@@ -89,43 +89,64 @@ for _,ses in enumerate(ses_type):
                     # find bar color in that trial
                     bar_color = [x for _,x in enumerate(df_run[df_run['trial_nr']==t]['event_type'].values) if x!='pulse' and x!='response' and x!='background'][0]
 
+                    if bar_color in params['general']['task_colors']['color_green'] or bar_color == 'color_green':
+                        main_color = 'color_green'
+                    elif bar_color in params['general']['task_colors']['color_red'] or bar_color == 'color_red':
+                        main_color = 'color_red' 
+
                     # update total number of (potential) responses 
+                    total_responses[main_color]+=1
                     total_responses[bar_color]+=1
 
                     # save actual participant response
                     response_df = df_run[(df_run['trial_nr']==t)&(df_run['event_type']=='response')]
 
                     if len(response_df.values)==0: # save incorrected response trial numbers, to check later
-                        incorr_responses[bar_color].append(t) 
+                        incorr_responses[main_color].append(t)
+                        incorr_responses[bar_color].append(t)  
                     else:
                         # participant response key
                         sub_response = response_df['response'].values[0]
 
                         if sub_response in params['keys']['left_index']:
-                            if bar_color == 'color_red':
+                            if main_color == 'color_red':
+                                corr_responses[main_color]+=1
                                 corr_responses[bar_color]+=1
                             else:
-                                incorr_responses[bar_color].append(t) 
+                                incorr_responses[main_color].append(t)
+                                incorr_responses[bar_color].append(t)  
                                 
                         elif sub_response in params['keys']['right_index']:
-                            if bar_color == 'color_green':
+                            if main_color == 'color_green':
+                                corr_responses[main_color]+=1
                                 corr_responses[bar_color]+=1
                             else:
-                                incorr_responses[bar_color].append(t) 
+                                incorr_responses[main_color].append(t)
+                                incorr_responses[bar_color].append(t)  
 
             # summarize results, for later plotting
             if i==0:
-                df_summary = pd.DataFrame({'run': np.repeat(run[-16:-11],3),
-                                           'condition': np.array(['color_green', 'color_red', 'total']),
-                                           'accuracy': [corr_responses['color_green']/total_responses['color_green'],
-                                                       corr_responses['color_red']/total_responses['color_red'],
-                                                       sum(corr_responses.values())/sum(total_responses.values())]})
+                df_summary = pd.DataFrame({'run': np.repeat(run[-16:-11], len(incorr_responses.keys())+1),
+                                           'condition': np.array(['total'] + list(incorr_responses.keys())), 
+                                           'accuracy': [sum(corr_responses.values())/sum(total_responses.values()),
+                                                        corr_responses['color_green']/total_responses['color_green'],
+                                                        corr_responses['color_red']/total_responses['color_red'],
+                                                        corr_responses['pink']/total_responses['pink'],
+                                                        corr_responses['orange']/total_responses['orange'],
+                                                        corr_responses['yellow']/total_responses['yellow'],
+                                                        corr_responses['blue']/total_responses['blue'],
+                                                       ]})
             else:
-                df_summary = df_summary.append(pd.DataFrame({'run': np.repeat(run[-16:-11],3),
-                                           'condition': np.array(['color_green', 'color_red', 'total']),
-                                           'accuracy': [corr_responses['color_green']/total_responses['color_green'],
-                                                       corr_responses['color_red']/total_responses['color_red'],
-                                                       sum(corr_responses.values())/sum(total_responses.values())]}),
+                df_summary = df_summary.append(pd.DataFrame({'run': np.repeat(run[-16:-11], len(incorr_responses.keys())+1),
+                                           'condition': np.array(['total'] + list(incorr_responses.keys())), 
+                                           'accuracy': [sum(corr_responses.values())/sum(total_responses.values()),
+                                                        corr_responses['color_green']/total_responses['color_green'],
+                                                        corr_responses['color_red']/total_responses['color_red'],
+                                                        corr_responses['pink']/total_responses['pink'],
+                                                        corr_responses['orange']/total_responses['orange'],
+                                                        corr_responses['yellow']/total_responses['yellow'],
+                                                        corr_responses['blue']/total_responses['blue'],
+                                                       ]}),
                                               ignore_index=True)
      
         # save accuracy and RT values
@@ -134,8 +155,8 @@ for _,ses in enumerate(ses_type):
         # plot barplot and save
         fig, axs = plt.subplots(1, 1, sharex=True, figsize=(10,7.5))
 
-        a = sns.barplot(x='condition', y='accuracy', palette=['red','green','yellow'],
-                    data=df_summary, capsize=.2, order = ['color_red','color_green','total'])
+        a = sns.barplot(x='condition', y='accuracy', palette=['grey', 'red','green','pink', 'orange', 'yellow', 'blue'],
+                    data=df_summary, capsize=.2, order = ['total'] + list(incorr_responses.keys()))
         a.tick_params(labelsize=15)
         a.set_xlabel('bar color',fontsize=15, labelpad = 20)
         a.set_ylabel('Accuracy',fontsize=15, labelpad = 15)

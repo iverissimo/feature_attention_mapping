@@ -537,7 +537,7 @@ def gradual_shift(curr_point,
     
 
 def draw_instructions(win, instructions, keys = ['b'], visual_obj = [], 
-                      color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), height = 30, #.65,
+                      color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), height = 40, #.65,
                         italic = True, alignHoriz = 'center', alignVert = 'center'):
     
     """ draw instructions on screen

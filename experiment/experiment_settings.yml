@@ -5,10 +5,17 @@ preferences:
 
 window: # refers to the parameters for the Psychopy Window class
   units: pix
+  color: [0, 0, 0] # psychopy rgb
+  fullscr: True
+  screen: 0 #1
+  #useRetina: False
+  winType: 'pyglet'
+  waitBlanking: True
+  colorSpace: 'rgb' #'hsv' #'rgb255'
 
 monitor:
   name: default
-  width: 69.8 #69  # width of monitor (in cm)
+  width: 69 #69.8 #69  # width of monitor (in cm)
   distance: 210 #225  # distance of participant from monitor (in cm)
   gamma: 1 # specific value for gamma correction
 
@@ -18,15 +25,7 @@ mouse:
 window_extra: # refers to the parameters for the OLD Psychopy Window class (new version breaks)
   size: [1920, 1080] #[1680, 1050]
   pos: [0, 0]
-  color: [0, 0, 0] # psychopy rgb
-  fullscr: True
-  screen: 0 #1
-  #useRetina: False
-  winType: 'pyglet'
-  waitBlanking: True
   framerate: 60
-  colorSpace: 'rgb' #'hsv' #'rgb255'
-  #units: pix
   display: 'square' # or 'rectangle', defines if square [vRes vRes] or rectangle [hRes vRes] display
   mac_bool: False
 
@@ -83,7 +82,7 @@ stimuli:
 
     bar_pass_direction: ['empty_long','L-R','U-D','empty','R-L','D-U','empty_long','D-U','R-L','empty','U-D','L-R','empty_long']
 
-    sync_scanner: False #True 
+    sync_scanner: True 
 
   feature:
     bar_width_ratio: 0.125 # ratio of the screen res
@@ -107,7 +106,7 @@ stimuli:
     task_colors: {'color_red': ['orange', 'pink'], 
                   'color_green': ['yellow', 'blue']}
 
-    sync_scanner: False 
+    sync_scanner: True 
 
     quest_stair: True # if using quest staircase or costum
     

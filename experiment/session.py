@@ -408,7 +408,7 @@ class PRFSession(ExpSession):
                                     'Right index finger - GREEN color category\n\n\n'
                                     '[waiting for scanner]')
         
-        draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
+        draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right], height = 40)
 
 
         # start recording gaze
@@ -696,7 +696,7 @@ class FeatureSession(ExpSession):
                                     'Right index finger - yellow\n\n\n'
                                     '[waiting for scanner]')
         
-        draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right])
+        draw_instructions(self.win, this_instruction_string, keys = [self.settings['mri'].get('sync', 't')], visual_obj = [self.rect_left,self.rect_right], height = 40)
 
         # start recording gaze
         if self.eyetracker_on:

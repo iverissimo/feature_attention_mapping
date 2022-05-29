@@ -613,6 +613,14 @@ images['PA'] = mri_utils.make_raw_vertex_image(pa4plot,
 cortex.quickshow(images['PA'],with_curvature=True,with_sulci=True,with_colorbar=True,
                  curvature_brightness = 0.4, curvature_contrast = 0.1)
 
+## plot rsq average accross runs
+images['pRF_rsq'] = mri_utils.make_raw_vertex_image(pRF_estimates['r2'], 
+                                                   cmap = 'Reds', vmin = 0, vmax = .8, 
+                                                  data2 = alpha_level, vmin2 = 0, vmax2 = 1, 
+                                                   subject = pysub, data2D = True)
+
+cortex.quickshow(images['pRF_rsq'],with_curvature=True,with_sulci=True)
+
 ## plot pRF polar angle ##
 
 # # only used voxels where pRF rsq bigger than 0

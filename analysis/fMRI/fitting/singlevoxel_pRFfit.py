@@ -405,7 +405,7 @@ else:
                                             baseline)   
 
 # set figure name
-fig_name = 'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_roi-{roi}_vertex-{vert}.png'.format(sj=sj,
+fig_name = 'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_roi-{roi}_vertex-{vert}.svg'.format(sj=sj,
                                                                                         acq=acq,
                                                                                         space=space,
                                                                                         run=run_type,
@@ -460,6 +460,6 @@ if fit_hrf:
     axis.set_xlim(0, 25)
     axis.legend(loc='upper right',fontsize=10) 
     axis.set_xlabel('Time (s)',fontsize=10, labelpad=10)
-    fig.savefig(op.join(figures_pth,'HRF_roi-{roi}_vertex-{vert}.png'.format(roi=roi,vert=vertex))) 
+    fig.savefig(op.join(figures_pth,'HRF_roi-{roi}_vertex-{vert}.svg'.format(roi=roi,vert=vertex))) 
 
 

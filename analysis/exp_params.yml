@@ -133,10 +133,10 @@ mri: # refers to the Psychopy SyncGenerator class
 
   paths:
     local: 
-      root: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/PILOT_DATA'
+      root: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/DATA'
       matlab: '/Applications/MATLAB_R2019a.app/bin/matlab'
-      derivatives: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/PILOT_DATA/derivatives'
-      sourcedata: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/PILOT_DATA/sourcedata'
+      derivatives: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/DATA/derivatives'
+      sourcedata: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/DATA/sourcedata'
     
     lisa:
       root: '/project/projects_verissimo/FAM/PILOT_DATA'

@@ -130,16 +130,16 @@ for _,ses in enumerate(ses_type):
                 all_ecc_dict['R'].append(np.array(all_trials[i])[...,0][t])
                 all_ecc_dict['G'].append(np.array(all_trials[i])[...,1][t])
                 all_ecc_dict['B'].append(np.array(all_trials[i])[...,2][t])
-                all_ecc_dict['luminance'].append(beh_utils.rgb255_2_hsv(all_trials[i][t])[-1])
+                all_ecc_dict['luminance'].append(beh_utils.rgb255_2_hsv(np.array(all_trials[i])[t])[-1])
             
         # add also reference color, for comparison - SHOULD GENERALIZE; THIS WILL BREAK WITH DIFFERENT REF COLOR
         for e in ecc_ind:
             all_ecc_dict['color'].append(ref_color)
             all_ecc_dict['ecc'].append(e) # doesnt matter, its the same for all ecc
             all_ecc_dict['R'].append(updated_settings['color_red']['task_color'][ref_color]['element_color'][0])
-            all_ecc_dict['G'].append(updated_settings['color_red']['task_color'][ref_color]['element_color'][0])
-            all_ecc_dict['B'].append(updated_settings['color_red']['task_color'][ref_color]['element_color'][0])
-            all_ecc_dict['luminance'].append(beh_utils.rgb255_2_hsv(updated_settings['color_red']['task_color'][ref_color]['element_color'][0])[-1])
+            all_ecc_dict['G'].append(updated_settings['color_red']['task_color'][ref_color]['element_color'][1])
+            all_ecc_dict['B'].append(updated_settings['color_red']['task_color'][ref_color]['element_color'][2])
+            all_ecc_dict['luminance'].append(beh_utils.rgb255_2_hsv(np.array(updated_settings['color_red']['task_color'][ref_color]['element_color']))[-1])
                 
         # convert to dataframe
         df_colors = pd.DataFrame(all_ecc_dict)

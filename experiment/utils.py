@@ -237,7 +237,7 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     # get rgb color and convert to hsv
     if np.array(new_color).any():
         hsv_color = rgb255_2_hsv(new_color)
-        print('new hsv is %s'%str(hsv_color))
+        #print('new hsv is %s'%str(hsv_color))
     else:
         hsv_color = rgb255_2_hsv(color_arr)
 
@@ -316,9 +316,9 @@ def update_elements(ElementArrayStim, condition_settings, this_phase, elem_posit
     ElementArrayStim.setTex(elementTex)
     ElementArrayStim.setSfs(element_sfs)
     ElementArrayStim.setOpacities(element_opacities)
-    ElementArrayStim.setColors(element_color)
+    ElementArrayStim.setColors(element_color, 'rgb')
     ElementArrayStim.setContrs(element_contrast)
-    print(element_contrast[list_indices[0]])
+    #print(element_contrast[list_indices[0]])
 
     # return updated settings, if such is the case
     if update_settings == True: 
@@ -538,7 +538,7 @@ def gradual_shift(curr_point,
 
 def draw_instructions(win, instructions, keys = ['b'], visual_obj = [], 
                       color = (1, 1, 1), font = 'Helvetica Neue', pos = (0, 0), height = 40, #.65,
-                        italic = True, alignHoriz = 'center', alignVert = 'center'):
+                        italic = True, anchorHoriz  = 'center', anchorVert = 'center'):
     
     """ draw instructions on screen
     
@@ -562,8 +562,8 @@ def draw_instructions(win, instructions, keys = ['b'], visual_obj = [],
                         pos = pos, 
                         height = height,
                         italic = italic, 
-                        alignHoriz = alignHoriz, 
-                        alignVert = alignVert
+                        anchorHoriz = anchorHoriz, 
+                        anchorVert = anchorVert
                         )
     
     # draw text again

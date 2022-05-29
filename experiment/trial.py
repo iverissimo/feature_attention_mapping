@@ -79,12 +79,7 @@ class PRFTrial(Trial):
                 self.session.ori_counter += 1
 
         ## draw stim
-        if (self.bar_pass_direction_at_TR == 'empty'): # if empty trial, show background
-
-            print('background')
-
-        else: # if bar pass at TR, then draw bar
-
+        if (self.bar_pass_direction_at_TR != 'empty'): # if bar pass at TR, then draw bar
 
             self.session.prf_stim.draw(bar_midpoint_at_TR = self.bar_midpoint_at_TR, 
                                        bar_pass_direction_at_TR = self.bar_pass_direction_at_TR,
@@ -92,7 +87,7 @@ class PRFTrial(Trial):
                                        position_dictionary = self.position_dictionary,
                                        orientation = self.session.ori_bool) 
 
-            print(self.phase_names[int(self.phase)]) #'ori_left')
+            #print(self.phase_names[int(self.phase)]) #'ori_left')
 
         # set orientation bool counter to false
         self.session.ori_bool = False
@@ -244,7 +239,7 @@ class FeatureTrial(Trial):
                                                ) 
 
 
-        print(self.phase_names[int(self.phase)]) #print(self.phase_names[int(self.phase)])
+        #print(self.phase_names[int(self.phase)]) #print(self.phase_names[int(self.phase)])
                 
 
         # set orientation bool counter to false

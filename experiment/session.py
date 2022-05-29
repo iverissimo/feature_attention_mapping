@@ -931,7 +931,7 @@ class FlickerSession(ExpSession):
                                 '[Press left index finger\nto skip]\n\n')
 
         key_pressed = draw_instructions(self.win, this_instruction_string, keys = self.settings['keys']['left_index']+self.settings['keys']['right_index'], visual_obj = [self.rect_left,self.rect_right])
-        print(self.settings['keys']['left_index']+self.settings['keys']['right_index'])
+        #print(self.settings['keys']['left_index']+self.settings['keys']['right_index'])
         if key_pressed[0] not in self.settings['keys']['left_index']: #if instructions not skipped
 
             this_instruction_string = ('If you press the buttons\n'

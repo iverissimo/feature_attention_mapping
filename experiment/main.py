@@ -75,13 +75,13 @@ def main():
         exp_sess = PRFSession(output_str = output_str,
                               output_dir = output_dir,
                               settings_file = 'experiment_settings.yml',
-                              eyetracker_on = True)
+                              eyetracker_on = False) #True)
 
     elif exp_type == 'feature': # run feature pRF mapper
          exp_sess = FeatureSession(output_str = output_str,
                                   output_dir = output_dir,
                                   settings_file = 'experiment_settings.yml',
-                                  eyetracker_on = True,
+                                  eyetracker_on = False, #True,
                                   att_color = att_color)
 
     elif exp_type == 'flicker': # run feature pRF mapper

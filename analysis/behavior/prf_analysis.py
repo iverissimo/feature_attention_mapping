@@ -43,6 +43,12 @@ for bar_pass_type in params['prf']['bar_pass_direction']:
 
     bar_pass_all = np.hstack((bar_pass_all,[bar_pass_type]*params['prf']['num_TRs'][bar_pass_type]))
 
+# conditions (colors)
+color_categories = params['general']['color_categories']
+task_colors = params['general']['task_colors']
+all_colors = [element for sublist in task_colors.values() for element in sublist] 
+
+TR = params['mri']['TR']
 
 # check results for behavioral session, and scanner session
 
@@ -66,6 +72,11 @@ for _,ses in enumerate(ses_type):
         prf_files = [op.join(data_dir,x) for _,x in enumerate(os.listdir(data_dir)) if task in x
                          and x.endswith('_events.tsv')]; prf_files.sort()
 
+        print('%i files found'%len(prf_files))
+
+        # summarize results, for later plotting
+        df_summary = pd.DataFrame(columns=['run', 'color_category', 'bar_color', 'accuracy', 'RT'])
+
         # for all runs
         for i,run in enumerate(prf_files):
             
@@ -78,92 +89,113 @@ for _,ses in enumerate(ses_type):
             total_trials = df_run.iloc[-1]['trial_nr']+1
             
             # to save number of participant responses, differentiating by color to check
-            corr_responses = {'color_green': 0, 'color_red': 0, 'pink': 0, 'orange': 0, 'yellow': 0, 'blue': 0}
-            total_responses = {'color_green': 0, 'color_red': 0, 'pink': 0, 'orange': 0, 'yellow': 0, 'blue': 0}
-            incorr_responses = {'color_green': [], 'color_red': [], 'pink': [], 'orange': [], 'yellow': [], 'blue': []}
+            corr_responses = {}
+            total_responses = {}
+            rt_responses = {}
+
+            for cc in color_categories:
+                corr_responses[cc] = 0
+                total_responses[cc] = 0
+                rt_responses[cc] = []
+            for ac in all_colors:
+                corr_responses[ac] = 0
+                total_responses[ac] = 0
+                rt_responses[ac] = []
+    
                         
             for t in range(total_trials):
                 
                 if 'empty' not in (bar_pass_all[t]):
-                    
+        
                     # find bar color in that trial
-                    bar_color = [x for _,x in enumerate(df_run[df_run['trial_nr']==t]['event_type'].values) if x!='pulse' and x!='response' and x!='background'][0]
-
-                    if bar_color in params['general']['task_colors']['color_green'] or bar_color == 'color_green':
+                    bar_color = [x for x in df_run.loc[df_run['trial_nr']==t]['event_type'].unique() if x in all_colors][0]
+                    
+                    if bar_color == 'color_green' or bar_color in task_colors['color_green']:
                         main_color = 'color_green'
-                    elif bar_color in params['general']['task_colors']['color_red'] or bar_color == 'color_red':
+                    elif bar_color == 'color_red' or bar_color in task_colors['color_red']:
                         main_color = 'color_red' 
 
                     # update total number of (potential) responses 
                     total_responses[main_color]+=1
                     total_responses[bar_color]+=1
-
+                    
                     # save actual participant response
                     response_df = df_run[(df_run['trial_nr']==t)&(df_run['event_type']=='response')]
 
-                    if len(response_df.values)==0: # save incorrected response trial numbers, to check later
-                        incorr_responses[main_color].append(t)
-                        incorr_responses[bar_color].append(t)  
-                    else:
+                    if len(response_df.values)>0: 
+                        
                         # participant response key
                         sub_response = response_df['response'].values[0]
 
-                        if sub_response in params['keys']['left_index']:
-                            if main_color == 'color_red':
-                                corr_responses[main_color]+=1
-                                corr_responses[bar_color]+=1
-                            else:
-                                incorr_responses[main_color].append(t)
-                                incorr_responses[bar_color].append(t)  
-                                
-                        elif sub_response in params['keys']['right_index']:
-                            if main_color == 'color_green':
-                                corr_responses[main_color]+=1
-                                corr_responses[bar_color]+=1
-                            else:
-                                incorr_responses[main_color].append(t)
-                                incorr_responses[bar_color].append(t)  
+                        if sub_response in params['keys']['left_index'] and main_color == 'color_red':
+                            
+                            corr_responses[main_color]+=1
+                            corr_responses[bar_color]+=1
+                            
+                            rt_responses[main_color].append(response_df['onset'].values[0] - t*TR)
+                            rt_responses[bar_color].append(response_df['onset'].values[0] - t*TR)
 
-            # summarize results, for later plotting
-            if i==0:
-                df_summary = pd.DataFrame({'run': np.repeat(run[-16:-11], len(incorr_responses.keys())+1),
-                                           'condition': np.array(['total'] + list(incorr_responses.keys())), 
-                                           'accuracy': [sum(corr_responses.values())/sum(total_responses.values()),
-                                                        corr_responses['color_green']/total_responses['color_green'],
-                                                        corr_responses['color_red']/total_responses['color_red'],
-                                                        corr_responses['pink']/total_responses['pink'],
-                                                        corr_responses['orange']/total_responses['orange'],
-                                                        corr_responses['yellow']/total_responses['yellow'],
-                                                        corr_responses['blue']/total_responses['blue'],
-                                                       ]})
-            else:
-                df_summary = df_summary.append(pd.DataFrame({'run': np.repeat(run[-16:-11], len(incorr_responses.keys())+1),
-                                           'condition': np.array(['total'] + list(incorr_responses.keys())), 
-                                           'accuracy': [sum(corr_responses.values())/sum(total_responses.values()),
-                                                        corr_responses['color_green']/total_responses['color_green'],
-                                                        corr_responses['color_red']/total_responses['color_red'],
-                                                        corr_responses['pink']/total_responses['pink'],
-                                                        corr_responses['orange']/total_responses['orange'],
-                                                        corr_responses['yellow']/total_responses['yellow'],
-                                                        corr_responses['blue']/total_responses['blue'],
-                                                       ]}),
-                                              ignore_index=True)
+                        elif sub_response in params['keys']['right_index'] and main_color == 'color_green':
+
+                            corr_responses[main_color]+=1
+                            corr_responses[bar_color]+=1
+                            
+                            rt_responses[main_color].append(response_df['onset'].values[0] - t*TR)
+                            rt_responses[bar_color].append(response_df['onset'].values[0] - t*TR)
+                
+
+            # set this again, guarantee correct order
+            all_colors = task_colors[color_categories[0]]+task_colors[color_categories[1]]
+
+            df_summary = df_summary.append(pd.DataFrame({'run': np.repeat(run[-16:-11],len(all_colors)),
+                                                        'color_category': np.repeat(color_categories,2),
+                                                        'bar_color': all_colors,
+                                                        'accuracy': [corr_responses[x]/total_responses[x] for x in all_colors],
+                                                        'RT': [np.mean(rt_responses[x]) for x in all_colors]
+                                                        }))
+                                             
      
         # save accuracy and RT values
         df_summary.to_csv(op.join(out_dir,'sub-{sj}_task-{task}_acc_RT_{ses_type}.csv'.format(sj=sj, task=task, ses_type = ses)), index = False, header=True)
 
-        # plot barplot and save
-        fig, axs = plt.subplots(1, 1, sharex=True, figsize=(10,7.5))
+        # plot ACCURACY barplot and save
+        fig, axs = plt.subplots(1, 2, figsize=(15,7.5))
 
-        a = sns.barplot(x='condition', y='accuracy', palette=['grey', 'red','green','pink', 'orange', 'yellow', 'blue'],
-                    data=df_summary, capsize=.2, order = ['total'] + list(incorr_responses.keys()))
-        a.tick_params(labelsize=15)
-        a.set_xlabel('bar color',fontsize=15, labelpad = 20)
-        a.set_ylabel('Accuracy',fontsize=15, labelpad = 15)
-        a.set_title('pRF task',fontsize=18)
+        a = sns.barplot(x='color_category', y='accuracy', palette = params['plotting']['cond_colors'],
+                    data=df_summary, capsize=.2, ax = axs[0])
+        axs[0].tick_params(labelsize=15)
+        axs[0].set_xlabel('Color Category',fontsize=15, labelpad = 20)
+        axs[0].set_ylabel('Accuracy',fontsize=15, labelpad = 15)
+        axs[0].set_title('pRF task',fontsize=18)
 
+        b = sns.barplot(x='bar_color', y='accuracy', palette = params['plotting']['cond_colors'],
+                    data=df_summary, capsize=.2, ax = axs[1])
+        axs[1].tick_params(labelsize=15)
+        axs[1].set_xlabel('Bar color',fontsize=15, labelpad = 20)
+        axs[1].set_ylabel('Accuracy',fontsize=15, labelpad = 15)
+        axs[1].set_title('pRF task',fontsize=18)
 
-        fig.savefig(op.join(out_dir,'sub-{sj}_task-{task}_barplot-across-runs_{ses_type}.png'.format(sj = sj, 
+        fig.savefig(op.join(out_dir,'sub-{sj}_task-{task}_barplot-accuracy_across-runs_{ses_type}.png'.format(sj = sj, 
                                                                                                       task = task,
                                                                                                       ses_type = ses)))
 
+        # plot ACCURACY barplot and save
+        fig, axs = plt.subplots(1, 2, figsize=(15,7.5))
+
+        a = sns.barplot(x='color_category', y='RT', palette = params['plotting']['cond_colors'],
+                    data=df_summary, capsize=.2, ax = axs[0])
+        axs[0].tick_params(labelsize=15)
+        axs[0].set_xlabel('Color Category',fontsize=15, labelpad = 20)
+        axs[0].set_ylabel('RT (s)',fontsize=15, labelpad = 15)
+        axs[0].set_title('pRF task',fontsize=18)
+
+        b = sns.barplot(x='bar_color', y='RT', palette = params['plotting']['cond_colors'],
+                    data=df_summary, capsize=.2, ax = axs[1])
+        axs[1].tick_params(labelsize=15)
+        axs[1].set_xlabel('Bar color',fontsize=15, labelpad = 20)
+        axs[1].set_ylabel('RT (s)',fontsize=15, labelpad = 15)
+        axs[1].set_title('pRF task',fontsize=18)
+
+        fig.savefig(op.join(out_dir,'sub-{sj}_task-{task}_barplot-RT_across-runs_{ses_type}.png'.format(sj = sj, 
+                                                                                                            task = task,
+                                                                                                            ses_type = ses)))

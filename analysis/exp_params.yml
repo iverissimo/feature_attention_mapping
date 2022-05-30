@@ -211,10 +211,13 @@ keys: # keys to press, valid for laptop, scanner and behav lab
 plotting:
   # define costum palette
   cond_colors : 
-    green_horizontal : (0,1,0), #(0,0.5412,0),
-    green_vertical : (0,1,0), #(0,0.5412,0),
-    red_horizontal : (1,0,0), #(0.6588,0,0),
-    red_vertical : (1,0,0)} #(0.6588,0,0)}
+    color_red: [0.61960784, 0.00784314, 0.00784314]
+    color_green: [0.00784314, 0.61960784, 0.03921569]
+    pink: [0.61960784, 0.00784314, 0.29411765]
+    orange: [0.61960784, 0.24313725, 0.00784314]
+    blue: [0.00784314, 0.61960784, 0.44705882]
+    yellow: [0.52941176, 0.61960784, 0.00784314]
+
 
   pycortex_sub: 'hcp_999999' #'fsaverage'
 

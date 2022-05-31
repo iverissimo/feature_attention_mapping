@@ -144,9 +144,6 @@ for _,ses in enumerate(ses_type):
                             rt_responses[bar_color].append(response_df['onset'].values[0] - t*TR)
                 
 
-            # set this again, guarantee correct order
-            all_colors = task_colors[color_categories[0]]+task_colors[color_categories[1]]
-
             df_summary = df_summary.append(pd.DataFrame({'run': np.repeat(run[-16:-11],len(all_colors)),
                                                         'color_category': np.repeat(color_categories,2),
                                                         'bar_color': all_colors,
@@ -179,7 +176,7 @@ for _,ses in enumerate(ses_type):
                                                                                                       task = task,
                                                                                                       ses_type = ses)))
 
-        # plot ACCURACY barplot and save
+        # plot RT barplot and save
         fig, axs = plt.subplots(1, 2, figsize=(15,7.5))
 
         a = sns.barplot(x='color_category', y='RT', palette = params['plotting']['cond_colors'],

@@ -57,18 +57,10 @@ behav_dir =  op.join(params['mri']['paths'][base_dir]['root'],'derivatives',
 task_name = 'feature' if task == 'FA' else 'prf'
 TR = params['mri']['TR'] if params[task_name]['task_rate']== 'TR' else params[task_name]['task_rate']
 print('feature trial rate is %.2f s'%TR)
-empty_TR = params['feature']['empty_TR']
-cue_TR = params['feature']['cue_TR']
-mini_blk_TR = params['feature']['num_bar_position'][0]*params['feature']['num_bar_position'][1]*2
 
 # sample rate eyetracking
 sample_rate = params['eyetracking']['sampling_freq']
 
-# make plots for each miniblock
-# so empty, cue, empty, miniblock
-
-# duration of miniblock, in seconds
-mini_blk_dur = (cue_TR + 2*empty_TR + mini_blk_TR)*TR
 
 # check results for behavioral session, and scanner session
 for _,ses in enumerate(ses_type):

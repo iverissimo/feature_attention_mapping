@@ -139,7 +139,7 @@ mri: # refers to the Psychopy SyncGenerator class
       sourcedata: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/DATA/sourcedata'
     
     lisa:
-      root: '/project/projects_verissimo/FAM/PILOT_DATA'
+      root: '/project/projects_verissimo/FAM/DATA'
       matlab: ''
       derivatives: '/scratch/derivatives'
       sourcedata: '/scratch/sourcedata'

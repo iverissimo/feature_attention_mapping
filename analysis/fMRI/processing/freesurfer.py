@@ -57,9 +57,9 @@ t2_filename = [op.join(anat_dir,run) for _,run in enumerate(os.listdir(anat_dir)
 t1_str = ''
 for ind,t in enumerate(t1_filename):
     if ind==0:
-        t1_str += t.replace(anat_dir,'/scratch/anat')
+        t1_str += t.replace(anat_dir,'/scratch/FAM_wf/anat')
     else:
-        t1_str += ' -i '+t.replace(anat_dir,'/scratch/anat')
+        t1_str += ' -i '+t.replace(anat_dir,'/scratch/FAM_wf/anat')
         
 ## same but for T2w string
 # although not sure if freesurfer actually averages them or takes last one
@@ -82,13 +82,16 @@ echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
 conda activate i36
 
-cp -r $ANATDIR $TMPDIR
+# make working directory in node
+mkdir $TMPDIR/FAM_wf
+
+cp -r $ANATDIR $TMPDIR/FAM_wf/
 wait
-cp -r $OUTDIR/$SJ_NR $TMPDIR
+cp -r $OUTDIR/$SJ_NR $TMPDIR/FAM_wf/
 
 wait
 
-export SUBJECTS_DIR=$TMPDIR/$SJ_NR
+export SUBJECTS_DIR=$TMPDIR/FAM_wf/
 
 wait
 
@@ -106,8 +109,6 @@ elif [ "$CMD" == pial ]; then
 
     echo "running pial fixes"
 
-    cd $TMPDIR
-
     recon-all -s $SJ_NR -hires -autorecon-pial
 
 else
@@ -117,7 +118,7 @@ fi
 
 wait
 
-rsync -chavzP $TMPDIR/$SJ_NR/ $OUTDIR
+rsync -chavzP $TMPDIR/FAM_wf/$SJ_NR $OUTDIR
 
 wait          # wait until programs are finished
 

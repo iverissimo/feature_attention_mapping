@@ -106,6 +106,8 @@ elif [ "$CMD" == pial ]; then
 
     echo "running pial fixes"
 
+    cd $TMPDIR
+
     recon-all -s $SJ_NR -hires -autorecon-pial
 
 else

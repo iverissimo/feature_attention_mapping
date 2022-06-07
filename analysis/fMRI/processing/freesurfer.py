@@ -66,9 +66,9 @@ for ind,t in enumerate(t1_filename):
 t2_str = ''
 for ind,t in enumerate(t2_filename):
     if ind==0:
-        t2_str += t.replace(anat_dir,'/scratch/anat')
+        t2_str += t.replace(anat_dir,'/scratch/FAM_wf/anat')
     else:
-        t2_str += ' -T2 '+t.replace(anat_dir,'/scratch/anat')
+        t2_str += ' -T2 '+t.replace(anat_dir,'/scratch/FAM_wf/anat')
 
 batch_string = """#!/bin/bash
 #SBATCH -t 96:00:00

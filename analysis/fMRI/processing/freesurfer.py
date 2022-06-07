@@ -31,7 +31,7 @@ else:
 if base_dir in ['local']:
     raise NameError('Dont run freesurfer locally - only implemented in slurm systems')
 
-list_cmd = ['all', 'pial']
+list_cmd = ['all', 'pial', 't2']
 if freesurfer_cmd not in list_cmd:
     raise NameError('Not implemented, use freesurfer commands from %s'%str(list_cmd))
 

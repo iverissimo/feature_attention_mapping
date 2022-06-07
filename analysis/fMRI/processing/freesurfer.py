@@ -20,7 +20,7 @@ elif len(sys.argv)<3:
     raise NameError('Please specify where running data (local vs lisa)'
                     'as 2nd argument in the command line!')
 elif len(sys.argv)<4:
-    raise NameError('Please specify type of freesurfer commad (all, pial)'
+    raise NameError('Please specify type of freesurfer commad (all, pial, t2)'
                     'as 3rd argument in the command line!') 
 
 else:
@@ -110,6 +110,12 @@ elif [ "$CMD" == pial ]; then
     echo "running pial fixes"
 
     recon-all -s $SJ_NR -hires -autorecon-pial
+
+elif [ "$CMD" == t2 ]; then
+
+    echo "running pial fixes taking into account T2 or FLAIR images"
+
+    recon-all -s $SJ_NR -hires -T2 $T2_file -T2pial -autorecon3
 
 else
     echo "command not implemented, skipping"

@@ -124,7 +124,7 @@ fi
 
 wait
 
-rsync -chavzP $TMPDIR/FAM_wf/$SJ_NR $OUTDIR
+rsync -chavzP $TMPDIR/FAM_wf/$SJ_NR/ $OUTDIR/$SJ_NR
 
 wait          # wait until programs are finished
 

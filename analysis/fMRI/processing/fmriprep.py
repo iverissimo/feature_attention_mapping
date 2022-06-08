@@ -83,7 +83,7 @@ $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/fmriprep/ participant \
 --participant-label sub-$SJ_NR --fs-subjects-dir $ROOTFOLDER/derivatives/freesurfer/ \
 --output-space T1w fsnative fsaverage MNI152NLin2009cAsym --cifti-output 170k \
 --bold2t1w-init register --nthread 16 --mem_mb 5000 --low-mem --fs-license-file $FREESURFER/license.txt \
---use-syn-sdc --force-syn --bold2t1w-dof 6 --stop-on-first-crash --verbose --ignore slicetiming --skip_bids_validation --dummy-scans 5 \
+--use-syn-sdc --force-syn --bold2t1w-dof 6 --stop-on-first-crash --verbose --skip_bids_validation --dummy-scans 5 \
 -w $TMPDIR/FAM_wf
 
 wait          # wait until programs are finished

@@ -103,6 +103,9 @@ if [ "$CMD" == all ]; then
 
     echo "running full pipeline (recon all)"
 
+    # remove sub folder (empty anyway) to avoid freesurfer complaints
+    rm -r $TMPDIR/FAM_wf/$SJ_NR 
+
     if [[ -z "${T2_file}" ]]; then
 
         echo "no T2 file provided, running recon-all only on T1w file"

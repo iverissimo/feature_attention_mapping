@@ -26,7 +26,7 @@ with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f
 base_dir = params['general']['current_dir'] # which machine we run the data
 acq = params['mri']['acq'] # if using standard files or nordic files
 space = params['mri']['space'] # subject space
-file_ext = params['mri']['file_ext'] # file extension
+file_ext = params['mri']['file_ext'][space] # file extension
 confound_ext = params['mri']['confounds']['file_ext'] # file extension
 
 hemispheres = ['hemi-L','hemi-R'] # only used for gifti files
@@ -54,11 +54,6 @@ confound_files = {'pRF':[op.join(fmriprep_dir,run) for _,run in enumerate(os.lis
             if acq in run and 'FA' in run and run.endswith(confound_ext)]}
 
 
-# exception for this run that could not be nordiced
-if sj == '004':
-    epi_files['FA'].append(op.join(fmriprep_dir,'sub-{sj}_ses-1_task-FA_acq-standard_run-4_space-{space}{file_ext}'.format(sj=sj, space=space, file_ext=file_ext))) 
-    confound_files['FA'].append(op.join(fmriprep_dir,'sub-{sj}_ses-1_task-FA_acq-standard_run-4{file_ext}'.format(sj=sj, file_ext=confound_ext)))
-
 # dict to store names of processed files, per task
 proc_files = {'pRF': [],
              'FA': []}
@@ -70,13 +65,12 @@ for _,task in enumerate(['pRF','FA']):
     task_name = 'feature' if task == 'FA' else 'prf' # due to params yml notation, should change later
 
     # load and convert files in numpy arrays, to make format issue obsolete
-    epi_files[task] = mri_utils.load_data_save_npz(epi_files[task], output_dir)
+    epi_files[task] = mri_utils.load_data_save_npz(epi_files[task], output_dir, save_subcortical=True)
     
     ## crop files, due to "dummies"
     crop_TR = params[task_name]['dummy_TR'] + params[task_name]['crop_TR'] if params[task_name]['crop'] == True else params[task_name]['dummy_TR'] 
 
-    proc_files[task] = mri_utils.crop_epi(epi_files[task], output_dir, num_TR_task = params[task_name]['total_number_TR'], 
-                                           num_TR_crop = crop_TR)
+    proc_files[task] = mri_utils.crop_epi(epi_files[task], output_dir, num_TR_crop = crop_TR)
 
     if params[task_name]['regress_confounds']: # if regressing confounds
     

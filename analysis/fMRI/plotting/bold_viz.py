@@ -14,9 +14,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import cortex
 
-sys.path.insert(0,'..') # add parent folder to path
-from utils import * #import script to use relevante functions
-
 
 # load settings from yaml
 with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:

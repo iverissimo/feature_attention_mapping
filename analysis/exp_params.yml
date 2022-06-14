@@ -113,8 +113,11 @@ mri: # refers to the Psychopy SyncGenerator class
   sync: 't'  # character used as flag for sync timing
 
   space: 'fsLR_den-170k' #'fsaverage' # space of the files to be used in analysis
-  file_ext:  '_bold.dtseries.nii' #'_bold.func.gii' # file extension
+  file_ext:  {'fsLR_den-170k': '_bold.dtseries.nii', 
+              'fsaverage': '_bold.func.gii'} # file extension
   acq: 'nordic' #'nordic' # "acquisition" type to use
+
+  save_subcortical: True # saving subcortical surface date
 
   confounds:
     file_ext: '_desc-confounds_timeseries.tsv' # file extension for confounds

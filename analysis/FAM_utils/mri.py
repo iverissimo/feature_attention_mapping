@@ -162,7 +162,7 @@ def correlate_vol(data1,data2,outfile):
     return correlations
 
 
-def crop_epi(file, outdir, num_TR_task=220, num_TR_crop = 5):
+def crop_epi(file, outdir, num_TR_crop = 5):
 
     """ crop epi file (expects numpy file)
     and thus remove the first recorded "dummy" trials, if such was the case
@@ -173,8 +173,6 @@ def crop_epi(file, outdir, num_TR_task=220, num_TR_crop = 5):
         absolute filename to be filtered (or list of filenames)
     outdir : str
         path to save new file
-    num_TR_task: int
-        number of TRs of task, for safety check
     num_TR_crop : int
         number of TRs to remove from beginning of file
     
@@ -1222,7 +1220,7 @@ def normalize(M):
     return (M-np.nanmin(M))/(np.nanmax(M)-np.nanmin(M))
 
 
-def surf_data_from_cifti(data, axis, surf_name):
+def surf_data_from_cifti(data, axis, surf_name, medial_struct=False):
 
     """
     load surface data from cifti, from one hemisphere
@@ -1234,11 +1232,14 @@ def surf_data_from_cifti(data, axis, surf_name):
         if name == surf_name:                                 # Just looking for a surface
             data = data.T[data_indices]                       # Assume brainmodels axis is last, move it to front
             vtx_indices = model.vertex                        # Generally 1-N, except medial wall vertices
-            surf_data = np.zeros((vtx_indices.max() + 1,) + data.shape[1:], dtype=data.dtype)
+            if medial_struct:
+                surf_data = np.zeros((len(vtx_indices), data.shape[-1]), dtype=data.dtype)
+            else:
+                surf_data = np.zeros((vtx_indices.max() + 1,) + data.shape[1:], dtype=data.dtype)
             surf_data[vtx_indices] = data
             return surf_data
 
-def load_data_save_npz(file, outdir):
+def load_data_save_npz(file, outdir, save_subcortical=False):
     
     """ load data file, be it nifti, gifti or cifti
     and save as npz - (whole brain: ("vertex", TR))
@@ -1249,6 +1250,8 @@ def load_data_save_npz(file, outdir):
         absolute filename of ciftis to be decomposed (or list of filenames)
     outdir : str
         path to save new files
+    save_subcortical: bool
+        if we also want to save subcortical structures
     
     Outputs
     -------
@@ -1261,6 +1264,14 @@ def load_data_save_npz(file, outdir):
     hemispheres = ['hemi-L','hemi-R']
     cifti_hemis = {'hemi-L': 'CIFTI_STRUCTURE_CORTEX_LEFT', 
                    'hemi-R': 'CIFTI_STRUCTURE_CORTEX_RIGHT'}
+    subcortical_hemis = ['BRAIN_STEM', 'ACCUMBENS', 'AMYGDALA', 'CAUDATE', 'CEREBELLUM', 
+                        'DIENCEPHALON_VENTRAL', 'HIPPOCAMPUS', 'PALLIDUM', 'PUTAMEN', 'THALAMUS']
+
+    # make sub-folder to save other files
+    if save_subcortical:
+        subcort_dir = op.join(outdir, 'subcortical')
+        if not op.isdir(subcort_dir): 
+            os.makedirs(subcort_dir)
         
     # check if single filename or list of filenames
     
@@ -1301,6 +1312,19 @@ def load_data_save_npz(file, outdir):
                 # save gii, per hemisphere
                 # note that surface data is (time, "vertex")
                 data = np.vstack([surf_data_from_cifti(cifti_data, axes[1], cifti_hemis[hemi]) for hemi in hemispheres])
+
+                if save_subcortical:
+                    print('also saving subcortical structures in separate folder')
+                    subcort_dict = {}
+
+                    #for name in subcortical_hemis:
+                    for name,_,_ in axes[-1].iter_structures():
+                        if 'CORTEX' not in name:
+                            print('saving data for %s'%name)
+                            subcort_dict[name] = surf_data_from_cifti(cifti_data, axes[1], name, medial_struct=True)
+                    
+                    # save dict in folder
+                    np.savez(op.join(subcort_dir, op.split(output_file)[-1].replace('_bold_','_struct-subcortical_bold_').replace('.npy','.npz')), **subcort_dict)
             
             elif file_extension == '.func.gii': # load gifti file
                 
@@ -1309,7 +1333,7 @@ def load_data_save_npz(file, outdir):
                 print('implement later')
                 
             # actually save
-            np.save(output_file,data)
+            np.save(output_file, data)
 
         # append out files
         outfiles.append(output_file)

@@ -103,13 +103,13 @@ if [ "$CMD" == all ]; then
 
     echo "running full pipeline (recon all)"
 
-    if [ -z "$T2_file" ]; then
+    if [ -n "$T2_file" ]; then
 
+        recon-all -s $SJ_NR -hires -i $T1_file -T2 $T2_file -T2pial -all
+        
+    else
         echo "no T2 file provided, running recon-all only on T1w file"
         recon-all -s $SJ_NR -hires -i $T1_file -all
-
-    else
-        recon-all -s $SJ_NR -hires -i $T1_file -T2 $T2_file -T2pial -all
     fi
 
 elif [ "$CMD" == pial ]; then

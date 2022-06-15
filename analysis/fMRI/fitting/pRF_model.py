@@ -99,9 +99,11 @@ data = np.load(file,allow_pickle=True) # will be (vertex, TR)
 
 # if we want to keep baseline fix, we need to correct it!
 if correct_baseline:
-    data = mri_utils.baseline_correction(data, params, num_baseline_TRs = 7, baseline_interval = 'empty_long', 
+    data = mri_utils.baseline_correction(data, params, num_baseline_TRs = 10, baseline_interval = 'empty_long', 
                             avg_type = 'median', crop = params['prf']['crop'], 
-                            crop_TR = params['prf']['crop_TR'])
+                            crop_TR = params['prf']['crop_TR'], 
+                            shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
+                            shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'])
 
 ## make DM mask, according to sub responses
 # sourcedata dir
@@ -186,7 +188,10 @@ else:
     else:
         # define design matrix 
         visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, save_imgs=False, 
-                                            res_scaling = 0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], overwrite=True, mask=DM_mask_beh)
+                                            res_scaling = 0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
+                                            shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
+                                            shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'],
+                                            overwrite = True, mask = DM_mask_beh)
     
         # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
         prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],

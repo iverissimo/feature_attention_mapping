@@ -114,8 +114,10 @@ if not os.path.exists(figures_pth):
 
 # define design matrix 
 visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
-                                save_imgs = False, res_scaling=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
-                                overwrite = False,  mask = DM_mask_beh)
+                                save_imgs = True, res_scaling=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
+                                shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
+                                shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'],
+                                overwrite = True,  mask = DM_mask_beh)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -134,8 +136,8 @@ gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
                                 )
 
 # and parameters
-grid_nr = params['mri']['fitting']['pRF']['grid_nr']
-max_ecc_size = params['mri']['fitting']['pRF']['max_eccen'] #prf_stim.screen_size_degrees/2.0
+grid_nr = 20 #params['mri']['fitting']['pRF']['grid_nr']
+max_ecc_size = prf_stim.screen_size_degrees/2.0 #params['mri']['fitting']['pRF']['max_eccen'] #
 sizes, eccs, polars = max_ecc_size * np.linspace(0.25, 1, grid_nr)**2, \
     max_ecc_size * np.linspace(0.1, 1, grid_nr)**2, \
     np.linspace(0, 2*np.pi, grid_nr)
@@ -152,11 +154,12 @@ gauss_bounds = [(-1.5*ss, 1.5*ss),  # x
                 (-1.5*ss, 1.5*ss),  # y
                 (eps, 1.5*ss),  # prf size
                 (0, 1000),  # prf amplitude
-                (-1000, 1000)]  # bold baseline
+                (0, 1000)] #(-1000, 1000)]  # bold baseline
 
 # grid exponent parameter
 css_n_grid = np.linspace(params['mri']['fitting']['pRF']['min_n'], 
-                         params['mri']['fitting']['pRF']['max_n'],12)
+                                        params['mri']['fitting']['pRF']['max_n'], 
+                                        params['mri']['fitting']['pRF']['grid_nr'], dtype='float32')
 
 # define CSS model 
 css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
@@ -173,7 +176,7 @@ css_bounds = [(-1.5*ss, 1.5*ss),  # x
             (-1.5*ss, 1.5*ss),  # y
             (eps, 1.5*ss),  # prf size
             (0, 1000),  # prf amplitude
-            (-1000, 1000),  # bold baseline
+            (0, 1000),  # bold baseline
             (0.01, 1)]  # CSS exponent
 
 # define DN model
@@ -202,8 +205,11 @@ data = np.load(proc_files[0],allow_pickle=True) # will be (vertex, TR)
 
 # if we want to keep baseline fix, we need to correct it!
 if correct_baseline:
-    data = mri_utils.baseline_correction(data, params, num_baseline_TRs = 7, baseline_interval = 'empty_long', 
-                            avg_type = 'median', crop = True, crop_TR = 8)
+    data = mri_utils.baseline_correction(data, params, num_baseline_TRs = 10, baseline_interval = 'empty_long', 
+                            avg_type = 'median', crop = params['prf']['crop'], 
+                            crop_TR = params['prf']['crop_TR'], 
+                            shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
+                            shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'])
     
 if roi != 'None' and vertex not in ['max','min']:
     print('masking data for ROI %s'%roi)
@@ -266,18 +272,19 @@ if fit_now:
                                             fit_hrf = fit_hrf,
                                             previous_gaussian_fitter = gauss_fitter)
 
-        css_fitter.grid_fit(exponent_grid = css_n_grid, 
+        css_fitter.grid_fit(exponent_grid = css_n_grid,
+                            rsq_threshold = 0.1, 
                             pos_prfs_only = True)
         
         estimates_css_grid = css_fitter.gridsearch_params[0]
         
         # iterative fit
         print("Iterative fit")
-        css_fitter.iterative_fit(rsq_threshold = 0.05, 
-                                   verbose = False,
-                                   bounds = css_bounds,
-                                   xtol = xtol,
-                                   ftol = ftol)
+        css_fitter.iterative_fit(rsq_threshold = 0.1, 
+                                verbose = False,
+                                bounds = css_bounds,
+                                xtol = xtol,
+                                ftol = ftol)
 
 
         estimates_css_it = css_fitter.iterative_search_params[0]
@@ -425,16 +432,35 @@ time_sec = np.linspace(0,len(model_fit[0,...])*TR,num=len(model_fit[0,...])) # a
 axis.plot(time_sec, model_fit[0,...],c='red',lw=3,label='model R$^2$ = %.2f'%rsq,zorder=1)
 #axis.scatter(time_sec, data_reshape[ind_max_rsq,:], marker='v',s=15,c='k',label='data')
 axis.plot(time_sec, timeseries[0,...],'k--',label='data')
-axis.set_xlabel('Time (s)',fontsize=20, labelpad=20)
-axis.set_ylabel('BOLD signal change (%)',fontsize=20, labelpad=10)
+axis.set_xlabel('Time (s)',fontsize=20, labelpad=5)
+axis.set_ylabel('BOLD signal change (%)',fontsize=20, labelpad=5)
 axis.set_xlim(0,len(model_fit[0,...])*TR)
 axis.legend(loc='upper left',fontsize=10)  # doing this to guarantee that legend is how I want it  
 
-# times where bar is on screen [1st on, last on, 1st on, last on, etc] 
-bar_onset = np.array([20,36,37,53,66,82,83,99,120,136,137,153,166,182,183,199])*TR
+# order of conditions in run
+bar_pass_direction = params['prf']['bar_pass_direction']
+
+# get bar onsets in TR
+onset_TRs = 0
+bar_onset = []
+for _,bartype in enumerate(bar_pass_direction):
+    onset_TRs += params['prf']['num_TRs'][bartype]
+    
+    if 'empty' not in bartype:
+        # times where bar is on screen [1st on, last on, 1st on, last on, etc] 
+        bar_onset.append(onset_TRs - params['prf']['num_TRs'][bartype])
+        bar_onset.append(onset_TRs-1)
+
+bar_onset = np.array(bar_onset)
 
 if params['prf']['crop']:
     bar_onset = bar_onset - params['prf']['crop_TR']
+    
+if params['mri']['fitting']['pRF']['shift_DM']:
+    bar_onset = bar_onset - params['mri']['fitting']['pRF']['shift_DM_TRs']
+
+# also get onsets in seconds, for plotting
+bar_onset_sec = bar_onset*TR
 
 bar_directions = [val for _,val in enumerate(params['prf']['bar_pass_direction']) if 'empty' not in val]
 # plot axis vertical bar on background to indicate stimulus display time
@@ -442,10 +468,10 @@ ax_count = 0
 for h in range(8):
     
     if bar_directions[h] in ['L-R','R-L']: # horizontal bar passes will be darker 
-        plt.axvspan(bar_onset[ax_count], bar_onset[ax_count+1]+TR, facecolor='#8f0000', alpha=0.1)
+        plt.axvspan(bar_onset_sec[ax_count], bar_onset_sec[ax_count+1]+TR, facecolor='#8f0000', alpha=0.1)
         
     elif bar_directions[h] in ['U-D','D-U']: # vertical bar passes will be lighter 
-        plt.axvspan(bar_onset[ax_count], bar_onset[ax_count+1]+TR, facecolor='#ff0000', alpha=0.1)
+        plt.axvspan(bar_onset_sec[ax_count], bar_onset_sec[ax_count+1]+TR, facecolor='#ff0000', alpha=0.1)
     
     ax_count += 2
 

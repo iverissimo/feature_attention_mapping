@@ -159,15 +159,18 @@ mri: # refers to the Psychopy SyncGenerator class
       run: 'mean' 
       total_chunks: {'fsaverage': 83, 'T1w': 89, 'fsLR_den-170k': 54} # total number of chunks to split the data, depends on space of files
 
-      fit_model: 'gauss' #'dn' #'gauss' #'css'
+      fit_model: 'css' #'dn' #'gauss' #'css'
 
       estimate_keys: {'gauss': ['x','y','size','betas','baseline','r2'],
                       'css': ['x','y','size','betas','baseline','ns', 'r2'],
                       'dn': ['x','y','size','betas','baseline', 'sa', 'ss', 'nb', 'sb', 'r2']} # to keep track of variables throughout scripts
 
-      fit_hrf: True #True
-      fix_bold_baseline: False
+      fit_hrf: True
+      fix_bold_baseline: True
       correct_baseline: True
+
+      shift_DM: True # True
+      shift_DM_TRs: 2
 
       grid_nr: 40 # number of grid steps
       min_eccen: 0.2

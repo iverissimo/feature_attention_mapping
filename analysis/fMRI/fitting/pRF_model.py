@@ -78,6 +78,8 @@ derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
 postfmriprep_dir = op.join(derivatives_dir,'post_fmriprep','sub-{sj}'.format(sj=sj),space,'processed')
 
 output_dir =  op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), space, model_type,'run-{run}'.format(run=run_type))
+if fit_hrf:
+    output_dir = op.join(output_dir, 'with_hrf')
 
 # check if path to save processed files exist
 if not op.exists(output_dir): 

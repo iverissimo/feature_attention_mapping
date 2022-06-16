@@ -12,9 +12,9 @@ window: # refers to the parameters for the Psychopy Window class
 
 monitor:
   name: default
-  width: 69.8 #69  # width of monitor (in cm)
+  width: 69  # width of monitor (in cm)
   height: 39.3 #41 # height of monitor (in cm)
-  distance: 194 #210 #225  # distance of participant from monitor (in cm)
+  distance: 210 #194 #225  # distance of participant from monitor (in cm)
 
 stimuli:
   gab_ratio: 0.66 #0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid

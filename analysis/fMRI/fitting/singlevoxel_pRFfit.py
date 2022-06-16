@@ -97,6 +97,9 @@ postfmriprep_dir = op.join(derivatives_dir,'post_fmriprep','sub-{sj}'.format(sj=
 # path to pRF fits (if they exist)
 fits_pth =  op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), space, 'iterative_{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
 
+if fit_hrf:
+    fits_pth = op.join(fits_pth, 'with_hrf')
+
 ## make DM mask, according to sub responses
 # sourcedata dir
 source_dir = glob.glob(op.join(params['mri']['paths'][base_dir]['root'], 'sourcedata', 
@@ -245,7 +248,7 @@ if fit_now:
 
     # iterative fit
     print("Iterative fit")
-    gauss_fitter.iterative_fit(rsq_threshold = 0.05, 
+    gauss_fitter.iterative_fit(rsq_threshold = 0.1, 
                                verbose = True,
                                bounds=gauss_bounds,
                                xtol = xtol,
@@ -304,7 +307,84 @@ if fit_now:
 
         if fit_hrf:
             hrf_deriv = estimates_css_it[6]
-            hrf_disp = estimates_css_it[7] 
+            hrf_disp = estimates_css_it[7]
+
+    elif model_type == 'dn':
+        
+        ## set grid for new params
+
+        # Surround amplitude (Normalization parameter C)
+        surround_amplitude_grid = np.array([0.1,0.2,0.4,0.7,1,3]) 
+        
+        # Surround size (gauss sigma_2)
+        surround_size_grid = np.array([3,5,8,12,18])
+        
+        # Neural baseline (Normalization parameter B)
+        neural_baseline_grid = np.array([0,1,10,100])
+
+        # Surround baseline (Normalization parameter D)
+        surround_baseline_grid = np.array([0.1,1.0,10.0,100.0])
+
+        ## GRID FIT
+        print("Grid fit")
+        dn_fitter = Norm_Iso2DGaussianFitter(data = timeseries, 
+                                           model = dn_model, 
+                                           n_jobs = 16,
+                                            fit_hrf = fit_hrf,
+                                            previous_gaussian_fitter = gauss_fitter)
+
+        dn_fitter.grid_fit(surround_amplitude_grid,
+                            surround_size_grid,
+                            neural_baseline_grid,
+                            surround_baseline_grid,
+                            rsq_threshold = 0.1, 
+                            pos_prfs_only = True)
+        
+        estimates_dn_grid = dn_fitter.gridsearch_params[0]
+
+        # model parameter bounds
+        dn_bounds = [(-1.5*ss, 1.5*ss),  # x
+                    (-1.5*ss, 1.5*ss),  # y
+                    (eps, 1.5*ss),  # prf size
+                    (0, 1000),  # prf amplitude
+                    (0, 1000),  # bold baseline
+                    (0, 1000),  # surround amplitude
+                    (eps, 3*ss),  # surround size
+                    (0, 1000),  # neural baseline
+                    (1e-6, 1000)]  # surround baseline
+
+        if fit_hrf:
+            dn_bounds += [(0,10),(0,0)]
+        
+        if fix_bold_baseline:
+            dn_bounds[4] = (0,0) 
+        
+        # iterative fit
+        print("Iterative fit")
+        dn_fitter.iterative_fit(rsq_threshold = 0.1, 
+                                verbose = False,
+                                bounds = dn_bounds,
+                                xtol = xtol,
+                                ftol = ftol)
+
+
+        estimates_dn_it = dn_fitter.iterative_search_params[0]
+        
+        # set outcomes
+        xx = estimates_dn_it[0]
+        yy = estimates_dn_it[1]
+        size = estimates_dn_it[2] 
+        beta = estimates_dn_it[3]
+        baseline = estimates_dn_it[4]
+        sa = estimates_dn_it[5]
+        ss = estimates_dn_it[6]
+        nb = estimates_dn_it[7]
+        sb = estimates_dn_it[8]
+        rsq = estimates_dn_it[-1] 
+
+        if fit_hrf:
+            hrf_deriv = estimates_dn_it[9]
+            hrf_disp = estimates_dn_it[10] 
         
 else:
     print('loading estimates')
@@ -430,6 +510,8 @@ fig_name = 'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_ro
                                                                                         model=model_type,
                                                                                         roi=roi,
                                                                                         vert=vertex) 
+if fit_hrf:
+   fig_name = fig_name.replace('.png','_withHRF.png') 
 
 if fit_now == False:
     fig_name = fig_name.replace('.png','_loaded.png')

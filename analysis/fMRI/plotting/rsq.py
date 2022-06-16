@@ -59,28 +59,12 @@ model_type = params['mri']['fitting']['pRF']['fit_model']
 # set estimate key names
 estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][model_type]
 
-# define file extension that we want to use, 
-# should include processing key words
-file_ext = ''
-# if cropped first
-if params['feature']['crop']:
-    file_ext += '_{name}'.format(name='cropped')
-# type of filtering/denoising
-if params['feature']['regress_confounds']:
-    file_ext += '_{name}'.format(name='confound')
-else:
-    file_ext += '_{name}'.format(name = params['mri']['filtering']['type'])
-# type of standardization 
-file_ext += '_{name}'.format(name = params['feature']['standardize'])
-# don't forget its a numpy array
-file_ext += '.npy'
-
 # set paths
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
 postfmriprep_dir = op.join(derivatives_dir,'post_fmriprep','sub-{sj}'.format(sj=sj),space,'processed')
 
 # output dir to save fit and plot
-figures_pth = op.join(derivatives_dir,'plots','rsq','{task}fit'.format(task=task),
+figures_pth = op.join(derivatives_dir,'plots','rsq','{task}_fit'.format(task=task),
                       'sub-{sj}'.format(sj=sj), space, model_type,'run-{run}'.format(run=run_type)) # path to save plots
 if not os.path.exists(figures_pth):
     os.makedirs(figures_pth) 
@@ -95,6 +79,13 @@ if task == 'pRF':
     
     # grid fitting doesnt include hrf
     fit_hrf = {'iterative': params['mri']['fitting']['pRF']['fit_hrf'], 'grid': False}
+
+    # update paths and estimate names, if fitting hrf
+    if params['mri']['fitting']['pRF']['fit_hrf']:
+        fits_pth['iterative'] = op.join(fits_pth['iterative'],'with_hrf')
+        fits_pth['grid'] = op.join(fits_pth['grid'],'with_hrf')
+
+        estimate_keys = estimate_keys+['hrf_derivative','hrf_dispersion']
 
     ## Load pRF estimates 
         
@@ -129,8 +120,10 @@ if task == 'pRF':
     
     # define design matrix 
     visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
-                                     save_imgs = False, res_scaling = 0.1, crop = params['prf']['crop'] , 
-                                     crop_TR = params['prf']['crop_TR'], overwrite=False)
+                                     save_imgs = False, res_scaling = 0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
+                                            shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
+                                            shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'],
+                                            overwrite = False)
 
     # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
     prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -140,14 +133,14 @@ if task == 'pRF':
     
     # get the ecc limits (in dva)
     # to mask estimates
-    x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
+    x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm, params, screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
 
     rsq = estimates['iterative']['r2'] 
 
     # mask estimates
     print('masking estimates')
     masked_est = mri_utils.mask_estimates(estimates['iterative'], 
-                                          estimate_keys = estimate_keys+['hrf_derivative','hrf_dispersion'],
+                                          estimate_keys = estimate_keys,
                                           x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
 
     masked_rsq = masked_est['r2']
@@ -161,9 +154,14 @@ if task == 'pRF':
 
 elif task == 'FA':
     
-    # mask rsq given masked rsq of pRF mean run (within screen boundaries etc)
-    pRF_masked_rsq = np.load(op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), space, 
-                      'iterative_{model}'.format(model=model_type),'run-mean','combined','masked_rsq.npy'))
+    ## mask rsq given masked rsq of pRF mean run (within screen boundaries etc)
+    pRF_fits_path = op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), space, 
+                      'iterative_{model}'.format(model=model_type),'run-mean')
+    if params['mri']['fitting']['pRF']['fit_hrf']:
+        pRF_fits_path = op.join(pRF_fits_path, 'with_hrf')
+
+    # load  
+    pRF_masked_rsq = op.join(pRF_fits_path, 'combined', 'masked_rsq.npy')
     
     runs = ['1','2','3','4'] if run_type == 'mean' else [run_type]
         
@@ -197,43 +195,13 @@ rsq_threshold = params['plotting']['rsq_threshold']
 
 ## make violin plots with values per ROI
 
-# if using atlas to get ROIs 
-use_atlas = False 
 # get pycortex sub
-pysub = params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
-# get vertices for ROI
-roi_verts = {} #empty dictionary  
+pysub = params['plotting']['pycortex_sub'] #+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
 
-## get vertices and color palette, 
-# for consistency
-if use_atlas:
-    # Get Glasser atlas
-    atlas_df, atlas_array = mri_utils.create_glasser_df(op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
+ROIs, roi_verts, color_codes = mri_utils.get_rois4plotting(params, pysub = pysub, 
+                                            use_atlas = True, atlas_pth = op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
 
-    # ROI names
-    ROIs = list(params['plotting']['ROIs']['glasser_atlas'].keys())
-    # colors
-    color_codes = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs}
-
-    # get vertices for ROI
-    for _,key in enumerate(ROIs):
-        roi_verts[key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
-
-
-else:
-    # set ROI names
-    ROIs = params['plotting']['ROIs'][space]
-
-    # dictionary with one specific color per group - similar to fig3 colors
-    ROI_pal = params['plotting']['ROI_pal']
-    color_codes = {key: ROI_pal[key] for key in ROIs}
-
-    # get vertices for ROI
-    for _,val in enumerate(ROIs):
-        roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
-
-
-
+# save rsq values in dataframe, for plotting
 for idx,rois_ks in enumerate(ROIs): 
     
     # mask estimates
@@ -266,7 +234,8 @@ plt.xlabel('ROI',fontsize = 20,labelpad=18)
 plt.ylabel('RSQ',fontsize = 20,labelpad=18)
 plt.ylim(plot_lims_dist[0],plot_lims_dist[1])
 
-fig.savefig(op.join(figures_pth,'rsq_%s_violinplot.svg'%model_type), dpi=100)
+fig.savefig(op.join(figures_pth,'rsq_%s_violinplot_withHRF-%s.png'%(model_type,
+                            str(params['mri']['fitting']['pRF']['fit_hrf']))), dpi=100)
 
 images = {}
 
@@ -277,7 +246,9 @@ images['rsq'] = cortex.Vertex(rsq,
                             cmap='Reds')
 #cortex.quickshow(images['rsq'],with_curvature=True,with_sulci=True)
 
-filename = op.join(figures_pth,'flatmap_space-{space}_type-rsq_{model}.svg'.format(space=pysub, model=model_type))
+filename = op.join(figures_pth,'flatmap_space-{space}_type-rsq_{model}_withHRF-{hrf}.png'.format(space = pysub, 
+                                                                                                model = model_type,
+                                                                                                hrf = str(params['mri']['fitting']['pRF']['fit_hrf'])))
 print('saving %s' %filename)
 _ = cortex.quickflat.make_png(filename, images['rsq'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
@@ -291,7 +262,9 @@ images['rsq_masked'] = cortex.Vertex(new_rsq,
                                     cmap='Reds')
 #cortex.quickshow(images['rsq_masked'],with_curvature=True,with_sulci=True)
 
-filename = op.join(figures_pth,'flatmap_space-{space}_type-rsq_masked_{model}.svg'.format(space=pysub, model=model_type))
+filename = op.join(figures_pth,'flatmap_space-{space}_type-rsq_masked_{model}_withHRF-{hrf}.png'.format(space = pysub, 
+                                                                                                model = model_type,
+                                                                                                hrf = str(params['mri']['fitting']['pRF']['fit_hrf'])))
 print('saving %s' %filename)
 _ = cortex.quickflat.make_png(filename, images['rsq_masked'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
@@ -303,14 +276,16 @@ if task == 'pRF':
     grid_r2 = estimates['grid']['r2'].copy()
     grid_r2[new_rsq == 0] = 0
     
-    ## plot percentage increase from grid to iterative
-    images['rsq_grid_iter_change'] = cortex.Vertex((new_rsq - grid_r2)/grid_r2 * 100, 
+    ## plot rsq value difference from grid to iterative
+    images['rsq_grid_iter_change'] = cortex.Vertex(new_rsq - grid_r2, 
                                     pysub,
-                                    vmin = -100, vmax = 100,
+                                    vmin = -.1, vmax = .1,
                                     cmap='BuBkRd')
     #cortex.quickshow(images['rsq_grid_iter_change'],with_curvature=True,with_sulci=True)
 
-    filename = op.join(figures_pth,'flatmap_space-{space}_percent_change_grid2iterative_type-rsq_masked_{model}.svg'.format(space=pysub, model=model_type))
+    filename = op.join(figures_pth,'flatmap_space-{space}_grid2iterative_diff_type-rsq_masked_{model}_withHRF-{hrf}.png'.format(space = pysub, 
+                                                                                                model = model_type,
+                                                                                                hrf = str(params['mri']['fitting']['pRF']['fit_hrf'])))
     print('saving %s' %filename)
     _ = cortex.quickflat.make_png(filename, images['rsq_grid_iter_change'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
@@ -338,14 +313,16 @@ if task == 'pRF':
         gauss_r2 = estimates_gauss['r2'].copy()
         gauss_r2[new_rsq == 0] = 0
 
-        ## plot percentage increase from grid to iterative
-        images['rsq_gauss_%s_change'%model_type] = cortex.Vertex((new_rsq - gauss_r2)/gauss_r2 * 100, 
+        ## plot value difference from grid to iterative
+        images['rsq_gauss_%s_change'%model_type] = cortex.Vertex(new_rsq - gauss_r2, 
                                         pysub,
-                                        vmin = -100, vmax = 100,
+                                        vmin = -.1, vmax = .1,
                                         cmap='BuBkRd')
         #cortex.quickshow(images['rsq_gauss_%s_change'%model_type],with_curvature=True,with_sulci=True)
         
-        filename = op.join(figures_pth,'flatmap_space-{space}_percent_change_gauss2{model}_type-rsq_masked_{model}.svg'.format(space=pysub, model=model_type))
+        filename = op.join(figures_pth,'flatmap_space-{space}_gauss2{model}_diff_type-rsq_masked_{model}_withHRF-{hrf}.png'.format(space = pysub, 
+                                                                                                                                model = model_type,
+                                                                                                                        hrf = str(params['mri']['fitting']['pRF']['fit_hrf'])))
         print('saving %s' %filename)
         _ = cortex.quickflat.make_png(filename, images['rsq_gauss_%s_change'%model_type], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 

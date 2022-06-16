@@ -1158,7 +1158,7 @@ def dva_per_pix(height_cm,distance_cm,vert_res_pix):
 
 
 def mask_estimates(estimates, ROI = 'None', x_ecc_lim = [-6,6], y_ecc_lim = [-6,6],
-                    max_size = 20, space = 'fsaverage', estimate_keys = ['x','y','size','betas','baseline','r2']):
+                    rsq_threshold = .1, space = 'fsaverage', estimate_keys = ['x','y','size','betas','baseline','r2']):
     
     """ mask estimates, to be positive RF, within screen limits
     and for a certain ROI (if the case)
@@ -1190,6 +1190,7 @@ def mask_estimates(estimates, ROI = 'None', x_ecc_lim = [-6,6], y_ecc_lim = [-6,
     # also for positive pRFs
 
     indices = np.where((~np.isnan(estimates['r2']))& \
+                        (estimates['r2']>= rsq_threshold)& \
                        (estimates['x'] <= np.max(x_ecc_lim))& \
                       (estimates['x'] >= np.min(x_ecc_lim))& \
                       (estimates['y'] <= np.max(y_ecc_lim))& \
@@ -2918,3 +2919,44 @@ def make_blk_nuisance_regressor(data, params, pRF_rsq,
     nuisance_regressor_surf[mask_ind] = all_regs 
     
     return nuisance_regressor_surf
+
+
+def get_rois4plotting(params, pysub = 'hcp_999999', use_atlas = True, atlas_pth = ''):
+
+    """ helper function to get ROI names, vertice index and color palette
+   to be used in plotting scripts
+    
+    Parameters
+    ----------
+    params : dict
+        yaml dict with task related infos  
+    """ 
+    
+    roi_verts = {} #empty dictionary  
+    
+    if use_atlas:
+        # Get Glasser atlas
+        atlas_df, atlas_array = create_glasser_df(atlas_pth)
+
+        # ROI names
+        ROIs = list(params['plotting']['ROIs']['glasser_atlas'].keys())
+        # colors
+        color_codes = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs}
+
+        # get vertices for ROI
+        for _,key in enumerate(ROIs):
+            roi_verts[key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
+
+    else:
+        # set ROI names
+        ROIs = params['plotting']['ROIs'][space]
+
+        # dictionary with one specific color per group - similar to fig3 colors
+        ROI_pal = params['plotting']['ROI_pal']
+        color_codes = {key: ROI_pal[key] for key in ROIs}
+
+        # get vertices for ROI
+        for _,val in enumerate(ROIs):
+            roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
+            
+    return ROIs, roi_verts, color_codes

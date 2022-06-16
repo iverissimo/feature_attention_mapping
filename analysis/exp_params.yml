@@ -14,7 +14,7 @@ monitor:
   name: default
   width: 69  # width of monitor (in cm)
   height: 39.3 #41 # height of monitor (in cm)
-  distance: 210 #194 #225  # distance of participant from monitor (in cm)
+  distance: 210 #210 #194 #225  # distance of participant from monitor (in cm)
 
 stimuli:
   gab_ratio: 0.66 #0.62 # ratio to multiply by gab diameter, to avoid empty spaces in grid
@@ -165,7 +165,7 @@ mri: # refers to the Psychopy SyncGenerator class
                       'css': ['x','y','size','betas','baseline','ns', 'r2'],
                       'dn': ['x','y','size','betas','baseline', 'sa', 'ss', 'nb', 'sb', 'r2']} # to keep track of variables throughout scripts
 
-      fit_hrf: True
+      fit_hrf: False #True
       fix_bold_baseline: True
       correct_baseline: True
 

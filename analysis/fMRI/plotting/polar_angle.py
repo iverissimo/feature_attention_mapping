@@ -48,24 +48,11 @@ TR = params['mri']['TR']
 # type of model to fit
 model_type = params['mri']['fitting']['pRF']['fit_model']
 
+# if we fitted hrf
+fit_hrf = params['mri']['fitting']['pRF']['fit_hrf']
+
 # set estimate key names
 estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][model_type]
-
-# define file extension that we want to use, 
-# should include processing key words
-file_ext = ''
-# if cropped first
-if params['feature']['crop']:
-    file_ext += '_{name}'.format(name='cropped')
-# type of filtering/denoising
-if params['feature']['regress_confounds']:
-    file_ext += '_{name}'.format(name='confound')
-else:
-    file_ext += '_{name}'.format(name = params['mri']['filtering']['type'])
-# type of standardization 
-file_ext += '_{name}'.format(name = params['feature']['standardize'])
-# don't forget its a numpy array
-file_ext += '.npy'
 
 # set paths
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
@@ -75,14 +62,16 @@ postfmriprep_dir = op.join(derivatives_dir,'post_fmriprep','sub-{sj}'.format(sj=
 fits_pth =  op.join(derivatives_dir,'{task}_fit'.format(task=task),'sub-{sj}'.format(sj=sj), space, 
                     'iterative_{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
 
+if fit_hrf:
+    fits_pth = op.join(fits_pth,'with_hrf')
+    estimate_keys = estimate_keys+['hrf_derivative','hrf_dispersion']
+
 # output dir to save fit and plot
-figures_pth = op.join(derivatives_dir,'plots','polar_angle','{task}fit'.format(task=task),
+figures_pth = op.join(derivatives_dir,'plots','polar_angle','{task}_fit'.format(task=task),
                       'sub-{sj}'.format(sj=sj), space, model_type,'run-{run}'.format(run=run_type)) # path to save plots
 if not os.path.exists(figures_pth):
     os.makedirs(figures_pth)
 
-# if we fitted hrf
-fit_hrf = params['mri']['fitting']['pRF']['fit_hrf']
 
 ## Load pRF estimates 
 
@@ -107,8 +96,10 @@ else: # if not join chunks and save file
 
 # define design matrix 
 visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
-                                 save_imgs = False, res_scaling = 0.1, crop = params['prf']['crop'] , 
-                                 crop_TR = params['prf']['crop_TR'], overwrite=False)
+                                     save_imgs = False, res_scaling = 0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
+                                            shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
+                                            shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'],
+                                            overwrite = False)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -123,7 +114,7 @@ x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg
 # mask estimates
 print('masking estimates')
 masked_est = mri_utils.mask_estimates(estimates, 
-                                      estimate_keys = estimate_keys+['hrf_derivative','hrf_dispersion'],
+                                      estimate_keys = estimate_keys,
                                       x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
 
 rsq = masked_est['r2']
@@ -143,20 +134,12 @@ n_bins_colors = 256
 # set threshold for plotting
 rsq_threshold = params['plotting']['rsq_threshold']
 
-# get vertices for subject fsaverage
-ROIs = params['plotting']['ROIs'][space]
-
-# dictionary with one specific color per group - similar to fig3 colors
-ROI_pal = params['plotting']['ROI_pal']
-color_codes = {key: ROI_pal[key] for key in ROIs}
-
 # get pycortex sub
-pysub = params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj)
+pysub = params['plotting']['pycortex_sub'] #+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
 
-# get vertices for ROI
-roi_verts = {} #empty dictionary  
-for _,val in enumerate(ROIs):
-    roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
+ROIs, roi_verts, color_codes = mri_utils.get_rois4plotting(params, pysub = pysub, 
+                                            use_atlas = True, atlas_pth = op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
+
 
 images = {}
 
@@ -172,7 +155,6 @@ PA_cmap = mri_utils.make_colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82
                                     cmap_name = 'PA_mackey_costum',
                               discrete = False, add_alpha = False, return_cmap = True)
 
-
 images['PA'] = mri_utils.make_raw_vertex_image(pa4plot, 
                                                cmap = PA_cmap, vmin = 0, vmax = 1, 
                                               data2 = alpha_level, vmin2 = 0, vmax2 = 1, 
@@ -180,11 +162,23 @@ images['PA'] = mri_utils.make_raw_vertex_image(pa4plot,
 
 #cortex.quickshow(images['PA'],with_curvature=True,with_sulci=True,with_colorbar=True,
 #                 curvature_brightness = 0.4, curvature_contrast = 0.1)#, recache = True)
-
-
-filename = op.join(figures_pth,'flatmap_space-{space}_type-PA_mackey_colorwheel.svg'.format(space=pysub))
+filename = op.join(figures_pth,'flatmap_space-{space}_type-PA_mackey_colorwheel_withHRF-{hrf}.png'.format(space = pysub,
+                                                                                    hrf = str(params['mri']['fitting']['pRF']['fit_hrf'])))
 print('saving %s' %filename)
 _ = cortex.quickflat.make_png(filename, images['PA'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
+#### do same but without alpha level #########
+images['PA_noalpha'] = mri_utils.make_raw_vertex_image(pa4plot, 
+                                               cmap = PA_cmap, vmin = 0, vmax = 1, 
+                                              data2 = alpha_level, vmin2 = 0, vmax2 = 1, 
+                                               subject = pysub, data2D = False)
+
+filename = op.join(figures_pth,'flatmap_space-{space}_type-PA_NOalpha_mackey_colorwheel_withHRF-{hrf}.png'.format(space = pysub,
+                                                                                    hrf = str(params['mri']['fitting']['pRF']['fit_hrf'])))
+print('saving %s' %filename)
+_ = cortex.quickflat.make_png(filename, images['PA_noalpha'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+######################
+
 
 ## plot polar angle in non uniform color wheel
 ## for better visualization of boundaries
@@ -226,7 +220,8 @@ images['PA_half_hemi'] = cortex.VertexRGB(rgb_angle[:, 0], rgb_angle[:, 1], rgb_
 #cortex.quickshow(images['PA_half_hemi'],with_curvature=True,with_sulci=True,with_colorbar=True,
 #                 curvature_brightness = 0.4, curvature_contrast = 0.1)
 
-filename = op.join(figures_pth,'flatmap_space-{space}_type-PA_hsv_half_colorwheel.svg'.format(space=pysub))
+filename = op.join(figures_pth,'flatmap_space-{space}_type-PA_hsv_half_colorwheel_withHRF-{hrf}.png'.format(space = pysub,
+                                                                                hrf = str(params['mri']['fitting']['pRF']['fit_hrf'])))
 print('saving %s' %filename)
 _ = cortex.quickflat.make_png(filename, images['PA_half_hemi'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
@@ -247,7 +242,7 @@ circle_pa_left = circle_pa.copy()
 circle_pa_left[(circle_pa_left < -angle_thresh) | (circle_pa_left > angle_thresh)] = angle_thresh 
 plt.imshow(circle_pa_left, cmap=cmap, norm=norm,origin='lower') # origin lower because imshow flips it vertically, now in right order for VF
 plt.axis('off')
-plt.savefig(op.join(figures_pth,'color_wheel_4LH-RVF.svg'),dpi=100)
+plt.savefig(op.join(figures_pth,'color_wheel_4LH-RVF.png'),dpi=100)
 
 # # for RH (LVF)
 circle_pa_right = circle_pa.copy()
@@ -257,7 +252,7 @@ circle_pa_right = np.fliplr(circle_pa_right)
 circle_pa_right[(circle_pa_right < -.75 * np.pi) | (circle_pa_right > 0.75 * np.pi)] = .75*np.pi
 plt.imshow(circle_pa_right, cmap=cmap, norm=norm,origin='lower')
 plt.axis('off')
-plt.savefig(op.join(figures_pth,'color_wheel_4RH-LVF.svg'),dpi=100)
+plt.savefig(op.join(figures_pth,'color_wheel_4RH-LVF.png'),dpi=100)
 
 
 # # normal color wheel
@@ -272,7 +267,7 @@ norm = colors.Normalize(-np.pi, np.pi)
 
 plt.imshow(circle_pa, cmap = colormap, norm=norm, origin='lower')
 plt.axis('off')
-plt.savefig(op.join(figures_pth,'color_wheel_mackey_discrete.svg'),dpi=100)
+plt.savefig(op.join(figures_pth,'color_wheel_mackey_discrete.png'),dpi=100)
 
 ## continuous colormap
 
@@ -285,4 +280,9 @@ cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", tuples)
 
 plt.imshow(circle_pa, cmap = cmap, norm = colors.Normalize(-np.pi, np.pi) , origin='lower')
 plt.axis('off')
-plt.savefig(op.join(figures_pth,'color_wheel_mackey_continuous.svg'),dpi=100)
+plt.savefig(op.join(figures_pth,'color_wheel_mackey_continuous.png'),dpi=100)
+
+
+### ADD TO OVERLAY, TO DRAW BORDERS
+#cortex.utils.add_roi(images['PA_noalpha'], name = 'PA_noalpha', open_inkscape = False)
+#cortex.utils.add_roi(images['PA_half_hemi'], name = 'PA_half_hemi', open_inkscape = False)

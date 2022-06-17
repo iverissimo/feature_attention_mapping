@@ -59,6 +59,8 @@ TR = params['mri']['TR']
 # type of model to fit
 model_type = params['mri']['fitting']['pRF']['fit_model']
 fit_hrf = params['mri']['fitting']['pRF']['fit_hrf']
+osf = 10
+resample_pred = True
 
 # set estimate key names
 estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][model_type]
@@ -103,9 +105,7 @@ data = np.load(file,allow_pickle=True) # will be (vertex, TR)
 if correct_baseline:
     data = mri_utils.baseline_correction(data, params, num_baseline_TRs = 10, baseline_interval = 'empty_long', 
                             avg_type = 'median', crop = params['prf']['crop'], 
-                            crop_TR = params['prf']['crop_TR'], 
-                            shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
-                            shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'])
+                            crop_TR = params['prf']['crop_TR'])
 
 ## make DM mask, according to sub responses
 # sourcedata dir
@@ -116,6 +116,11 @@ behav_files = [op.join(source_dir, h) for h in os.listdir(source_dir) if 'task-p
                  h.endswith('events.tsv')]
 # behav boolean mask
 DM_mask_beh = mri_utils.get_beh_mask(behav_files,params)
+
+## get onset of events from behavioral tsv files
+event_onsets = mri_utils.get_event_onsets(behav_files, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
+                                shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
+                                shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'])
 
 
 # fit model
@@ -189,11 +194,12 @@ else:
         
     else:
         # define design matrix 
-        visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, save_imgs=False, 
-                                            res_scaling = 0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
-                                            shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
-                                            shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'],
-                                            overwrite = True, mask = DM_mask_beh)
+        visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
+                                save_imgs = False, res_scaling = 0.1, TR = params['mri']['TR'],
+                                crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
+                                shift_TRs = True, shift_TR_num = 1, oversampling_time = osf,
+                                overwrite = True, mask = DM_mask_beh, event_onsets = event_onsets)
+
     
         # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
         prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -203,6 +209,8 @@ else:
         
         # define model 
         gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
+                                            resample_pred = resample_pred,
+                                            osf = osf,
                                             filter_predictions = True,
                                             filter_type = params['mri']['filtering']['type'],
                                             filter_params = {'highpass': params['mri']['filtering']['highpass'],
@@ -293,6 +301,8 @@ else:
 
                 # define model 
                 css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
+                                                    resample_pred = resample_pred,
+                                                    osf = osf,
                                                     filter_predictions = True,
                                                     filter_type = params['mri']['filtering']['type'],
                                                     filter_params = {'highpass': params['mri']['filtering']['highpass'],
@@ -361,6 +371,8 @@ else:
 
                 # define model 
                 dn_model =  Norm_Iso2DGaussianModel(stimulus = prf_stim,
+                                                    resample_pred = resample_pred,
+                                                    osf = osf,
                                                     filter_predictions = True,
                                                     filter_type = params['mri']['filtering']['type'],
                                                     filter_params = {'highpass': params['mri']['filtering']['highpass'],

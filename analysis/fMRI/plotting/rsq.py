@@ -142,6 +142,8 @@ if task == 'pRF':
     masked_est = mri_utils.mask_estimates(estimates['iterative'], 
                                           estimate_keys = estimate_keys,
                                           x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
+    print(x_ecc_lim)
+    print(y_ecc_lim)
 
     masked_rsq = masked_est['r2']
 
@@ -196,7 +198,7 @@ rsq_threshold = params['plotting']['rsq_threshold']
 ## make violin plots with values per ROI
 
 # get pycortex sub
-pysub = params['plotting']['pycortex_sub'] #+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
+pysub = params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
 
 ROIs, roi_verts, color_codes = mri_utils.get_rois4plotting(params, pysub = pysub, 
                                             use_atlas = True, atlas_pth = op.join(derivatives_dir,'glasser_atlas','59k_mesh'))

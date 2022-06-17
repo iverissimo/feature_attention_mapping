@@ -79,6 +79,8 @@ TR = params['mri']['TR']
 # type of model to fit
 model_type = params['mri']['fitting']['pRF']['fit_model']
 fit_hrf = params['mri']['fitting']['pRF']['fit_hrf']
+osf = 10
+resample_pred = True
 
 # if we are keeping baseline fixed at 0
 fix_bold_baseline = params['mri']['fitting']['pRF']['fix_bold_baseline']
@@ -110,6 +112,11 @@ behav_files = [op.join(source_dir, h) for h in os.listdir(source_dir) if 'task-p
 # behav boolean mask
 DM_mask_beh = mri_utils.get_beh_mask(behav_files,params)
 
+## get onset of events from behavioral tsv files
+event_onsets = mri_utils.get_event_onsets(behav_files, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
+                                shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
+                                shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'])
+
 # output dir to save fit and plot
 figures_pth = op.join(derivatives_dir,'plots','single_vertex','pRFfit','sub-{sj}'.format(sj=sj), space, model_type,'run-{run}'.format(run=run_type)) # path to save plots
 if not os.path.exists(figures_pth):
@@ -117,10 +124,10 @@ if not os.path.exists(figures_pth):
 
 # define design matrix 
 visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
-                                save_imgs = False, res_scaling=0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
-                                shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
-                                shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'],
-                                overwrite = False,  mask = DM_mask_beh)
+                                save_imgs = False, res_scaling = 0.1, TR = params['mri']['TR'],
+                                crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
+                                shift_TRs = True, shift_TR_num = 1, oversampling_time = osf,
+                                overwrite = True, mask = DM_mask_beh, event_onsets = event_onsets)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -130,6 +137,8 @@ prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
 
 # define gaussian model 
 gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
+                                 resample_pred = resample_pred,
+                                 osf = osf,
                                  filter_predictions = True,
                                  filter_type = params['mri']['filtering']['type'],
                                  filter_params = {'highpass': params['mri']['filtering']['highpass'],
@@ -161,11 +170,13 @@ gauss_bounds = [(-1.5*ss, 1.5*ss),  # x
 
 # grid exponent parameter
 css_n_grid = np.linspace(params['mri']['fitting']['pRF']['min_n'], 
-                                        params['mri']['fitting']['pRF']['max_n'], 
+                                        grid_nr, 
                                         params['mri']['fitting']['pRF']['grid_nr'], dtype='float32')
 
 # define CSS model 
 css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
+                                 resample_pred = resample_pred,
+                                 osf = osf,
                                  filter_predictions = True,
                                  filter_type = params['mri']['filtering']['type'],
                                  filter_params = {'highpass': params['mri']['filtering']['highpass'],
@@ -186,6 +197,8 @@ css_bounds = [(-1.5*ss, 1.5*ss),  # x
 
 # define model 
 dn_model =  Norm_Iso2DGaussianModel(stimulus = prf_stim,
+                                    resample_pred = resample_pred,
+                                    osf = osf,
                                     filter_predictions = True,
                                     filter_type = params['mri']['filtering']['type'],
                                     filter_params = {'highpass': params['mri']['filtering']['highpass'],
@@ -214,13 +227,11 @@ data = np.load(proc_files[0],allow_pickle=True) # will be (vertex, TR)
 if correct_baseline:
     data = mri_utils.baseline_correction(data, params, num_baseline_TRs = 10, baseline_interval = 'empty_long', 
                             avg_type = 'median', crop = params['prf']['crop'], 
-                            crop_TR = params['prf']['crop_TR'], 
-                            shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
-                            shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'])
+                            crop_TR = params['prf']['crop_TR'])
     
 if roi != 'None' and vertex not in ['max','min']:
     print('masking data for ROI %s'%roi)
-    roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj),roi) # get indices for that ROI
+    roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub'], roi) #+'_sub-{sj}'.format(sj=sj),roi) # get indices for that ROI
     data = data[roi_ind[roi]]
 
 if vertex not in ['max','min']:
@@ -416,8 +427,8 @@ else:
     if roi != 'None':
         print('masking data for ROI %s'%roi)
         #roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub'],roi) # get indices for that ROI
-        #roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj),roi) # get indices for that ROI
-        #data = data[roi_ind[roi]]
+        roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj),roi) # get indices for that ROI
+        data = data[roi_ind[roi]]
 
         if vertex == 'max':
             vertex = np.where(estimates['r2'][roi_ind[roi]] == np.nanmax(estimates['r2'][roi_ind[roi]]))[0][0]
@@ -478,7 +489,7 @@ else:
             hrf_disp = estimates['hrf_dispersion'][vertex]
 
 if fit_hrf:
-    hrf = mri_utils.create_hrf(hrf_params=[1.0,hrf_deriv,hrf_disp],TR=TR)
+    hrf = mri_utils.create_hrf(hrf_params=[1.0,hrf_deriv,hrf_disp],TR=TR, osf=osf)
     gauss_model.hrf = hrf
     css_model.hrf = hrf
     dn_model.hrf = hrf
@@ -549,9 +560,6 @@ bar_onset = np.array(bar_onset)
 if params['prf']['crop']:
     bar_onset = bar_onset - params['prf']['crop_TR']
     
-if params['mri']['fitting']['pRF']['shift_DM']:
-    bar_onset = bar_onset - params['mri']['fitting']['pRF']['shift_DM_TRs']
-
 # also get onsets in seconds, for plotting
 bar_onset_sec = bar_onset*TR
 
@@ -575,7 +583,7 @@ if fit_hrf:
     fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
 
     axis.plot(mri_utils.create_hrf(TR=TR)[0],'grey',label='spm hrf')
-    axis.plot(hrf[0],'red',label='fitted hrf')
+    axis.plot(mri_utils.create_hrf(hrf_params=[1.0,hrf_deriv,hrf_disp],TR=TR)[0],'red',label='fitted hrf')
     axis.set_xlim(0, 25)
     axis.legend(loc='upper right',fontsize=10) 
     axis.set_xlabel('Time (s)',fontsize=10, labelpad=10)

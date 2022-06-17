@@ -614,9 +614,9 @@ def load_and_mask_data(file, chunk_num = 1, total_chunks = 1):
     return masked_data, not_nan_vox, orig_shape
 
 
-def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1, 
-                    crop = False, crop_TR = 8, overwrite=False, 
-                shift_TRs = True, shift_TR_num = 1, mask = []):
+def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1, TR = 1.6,
+                    crop = False, crop_TR = 8, overwrite=False, oversampling_time = None,
+                shift_TRs = False, shift_TR_num = 1, mask = [], event_onsets = []):
     
     """Make design matrix for pRF task
     
@@ -661,12 +661,27 @@ def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1,
         for _,bartype in enumerate(bar_pass_direction):
             condition_per_TR = np.concatenate((condition_per_TR, np.tile(bartype, TR_conditions[bartype])))
         
-        # get total number of TRs in run
-        total_TR = len(condition_per_TR)
-
         # set fake mask, in case we are not masking actually
         if len(mask) == 0:
-            mask = np.tile(False, total_TR)
+            mask = np.tile(False, len(condition_per_TR))
+
+        # if we're cropping fMRI data, then also crop dm
+        if crop:
+            condition_per_TR = condition_per_TR[crop_TR:]
+            mask = mask[crop_TR:]
+            
+        # if oversampling is None, then we're working with the TR
+        if oversampling_time is None:
+            osf = 1
+        else:
+            osf = oversampling_time
+
+        # if no events array given, make one based on TR
+        if len(event_onsets) == 0:
+            event_onsets = np.arange(0, len(condition_per_TR)*TR, TR)
+            
+        # convert event onset into TRs
+        event_onsets = np.round(event_onsets/TR*osf)
 
         # all possible positions in pixels for for midpoint of
         # y position for vertical bar passes, 
@@ -676,19 +691,20 @@ def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1,
 
         # coordenates for bar pass, for PIL Image
         coordenates_bars = {'L-R': {'upLx': hor_x-0.5*bar_width*screen_res[0], 'upLy': np.repeat(screen_res[1],TR_conditions['L-R']),
-                                     'lowRx': hor_x+0.5*bar_width*screen_res[0], 'lowRy': np.repeat(0,TR_conditions['L-R'])},
+                                    'lowRx': hor_x+0.5*bar_width*screen_res[0], 'lowRy': np.repeat(0,TR_conditions['L-R'])},
                             'R-L': {'upLx': np.array(list(reversed(hor_x-0.5*bar_width*screen_res[0]))), 'upLy': np.repeat(screen_res[1],TR_conditions['R-L']),
-                                     'lowRx': np.array(list(reversed(hor_x+0.5*bar_width*screen_res[0]))), 'lowRy': np.repeat(0,TR_conditions['R-L'])},
+                                    'lowRx': np.array(list(reversed(hor_x+0.5*bar_width*screen_res[0]))), 'lowRy': np.repeat(0,TR_conditions['R-L'])},
                             'U-D': {'upLx': np.repeat(0,TR_conditions['U-D']), 'upLy': ver_y+0.5*bar_width*screen_res[1],
-                                     'lowRx': np.repeat(screen_res[0],TR_conditions['U-D']), 'lowRy': ver_y-0.5*bar_width*screen_res[1]},
+                                    'lowRx': np.repeat(screen_res[0],TR_conditions['U-D']), 'lowRy': ver_y-0.5*bar_width*screen_res[1]},
                             'D-U': {'upLx': np.repeat(0,TR_conditions['D-U']), 'upLy': np.array(list(reversed(ver_y+0.5*bar_width*screen_res[1]))),
-                                     'lowRx': np.repeat(screen_res[0],TR_conditions['D-U']), 'lowRy': np.array(list(reversed(ver_y-0.5*bar_width*screen_res[1])))}
-                             }
-
+                                    'lowRx': np.repeat(screen_res[0],TR_conditions['D-U']), 'lowRy': np.array(list(reversed(ver_y-0.5*bar_width*screen_res[1])))}
+                            }
         
         # save screen display for each TR
-        visual_dm_array = np.zeros((total_TR, round(screen_res[0]*res_scaling), round(screen_res[1]*res_scaling)))
+        visual_dm_array = np.zeros((len(condition_per_TR)*osf, round(screen_res[0]*res_scaling), round(screen_res[1]*res_scaling)))
         i = 0
+        hor_pass_ind = []
+        ver_pass_ind = []
 
         for trl,bartype in enumerate(condition_per_TR): # loop over bar pass directions
 
@@ -707,25 +723,26 @@ def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1,
                 # increment counter
                 i = i+1 if condition_per_TR[trl] == condition_per_TR[trl+1] else 0                    
 
-            visual_dm_array[trl, ...] = np.array(img)[::round(1/res_scaling),::round(1/res_scaling),0][np.newaxis,...]
+            if trl<len(event_onsets)-1:
+                visual_dm_array[int(event_onsets[trl]):int(event_onsets[trl+1]), ...] = np.array(img)[::round(1/res_scaling),::round(1/res_scaling),0][np.newaxis,...]
+            
+                ## turn behavior mask into position mask
+                # get indices for horizontal and vertical bar pass
+                if mask[trl] == False:
+                    if bartype in ['L-R','R-L']:
+                        hor_pass_ind += list(np.arange(int(event_onsets[trl]), int(event_onsets[trl+1]))) 
+                    elif bartype in ['U-D','D-U']:
+                        ver_pass_ind += list(np.arange(int(event_onsets[trl]), int(event_onsets[trl+1])))  
+
 
         # swap axis to have time in last axis [x,y,t]
         visual_dm = visual_dm_array.transpose([1,2,0])
-
-        ## turn behavior mask into position mask
-        # get indices for horizontal and vertical bar pass
-        hor_pass_ind = np.array([ind for ind,val in enumerate(condition_per_TR) if val in ['L-R','R-L'] and mask[ind]==False])
-        ver_pass_ind = np.array([ind for ind,val in enumerate(condition_per_TR) if val in ['U-D','D-U'] and mask[ind]==False])
 
         hor_mask = visual_dm[...,hor_pass_ind].sum(axis=-1); hor_mask[hor_mask > 0] = 1
         vert_mask = visual_dm[...,ver_pass_ind].sum(axis=-1) ; vert_mask[vert_mask > 0] = 1
         position_mask = hor_mask * vert_mask
 
         visual_dm = visual_dm * position_mask[...,np.newaxis]
-
-        # in case we want to crop the beginning of the DM
-        if crop == True:
-            visual_dm = visual_dm[...,crop_TR::] 
         
         # save design matrix
         np.save(output, visual_dm)
@@ -741,7 +758,10 @@ def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1,
     # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
     if shift_TRs == True:
         new_visual_dm = visual_dm.copy()
-        new_visual_dm[...,:-shift_TR_num] = visual_dm[...,shift_TR_num:]
+        if oversampling_time is None: 
+            new_visual_dm[...,:-shift_TR_num] = visual_dm[...,shift_TR_num:]
+        else:
+            new_visual_dm[...,:-int(shift_TR_num * TR *osf)] = visual_dm[...,int(shift_TR_num * TR *osf):]
         visual_dm = new_visual_dm.copy()
         
     #if we want to save the images
@@ -752,7 +772,11 @@ def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1,
 
         for w in range(visual_dm.shape[-1]):
             im = Image.fromarray(visual_dm[...,w])
-            im.save(op.join(outfolder,"DM_TR-%i.png"%w))      
+            im.save(op.join(outfolder,"DM_TR-%s.png"%str(w).zfill(4)))  
+
+        ## save as video
+        img_name = op.join(outfolder,'DM_TR-%4d.png')
+        os.system("ffmpeg -r 6 -start_number 0 -i %s -vcodec mpeg4 -y %s"%(img_name, op.join(outfolder,'DM_movie.mp4')))     
             
     return normalize(visual_dm)
 
@@ -2724,7 +2748,7 @@ def get_weighted_bins(data_df, x_key = 'ecc', y_key = 'size', weight_key = 'rsq'
 
 
 def baseline_correction(data, params, num_baseline_TRs = 6, baseline_interval = 'empty_long', 
-                        avg_type = 'median', crop = False, crop_TR = 8, shift_TRs = True, shift_TR_num = 1):
+                        avg_type = 'median', crop = False, crop_TR = 8):
     
     """Do baseline correction to timecourse
      Useful when we want a fix baseline during fitting
@@ -2770,9 +2794,6 @@ def baseline_correction(data, params, num_baseline_TRs = 6, baseline_interval = 
 
     if crop:
         interval_ind = np.array(interval_ind) - crop_TR
-
-    if shift_TRs:
-        interval_ind = interval_ind - shift_TR_num
 
     # get baseline values
     baseline_arr = np.hstack([data[..., ind[0]:ind[1]] for ind in interval_ind])
@@ -2960,3 +2981,47 @@ def get_rois4plotting(params, pysub = 'hcp_999999', use_atlas = True, atlas_pth 
             roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
             
     return ROIs, roi_verts, color_codes
+
+
+def get_event_onsets(behav_files, TR = 1.6, crop = True, crop_TR = 8, shift_TRs = True, shift_TR_num = .5):
+    
+    """ Get behavioral event onsets
+    to use in design matrix for pRF task
+    based on actual MRI pulses
+    
+    Parameters
+    ----------
+    behav_files : list/array
+       list with absolute filenames for all pRF runs .tsv
+    """
+    
+    avg_onset = []
+
+    for r in range(len(behav_files)):
+
+        # load df for run
+        df_run = pd.read_csv(behav_files[r], sep='\t')
+        # get onsets
+        onset_run = df_run[df_run['event_type']=='pulse']['onset'].values
+
+        onset = [0] # first trigger is not saved in df --> this accounts for 1TR shift, due to start of dynamic scans!
+        for i in range(len(onset_run)-1):
+            onset.append(onset_run[i])
+
+        if r == 0:
+            avg_onset = onset
+        else:
+            avg_onset = np.vstack((avg_onset, onset))
+
+    # average accross runs
+    avg_onset = np.mean(avg_onset, axis=0)
+    
+    # if we're cropping fMRI data, then also need to crop length of events array
+    if crop: 
+        avg_onset = avg_onset[crop_TR:] - avg_onset[crop_TR]
+        
+    # if we want to shift events (ex: due to slice time correction)
+    if shift_TRs: 
+        avg_onset[1:] = avg_onset[1:] - shift_TR_num*TR
+     
+    return avg_onset

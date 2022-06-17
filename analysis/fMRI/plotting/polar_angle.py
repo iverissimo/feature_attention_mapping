@@ -135,7 +135,7 @@ n_bins_colors = 256
 rsq_threshold = params['plotting']['rsq_threshold']
 
 # get pycortex sub
-pysub = params['plotting']['pycortex_sub'] #+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
+pysub = params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
 
 ROIs, roi_verts, color_codes = mri_utils.get_rois4plotting(params, pysub = pysub, 
                                             use_atlas = True, atlas_pth = op.join(derivatives_dir,'glasser_atlas','59k_mesh'))

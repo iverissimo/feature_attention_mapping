@@ -51,24 +51,11 @@ TR = params['mri']['TR']
 # type of model to fit
 model_type = 'css'
 
+# if we fitted hrf
+fit_hrf = params['mri']['fitting']['pRF']['fit_hrf']
+
 # set estimate key names
 estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][model_type]
-
-# define file extension that we want to use, 
-# should include processing key words
-file_ext = ''
-# if cropped first
-if params['feature']['crop']:
-    file_ext += '_{name}'.format(name='cropped')
-# type of filtering/denoising
-if params['feature']['regress_confounds']:
-    file_ext += '_{name}'.format(name='confound')
-else:
-    file_ext += '_{name}'.format(name = params['mri']['filtering']['type'])
-# type of standardization 
-file_ext += '_{name}'.format(name = params['feature']['standardize'])
-# don't forget its a numpy array
-file_ext += '.npy'
 
 # set paths
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
@@ -82,6 +69,10 @@ if not os.path.exists(figures_pth):
 
 # path to pRF fits 
 fits_pth =  op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), space, 'iterative_{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
+
+if fit_hrf:
+    fits_pth = op.join(fits_pth,'with_hrf')
+    estimate_keys = estimate_keys+['hrf_derivative','hrf_dispersion']
 
 ## Load pRF estimates 
 
@@ -107,11 +98,12 @@ else: # if not join chunks and save file
     estimates = mri_utils.join_chunks(fits_pth, estimates_combi, fit_hrf = params['mri']['fitting']['pRF']['fit_hrf'],
                             chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
 
-
 # define design matrix 
 visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
-                                 save_imgs = False, res_scaling = 0.1, crop = params['prf']['crop'] , 
-                                 crop_TR = params['prf']['crop_TR'], overwrite=False)
+                                save_imgs = False, res_scaling = 0.1, TR = params['mri']['TR'],
+                                crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
+                                shift_TRs = True, shift_TR_num = 1, oversampling_time = 10,
+                                overwrite = False, mask = [], event_onsets = [])
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -121,55 +113,26 @@ prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
 
 # get the ecc limits (in dva)
 # to mask estimates
-x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
+#x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
+x_ecc_lim = [- prf_stim.screen_size_degrees/2, prf_stim.screen_size_degrees/2]
+y_ecc_lim = [- prf_stim.screen_size_degrees/2, prf_stim.screen_size_degrees/2] 
 
 rsq = estimates['r2'] 
 
 # mask estimates
 print('masking estimates')
 masked_est = mri_utils.mask_estimates(estimates, 
-                                      estimate_keys = estimate_keys+['hrf_derivative','hrf_dispersion'],
+                                      estimate_keys = estimate_keys,
                                       x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
 
 masked_rsq = masked_est['r2']
 masked_ns = masked_est['ns']
 
-## make violin plots with exponent values per ROI
-
-# if using atlas to get ROIs 
-use_atlas = False 
 # get pycortex sub
 pysub = params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
-# get vertices for ROI
-roi_verts = {} #empty dictionary  
 
-## get vertices and color palette, 
-# for consistency
-if use_atlas:
-    # Get Glasser atlas
-    atlas_df, atlas_array = mri_utils.create_glasser_df(op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
-
-    # ROI names
-    ROIs = list(params['plotting']['ROIs']['glasser_atlas'].keys())
-    # colors
-    color_codes = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs}
-
-    # get vertices for ROI
-    for _,key in enumerate(ROIs):
-        roi_verts[key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
-
-else:
-    # set ROI names
-    ROIs = params['plotting']['ROIs'][space]
-
-    # dictionary with one specific color per group - similar to fig3 colors
-    ROI_pal = params['plotting']['ROI_pal']
-    color_codes = {key: ROI_pal[key] for key in ROIs}
-
-    # get vertices for ROI
-    for _,val in enumerate(ROIs):
-        roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
-
+ROIs, roi_verts, color_codes = mri_utils.get_rois4plotting(params, pysub = pysub, 
+                                            use_atlas = False, atlas_pth = op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
 
 ## make flatmap
 ## save flatmap
@@ -184,7 +147,8 @@ images['masked_ns'] = cortex.Vertex2D(masked_ns, alpha_level,
                             vmin2 = 0, vmax2 = 1,
                             cmap='plasma_alpha')
 #cortex.quickshow(images['masked_ns'],with_curvature=True,with_sulci=True)
-filename = op.join(figures_pth,'flatmap_space-{space}_type-exponent_visual_masked.svg'.format(space=pysub))
+filename = op.join(figures_pth,'flatmap_space-{space}_type-exponent_visual_masked_withHRF-{hrf}.png'.format(space = pysub,
+                                                                                                            hrf = str(params['mri']['fitting']['pRF']['fit_hrf'])))
 print('saving %s' %filename)
 _ = cortex.quickflat.make_png(filename, images['masked_ns'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
@@ -195,12 +159,13 @@ images['ns'] = cortex.Vertex2D(estimates['ns'], mri_utils.normalize(np.clip(rsq,
                             vmin2 = 0, vmax2 = 1,
                             cmap='plasma_alpha')
 #cortex.quickshow(images['ns'],with_curvature=True,with_sulci=True)
-filename = op.join(figures_pth,'flatmap_space-{space}_type-exponent_visual.svg'.format(space=pysub))
+filename = op.join(figures_pth,'flatmap_space-{space}_type-exponent_visual_withHRF-{hrf}.png'.format(space = pysub,
+                                                                                                    hrf = str(params['mri']['fitting']['pRF']['fit_hrf'])))
 print('saving %s' %filename)
 _ = cortex.quickflat.make_png(filename, images['ns'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
 # set threshold for plotting
-rsq_threshold = .1 #params['plotting']['rsq_threshold']
+rsq_threshold = params['plotting']['rsq_threshold']
 
 ## plot distribution
 for idx,rois_ks in enumerate(ROIs): 
@@ -240,7 +205,7 @@ plt.xlabel('ROI',fontsize = 20,labelpad=18)
 plt.ylabel('Exponent',fontsize = 20,labelpad=18)
 plt.ylim(0,1.1)
 
-fig.savefig(op.join(figures_pth,'exponent_visual_boxplot.svg'), dpi=100)
+fig.savefig(op.join(figures_pth,'exponent_visual_boxplot_withHRF-{hrf}.png'.format(hrf = str(params['mri']['fitting']['pRF']['fit_hrf']))), dpi=100)
 
 ## make value distribution plot
 sns.set(font_scale = 1.5)
@@ -262,4 +227,4 @@ for i, ax in enumerate(axes):
     ax.axvline(df_ns.loc[df_ns['roi']==ROIs[i]]["exponent"].median(), ls='--', c='green')
     
 g.set_titles("{col_name}")  # use this argument literally
-g.savefig(op.join(figures_pth,'exponent_visual_histogram.svg'), dpi=100)
+g.savefig(op.join(figures_pth,'exponent_visual_histogram_withHRF-{hrf}.png'.format(hrf = str(params['mri']['fitting']['pRF']['fit_hrf']))), dpi=100)

@@ -96,10 +96,10 @@ else: # if not join chunks and save file
 
 # define design matrix 
 visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
-                                     save_imgs = False, res_scaling = 0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
-                                            shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
-                                            shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'],
-                                            overwrite = False)
+                                save_imgs = False, res_scaling = 0.1, TR = params['mri']['TR'],
+                                crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
+                                shift_TRs = True, shift_TR_num = 1, oversampling_time = 10,
+                                overwrite = False, mask = [], event_onsets = [])
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -109,7 +109,9 @@ prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
 
 # get the ecc limits (in dva)
 # to mask estimates
-x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
+#x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
+x_ecc_lim = [- prf_stim.screen_size_degrees/2, prf_stim.screen_size_degrees/2]
+y_ecc_lim = [- prf_stim.screen_size_degrees/2, prf_stim.screen_size_degrees/2] 
 
 # mask estimates
 print('masking estimates')
@@ -138,7 +140,7 @@ rsq_threshold = params['plotting']['rsq_threshold']
 pysub = params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
 
 ROIs, roi_verts, color_codes = mri_utils.get_rois4plotting(params, pysub = pysub, 
-                                            use_atlas = True, atlas_pth = op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
+                                            use_atlas = False, atlas_pth = op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
 
 
 images = {}
@@ -178,6 +180,33 @@ filename = op.join(figures_pth,'flatmap_space-{space}_type-PA_NOalpha_mackey_col
 print('saving %s' %filename)
 _ = cortex.quickflat.make_png(filename, images['PA_noalpha'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 ######################
+
+### plot x and y separately, for sanity check ########
+
+images['x'] = cortex.Vertex2D(x, alpha_level,
+                            pysub,
+                            vmin = -6, vmax= 6,
+                          vmin2 = 0, vmax2= 1,
+                            cmap='BuBkRd_alpha_2D')
+#cortex.quickshow(images['x']with_curvature=True,with_sulci=True,with_colorbar=True,
+#                 curvature_brightness = 0.4, curvature_contrast = 0.1)#, recache = True)
+filename = op.join(figures_pth,'flatmap_space-{space}_type-x_withHRF-{hrf}.png'.format(space = pysub,
+                                                                                    hrf = str(params['mri']['fitting']['pRF']['fit_hrf'])))
+print('saving %s' %filename)
+_ = cortex.quickflat.make_png(filename, images['x'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
+images['y'] = cortex.Vertex2D(y, alpha_level,
+                            pysub,
+                            vmin = -6, vmax= 6,
+                          vmin2 = 0, vmax2= 1,
+                            cmap='BuBkRd_alpha_2D')
+#cortex.quickshow(images['x']with_curvature=True,with_sulci=True,with_colorbar=True,
+#                 curvature_brightness = 0.4, curvature_contrast = 0.1)#, recache = True)
+filename = op.join(figures_pth,'flatmap_space-{space}_type-y_withHRF-{hrf}.png'.format(space = pysub,
+                                                                                    hrf = str(params['mri']['fitting']['pRF']['fit_hrf'])))
+print('saving %s' %filename)
+_ = cortex.quickflat.make_png(filename, images['y'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
 
 
 ## plot polar angle in non uniform color wheel

@@ -120,10 +120,11 @@ if task == 'pRF':
     
     # define design matrix 
     visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
-                                     save_imgs = False, res_scaling = 0.1, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
-                                            shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
-                                            shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'],
-                                            overwrite = False)
+                                save_imgs = False, res_scaling = 0.1, TR = params['mri']['TR'],
+                                crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
+                                shift_TRs = True, shift_TR_num = 1, oversampling_time = 10,
+                                overwrite = False, mask = [], event_onsets = [])
+
 
     # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
     prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -133,7 +134,9 @@ if task == 'pRF':
     
     # get the ecc limits (in dva)
     # to mask estimates
-    x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm, params, screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
+    #x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm, params, screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
+    x_ecc_lim = [- prf_stim.screen_size_degrees/2, prf_stim.screen_size_degrees/2]
+    y_ecc_lim = [- prf_stim.screen_size_degrees/2, prf_stim.screen_size_degrees/2] 
 
     rsq = estimates['iterative']['r2'] 
 
@@ -201,7 +204,7 @@ rsq_threshold = params['plotting']['rsq_threshold']
 pysub = params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
 
 ROIs, roi_verts, color_codes = mri_utils.get_rois4plotting(params, pysub = pysub, 
-                                            use_atlas = True, atlas_pth = op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
+                                            use_atlas = False, atlas_pth = op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
 
 # save rsq values in dataframe, for plotting
 for idx,rois_ks in enumerate(ROIs): 

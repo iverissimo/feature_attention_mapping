@@ -113,9 +113,7 @@ behav_files = [op.join(source_dir, h) for h in os.listdir(source_dir) if 'task-p
 DM_mask_beh = mri_utils.get_beh_mask(behav_files,params)
 
 ## get onset of events from behavioral tsv files
-event_onsets = mri_utils.get_event_onsets(behav_files, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
-                                shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
-                                shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'])
+event_onsets = mri_utils.get_event_onsets(behav_files, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'])
 
 # output dir to save fit and plot
 figures_pth = op.join(derivatives_dir,'plots','single_vertex','pRFfit','sub-{sj}'.format(sj=sj), space, model_type,'run-{run}'.format(run=run_type)) # path to save plots
@@ -124,10 +122,10 @@ if not os.path.exists(figures_pth):
 
 # define design matrix 
 visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
-                                save_imgs = False, res_scaling = 0.1, TR = params['mri']['TR'],
-                                crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
-                                shift_TRs = True, shift_TR_num = 1, oversampling_time = osf,
-                                overwrite = True, mask = DM_mask_beh, event_onsets = event_onsets)
+                        save_imgs = False, res_scaling = 0.1, TR = params['mri']['TR'],
+                        crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
+                        shift_TRs = True, shift_TR_num =  params['mri']['fitting']['pRF']['shift_DM_TRs'], oversampling_time = osf,
+                        overwrite = False, mask = DM_mask_beh, event_onsets = event_onsets)
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -166,12 +164,13 @@ gauss_bounds = [(-1.5*ss, 1.5*ss),  # x
                 (-1.5*ss, 1.5*ss),  # y
                 (eps, 1.5*ss),  # prf size
                 (0, 1000),  # prf amplitude
-                (0, 1000)] #(-1000, 1000)]  # bold baseline
+                (-500, 1000)] #(-1000, 1000)]  # bold baseline
 
 # grid exponent parameter
 css_n_grid = np.linspace(params['mri']['fitting']['pRF']['min_n'], 
-                                        grid_nr, 
-                                        params['mri']['fitting']['pRF']['grid_nr'], dtype='float32')
+                                        params['mri']['fitting']['pRF']['max_n'], 
+                                        params['mri']['fitting']['pRF']['n_nr'], dtype='float32')
+#css_n_grid = np.array([.25, .5, .75, 1])
 
 # define CSS model 
 css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
@@ -190,8 +189,8 @@ css_bounds = [(-1.5*ss, 1.5*ss),  # x
             (-1.5*ss, 1.5*ss),  # y
             (eps, 1.5*ss),  # prf size
             (0, 1000),  # prf amplitude
-            (0, 1000),  # bold baseline
-            (0.01, 1)]  # CSS exponent
+            (-500, 1000),  # bold baseline
+            (0.01, 1.5)]  # CSS exponent
 
 # define DN model
 
@@ -229,9 +228,9 @@ if correct_baseline:
                             avg_type = 'median', crop = params['prf']['crop'], 
                             crop_TR = params['prf']['crop_TR'])
     
-if roi != 'None' and vertex not in ['max','min']:
+if roi != 'None':
     print('masking data for ROI %s'%roi)
-    roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub'], roi) #+'_sub-{sj}'.format(sj=sj),roi) # get indices for that ROI
+    roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj),roi) # get indices for that ROI
     data = data[roi_ind[roi]]
 
 if vertex not in ['max','min']:
@@ -425,10 +424,6 @@ else:
                                 chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
 
     if roi != 'None':
-        print('masking data for ROI %s'%roi)
-        #roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub'],roi) # get indices for that ROI
-        roi_ind = cortex.get_roi_verts(params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj),roi) # get indices for that ROI
-        data = data[roi_ind[roi]]
 
         if vertex == 'max':
             vertex = np.where(estimates['r2'][roi_ind[roi]] == np.nanmax(estimates['r2'][roi_ind[roi]]))[0][0]

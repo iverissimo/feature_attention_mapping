@@ -118,10 +118,7 @@ behav_files = [op.join(source_dir, h) for h in os.listdir(source_dir) if 'task-p
 DM_mask_beh = mri_utils.get_beh_mask(behav_files,params)
 
 ## get onset of events from behavioral tsv files
-event_onsets = mri_utils.get_event_onsets(behav_files, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
-                                shift_TRs = params['mri']['fitting']['pRF']['shift_DM'], 
-                                shift_TR_num = params['mri']['fitting']['pRF']['shift_DM_TRs'])
-
+event_onsets = mri_utils.get_event_onsets(behav_files, crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'])
 
 # fit model
 
@@ -197,7 +194,7 @@ else:
         visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
                                 save_imgs = False, res_scaling = 0.1, TR = params['mri']['TR'],
                                 crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
-                                shift_TRs = True, shift_TR_num = 1, oversampling_time = osf,
+                                shift_TRs = True, shift_TR_num =  params['mri']['fitting']['pRF']['shift_DM_TRs'], oversampling_time = osf,
                                 overwrite = True, mask = DM_mask_beh, event_onsets = event_onsets)
 
     
@@ -256,7 +253,7 @@ else:
         gauss_bounds = [(-1.5*ss, 1.5*ss),  # x
                         (-1.5*ss, 1.5*ss),  # y
                         (eps, 1.5*ss),  # prf size
-                        (0, 1000),  # prf amplitude
+                        (-500, 1000),  # prf amplitude
                         (0, 1000)]  # bold baseline
 
         if fit_hrf:
@@ -297,7 +294,7 @@ else:
                 # grid exponent parameter
                 css_n_grid = np.linspace(params['mri']['fitting']['pRF']['min_n'], 
                                         params['mri']['fitting']['pRF']['max_n'], 
-                                        params['mri']['fitting']['pRF']['grid_nr'], dtype='float32')
+                                        params['mri']['fitting']['pRF']['n_nr'], dtype='float32')
 
                 # define model 
                 css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
@@ -333,8 +330,8 @@ else:
                             (-1.5*ss, 1.5*ss),  # y
                             (eps, 1.5*ss),  # prf size
                             (0, 1000),  # prf amplitude
-                            (0, 1000),  # bold baseline
-                            (0.01, 1)]  # CSS exponent
+                            (-500, 1000),  # bold baseline
+                            (0.01, 1.5)]  # CSS exponent
 
                 if fit_hrf:
                     css_bounds += [(0,10),(0,0)]
@@ -405,7 +402,7 @@ else:
                             (-1.5*ss, 1.5*ss),  # y
                             (eps, 1.5*ss),  # prf size
                             (0, 1000),  # prf amplitude
-                            (0, 1000),  # bold baseline
+                            (-500, 1000),  # bold baseline
                             (0, 1000),  # surround amplitude
                             (eps, 3*ss),  # surround size
                             (0, 1000),  # neural baseline

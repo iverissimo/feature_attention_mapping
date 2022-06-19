@@ -631,6 +631,12 @@ def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1, TR = 1.6,
     res_scaling: float/int
         resolution scaling factor, to downsample screen spatial res of DM
     """
+
+    # if oversampling is None, then we're working with the TR
+    if oversampling_time is None:
+        osf = 1
+    else:
+        osf = oversampling_time
     
     if not op.exists(output) or overwrite == True: 
         print('making %s'%output)
@@ -669,12 +675,6 @@ def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1, TR = 1.6,
         if crop:
             condition_per_TR = condition_per_TR[crop_TR:]
             mask = mask[crop_TR:]
-            
-        # if oversampling is None, then we're working with the TR
-        if oversampling_time is None:
-            osf = 1
-        else:
-            osf = oversampling_time
 
         # if no events array given, make one based on TR
         if len(event_onsets) == 0:
@@ -743,7 +743,14 @@ def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1, TR = 1.6,
         position_mask = hor_mask * vert_mask
 
         visual_dm = visual_dm * position_mask[...,np.newaxis]
-        
+
+        # shifting TRs to the left (quick fix)
+        # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
+        if shift_TRs == True:
+            new_visual_dm = visual_dm.copy()
+            new_visual_dm[...,:-int(shift_TR_num * osf)] = visual_dm[...,int(shift_TR_num * osf):]
+            visual_dm = new_visual_dm.copy()
+            
         # save design matrix
         np.save(output, visual_dm)
         
@@ -753,17 +760,6 @@ def make_pRF_DM(output, params, save_imgs = False, res_scaling = 1, TR = 1.6,
         # load
         visual_dm = np.load(output)
 
-
-    # shifting TRs to the left (quick fix)
-    # to account for first trigger that was "dummy" - in future change experiment settings to skip 1st TR
-    if shift_TRs == True:
-        new_visual_dm = visual_dm.copy()
-        if oversampling_time is None: 
-            new_visual_dm[...,:-shift_TR_num] = visual_dm[...,shift_TR_num:]
-        else:
-            new_visual_dm[...,:-int(shift_TR_num * TR *osf)] = visual_dm[...,int(shift_TR_num * TR *osf):]
-        visual_dm = new_visual_dm.copy()
-        
     #if we want to save the images
     if save_imgs == True:
         outfolder = op.split(output)[0]
@@ -2942,7 +2938,7 @@ def make_blk_nuisance_regressor(data, params, pRF_rsq,
     return nuisance_regressor_surf
 
 
-def get_rois4plotting(params, pysub = 'hcp_999999', use_atlas = True, atlas_pth = ''):
+def get_rois4plotting(params, pysub = 'hcp_999999', use_atlas = True, atlas_pth = '', space = 'fsLR_den-170k'):
 
     """ helper function to get ROI names, vertice index and color palette
    to be used in plotting scripts
@@ -2978,12 +2974,13 @@ def get_rois4plotting(params, pysub = 'hcp_999999', use_atlas = True, atlas_pth 
 
         # get vertices for ROI
         for _,val in enumerate(ROIs):
+            print(val)
             roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
             
     return ROIs, roi_verts, color_codes
 
 
-def get_event_onsets(behav_files, TR = 1.6, crop = True, crop_TR = 8, shift_TRs = True, shift_TR_num = .5):
+def get_event_onsets(behav_files, TR = 1.6, crop = True, crop_TR = 8):
     
     """ Get behavioral event onsets
     to use in design matrix for pRF task
@@ -3004,9 +3001,8 @@ def get_event_onsets(behav_files, TR = 1.6, crop = True, crop_TR = 8, shift_TRs 
         # get onsets
         onset_run = df_run[df_run['event_type']=='pulse']['onset'].values
 
-        onset = [0] # first trigger is not saved in df --> this accounts for 1TR shift, due to start of dynamic scans!
-        for i in range(len(onset_run)-1):
-            onset.append(onset_run[i])
+        # first pulse does not start at 0, correct for that
+        onset = onset_run - onset_run[0]
 
         if r == 0:
             avg_onset = onset
@@ -3020,8 +3016,64 @@ def get_event_onsets(behav_files, TR = 1.6, crop = True, crop_TR = 8, shift_TRs 
     if crop: 
         avg_onset = avg_onset[crop_TR:] - avg_onset[crop_TR]
         
-    # if we want to shift events (ex: due to slice time correction)
-    if shift_TRs: 
-        avg_onset[1:] = avg_onset[1:] - shift_TR_num*TR
-     
     return avg_onset
+
+
+def fwhmax_fwatmin(model, estimates, normalize_RFs=False, return_profiles=False):
+    
+    """
+    taken from marco aqil's code, all credits go to him
+    """
+    
+    model = model.lower()
+    x=np.linspace(-50,50,1000).astype('float32')
+
+    prf = estimates['betas'] * np.exp(-0.5*x[...,np.newaxis]**2 / estimates['size']**2)
+    vol_prf =  2*np.pi*estimates['size']**2
+
+    if 'dog' in model or 'norm' in model:
+        srf = estimates['sa'] * np.exp(-0.5*x[...,np.newaxis]**2 / estimates['ss']**2)
+        vol_srf = 2*np.pi*estimates['ss']*2
+
+    if normalize_RFs==True:
+
+        if model == 'gauss':
+            profile =  prf / vol_prf
+        elif model == 'css':
+            #amplitude is outside exponent in CSS
+            profile = (prf / vol_prf)**estimates['ns'] * estimates['betas']**(1 - estimates['ns'])
+        elif model =='dog':
+            profile = prf / vol_prf - \
+                       srf / vol_srf
+        elif 'norm' in model:
+            profile = (prf / vol_prf + estimates['nb']) /\
+                      (srf / vol_srf + estimates['sb']) - estimates['nb']/estimates['sb']
+    else:
+        if model == 'gauss':
+            profile = prf
+        elif model == 'css':
+            #amplitude is outside exponent in CSS
+            profile = prf**estimates['ns'] * estimates['betas']**(1 - estimates['ns'])
+        elif model =='dog':
+            profile = prf - srf
+        elif 'norm' in model:
+            profile = (prf + estimates['nb'])/(srf + estimates['sb']) - estimates['nb']/estimates['sb']
+
+
+    half_max = np.max(profile, axis=0)/2
+    fwhmax = np.abs(2*x[np.argmin(np.abs(profile-half_max), axis=0)])
+
+
+    if 'dog' in model or 'norm' in model:
+
+        min_profile = np.min(profile, axis=0)
+        fwatmin = np.abs(2*x[np.argmin(np.abs(profile-min_profile), axis=0)])
+
+        result = fwhmax, fwatmin
+    else:
+        result = fwhmax
+
+    if return_profiles:
+        return result, profile.T
+    else:
+        return result

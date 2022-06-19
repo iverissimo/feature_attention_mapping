@@ -54,24 +54,11 @@ TR = params['mri']['TR']
 # type of model to fit
 model_type = params['mri']['fitting']['pRF']['fit_model']
 
+# if we fitted hrf
+fit_hrf = params['mri']['fitting']['pRF']['fit_hrf']
+
 # set estimate key names
 estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][model_type]
-
-# define file extension that we want to use, 
-# should include processing key words
-file_ext = ''
-# if cropped first
-if params['feature']['crop']:
-    file_ext += '_{name}'.format(name='cropped')
-# type of filtering/denoising
-if params['feature']['regress_confounds']:
-    file_ext += '_{name}'.format(name='confound')
-else:
-    file_ext += '_{name}'.format(name = params['mri']['filtering']['type'])
-# type of standardization 
-file_ext += '_{name}'.format(name = params['feature']['standardize'])
-# don't forget its a numpy array
-file_ext += '.npy'
 
 # set paths
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
@@ -80,8 +67,12 @@ postfmriprep_dir = op.join(derivatives_dir,'post_fmriprep','sub-{sj}'.format(sj=
 # path to pRF fits 
 fits_pth =  op.join(derivatives_dir,'pRF_fit','sub-{sj}'.format(sj=sj), space, 'iterative_{model}'.format(model=model_type),'run-{run}'.format(run=run_type))
 
+if fit_hrf:
+    fits_pth = op.join(fits_pth,'with_hrf')
+    estimate_keys = estimate_keys+['hrf_derivative','hrf_dispersion']
+
 # output dir to save fit and plot
-figures_pth = op.join(derivatives_dir,'plots','size_ecc','pRFfit',
+figures_pth = op.join(derivatives_dir,'plots','size_ecc','pRF_fit',
                       'sub-{sj}'.format(sj=sj), space, model_type,'run-{run}'.format(run=run_type)) # path to save plots
 if not os.path.exists(figures_pth):
     os.makedirs(figures_pth) 
@@ -110,11 +101,12 @@ else: # if not join chunks and save file
     estimates = mri_utils.join_chunks(fits_pth, estimates_combi, fit_hrf = params['mri']['fitting']['pRF']['fit_hrf'],
                             chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
 
-
 # define design matrix 
 visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
-                                 save_imgs = False, res_scaling = 0.1, crop = params['prf']['crop'] , 
-                                 crop_TR = params['prf']['crop_TR'], overwrite=False)
+                                save_imgs = False, res_scaling = 0.1, TR = params['mri']['TR'],
+                                crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
+                                shift_TRs = True, shift_TR_num = 1, oversampling_time = 10,
+                                overwrite = False, mask = [], event_onsets = [])
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
 prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
@@ -124,63 +116,33 @@ prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
 
 # get the ecc limits (in dva)
 # to mask estimates
-x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
-
+#x_ecc_lim, y_ecc_lim = mri_utils.get_ecc_limits(visual_dm,params,screen_size_deg = [prf_stim.screen_size_degrees,prf_stim.screen_size_degrees])
+x_ecc_lim = [- prf_stim.screen_size_degrees/2, prf_stim.screen_size_degrees/2]
+y_ecc_lim = [- prf_stim.screen_size_degrees/2, prf_stim.screen_size_degrees/2] 
 
 # mask estimates
 print('masking estimates')
 masked_est = mri_utils.mask_estimates(estimates, 
-                                      estimate_keys = estimate_keys+['hrf_derivative','hrf_dispersion'],
+                                      estimate_keys = estimate_keys,
                                       x_ecc_lim = x_ecc_lim, y_ecc_lim = y_ecc_lim)
 
 rsq = masked_est['r2']
 x = masked_est['x']
 y = masked_est['y']
-size = masked_est['size']
-
-# non-linearity interacts with the Gaussian standard deviation to make an effective pRF size of σ/sqr(n)
-##### in future change plots to use FWHM - comparable across models ########
-if model_type == 'css': 
-    size = size/np.sqrt(masked_est['ns']) 
-
-complex_location = x + y * 1j # calculate eccentricity values
+# calculate eccentricity values
+complex_location = x + y * 1j 
 ecc = np.abs(complex_location)
 
-## get vertices per ROI
+# size estimates are different across models (due to non linearities)
+# eg non-linearity interacts with the Gaussian standard deviation to make an effective pRF size of σ/sqr(n)
+# best way is to compute the fwhm as a way to make size comparable across models 
+size_fwhmax = mri_utils.fwhmax_fwatmin(model_type, masked_est)
 
-# if using atlas to get ROIs 
-use_atlas = False 
 # get pycortex sub
 pysub = params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj) # because subject specific borders 
-# get vertices for ROI
-roi_verts = {} #empty dictionary  
 
-## get vertices and color palette, 
-# for consistency
-if use_atlas:
-    # Get Glasser atlas
-    atlas_df, atlas_array = mri_utils.create_glasser_df(op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
-
-    # ROI names
-    ROIs = list(params['plotting']['ROIs']['glasser_atlas'].keys())
-    # colors
-    color_codes = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs}
-
-    # get vertices for ROI
-    for _,key in enumerate(ROIs):
-        roi_verts[key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
-
-else:
-    # set ROI names
-    ROIs = params['plotting']['ROIs'][space]
-
-    # dictionary with one specific color per group - similar to fig3 colors
-    ROI_pal = params['plotting']['ROI_pal']
-    color_codes = {key: ROI_pal[key] for key in ROIs}
-
-    # get vertices for ROI
-    for _,val in enumerate(ROIs):
-        roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
+ROIs, roi_verts, color_codes = mri_utils.get_rois4plotting(params, pysub = pysub, 
+                                            use_atlas = False, atlas_pth = op.join(derivatives_dir,'glasser_atlas','59k_mesh'))
 
 
 # set threshold for plotting
@@ -196,7 +158,7 @@ regions = {'occipital': ['V1','V2','V3','V3AB','hV4','LO'],
 min_ecc = 0.25
 max_ecc = 4 #3.3
 n_bins = 10
-max_size = 15
+max_size = 20
 
 # to also save unbinned data and compare
 unbinned_df = pd.DataFrame({'ecc': [], 'size': [], 'rsq': [], 'ROI': []})
@@ -207,7 +169,7 @@ for idx,roi in enumerate(ROIs): # go over ROIs
     print('masking estimates for ROI %s'%roi)
 
     # get datapoints for RF only belonging to roi
-    new_size = size[roi_verts[roi]]
+    new_size = size_fwhmax[roi_verts[roi]]
 
     new_complex_location = x[roi_verts[roi]] + y[roi_verts[roi]] * 1j # calculate eccentricity values
     new_ecc = np.abs(new_complex_location)
@@ -262,21 +224,23 @@ sns.set(font_scale=1.3)
 sns.set_style("ticks")
 
 ax = sns.lmplot(x = 'mean_ecc', y = 'mean_size', hue = 'ROI', data = all_roi,
-                scatter=True, palette = color_codes, markers=['^','s','o', 'v','D','h','P'])
+                scatter=True, palette = color_codes, markers=['^', 's', 'o', 'v', 'D', 'h', 'P', '.', ','])
 
 ax = plt.gca()
 plt.xticks(fontsize = 18)
 plt.yticks(fontsize = 18)
 #ax.axes.tick_params(labelsize=16)
 ax.axes.set_xlim(min_ecc,max_ecc)
-ax.axes.set_ylim(0.5,6)
+ax.axes.set_ylim(0.5,14)
 
-ax.set_xlabel('pRF eccentricity [dva]', fontsize = 20, labelpad = 15)
-ax.set_ylabel('pRF size [dva]', fontsize = 20, labelpad = 15)
+ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
+ax.set_ylabel('pRF size FWHMax [deg]', fontsize = 20, labelpad = 15)
 #ax.set_title('ecc vs size plot, %d bins from %.2f-%.2f ecc [dva]'%(n_bins,min_ecc,max_ecc),fontsize=12)
 sns.despine(offset=15)
 fig1 = plt.gcf()
-fig1.savefig(op.join(figures_pth,'ecc_vs_size_binned_weighted_rsq-%0.2f.svg'%(rsq_threshold)), dpi=100,bbox_inches = 'tight')
+fig1.savefig(op.join(figures_pth,'ecc_vs_size_binned_weighted_rsq-{thresh}_withHRF-{hrf}.png'.format(space = pysub,
+                                                                                    thresh = rsq_threshold,
+                                                                                    hrf = str(params['mri']['fitting']['pRF']['fit_hrf']))), dpi=100,bbox_inches = 'tight')
 
 ### plot UNbinned regressions ###
 
@@ -284,24 +248,26 @@ sns.set(font_scale=1.3)
 sns.set_style("ticks")
 
 g = sns.lmplot(x="ecc", y="size", hue = 'ROI', data = unbinned_df, scatter_kws={'alpha':0.15},
-              scatter=True, palette = color_codes, markers=['^','s','o', 'v','D','h','P'])
+              scatter=True, palette = color_codes, markers=['^', 's', 'o', 'v', 'D', 'h', 'P', '.', ','])
 
 ax = plt.gca()
 plt.xticks(fontsize = 18)
 plt.yticks(fontsize = 18)
 #ax.axes.tick_params(labelsize=16)
 ax.axes.set_xlim(min_ecc,max_ecc)
-ax.axes.set_ylim(0.5,6)
+ax.axes.set_ylim(0.5,14)
 
-ax.set_xlabel('pRF eccentricity [dva]', fontsize = 20, labelpad = 15)
-ax.set_ylabel('pRF size [dva]', fontsize = 20, labelpad = 15)
+ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
+ax.set_ylabel('pRF size FWHMax [deg]', fontsize = 20, labelpad = 15)
 #ax.set_title('ecc vs size plot, %d bins from %.2f-%.2f ecc [dva]'%(n_bins,min_ecc,max_ecc),fontsize=12)
 sns.despine(offset=15)
 # to make legend full alpha
 for lh in g._legend.legendHandles: 
     lh.set_alpha(1)
 fig2 = plt.gcf()
-fig2.savefig(op.join(figures_pth,'ecc_vs_size_UNbinned_rsq-%0.2f.svg'%(rsq_threshold)), dpi=100,bbox_inches = 'tight')
+fig2.savefig(op.join(figures_pth,'ecc_vs_size_UNbinned_rsq-{thresh}_withHRF-{hrf}.png'.format(space = pysub,
+                                                                                    thresh = rsq_threshold,
+                                                                                    hrf = str(params['mri']['fitting']['pRF']['fit_hrf']))), dpi=100,bbox_inches = 'tight')
 
 
 # ### plot for Occipital Areas - V1 V2 V3 V3AB hV4 LO ###
@@ -396,15 +362,16 @@ images['ecc'] = mri_utils.make_raw_vertex_image(ecc4plot,
 
 #cortex.quickshow(images['ecc'],with_curvature=True,with_sulci=True,with_labels=False,
 #                 curvature_brightness = 0.4, curvature_contrast = 0.1)
-filename = op.join(figures_pth,'flatmap_space-fsaverage_type-ecc_visual.svg')
+filename = op.join(figures_pth,'flatmap_space-fsaverage_type-ecc_visual_withHRF-{hrf}.png'.format(space = pysub,
+                                                                                    hrf = str(params['mri']['fitting']['pRF']['fit_hrf'])))
 print('saving %s' %filename)
 _ = cortex.quickflat.make_png(filename, images['ecc'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
 ## plot pRF size ##
 
 # only used voxels where pRF rsq bigger than 0
-size4plot = np.zeros(size.shape); size4plot[:] = np.nan
-size4plot[rsq>0] = size[rsq>0]
+size4plot = np.zeros(size_fwhmax.shape); size4plot[:] = np.nan
+size4plot[rsq>0] = size_fwhmax[rsq>0]
 
 images['size'] = mri_utils.make_raw_vertex_image(size4plot, 
                                                cmap = 'hot', vmin = 0, vmax = 7, 
@@ -413,6 +380,7 @@ images['size'] = mri_utils.make_raw_vertex_image(size4plot,
 
 #cortex.quickshow(images['size'],with_curvature=True,with_sulci=True,with_labels=False,
 #                 curvature_brightness = 0.4, curvature_contrast = 0.1)
-filename = op.join(figures_pth,'flatmap_space-fsaverage_type-size_visual.svg')
+filename = op.join(figures_pth,'flatmap_space-fsaverage_type-size_fwhmax_visual_withHRF-{hrf}.png'.format(space = pysub,
+                                                                                    hrf = str(params['mri']['fitting']['pRF']['fit_hrf'])))
 print('saving %s' %filename)
 _ = cortex.quickflat.make_png(filename, images['size'], recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)

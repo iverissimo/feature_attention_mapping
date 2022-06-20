@@ -59,8 +59,16 @@ TR = params['mri']['TR']
 # type of model to fit
 model_type = params['mri']['fitting']['pRF']['fit_model']
 fit_hrf = params['mri']['fitting']['pRF']['fit_hrf']
-osf = 10
-resample_pred = True
+# if we're shifting TRs, to account for dummy scans or slicetime correction
+shift_TRs = params['mri']['fitting']['pRF']['shift_DM'] 
+shift_TR_num =  params['mri']['fitting']['pRF']['shift_DM_TRs']
+if isinstance(shift_TR_num, int):
+    osf = 1
+    resample_pred = False
+else:
+    print('shift implies upsampling DM')
+    osf = 10
+    resample_pred = True
 
 # set estimate key names
 estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][model_type]
@@ -103,7 +111,9 @@ data = np.load(file,allow_pickle=True) # will be (vertex, TR)
 
 # if we want to keep baseline fix, we need to correct it!
 if correct_baseline:
-    data = mri_utils.baseline_correction(data, params, num_baseline_TRs = 10, baseline_interval = 'empty_long', 
+    data = mri_utils.baseline_correction(data, params, 
+                            num_baseline_TRs = params['mri']['fitting']['pRF']['num_baseline_TRs'], 
+                            baseline_interval = 'empty_long', 
                             avg_type = 'median', crop = params['prf']['crop'], 
                             crop_TR = params['prf']['crop_TR'])
 
@@ -194,7 +204,7 @@ else:
         visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
                                 save_imgs = False, res_scaling = 0.1, TR = params['mri']['TR'],
                                 crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
-                                shift_TRs = True, shift_TR_num =  params['mri']['fitting']['pRF']['shift_DM_TRs'], oversampling_time = osf,
+                                shift_TRs = shift_TRs, shift_TR_num =  shift_TR_num, oversampling_time = osf,
                                 overwrite = True, mask = DM_mask_beh, event_onsets = event_onsets)
 
     
@@ -253,8 +263,8 @@ else:
         gauss_bounds = [(-1.5*ss, 1.5*ss),  # x
                         (-1.5*ss, 1.5*ss),  # y
                         (eps, 1.5*ss),  # prf size
-                        (-500, 1000),  # prf amplitude
-                        (0, 1000)]  # bold baseline
+                        (0, 1000),  # prf amplitude
+                        (-500, 1000)]  # bold baseline
 
         if fit_hrf:
             gauss_bounds += [(0,10),(0,0)]
@@ -264,7 +274,7 @@ else:
 
         # iterative fit
         print("Gauss model ITERATIVE fit")
-        gauss_fitter.iterative_fit(rsq_threshold = 0.1, 
+        gauss_fitter.iterative_fit(rsq_threshold = 0.05, 
                                     verbose = True,
                                     bounds = gauss_bounds,
                                     xtol = xtol,
@@ -317,7 +327,7 @@ else:
                                                     previous_gaussian_fitter = gauss_fitter)
 
                 css_fitter.grid_fit(exponent_grid = css_n_grid,
-                                    rsq_threshold = 0.1, 
+                                    rsq_threshold = 0.05, 
                                     pos_prfs_only = True)
 
 
@@ -341,8 +351,8 @@ else:
 
                 # iterative fit
                 print("CSS model ITERATIVE fit")
-                css_fitter.iterative_fit(rsq_threshold = 0.1, 
-                                            verbose = False,
+                css_fitter.iterative_fit(rsq_threshold = 0.05, 
+                                            verbose = True,
                                             bounds = css_bounds,
                                             xtol = xtol,
                                             ftol = ftol)
@@ -390,7 +400,7 @@ else:
                                     surround_size_grid,
                                     neural_baseline_grid,
                                     surround_baseline_grid,
-                                    rsq_threshold = 0.1, 
+                                    rsq_threshold = 0.05, 
                                     pos_prfs_only = True)
 
                 estimates_grid_fitmodel = dn_fitter.gridsearch_params
@@ -416,7 +426,7 @@ else:
 
                 # iterative fit
                 print("DN model ITERATIVE fit")
-                dn_fitter.iterative_fit(rsq_threshold = 0.1, 
+                dn_fitter.iterative_fit(rsq_threshold = 0.05, 
                                             verbose = False,
                                             bounds = dn_bounds,
                                             xtol = xtol,

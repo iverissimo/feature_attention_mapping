@@ -57,23 +57,42 @@ class visualize_on_click:
 
         
     
-    def set_figure(self):
+    def set_figure(self, task2viz = 'both'):
 
+        # set task of interest
+        self.task2viz = task2viz
         # set figure grid 
         self.full_fig = plt.figure(constrained_layout = True, figsize = self.full_figsize)
-        gs = self.full_fig.add_gridspec(4, 3)
 
-        self.flatmap_ax = self.full_fig.add_subplot(gs[:2, :])
+        if self.task2viz in ['both', 'FA', 'feature']:
 
-        self.prf_timecourse_ax = self.full_fig.add_subplot(gs[2, :2])
-        self.fa_timecourse_ax = self.full_fig.add_subplot(gs[3, :2])
+            gs = self.full_fig.add_gridspec(4, 3)
 
-        self.prf_ax = self.full_fig.add_subplot(gs[2, 2])
+            self.flatmap_ax = self.full_fig.add_subplot(gs[:2, :])
 
-        self.flatmap_ax.set_title('flatmap')
-        self.fa_timecourse_ax.set_title('FA timecourse')
-        self.prf_timecourse_ax.set_title('pRF timecourse')
-        self.prf_ax.set_title('prf')
+            self.prf_timecourse_ax = self.full_fig.add_subplot(gs[2, :2])
+            self.fa_timecourse_ax = self.full_fig.add_subplot(gs[3, :2])
+
+            self.prf_ax = self.full_fig.add_subplot(gs[2, 2])
+
+            self.flatmap_ax.set_title('flatmap')
+            self.fa_timecourse_ax.set_title('FA timecourse')
+            self.prf_timecourse_ax.set_title('pRF timecourse')
+            self.prf_ax.set_title('prf')
+        
+        elif self.task2viz in ['prf', 'pRF']:
+
+            gs = self.full_fig.add_gridspec(4, 2)
+
+            self.flatmap_ax = self.full_fig.add_subplot(gs[:3, :])
+
+            self.prf_timecourse_ax = self.full_fig.add_subplot(gs[3, :1])
+
+            self.prf_ax = self.full_fig.add_subplot(gs[3, 1])
+
+            self.flatmap_ax.set_title('flatmap')
+            self.prf_timecourse_ax.set_title('pRF timecourse')
+            self.prf_ax.set_title('prf')
         
     
     def get_prf_model(self, vertex, model_type = 'css', fit_hrf = False):
@@ -207,8 +226,9 @@ class visualize_on_click:
         print(refresh)
 
         if refresh: # if we want to clean up timecourses
-            self.fa_timecourse_ax.clear()
             self.prf_timecourse_ax.clear()
+            if self.task2viz in ['both', 'FA', 'feature']:
+                self.fa_timecourse_ax.clear()
             
         self.prf_timecourse_ax = self.plot_prf_tc(self.prf_timecourse_ax, timecourse = self.pRF_data[vertex])
 
@@ -217,7 +237,6 @@ class visualize_on_click:
             self.fa_timecourse_ax = self.plot_fa_tc(self.fa_timecourse_ax, timecourse = self.FA_data[vertex])
         elif len(self.FA_data)>0:
             self.fa_timecourse_ax = self.plot_fa_tc(self.fa_timecourse_ax, timecourse = self.FA_data[vertex], plot_model = False) 
-
 
         prf = gauss2D_iso_cart(self.point_grid_2D[0],
                                self.point_grid_2D[1],
@@ -230,6 +249,10 @@ class visualize_on_click:
         self.prf_ax.axvline(self.prf_dm.shape[0]/2, color='white', linestyle='dashed', lw=0.5)
         self.prf_ax.axhline(self.prf_dm.shape[1]/2, color='white', linestyle='dashed', lw=0.5)
         #prf_ax.set_title(f"x: {self.prf_pars_dict['x'][vertex]}, y: {self.prf_pars_dict['y'][vertex]}")
+
+        # just to check if exponent values make sense
+        if self.prf_model_type == 'css':
+            print('pRF exponent = %.2f'%self.prf_pars_dict['ns'][vertex])
 
     #def polar_angle():
         
@@ -264,7 +287,7 @@ class visualize_on_click:
             cortex.quickshow(self.images['pRF_rsq'], with_rois = False, with_curvature = True,
                         fig = self.flatmap_ax, with_colorbar = False)
             self.flatmap_ax.set_title('pRF rsq')
-        elif event.key == '2':  # FA rsq
+        elif (event.key == '2') & (self.task2viz in ['both', 'FA', 'feature']):  # FA rsq
             cortex.quickshow(self.images['FA_rsq'], with_rois = False, with_curvature = True,
                         fig = self.flatmap_ax, with_colorbar = False)
             self.flatmap_ax.set_title('FA rsq')
@@ -273,13 +296,17 @@ class visualize_on_click:
                         fig = self.flatmap_ax, with_colorbar = False)
             self.flatmap_ax.set_title('pRF eccentricity')
         elif event.key == '4':  # pRF Size
-            cortex.quickshow(self.images['size'], with_rois = False, with_curvature = True,
+            cortex.quickshow(self.images['size_fwhmax'], with_rois = False, with_curvature = True,
                         fig = self.flatmap_ax, with_colorbar = False)
-            self.flatmap_ax.set_title('pRF size')
+            self.flatmap_ax.set_title('pRF size (FWHMax)')
         elif event.key == '5':  # pRF PA
             cortex.quickshow(self.images['PA'], with_rois = False, with_curvature = True,
                         fig = self.flatmap_ax, with_colorbar = False)
             self.flatmap_ax.set_title('pRF PA')
+        elif (event.key == '6') & (self.prf_model_type == 'css'):  # pRF exponent
+            cortex.quickshow(self.images['ns'], with_rois = False, with_curvature = True,
+                        fig = self.flatmap_ax, with_colorbar = False)
+            self.flatmap_ax.set_title('pRF exponent')
         # elif event.key == '3':  # polar angle
         #     cx.quickshow(size_v, with_rois=True, with_curvature=True,
         #                 fig=flatmap_ax, with_colorbar=False)

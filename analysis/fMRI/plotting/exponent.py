@@ -84,29 +84,9 @@ if fit_hrf:
     fits_pth = op.join(fits_pth,'with_hrf')
     estimate_keys = estimate_keys+['hrf_derivative','hrf_dispersion']
 
-## Load pRF estimates 
-
-# path to combined estimates
-estimates_pth = op.join(fits_pth,'combined')
-
-# combined estimates filename
-est_name = [x for _,x in enumerate(os.listdir(fits_pth)) if 'chunk-001' in x][0]
-est_name = est_name.replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
-
-# total path to estimates path
-estimates_combi = op.join(estimates_pth,est_name)
-
-if op.isfile(estimates_combi): # if combined estimates exists
-
-    print('loading %s'%estimates_combi)
-    estimates = np.load(estimates_combi) # load it
-
-else: # if not join chunks and save file
-    if not op.exists(estimates_pth):
-        os.makedirs(estimates_pth) 
-
-    estimates = mri_utils.join_chunks(fits_pth, estimates_combi, fit_hrf = params['mri']['fitting']['pRF']['fit_hrf'],
-                            chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
+## Load pRF estimates
+estimates = mri_utils.load_pRF_estimates(fits_pth, params, 
+                                                 total_chunks = total_chunks, model_type = model_type) 
 
 # define design matrix 
 visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 

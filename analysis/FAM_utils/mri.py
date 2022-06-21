@@ -1845,7 +1845,7 @@ def leave_one_out(input_list):
     return out_lists
 
 
-def create_hrf(hrf_params=[1.0, 1.0, 0.0], TR = 1.2, osf = 1):
+def create_hrf(hrf_params=[1.0, 1.0, 0.0], TR = 1.6, osf = 1):
     """
     construct single or multiple HRFs 
     [taken from prfpy - all credits go to Marco]
@@ -3077,3 +3077,40 @@ def fwhmax_fwatmin(model, estimates, normalize_RFs=False, return_profiles=False)
         return result, profile.T
     else:
         return result
+
+
+def load_pRF_estimates(fits_pth, params, total_chunks = 54, model_type = 'gauss'):
+
+    """ Load pRF estimates and combined them
+    
+    Parameters
+    ----------
+    fits_pth : str
+        absolute path to fits locations
+    params : dict
+        yaml dict with task related infos 
+    """
+    
+    # path to combined estimates
+    estimates_pth = op.join(fits_pth,'combined')
+
+    # combined estimates filename
+    est_name = [x for _,x in enumerate(os.listdir(fits_pth)) if 'chunk-001' in x][0]
+    est_name = est_name.replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
+
+    # total path to estimates path
+    estimates_combi = op.join(estimates_pth, est_name)
+
+    if op.isfile(estimates_combi): # if combined estimates exists
+
+        print('loading %s'%estimates_combi)
+        estimates = np.load(estimates_combi) # load it
+
+    else: # if not join chunks and save file
+        if not op.exists(estimates_pth):
+            os.makedirs(estimates_pth) 
+
+        estimates = join_chunks(fits_pth, estimates_combi, fit_hrf = params['mri']['fitting']['pRF']['fit_hrf'],
+                                chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
+    
+    return estimates

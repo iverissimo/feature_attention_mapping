@@ -83,27 +83,9 @@ figures_pth = op.join(derivatives_dir,'plots','polar_angle','{task}_fit'.format(
 if not os.path.exists(figures_pth):
     os.makedirs(figures_pth)
 
-
-## Load pRF estimates 
-
-est_name = [x for _,x in enumerate(os.listdir(fits_pth)) if 'chunk-001' in x][0]
-est_name = est_name.replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
-
-# total path to estimates path
-estimates_combi = op.join(fits_pth,'combined', est_name)
-
-if op.isfile(estimates_combi): # if combined estimates exists
-
-        print('loading %s'%estimates_combi)
-        estimates = np.load(estimates_combi) # load it
-
-else: # if not join chunks and save file
-    if not op.exists(op.join(fits_pth,'combined')):
-        os.makedirs(op.join(fits_pth,'combined')) 
-
-    # combine estimate chunks
-    estimates = mri_utils.join_chunks(fits_pth, estimates_combi, fit_hrf = fit_hrf,
-                            chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) 
+## Load pRF estimates
+estimates = mri_utils.load_pRF_estimates(fits_pth, params, 
+                                                 total_chunks = total_chunks, model_type = model_type) 
 
 # define design matrix 
 visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 

@@ -60,6 +60,17 @@ fit_hrf = params['mri']['fitting']['pRF']['fit_hrf']
 # set estimate key names
 estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][model_type]
 
+# if we're shifting TRs, to account for dummy scans or slicetime correction
+shift_TRs = params['mri']['fitting']['pRF']['shift_DM'] 
+shift_TR_num =  params['mri']['fitting']['pRF']['shift_DM_TRs']
+if isinstance(shift_TR_num, int):
+    osf = 1
+    resample_pred = False
+else:
+    print('shift implies upsampling DM')
+    osf = 10
+    resample_pred = True
+
 # set paths
 derivatives_dir = params['mri']['paths'][base_dir]['derivatives']
 postfmriprep_dir = op.join(derivatives_dir,'post_fmriprep','sub-{sj}'.format(sj=sj),space,'processed')
@@ -105,7 +116,7 @@ else: # if not join chunks and save file
 visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
                                 save_imgs = False, res_scaling = 0.1, TR = params['mri']['TR'],
                                 crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
-                                shift_TRs = True, shift_TR_num = 1, oversampling_time = 10,
+                                shift_TRs = shift_TRs, shift_TR_num = shift_TR_num, oversampling_time = osf,
                                 overwrite = False, mask = [], event_onsets = [])
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
@@ -136,7 +147,10 @@ ecc = np.abs(complex_location)
 # size estimates are different across models (due to non linearities)
 # eg non-linearity interacts with the Gaussian standard deviation to make an effective pRF size of σ/sqr(n)
 # best way is to compute the fwhm as a way to make size comparable across models 
-size_fwhmax = mri_utils.fwhmax_fwatmin(model_type, masked_est)
+if model_type in ['dn', 'dog']:
+    size_fwhmax, fwatmin = mri_utils.fwhmax_fwatmin(model_type, masked_est)
+else: 
+    size_fwhmax = mri_utils.fwhmax_fwatmin(model_type, masked_est)
 
 # get pycortex sub
 pysub = params['plotting']['pycortex_sub']+'_sub-{sj}'.format(sj=sj) # because subject specific borders 

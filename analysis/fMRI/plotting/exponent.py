@@ -53,6 +53,16 @@ model_type = 'css'
 
 # if we fitted hrf
 fit_hrf = params['mri']['fitting']['pRF']['fit_hrf']
+# if we're shifting TRs, to account for dummy scans or slicetime correction
+shift_TRs = params['mri']['fitting']['pRF']['shift_DM'] 
+shift_TR_num =  params['mri']['fitting']['pRF']['shift_DM_TRs']
+if isinstance(shift_TR_num, int):
+    osf = 1
+    resample_pred = False
+else:
+    print('shift implies upsampling DM')
+    osf = 10
+    resample_pred = True
 
 # set estimate key names
 estimate_keys = params['mri']['fitting']['pRF']['estimate_keys'][model_type]
@@ -102,7 +112,8 @@ else: # if not join chunks and save file
 visual_dm = mri_utils.make_pRF_DM(op.join(derivatives_dir,'pRF_fit', 'sub-{sj}'.format(sj=sj), 'DMprf.npy'), params, 
                                 save_imgs = False, res_scaling = 0.1, TR = params['mri']['TR'],
                                 crop = params['prf']['crop'] , crop_TR = params['prf']['crop_TR'], 
-                                shift_TRs = True, shift_TR_num = 1, oversampling_time = 10,
+                                shift_TRs = shift_TRs, shift_TR_num = shift_TR_num, 
+                                oversampling_time = osf,
                                 overwrite = False, mask = [], event_onsets = [])
 
 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions

@@ -3031,7 +3031,7 @@ def fwhmax_fwatmin(model, estimates, normalize_RFs=False, return_profiles=False)
     prf = estimates['betas'] * np.exp(-0.5*x[...,np.newaxis]**2 / estimates['size']**2)
     vol_prf =  2*np.pi*estimates['size']**2
 
-    if 'dog' in model or 'norm' in model:
+    if 'dog' in model or 'dn' in model:
         srf = estimates['sa'] * np.exp(-0.5*x[...,np.newaxis]**2 / estimates['ss']**2)
         vol_srf = 2*np.pi*estimates['ss']*2
 
@@ -3045,7 +3045,7 @@ def fwhmax_fwatmin(model, estimates, normalize_RFs=False, return_profiles=False)
         elif model =='dog':
             profile = prf / vol_prf - \
                        srf / vol_srf
-        elif 'norm' in model:
+        elif 'dn' in model:
             profile = (prf / vol_prf + estimates['nb']) /\
                       (srf / vol_srf + estimates['sb']) - estimates['nb']/estimates['sb']
     else:
@@ -3056,7 +3056,7 @@ def fwhmax_fwatmin(model, estimates, normalize_RFs=False, return_profiles=False)
             profile = prf**estimates['ns'] * estimates['betas']**(1 - estimates['ns'])
         elif model =='dog':
             profile = prf - srf
-        elif 'norm' in model:
+        elif 'dn' in model:
             profile = (prf + estimates['nb'])/(srf + estimates['sb']) - estimates['nb']/estimates['sb']
 
 
@@ -3064,7 +3064,7 @@ def fwhmax_fwatmin(model, estimates, normalize_RFs=False, return_profiles=False)
     fwhmax = np.abs(2*x[np.argmin(np.abs(profile-half_max), axis=0)])
 
 
-    if 'dog' in model or 'norm' in model:
+    if 'dog' in model or 'dn' in model:
 
         min_profile = np.min(profile, axis=0)
         fwatmin = np.abs(2*x[np.argmin(np.abs(profile-min_profile), axis=0)])

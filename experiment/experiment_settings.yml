@@ -177,6 +177,8 @@ eyetracker:
     active_eye: left  # [right]
     calibration_type: HV9  # [H3, HV3, HV5, HV9]
     sample_rate: 1000
+    calibration_area_proportion: 0.4 0.4
+    validation_area_proportion: 0.4 0.4
 
 mri: # refers to the Psychopy SyncGenerator class
   scanner: False #True

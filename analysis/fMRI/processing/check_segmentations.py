@@ -37,10 +37,10 @@ if check_type == 'view':
     export SUBJECTS_DIR=$DATADIR
 
     cd $DATADIR
-    # sub-$SJ_NR/mri/T2.mgz \
 
     freeview -v \
         sub-$SJ_NR/mri/T1.mgz \
+        sub-$SJ_NR/mri/T2.mgz \
         sub-$SJ_NR/mri/wm.mgz \
         sub-$SJ_NR/mri/brainmask.mgz \
         sub-$SJ_NR/mri/aseg.mgz:colormap=lut:opacity=0.2 \

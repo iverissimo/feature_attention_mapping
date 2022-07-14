@@ -92,6 +92,8 @@ else:
     
 # if we are keeping baseline fixed at 0
 fix_bold_baseline = params['mri']['fitting']['pRF']['fix_bold_baseline']
+fixed_grid_baseline = 0 if fix_bold_baseline else None
+
 # if we want to do bold baseline correction
 correct_baseline = params['mri']['fitting']['pRF']['correct_baseline'] 
 
@@ -141,10 +143,14 @@ prf_stim = PRFStimulus2D(screen_size_cm = params['monitor']['height'],
                          design_matrix = visual_dm,
                          TR = TR)
 
+## shift hrf onset to account for slicetime correction
+hrf_onset = -TR/2 if params['mri']['slicetimecorrection'] else 0
+
 # define gaussian model 
 gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
                                  resample_pred = resample_pred,
                                  osf = osf,
+                                 hrf_onset = hrf_onset,
                                  filter_predictions = True,
                                  filter_type = params['mri']['filtering']['type'],
                                  filter_params = {'highpass': params['mri']['filtering']['highpass'],
@@ -177,13 +183,19 @@ gauss_bounds = [(-1.5*ss, 1.5*ss),  # x
 # grid exponent parameter
 css_n_grid = np.linspace(params['mri']['fitting']['pRF']['min_n'], 
                                         params['mri']['fitting']['pRF']['max_n'], 
-                                        params['mri']['fitting']['pRF']['n_nr'], dtype='float64')
+                                        params['mri']['fitting']['pRF']['n_nr'], dtype='float32')
 #css_n_grid = np.array([.25, .5, .75, 1])
+
+## set grid bounds
+gauss_grid_bounds = [(0,1000)] #only prf amplitudes between 0 and 1000
+css_grid_bounds = [(0,1000)] #only prf amplitudes between 0 and 1000
+
 
 # define CSS model 
 css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
                                  resample_pred = resample_pred,
                                  osf = osf,
+                                 hrf_onset = hrf_onset,
                                  filter_predictions = True,
                                  filter_type = params['mri']['filtering']['type'],
                                  filter_params = {'highpass': params['mri']['filtering']['highpass'],
@@ -206,6 +218,7 @@ css_bounds = [(-1.5*ss, 1.5*ss),  # x
 dn_model =  Norm_Iso2DGaussianModel(stimulus = prf_stim,
                                     resample_pred = resample_pred,
                                     osf = osf,
+                                    hrf_onset = hrf_onset,
                                     filter_predictions = True,
                                     filter_type = params['mri']['filtering']['type'],
                                     filter_params = {'highpass': params['mri']['filtering']['highpass'],
@@ -261,7 +274,8 @@ if fit_now:
     gauss_fitter.grid_fit(ecc_grid = eccs, 
                           polar_grid = polars, 
                           size_grid = sizes, 
-                          pos_prfs_only = True)
+                          fixed_grid_baseline = fixed_grid_baseline,
+                          grid_bounds = gauss_grid_bounds)
 
 
     estimates_grid = gauss_fitter.gridsearch_params[0]
@@ -300,8 +314,9 @@ if fit_now:
                                             previous_gaussian_fitter = gauss_fitter)
 
         css_fitter.grid_fit(exponent_grid = css_n_grid,
-                            rsq_threshold = 0.05, 
-                            pos_prfs_only = True)
+                            fixed_grid_baseline = fixed_grid_baseline,
+                            grid_bounds = css_grid_bounds,
+                            rsq_threshold = 0.05)
         
         estimates_css_grid = css_fitter.gridsearch_params[0]
         
@@ -494,7 +509,7 @@ else:
             hrf_disp = estimates['hrf_dispersion'][vertex]
 
 if fit_hrf:
-    hrf = mri_utils.create_hrf(hrf_params=[1.0,hrf_deriv,hrf_disp],TR=TR, osf=osf)
+    hrf = mri_utils.create_hrf(hrf_params=[1.0,hrf_deriv,hrf_disp],TR=TR, osf=osf, onset=hrf_onset)
     gauss_model.hrf = hrf
     css_model.hrf = hrf
     dn_model.hrf = hrf
@@ -587,8 +602,8 @@ fig.savefig(op.join(figures_pth,fig_name))
 if fit_hrf:
     fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
 
-    axis.plot(mri_utils.create_hrf(TR=TR)[0],'grey',label='spm hrf')
-    axis.plot(mri_utils.create_hrf(hrf_params=[1.0,hrf_deriv,hrf_disp],TR=TR)[0],'red',label='fitted hrf')
+    axis.plot(mri_utils.create_hrf(TR = TR, onset = hrf_onset)[0],'grey',label='spm hrf')
+    axis.plot(mri_utils.create_hrf(hrf_params = [1.0,hrf_deriv,hrf_disp], TR = TR, onset = hrf_onset)[0],'red',label='fitted hrf')
     axis.set_xlim(0, 25)
     axis.legend(loc='upper right',fontsize=10) 
     axis.set_xlabel('Time (s)',fontsize=10, labelpad=10)

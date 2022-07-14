@@ -119,6 +119,8 @@ mri: # refers to the Psychopy SyncGenerator class
 
   save_subcortical: True # saving subcortical surface date
 
+  slicetimecorrection: True
+
   confounds:
     file_ext: '_desc-confounds_timeseries.tsv' # file extension for confounds
     regs: ['a_comp_cor','cosine','framewise_displacement']
@@ -165,13 +167,13 @@ mri: # refers to the Psychopy SyncGenerator class
                       'css': ['x','y','size','betas','baseline','ns', 'r2'],
                       'dn': ['x','y','size','betas','baseline', 'sa', 'ss', 'nb', 'sb', 'r2']} # to keep track of variables throughout scripts
 
-      fit_hrf: True
+      fit_hrf: False #True
       fix_bold_baseline: True
       correct_baseline: True
       num_baseline_TRs: 8
 
       shift_DM: True # True
-      shift_DM_TRs: 1 #.5
+      shift_DM_TRs: 1 # accounts for dynamic trigger sent on last dummy
 
       grid_nr: 40 # number of grid steps
       min_eccen: 0.2

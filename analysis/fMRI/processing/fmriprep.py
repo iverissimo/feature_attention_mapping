@@ -29,7 +29,7 @@ else:
     base_dir = str(sys.argv[3]) # which machine we run the data
 
 # path to singularity image
-sing_img = '/home/inesv/my_images/fmriprep.21.0.1.simg' #fmriprep.20.2.3.simg'
+sing_img = '/home/inesv/my_images/fmriprep.21.0.2.simg' #fmriprep.20.2.3.simg'
 
 # make fmriprep folder if it does not exist
 fmriprep_folder = op.join(params['mri']['paths'][base_dir]['root'],'derivatives','fmriprep')

@@ -1845,7 +1845,7 @@ def leave_one_out(input_list):
     return out_lists
 
 
-def create_hrf(hrf_params=[1.0, 1.0, 0.0], TR = 1.6, osf = 1):
+def create_hrf(hrf_params=[1.0, 1.0, 0.0], TR = 1.6, osf = 1, onset = 0):
     """
     construct single or multiple HRFs 
     [taken from prfpy - all credits go to Marco]
@@ -1866,16 +1866,19 @@ def create_hrf(hrf_params=[1.0, 1.0, 0.0], TR = 1.6, osf = 1):
             spm_hrf(
                 tr = TR,
                 oversampling = osf,
+                onset=onset,
                 time_length = 40)[...,np.newaxis],
             hrf_params[1] *
             spm_time_derivative(
                 tr = TR,
                 oversampling = osf,
+                onset=onset,
                 time_length = 40)[...,np.newaxis],
             hrf_params[2] *
             spm_dispersion_derivative(
                 tr = TR,
                 oversampling = osf,
+                onset=onset,
                 time_length = 40)[...,np.newaxis]]).sum(
         axis=0)                    
 

@@ -2,6 +2,7 @@
 
 import os, sys
 import os.path as op
+import numpy as np
 import glob
 from shutil import copy2
 
@@ -42,9 +43,19 @@ for file in orig_nii_files:
     # copy the original to the new folder
     copy2(file, op.join(new_folder, op.split(file)[-1]))
 
-    # and crop the one in sourcedata
+    # for convenience, reorient all files to RAS+ (used by nibabel & fMRIprep) 
     orig_img = nb.load(file)
+    orig_img_hdr = orig_img.header
+
+    qform = orig_img_hdr['qform_code'] # set qform code to original
 
     canonical_img = nb.as_closest_canonical(orig_img)
 
+    if qform != 0:
+        canonical_img.header['qform_code'] = np.array([qform], dtype=np.int16)
+    else:
+        # set to 1 if original qform code = 0
+        canonical_img.header['qform_code'] = np.array([1], dtype=np.int16)
+
     nb.save(canonical_img, file)
+

@@ -114,6 +114,9 @@ class MRIData(FAMData):
         
         # path to freesurfer
         self.freesurfer_pth = op.join(self.derivatives_pth, 'freesurfer')
+        
+        # path to fmriprep
+        self.fmriprep_pth = op.join(self.derivatives_pth, 'fmriprep')
 
         # path to repo install (needed to run mat files)
         self.repo_pth = repo_pth
@@ -465,3 +468,111 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             os.system('sbatch ' + js_name)
 
             
+    def call_fmriprep(self, data_type='anat', wf_dir = '/scratch/FAM_wf', batch_dir ='/home/inesv/batch',
+                     partition_name = None, node_name = None):
+        
+        """
+        Run FMRIPREP on anat or functional data
+        
+        NOTE - needs to be run in slurm system!!
+        
+        Parameters
+        ----------
+        data_type : str
+            if we want to run it on 'anat' or 'func'
+        """ 
+        
+        if self.base_dir == 'local':
+            raise NameError('Dont run freesurfer locally - only implemented in slurm systems')
+        
+        # loop over participants
+        for pp in self.sj_num:
+            
+            fmriprep_cmd = """#!/bin/bash
+#SBATCH -t 40:00:00
+#SBATCH -N 1 --mem=90G
+#SBATCH -v
+#SBATCH --output=$BD/slurm_FMRIPREP_%A.out\n"""
+            
+            if partition_name is not None:
+                fmriprep_cmd += '#SBATCH --partition {p}\n'.format(p=partition_name)
+            if node_name is not None:
+                fmriprep_cmd += '#SBATCH -w {n}\n'.format(n=node_name)
+            
+            # make fmriprep folder if it does not exist
+            if not op.exists(self.fmriprep_pth):
+                os.makedirs(self.fmriprep_pth)
+                
+            if data_type == 'anat':
+                fmriprep_cmd +="""\n# call the programs
+echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
+
+# make working directory in node
+mkdir $WF_DIR
+
+wait
+
+PYTHONPATH="" singularity run --cleanenv -B /project/projects_verissimo -B $WF_DIR \
+$SINGIMG \
+$ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/fmriprep/ participant \
+--participant-label sub-$SJ_NR --fs-subjects-dir $ROOTFOLDER/derivatives/freesurfer/ \
+--output-space T1w \
+--nthread 16 --mem_mb 5000 --low-mem --fs-license-file $FREESURFER/license.txt \
+--anat-only \
+-w $WF_DIR
+
+wait          # wait until programs are finished
+
+echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
+"""
+                
+            else:
+                
+                fmriprep_cmd +="""# call the programs
+echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
+
+# make working directory in node
+mkdir $WF_DIR
+
+wait
+
+PYTHONPATH="" singularity run --cleanenv -B /project/projects_verissimo -B $WF_DIR \
+$SINGIMG \
+$ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/fmriprep/ participant \
+--participant-label sub-$SJ_NR --fs-subjects-dir $ROOTFOLDER/derivatives/freesurfer/ \
+--output-space T1w fsnative fsaverage MNI152NLin2009cAsym --cifti-output 170k \
+--bold2t1w-init register --nthread 16 --mem_mb 5000 --low-mem --fs-license-file $FREESURFER/license.txt \
+--use-syn-sdc --force-syn --bold2t1w-dof 6 --stop-on-first-crash --verbose --skip_bids_validation --dummy-scans 5 \
+-w $WF_DIR
+
+wait          # wait until programs are finished
+
+echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
+"""
+
+            
+            #os.chdir(batch_dir)
+            batch_string = fmriprep_cmd
+
+            keys2replace = {'$SJ_NR': 'sub-{sj}'.format(sj=pp),
+                            '$SINGIMG': self.params['mri']['paths'][self.base_dir]['singularity'],
+                            '$ROOTFOLDER': op.split(self.sourcedata_pth)[0],
+                            '$WF_DIR': wf_dir,
+                            '$BD': batch_dir
+                             }
+
+            # replace all key-value pairs in batch string
+            for key, value in keys2replace.items():
+                batch_string = batch_string.replace(key, value)
+                
+            print(batch_string)
+            
+            # run it
+            js_name = op.join(batch_dir, 'FMRIPREP_sub-{sj}_FAM_{data}.sh'.format(sj=pp, data=data_type))
+            of = open(js_name, 'w')
+            of.write(batch_string)
+            of.close()
+
+            print('submitting ' + js_name + ' to queue')
+            print(batch_string)
+            os.system('sbatch ' + js_name)

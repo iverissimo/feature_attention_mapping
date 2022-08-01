@@ -151,6 +151,7 @@ mri: # refers to the Psychopy SyncGenerator class
       matlab: ''
       derivatives: '/scratch/derivatives'
       sourcedata: '/scratch/sourcedata'
+      singularity: '/home/inesv/my_images/fmriprep.21.0.2.simg'
 
     aeneas:
       root: '/home/shared/2021/visual/FAM/PILOT_DATA'

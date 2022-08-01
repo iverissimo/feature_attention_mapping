@@ -111,6 +111,9 @@ class MRIData(FAMData):
 
         # path to NORDIC files
         self.nordic_pth = op.join(self.proj_root_pth, 'NORDIC')
+        
+        # path to freesurfer
+        self.freesurfer_pth = op.join(self.derivatives_pth, 'freesurfer')
 
         # path to repo install (needed to run mat files)
         self.repo_pth = repo_pth
@@ -241,6 +244,11 @@ class MRIData(FAMData):
         
         """
         Check if we ran preprocessing for anatomical data
+        
+        Parameters
+        ----------
+        T2file : bool
+            if participant has T2w file (or if we want to check for it anyway)
         """ 
         
         # loop over participants
@@ -249,7 +257,7 @@ class MRIData(FAMData):
             # path for sourcedata anat files of that participant
             anat_pth = glob.glob(op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=pp), 'ses-*', 'anat'))[0]
             
-            # if we collected T2w files for participant
+            ##### if we collected T2w files for participant #######
             if T2file:
                 
                 # check for T2w files in sourcedata
@@ -268,3 +276,192 @@ class MRIData(FAMData):
                             # run BFC
                             print('Running BFC for participant {pp}'.format(pp = pp))
                             self.BiasFieldCorrec(participant=pp)
+                    
+                    print('Participant T2w files already processed')
+                    
+                    
+            ##### check if masked T1w file in anat folder #####
+            masked_T1_files = [op.join(anat_pth, val) for val in os.listdir(anat_pth) if val.endswith('_desc-masked_T1w.nii.gz')]
+            
+            if len(masked_T1_files) == 0:
+                print('No  masked T1w files in {folder}!'.format(folder=anat_pth))
+                
+                # check if files in anat_preprocessing folder and we forgot to copy
+                masked_T1_pth = op.join(self.anat_preproc_pth, 'derivatives', 'masked_mp2rage', 
+                                       'sub-{sj}'.format(sj=pp), 'ses-1', 'anat')
+                
+                if not op.exists(masked_T1_pth):
+                    os.makedirs(masked_T1_pth)
+                print('saving files in %s'%masked_T1_pth)
+                
+                masked_T1_files = [op.join(masked_T1_pth, val) for val in os.listdir(masked_T1_pth) if val.endswith('_desc-masked_T1w.nii.gz')]
+                
+                # if they exist, copy them
+                if len(masked_T1_files) > 0:
+                    for f in masked_T1_files:
+                        os.system('cp {mask_file} {sourcedata_file}'.format(mask_file = f,
+                                                                           sourcedata_file = op.join(anat_pth, op.split(f)[-1])))
+                
+                # if not, then ask user to run linescanning pipeline in new terminal       
+                else:
+                    print('Linescanning anatomical processing pipeline not run!! open new terminal and do following:')
+                    pipeline_txt = """\nconda activate fam_anat\nbash\nsource linescanning/shell/spinoza_setup\n
+                    
+                    master -s {sub} -m 04
+                    master -s {sub} -m 05b
+                    master -s {sub} -m 07
+                    master -s {sub} -m 08
+                    master -s {sub} -m 09
+                    master -s {sub} -m 11
+                    master -s {sub} -m 12
+                    master -s {sub} -m 13
+                    
+                    """
+                    print(pipeline_txt.format(sub=pp))
+                    
+            else:
+                print('Participant T1w files already processed')
+                
+                
+                
+    def call_freesurfer(self, cmd='all', wf_dir = '/scratch/FAM_wf', batch_dir ='/home/inesv/batch'):
+        
+        """
+        Run FREESURFER 7.2 on T1w and T2w (if available)
+        (to be done before fmriprep call)
+        
+        NOTE - needs to be run in slurm system!!
+        
+        Parameters
+        ----------
+        cmd : str
+            freesurfer command ('all', 'pial', 't2')
+        """ 
+        
+        if self.base_dir == 'local':
+            raise NameError('Dont run freesurfer locally - only implemented in slurm systems')
+        
+        # loop over participants
+        for pp in self.sj_num:
+            
+            ## freesurfer command ##
+            freesurfer_cmd = 'recon-all -s {sj} -hires '.format(sj=pp)
+            
+            # path to store freesurfer outputs, in derivatives
+            out_dir = op.join(self.freesurfer_pth, 'sub-{sj}'.format(sj=pp))
+            print('saving files in %s'%out_dir)
+
+            if not op.exists(out_dir):
+                os.makedirs(out_dir)
+            elif len(os.listdir(out_dir)) > 0 and freesurfer_cmd == 'all':
+                overwrite = ''
+                while overwrite not in ('y','yes','n','no'):
+                    overwrite = input('dir already has files, continue with recon-all\n(y/yes/n/no)?: ')
+                if overwrite in ['no','n']:
+                    raise NameError('directory already has files\nstopping analysis!')
+                    
+            # path for sourcedata anat files of that participant
+            anat_pth = glob.glob(op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=pp), 'ses-*', 'anat'))[0]
+            
+            # T1 and T2 filenames
+            t1_filename = [op.join(anat_pth,run) for run in os.listdir(anat_pth) if run.endswith('masked_T1w.nii.gz')]
+            t2_filename = [op.join(anat_pth,run) for run in os.listdir(anat_pth) if run.endswith('_T2w.nii.gz')]
+
+            
+            if (len(t1_filename) == 0) and (len(t2_filename) == 0):
+                raise NameError('No source files present!! Check whats up')
+            
+            ### EDIT COMMAND STRING ####
+            
+            if cmd == 'pial':
+                print("running pial fixes")
+                freesurfer_cmd += '-autorecon-pial '
+                
+            elif cmd == 't2':
+                print("running pial fixes taking into account T2 or FLAIR images")
+                freesurfer_cmd += '-T2 {T2_file} -T2pial -autorecon3 '.format(T2_file = t2_filename[0].replace(anat_pth, op.join(wf_dir, 'anat')))
+            
+            elif cmd == 'all':
+                print("running full pipeline (recon all)")
+                
+                # loop over t1 if we have several, will be averaged
+                for t1 in t1_filename:
+                    freesurfer_cmd += '-i {T1_file} '.format(T1_file = t1.replace(anat_pth, op.join(wf_dir, 'anat')))
+                # add t2, if exists
+                if len(t2_filename) > 0:
+                    freesurfer_cmd += '-T2 {T2_file} -T2pial '.format(T2_file = t2_filename[0].replace(anat_pth, op.join(wf_dir, 'anat')))
+            
+                freesurfer_cmd += '-all '
+            
+            
+            # set batch string
+            batch_string = """#!/bin/bash
+#SBATCH -t 96:00:00
+#SBATCH -N 1 --mem=65536
+#SBATCH --cpus-per-task=16
+#SBATCH -v
+#SBATCH --output=$BD/slurm_FREESURFER_%A.out
+
+# call the programs
+echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
+
+conda activate i38
+
+# make working directory in node
+mkdir $WF_DIR
+cp -r $ANATDIR $WF_DIR
+
+wait
+cp -r $OUTDIR/$SJ_NR $WF_DIR
+
+wait
+export SUBJECTS_DIR=$WF_DIR
+
+wait
+cd $SUBJECTS_DIR
+
+wait
+if [ "$CMD" == all ]; then
+    # remove sub folder (empty anyway) to avoid freesurfer complaints
+    rm -r $WF_DIR/$SJ_NR 
+fi
+
+wait
+$FS_CMD
+
+wait
+rsync -chavzP $WF_DIR/$SJ_NR/ $OUTDIR/$SJ_NR
+
+wait          # wait until programs are finished
+
+echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
+"""
+         
+            #os.chdir(batch_dir)
+
+            keys2replace = {'$SJ_NR': 'sub-{sj}'.format(sj=pp),
+                            '$ANATDIR': anat_pth,
+                            '$OUTDIR': op.split(out_dir)[0], 
+                            '$FS_CMD': freesurfer_cmd,
+                            '$CMD': cmd,
+                            '$WF_DIR': wf_dir,
+                            '$BD': batch_dir
+                             }
+
+            # replace all key-value pairs in batch string
+            for key, value in keys2replace.items():
+                batch_string = batch_string.replace(key, value)
+
+            print(batch_string)
+            
+            # run it
+            js_name = op.join(batch_dir, 'FREESURFER7_sub-{sj}_FAM_prefmriprep.sh'.format(sj=pp))
+            of = open(js_name, 'w')
+            of.write(batch_string)
+            of.close()
+
+            print('submitting ' + js_name + ' to queue')
+            print(batch_string)
+            os.system('sbatch ' + js_name)
+
+            

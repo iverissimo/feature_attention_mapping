@@ -126,6 +126,9 @@ mri: # refers to the Psychopy SyncGenerator class
     regs: ['a_comp_cor','cosine','framewise_displacement']
     CumulativeVarianceExplained: 0.4 # percentage of cumulative variance explained of components, to choose number of a_comp_cor
 
+  preproc:
+    BFC_T2: True
+  
   filtering:
     type: 'dc' #'HPgauss' # None
     cut_off_hz: 0.01 #0.014

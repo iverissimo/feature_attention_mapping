@@ -15,7 +15,7 @@ class FAMData:
     Class that loads relevant paths and settings for FAM data
     """
     
-    def __init__(self, params, sj_num, exclude_sj = []):
+    def __init__(self, params, sj_num, exclude_sj = [], base_dir = None):
         
         """__init__
         constructor for class, takes experiment params and subject num as input
@@ -46,16 +46,19 @@ class FAMData:
             
         ## set some paths
         # which machine we run the data
-        self.base_dir = self.params['general']['current_dir'] 
+        if base_dir is None:
+            self.base_dir = self.params['general']['current_dir'] 
+        else:
+            self.base_dir = base_dir
         
         # project root folder
         self.proj_root_pth = self.params['mri']['paths'][self.base_dir]['root']
         
         # sourcedata dir
-        self.sourcedata_pth = self.params['mri']['paths'][self.base_dir]['sourcedata']
+        self.sourcedata_pth = op.join(self.proj_root_pth,'sourcedata')
         
         # derivatives dir
-        self.derivatives_pth = self.params['mri']['paths'][self.base_dir]['derivatives']
+        self.derivatives_pth = op.join(self.proj_root_pth,'derivatives')
         
         ## set sj number
         if sj_num in ['group', 'all']: # if we want all participants in sourcedata folder
@@ -82,7 +85,7 @@ class MRIData(FAMData):
     Class that loads relevant paths and settings for (f)MRI data
     """
     
-    def __init__(self, params, sj_num, exclude_sj = [], repo_pth = ''):  # initialize child class
+    def __init__(self, params, sj_num, exclude_sj = [], repo_pth = '', base_dir = None):  # initialize child class
 
         """ Initializes MRIData object. 
 
@@ -99,7 +102,7 @@ class MRIData(FAMData):
         """
 
         # need to initialize parent class (BehTask), indicating output infos
-        super().__init__(params = params, sj_num = sj_num, exclude_sj = exclude_sj)
+        super().__init__(params = params, sj_num = sj_num, exclude_sj = exclude_sj, base_dir=base_dir)
 
         ## some paths
         # anat preprocessing path, 
@@ -500,8 +503,8 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                 fmriprep_cmd += '#SBATCH -w {n}\n'.format(n=node_name)
             
             # make fmriprep folder if it does not exist
-            if not op.exists(self.fmriprep_pth):
-                os.makedirs(self.fmriprep_pth)
+            #if not op.exists(self.fmriprep_pth):
+            #    os.makedirs(self.fmriprep_pth)
                 
             if data_type == 'anat':
                 fmriprep_cmd +="""\n# call the programs
@@ -515,7 +518,7 @@ wait
 PYTHONPATH="" singularity run --cleanenv -B /project/projects_verissimo -B $WF_DIR \
 $SINGIMG \
 $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/fmriprep/ participant \
---participant-label sub-$SJ_NR --fs-subjects-dir $ROOTFOLDER/derivatives/freesurfer/ \
+--participant-label $SJ_NR --fs-subjects-dir $ROOTFOLDER/derivatives/freesurfer/ \
 --output-space T1w \
 --nthread 16 --mem_mb 5000 --low-mem --fs-license-file $FREESURFER/license.txt \
 --anat-only \
@@ -539,7 +542,7 @@ wait
 PYTHONPATH="" singularity run --cleanenv -B /project/projects_verissimo -B $WF_DIR \
 $SINGIMG \
 $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/fmriprep/ participant \
---participant-label sub-$SJ_NR --fs-subjects-dir $ROOTFOLDER/derivatives/freesurfer/ \
+--participant-label $SJ_NR --fs-subjects-dir $ROOTFOLDER/derivatives/freesurfer/ \
 --output-space T1w fsnative fsaverage MNI152NLin2009cAsym --cifti-output 170k \
 --bold2t1w-init register --nthread 16 --mem_mb 5000 --low-mem --fs-license-file $FREESURFER/license.txt \
 --use-syn-sdc --force-syn --bold2t1w-dof 6 --stop-on-first-crash --verbose --skip_bids_validation --dummy-scans 5 \

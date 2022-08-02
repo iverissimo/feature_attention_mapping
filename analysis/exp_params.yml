@@ -112,6 +112,8 @@ mri: # refers to the Psychopy SyncGenerator class
   TR: 1.6  # seconds between volume acquisitions
   sync: 't'  # character used as flag for sync timing
 
+  dummy_TR: 5
+
   space: 'fsLR_den-170k' #'fsaverage' # space of the files to be used in analysis
   file_ext:  {'fsLR_den-170k': '_bold.dtseries.nii', 
               'fsaverage': '_bold.func.gii'} # file extension

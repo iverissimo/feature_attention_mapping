@@ -6,6 +6,7 @@ import yaml
 import glob
 
 from shutil import copy2
+import subprocess
 
 from nilearn.plotting import plot_anat
 import matplotlib.pyplot as plt
@@ -759,4 +760,72 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
                 self.NORDIC(participant = pp, input_pth = sub_prenordic, output_pth = func_pth, calc_tsnr=True)
                 
                 ## check fmaps ##
+                # to see if we cropped initial dummy scans
+                print('Cropping fieldmaps for participant {pp}, session-{ses}'.format(pp = pp, ses = ses))
+                self.crop_fieldmaps(participant = pp, input_pth = fmap_pth, dummys = self.params['mri']['dummy_TR'])
+                
+
+
+    def crop_fieldmaps(self, participant, dummys = 5, input_pth = None, output_pth = None):
+
+        """
+        Crop fieldmaps to remove dummy TRs
+
+        Parameters
+        ----------
+        participant : str
+            participant number
+        dummys: int
+            number of dummy TRs used (and thus that we want to remove)
+        input_pth: str
+            path to look for files, if None then will get them from sourcedata/sub-X/ses-1/fmap folder
+        output_pth: str
+            path to save original files, if None then will save them in root/sub-X/orig_fmap folder
+
+        """
+
+        ## zero pad participant number, just in case
+        participant = str(participant).zfill(3)
+
+        ## set input path where fmaps are
+        if input_pth is None:
+            input_pth = op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=participant), 'ses-1', 'fmap')
+
+        # list of original niftis
+        orig_nii_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if val.endswith('_epi.nii.gz')]
+
+        ## set output path where we want to store original (uncropped) fmaps
+        if output_pth is None:
+            output_pth = op.join(self.proj_root_pth, 'orig_fmaps' , 'sub-{sj}'.format(sj=participant))
+
+        if not op.isdir(output_pth):
+            os.makedirs(output_pth)
+
+        # then for each file
+        for file in orig_nii_files:
+
+            # first check size of file, to see if it was already cropped
+            file_trs = subprocess.check_output('fslnvols {file}'.format(file=file), shell=True)
+            file_trs = int(file_trs.decode('ascii'))
+
+            if file_trs > dummys:
+
+                # copy the original to the new folder
+                ogfile = op.join(output_pth, op.split(file)[-1])
+
+                if op.exists(ogfile):
+                    print('already exists %s'%ogfile)
+                else:
+                    copy2(file, ogfile)
+                    print('file copied to %s'%ogfile)
+
+                # and crop the one in sourcedata
+                os.system('fslroi {old} {new} {tr_n} {tr_n2}'.format(old = file, new = file, 
+                                                                    tr_n = int(file_trs-dummys), 
+                                                                    tr_n2 = dummys))
+            else:
+                print('already cropped {file}, nr TRs is {nt}'.format(file=file, 
+                                                                    nt=file_trs))
+
+
 

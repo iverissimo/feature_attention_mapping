@@ -5,8 +5,13 @@ import pandas as pd
 import yaml
 import glob
 
+from shutil import copy2
+
 from nilearn.plotting import plot_anat
 import matplotlib.pyplot as plt
+import seaborn as sns
+
+from FAM.utils import mri as mri_utils
 
 
 class FAMData:
@@ -123,6 +128,10 @@ class MRIData(FAMData):
 
         # path to repo install (needed to run mat files)
         self.repo_pth = repo_pth
+
+        # path to matlab install
+        if self.base_dir == 'local':
+            self.matlab_pth = self.params['mri']['paths'][self.base_dir]['matlab']
         
         
     def BiasFieldCorrec(self, participant, file_type='T2w', input_pth = None):
@@ -140,9 +149,6 @@ class MRIData(FAMData):
             path to look for files, if None then will get them from sourcedata/.../anat folder
 
         """ 
-        
-        # matlab install location
-        self.matlab_pth = self.params['mri']['paths'][self.base_dir]['matlab']
         
         if input_pth is None:
             input_pth = glob.glob(op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=participant), 'ses-*', 'anat'))[0]
@@ -579,3 +585,178 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             print('submitting ' + js_name + ' to queue')
             #print(batch_string)
             os.system('sbatch ' + js_name)
+
+
+    def NORDIC(self, participant, input_pth = None, output_pth = None, calc_tsnr=False):
+        
+        """
+        Run NORDIC on functional files
+        matlab script from (https://github.com/SteenMoeller/NORDIC_Raw/blob/main/NIFTI_NORDIC.m),
+        all credits go to the developers
+
+        NOTE - requires phase (_bold_phase.nii.gz) and mag (_bold.nii.gz) data to be stored in input folder
+
+        Parameters
+        ----------
+        participant : str
+            participant number
+        input_pth: str
+            path to look for files, if None then will get them from NORDIC/pre_nordic/sub-X/ses-1/ folder
+
+        """ 
+        
+        ## zero pad participant number, just in case
+        participant = str(participant).zfill(3)
+
+        ## in case we want to calculate tSNR
+        sub_tsnr = {'pre_nordic': [], 'post_nordic': []}
+        
+        ## to save shell scripts created
+        batch_dir = op.join(self.proj_root_pth,'batch')
+        if not op.exists(batch_dir):
+            os.makedirs(batch_dir)
+        
+        ## set input path where standard files are stored
+        if input_pth is None:
+            input_pth = op.join(self.nordic_pth, 'pre_nordic', 'sub-{sj}'.format(sj=participant), 'ses-1')
+            
+        # if input path doesnt exist or is empty
+        if not op.exists(input_pth) or len(os.listdir(input_pth)) == 0:
+            raise NameError('No files found in {pth}'.format(pth=input_pth))
+                
+        ## output path to copy NORDIC files 
+        # (if not set, then will copy to sourcedata folder)
+        if output_pth is None:
+            output_pth = op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=participant), 'ses-1', 'func')
+            
+        # list original (uncorrected) mag files 
+        input_mag = [op.join(input_pth,run) for run in os.listdir(input_pth) if run.endswith('_bold.nii.gz') \
+            and 'acq-standard' in run and 'phase' not in run]
+        
+        # if mag files not in sourcedata, 
+        # copy them there (we still want to process the non-nordic data)
+        for file in input_mag:
+            outfile = op.join(output_pth, op.split(file)[-1])
+
+            if op.exists(outfile):
+                print('already exists %s'%outfile)
+            else:
+                copy2(file, outfile)
+                print('file copied to %s'%outfile)
+        
+        # make post_nordic folder (for intermediate files)
+        post_nordic = input_pth.replace('pre_nordic', 'post_nordic')
+        if not op.exists(post_nordic):
+            os.makedirs(post_nordic)
+            
+        print('saving files in %s'%post_nordic)
+        
+        # loop over files, make sure using correct phase
+        for mag_filename in input_mag:
+            
+            # phase filename
+            phase_filename = mag_filename.replace('_bold.nii.gz', '_bold_phase.nii.gz')
+            
+            #
+            nordic_nii = op.join(post_nordic, op.split(mag_filename)[-1].replace('acq-standard','acq-nordic'))
+            
+            # if file aready exists, skip
+            if op.exists(nordic_nii):
+                print('NORDIC ALREADY PERFORMED ON %s,\nSKIPPING'%nordic_nii)
+                
+            else:
+                batch_string = """#!/bin/bash
+                
+echo "applying nordic to $INMAG"
+cd $FILEPATH # go to the folder
+cp $REPO/NIFTI_NORDIC.m ./NIFTI_NORDIC.m # copy matlab script to here
+
+$MATLAB -nodesktop -nosplash -r "NIFTI_NORDIC('$INMAG', '$INPHASE', '$OUTFILE'); quit;" # execute the NORDIC script in matlab
+
+wait 
+pigz $OUTFILE.nii # compress file
+
+wait
+mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
+
+"""
+                keys2replace = {'$FILEPATH': self.nordic_pth,
+                            '$REPO': self.repo_pth,
+                            '$INMAG': mag_filename,
+                            '$INPHASE': phase_filename, 
+                            '$OUTFILE': op.split(nordic_nii)[-1].replace('.nii.gz',''),
+                            '$OUTPATH': nordic_nii,
+                            '$MATLAB': self.matlab_pth
+                            }
+                    
+                # replace all key-value pairs in batch string
+                for key, value in keys2replace.items():
+                    batch_string = batch_string.replace(key, value)
+                    
+                # run it
+                js_name = op.join(batch_dir, 'NORDIC-' + op.split(nordic_nii)[-1].replace('.nii.gz','.sh'))
+                of = open(js_name, 'w')
+                of.write(batch_string)
+                of.close()
+
+                print(batch_string)
+                os.system('sh ' + js_name) 
+                
+                # copy file to sourcedata
+                copy2(nordic_nii, op.join(output_pth, op.split(nordic_nii)[-1]))
+                print('file copied to %s'%op.join(output_pth, op.split(nordic_nii)[-1]))
+
+            if calc_tsnr:
+                # calculate tSNR before nordic
+                sub_tsnr['pre_nordic'].append(mri_utils.get_tsnr(mag_filename, return_mean = True))
+
+                # calculate tSNR after nordic
+                sub_tsnr['post_nordic'].append(mri_utils.get_tsnr(nordic_nii, return_mean = True))
+
+        # make plot of tSNR for comparison
+        if calc_tsnr:
+            # create a figure with multiple axes to plot each bar
+            fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(10, 8))
+
+            sns.barplot(data = pd.DataFrame(sub_tsnr['pre_nordic']), ax=ax1)
+            ax1.set_ylim(0,30)
+            ax1.set_xticks([])
+            ax1.set_ylabel('Mean tSNR', fontsize=20)
+            ax1.set_xlabel('pre-NORDIC', fontsize=20)
+
+            sns.barplot(data = pd.DataFrame(sub_tsnr['post_nordic']), ax=ax2)
+            ax2.set_ylim(0,30)
+            ax2.set_xticks([])
+            ax2.set_xlabel('post-NORDIC', fontsize=20)
+            # save the output figure with all the anatomical images
+            fig.savefig(op.join(op.split(nordic_nii)[0], 'mean_tSNR_NORDIC.png'))
+
+
+    def check_funcpreproc(self):
+            
+        """
+        Check if we ran preprocessing for functional data
+
+        """ 
+
+        # loop over participants
+        for pp in self.sj_num:
+            
+            # and over sessions (if more than one)
+            for ses in self.session['sub-{sj}'.format(sj=pp)]:
+
+                # path for sourcedata func files of that participant
+                func_pth = op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=pp), ses, 'func')
+                # path for sourcedata fmap files of that participant
+                fmap_pth = op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=pp), ses, 'fmap')
+                
+                ## Run NORDIC on func files ##
+                #set pre-NORDIC dir 
+                sub_prenordic = op.join(self.nordic_pth, 'pre_nordic', 'sub-{sj}'.format(sj=pp), ses)
+                
+                # actually run it
+                print('Running NORDIC for participant {pp}, session-{ses}'.format(pp = pp, ses = ses))
+                self.NORDIC(participant = pp, input_pth = sub_prenordic, output_pth = func_pth, calc_tsnr=True)
+                
+                ## check fmaps ##
+

@@ -89,31 +89,43 @@ def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=N
                              session = ses, dataset = dataset, acq = acq)
 
 
-def get_tsnr(data,affine,file_name):
+def get_tsnr(input_file, return_mean=True, affine=[], hdr=[], filename=None):
+    
     """
     Compute the tSNR of nifti file
     and generate the equivalent nifti SNR 3Ds. 
-    """ 
-
-    if not op.exists(file_name): 
-        print('making %s'%file_name)
     
-        mean_d = np.mean(data,axis=-1)
-        std_d = np.std(data,axis=-1)
-        
-        tsnr = mean_d/std_d
-        #tsnr[np.where(np.isinf(tsnr))] = np.nan
-        
-        tsnr_image = nib.nifti1.Nifti1Image(tsnr,affine)
-        
-        nib.save(tsnr_image,file_name)
+    """
 
+    if isinstance(input_file, np.ndarray): # if already data array, then just use it 
+        data = input_file
     else:
-        print('already exists, skipping %s'%file_name)
-        tsnr = nib.load(file_name)
-        tsnr = np.array(tsnr.dataobj)
+        if isinstance(input_file, nib.Nifti1Image): # load nifti image
+            img = input_file
+        elif isinstance(input_file, str):
+            img = nib.load(input_file)
     
-    return tsnr
+        data = img.get_fdata()
+        affine = img.affine
+        hdr = img.header
+
+    # calculate tSNR
+    mean_d = np.mean(data,axis=-1)
+    std_d = np.std(data,axis=-1)
+    
+    tsnr = mean_d/std_d
+    tsnr[np.where(np.isinf(tsnr))] = np.nan
+
+    mean_tsnr = np.nanmean(np.ravel(tsnr))
+
+    # if we want to save image, need to provide an output filename
+    if filename:
+        tsnr_image = nib.Nifti1Image(tsnr, affine=affine, header=hdr).to_filename(filename)
+
+    if return_mean:
+        return mean_tsnr
+    else:
+        return tsnr
 
 
 def correlate_vol(data1,data2,outfile):

@@ -65,3 +65,11 @@ elif step == 'freesurfer':
 elif step == 'fmriprep':
     
     preproc_data.call_fmriprep(data_type = data_type, node_name = node_name, partition_name = partition_name)
+
+elif step == 'nordic':
+
+    preproc_data.NORDIC(participant=sj)
+
+elif step == 'func_preproc':
+
+    preproc_data.check_funcpreproc()

@@ -577,5 +577,5 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             of.close()
 
             print('submitting ' + js_name + ' to queue')
-            print(batch_string)
+            #print(batch_string)
             os.system('sbatch ' + js_name)

@@ -52,7 +52,7 @@ print("Preprocessing {data} data for subject {sj}!".format(data=data_type, sj=sj
 preproc_data = load_exp_data.MRIData(params, sj, repo_pth = op.split(load_exp_data.__file__)[0], base_dir=system_dir)
 
 ## run specific steps
-print('Running {step} for '.format(step=step))
+print('Running {step}'.format(step=step))
 
 if step == 'anat_preproc':
     

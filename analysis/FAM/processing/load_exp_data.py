@@ -8,6 +8,8 @@ import glob
 from shutil import copy2
 import subprocess
 
+import nibabel as nib
+
 from nilearn.plotting import plot_anat
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -266,9 +268,25 @@ class MRIData(FAMData):
         
         # loop over participants
         for pp in self.sj_num:
-            
+
             # path for sourcedata anat files of that participant
             anat_pth = glob.glob(op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=pp), 'ses-*', 'anat'))[0]
+            
+
+            #### first check if anat files are in correct orientation, ######
+            # if not we need to reorient 
+            # to avoid running into issues with linescanning pipeline
+            anat_preproc_sub = glob.glob(op.join(self.anat_preproc_pth,'sub-{sj}'.format(sj=pp), 'ses-*', 'anat'))[0]
+            anat_preproc_files = [op.join(anat_preproc_sub,val) for val in os.listdir(anat_preproc_sub) if val.endswith('.nii.gz')]
+            
+            # check first file in list, should be representative of rest
+            ori_val = subprocess.check_output('fslval {file} qform_xorient'.format(file=anat_preproc_files[0]), shell=True)
+            ori_val = str(ori_val.decode('ascii').strip())
+
+            if ori_val != 'Left-to-Right':
+                print('anat file not RAS, reorienting')
+                self.reorient_nii_2RAS(participant=pp, input_pth = anat_preproc_sub)
+
             
             ##### if we collected T2w files for participant #######
             if T2file:
@@ -780,7 +798,7 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
         input_pth: str
             path to look for files, if None then will get them from sourcedata/sub-X/ses-1/fmap folder
         output_pth: str
-            path to save original files, if None then will save them in root/sub-X/orig_fmap folder
+            path to save original files, if None then will save them in root/orig_fmap/sub-X folder
 
         """
 
@@ -826,6 +844,70 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
             else:
                 print('already cropped {file}, nr TRs is {nt}'.format(file=file, 
                                                                     nt=file_trs))
+
+
+    def reorient_nii_2RAS(self, participant, input_pth = None, output_pth = None):
+
+        """
+        Reorient niftis to RAS
+        (useful for anat files after dcm2niix)
+
+        Parameters
+        ----------
+        participant : str
+            participant number
+        input_pth: str
+            path to look for files, if None then will get them from root/anat_preprocessing/sub-X/ses-1/anat folder
+        output_pth: str
+            path to save original files, if None then will save them in root/orig_anat/sub-X folder
+
+        """
+
+        ## zero pad participant number, just in case
+        participant = str(participant).zfill(3)
+
+        ## set input path where fmaps are
+        if input_pth is None:
+            input_pth = op.join(self.anat_preproc_pth, 'sub-{sj}'.format(sj=participant), 'ses-1', 'anat')
+
+        # list of original niftis
+        orig_nii_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if val.endswith('.nii.gz')]
+
+        ## set output path where we want to store original (uncropped) fmaps
+        if output_pth is None:
+            output_pth = op.join(self.proj_root_pth, 'orig_anat' , 'sub-{sj}'.format(sj=participant))
+
+        if not op.isdir(output_pth):
+            os.makedirs(output_pth)
+
+        # then for each file
+        for file in orig_nii_files:
+
+            # copy the original to the new folder
+            ogfile = op.join(output_pth, op.split(file)[-1])
+
+            if op.exists(ogfile):
+                print('already exists %s'%ogfile)
+            else:
+                copy2(file, ogfile)
+                print('file copied to %s'%ogfile)
+
+            # reorient all files to RAS+ (used by nibabel & fMRIprep) 
+            orig_img = nib.load(file)
+            orig_img_hdr = orig_img.header
+
+            qform = orig_img_hdr['qform_code'] # set qform code to original
+
+            canonical_img = nib.as_closest_canonical(orig_img)
+
+            if qform != 0:
+                canonical_img.header['qform_code'] = np.array([qform], dtype=np.int16)
+            else:
+                # set to 1 if original qform code = 0
+                canonical_img.header['qform_code'] = np.array([1], dtype=np.int16)
+
+            nib.save(canonical_img, file)
+
 
 
 

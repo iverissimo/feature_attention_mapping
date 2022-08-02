@@ -73,3 +73,7 @@ elif step == 'nordic':
 elif step == 'func_preproc':
 
     preproc_data.check_funcpreproc()
+
+elif step == 'mriqc':
+
+    preproc_data.call_mriqc(batch_dir = op.join(preproc_data.proj_root_pth, 'batch'))

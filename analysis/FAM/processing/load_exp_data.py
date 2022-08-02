@@ -367,6 +367,10 @@ class MRIData(FAMData):
         ----------
         cmd : str
             freesurfer command ('all', 'pial', 't2')
+        wf_dir : str
+            workflow directory (only releavnt for slurm)
+        batch_dir: str
+            path to store .sh jobs, for later check of what was actually ran
         """ 
         
         if self.base_dir == 'local':
@@ -508,6 +512,10 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
         ----------
         data_type : str
             if we want to run it on 'anat' or 'func'
+        wf_dir : str
+            workflow directory (only releavnt for slurm)
+        batch_dir: str
+            path to store .sh jobs, for later check of what was actually ran
         """ 
         
         if self.base_dir == 'local':
@@ -583,7 +591,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             batch_string = fmriprep_cmd
 
             keys2replace = {'$SJ_NR': 'sub-{sj}'.format(sj=pp),
-                            '$SINGIMG': self.params['mri']['paths'][self.base_dir]['singularity'],
+                            '$SINGIMG': op.join(self.params['mri']['paths'][self.base_dir]['singularity'], self.params['mri']['fmriprep_sing']),
                             '$ROOTFOLDER': op.split(self.sourcedata_pth)[0],
                             '$WF_DIR': wf_dir,
                             '$BD': batch_dir
@@ -909,5 +917,91 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
             nib.save(canonical_img, file)
 
 
+    def call_mriqc(self, wf_dir = '/scratch/FAM_wf', batch_dir ='/home/inesv/batch'):
+            
+        """
+        Run MRIQC on anat or functional data
+
+        Parameters
+        ----------
+        wf_dir : str
+            workflow directory (only releavnt for slurm)
+        batch_dir: str
+            path to store .sh jobs, for later check of what was actually ran
+        """ 
+
+        # path to singularity image
+        sing_img = op.join(self.params['mri']['paths'][self.base_dir]['singularity'], self.params['mri']['mriqc_sing'])
+
+        # loop over participants
+        for pp in self.sj_num:
+
+            # path to store mriqc outputs, in derivatives
+            out_dir = op.join(self.derivatives_pth, 'mriqc', 'sub-{sj}'.format(sj=pp))
+            if not op.exists(out_dir):
+                os.makedirs(out_dir)
+            print('saving files in %s'%out_dir)
+
+            # if running in local machine
+            if self.base_dir == 'local':
+                batch_string = """#!/bin/bash
+conda activate i38
+wait
+
+docker run -it --rm \
+-v $ROOTFOLDER/sourcedata:/data:ro \
+-v $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR:/out \
+poldracklab/mriqc:latest /data /out participant --participant_label $SJ_NR
+"""
+            
+            else:
+                batch_string = """#!/bin/bash
+#SBATCH -t 40:00:00
+#SBATCH -N 1 --mem=65536
+#SBATCH --cpus-per-task=16
+#SBATCH -v
+#SBATCH --output=$BD/slurm_MRIQC_%A.out
+
+# call the programs
+echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
+conda activate i38
+
+echo "Running MRIQC on participant sub-$SJ_NR"
+
+# make working directory in node
+mkdir $WF_DIR
+
+wait
+singularity run --cleanenv -B /project/projects_verissimo -B $WF_DIR \
+$SINGIMG \
+$ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/mriqc/sub-$SJ_NR \
+participant --participant-label $SJ_NR --hmc-fsl --float32 -w $WF_DIR
+
+wait          # wait until programs are finished
+echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
+
+"""
+
+            keys2replace = {'$SJ_NR': pp,
+                            '$SINGIMG': sing_img,
+                            '$ROOTFOLDER': op.split(self.sourcedata_pth)[0],
+                            '$WF_DIR': wf_dir,
+                            '$BD': batch_dir
+                             }
+
+            # replace all key-value pairs in batch string
+            for key, value in keys2replace.items():
+                batch_string = batch_string.replace(key, value)
+                
+            print(batch_string)
+
+            # run it
+            js_name = op.join(batch_dir, 'MRIQC_sub-{sj}_FAM.sh'.format(sj=pp))
+            of = open(js_name, 'w')
+            of.write(batch_string)
+            of.close()
+
+            print('submitting ' + js_name + ' to queue')
+            os.system('sh ' + js_name) if self.base_dir == 'local' else os.system('sbatch ' + js_name)
 
 

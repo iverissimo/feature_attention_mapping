@@ -76,4 +76,7 @@ elif step == 'func_preproc':
 
 elif step == 'mriqc':
 
-    preproc_data.call_mriqc(batch_dir = op.join(preproc_data.proj_root_pth, 'batch'))
+    if preproc_data.base_dir == 'local':
+        preproc_data.call_mriqc(batch_dir = op.join(preproc_data.proj_root_pth, 'batch'))
+    else:
+        preproc_data.call_mriqc()

@@ -48,10 +48,11 @@ class FAMData:
         else:
             self.params = params
             
-        
-        # excluded participantsa
+        # excluded participants
         self.exclude_sj = exclude_sj
-            
+        if len(self.exclude_sj)>0:
+            self.exclude_sj = [str(val).zfill(3) for val in exclude_sj]
+
         ## set some paths
         # which machine we run the data
         if base_dir is None:

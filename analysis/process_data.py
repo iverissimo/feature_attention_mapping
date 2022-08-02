@@ -4,6 +4,7 @@ import argparse
 
 import yaml
 from FAM.processing import load_exp_data
+from FAM.visualize.preproc_viewer import MRIViewer
 
 # load settings from yaml
 with open('exp_params.yml', 'r') as f_in:
@@ -23,6 +24,8 @@ parser.add_argument("--exclude_sj", nargs='+', help="List of subjects to exclude
 # only relevant for LISA/slurm system
 parser.add_argument("--node_name", type = str, help="Node name, to send job to [default None]")
 parser.add_argument("--partition_name", type = str, help="Partition name, to send job to [default None]")
+# to view/plot FS segmentation:
+parser.add_argument("--freeview", type = str, help="Check Freesurfer segmentations (view [default] vs movie)")
 
 # set variables 
 args = parser.parse_args()
@@ -46,6 +49,8 @@ else:
     exclude_sj = []
 
 fs_cmd = args.fs_cmd if args.fs_cmd is not None else 'all' # freesurfer command to run
+
+freeview_cmd = args.freeview if args.freeview is not None else 'view' # freeview command to run
 
 ## Load data object
 print("Preprocessing {data} data for subject {sj}!".format(data=data_type, sj=sj))
@@ -80,3 +85,8 @@ elif step == 'mriqc':
         preproc_data.call_mriqc(batch_dir = op.join(preproc_data.proj_root_pth, 'batch'))
     else:
         preproc_data.call_mriqc()
+
+elif step == 'check_fs':
+
+    plotter = MRIViewer(preproc_data)
+    plotter.check_fs_seg(participant_list=preproc_data.sj_num, check_type = freeview_cmd, use_T2 = T2_file)

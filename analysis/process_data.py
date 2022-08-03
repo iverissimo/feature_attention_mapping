@@ -89,4 +89,4 @@ elif step == 'mriqc':
 elif step == 'check_fs':
 
     plotter = MRIViewer(preproc_data)
-    plotter.check_fs_seg(participant_list=preproc_data.sj_num, check_type = freeview_cmd, use_T2 = T2_file)
+    plotter.check_fs_seg(check_type = freeview_cmd, use_T2 = T2_file)

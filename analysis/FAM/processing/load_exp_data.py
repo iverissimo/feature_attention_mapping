@@ -502,7 +502,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
             
     def call_fmriprep(self, data_type='anat', wf_dir = '/scratch/FAM_wf', batch_dir ='/home/inesv/batch',
-                     partition_name = None, node_name = None):
+                     partition_name = None, node_name = None, use_fmap = True):
         
         """
         Run FMRIPREP on anat or functional data
@@ -579,7 +579,7 @@ $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/fmriprep/ participant \
 --participant-label $SJ_NR --fs-subjects-dir $ROOTFOLDER/derivatives/freesurfer/ \
 --output-space T1w fsnative fsaverage MNI152NLin2009cAsym --cifti-output 170k \
 --bold2t1w-init register --nthread 16 --mem_mb 5000 --low-mem --fs-license-file $FREESURFER/license.txt \
---use-syn-sdc --force-syn --bold2t1w-dof 6 --stop-on-first-crash --verbose --skip_bids_validation --dummy-scans 5 \
+$FMAP_CMD --bold2t1w-dof 6 --stop-on-first-crash --verbose --skip_bids_validation --dummy-scans 5 \
 -w $WF_DIR
 
 wait          # wait until programs are finished
@@ -587,6 +587,10 @@ wait          # wait until programs are finished
 echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 """
 
+            if use_fmap:
+                fmap_cmd = '--use-syn-sdc --force-syn'  
+            else:  
+                fmap_cmd = '--use-syn-sdc --force-syn --ignore fieldmaps'
             
             #os.chdir(batch_dir)
             batch_string = fmriprep_cmd
@@ -595,7 +599,8 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                             '$SINGIMG': op.join(self.params['mri']['paths'][self.base_dir]['singularity'], self.params['mri']['fmriprep_sing']),
                             '$ROOTFOLDER': op.split(self.sourcedata_pth)[0],
                             '$WF_DIR': wf_dir,
-                            '$BD': batch_dir
+                            '$BD': batch_dir,
+                            '$FMAP_CMD': fmap_cmd
                              }
 
             # replace all key-value pairs in batch string

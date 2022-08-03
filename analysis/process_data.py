@@ -26,6 +26,9 @@ parser.add_argument("--node_name", type = str, help="Node name, to send job to [
 parser.add_argument("--partition_name", type = str, help="Partition name, to send job to [default None]")
 # to view/plot FS segmentation:
 parser.add_argument("--freeview", type = str, help="Check Freesurfer segmentations (view [default] vs movie)")
+# fmriprep fmap input
+parser.add_argument("--use_fmap", type = int, help="Use/ignore fieldmaps if present during fmriprep processing, 1 [default] vs 0")
+
 
 # set variables 
 args = parser.parse_args()
@@ -45,12 +48,15 @@ partition_name = args.partition_name # partition name to submit slurm job (or No
 exclude_sj = args.exclude_sj # list of excluded subjects
 if len(exclude_sj)>0:
     exclude_sj = [val.zfill(3) for val in exclude_sj]
+    print('Excluding participants {expp}'.format(expp = exclude_sj))
 else:
     exclude_sj = []
 
 fs_cmd = args.fs_cmd if args.fs_cmd is not None else 'all' # freesurfer command to run
 
 freeview_cmd = args.freeview if args.freeview is not None else 'view' # freeview command to run
+
+use_fmap = bool(args.use_fmap) if args.use_fmap is not None else True # make it boolean
 
 ## Load data object
 print("Preprocessing {data} data for subject {sj}!".format(data=data_type, sj=sj))
@@ -69,7 +75,7 @@ elif step == 'freesurfer':
 
 elif step == 'fmriprep':
     
-    preproc_data.call_fmriprep(data_type = data_type, node_name = node_name, partition_name = partition_name)
+    preproc_data.call_fmriprep(data_type = data_type, node_name = node_name, partition_name = partition_name, use_fmap=use_fmap)
 
 elif step == 'nordic':
 

@@ -6,7 +6,7 @@ import yaml
 import glob
 import json
 
-from shutil import copy2
+from shutil import copy2, copyfile
 import subprocess
 
 import nibabel as nib
@@ -791,6 +791,11 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
                 # actually run it
                 print('Running NORDIC for participant {pp}, session-{ses}'.format(pp = pp, ses = ses))
                 self.NORDIC(participant = pp, input_pth = sub_prenordic, output_pth = func_pth, calc_tsnr=True)
+
+                print('updating jason files')
+                self.update_jsons(participant = pp, input_pth = func_pth, json_folder = 'func',
+                                    parrec_pth = op.join(self.proj_root_pth, 'raw_data', 'parrec', 
+                                    'sub-{sj}'.format(sj = pp), ses))
                 
                 ## check fmaps ##
                 # to see if we cropped initial dummy scans
@@ -887,16 +892,66 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
 
         ## for functional data json
         elif json_folder == 'func':
-            ## get json file list we want to update
-            json_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if 'task-' in val \
-                            and val.endswith('_bold.json')]; json_files.sort()
-        
-            ## get PAR/REC file list 
-            parrec_files = [op.join(parrec_pth, val) for val in os.listdir(parrec_pth) if 'task-' in val \
-                            and val.endswith('.PAR')]
 
-            ## 
-            raise NameError('not implemented yet, only works for fmaps')
+            ## loop over tasks
+            for tsk in self.params['general']['tasks']:
+
+                ## get json file list we want to update
+                json_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if 'task-{tsk}'.format(tsk=tsk) in val \
+                                and val.endswith('_bold.json')]; json_files.sort()
+            
+                ## get PAR/REC file list 
+                parrec_files = [op.join(parrec_pth, val) for val in os.listdir(parrec_pth) if 'task-{tsk}'.format(tsk=tsk) in val \
+                                and val.endswith('.PAR')]
+
+                ## loop over runs
+                for r in range(self.params['mri']['nr_runs']):
+                    
+                    # check if run file exists
+                    jfile = [val for val in json_files if 'run-%i'%(r+1) in val or 'run-0%i'%(r+1) in val]
+
+                    if len(jfile)>0:
+
+                        for runj in jfile: ## because there are usually 2 files for a same run (nordic and not nordic)
+                            ## load jason file
+                            with open(runj) as f:
+                                json_data = json.load(f)
+                                
+                            # check if we have respective parrec
+                            parfile = [val for val in parrec_files if 'run-%i'%(r+1) in val or 'run-0%i'%(r+1) in val]
+
+                            if len(parfile)>0:
+                                par_data = nib.parrec.load(parfile[0])
+                            
+                                ## get waterfat shift value and calculate other necessart params for fmriprep ##
+                                
+                                #BIDS wants TRT to be specified for epi files. long story short, we MUST to put that AND EES in
+                                WFS = par_data.header.get_water_fat_shift()
+                                #magnetic field strength * water fat difference in ppm * gyromagnetic hydrogen ratio
+                                WFS_hz = 7 * 3.35 * 42.576
+                                TRT = WFS/WFS_hz
+                                epi_factor = par_data.header.general_info['epi_factor']
+                                #trt/(epi factor +1)
+                                EES = TRT / (epi_factor+1)
+                                
+                                ## update params
+                                json_data['WaterFatShift'] = WFS
+                                json_data['EffectiveEchoSpacing'] = EES
+                                json_data['TotalReadoutTime'] = TRT
+                                json_data['EPIFactor'] = epi_factor
+                                json_data['SliceTiming'] = list(np.tile(np.linspace(0, json_data['RepetitionTime'],
+                                                                int(par_data.header.general_info['max_slices']/json_data['MultiBandAccelerationFactor']),endpoint=False),
+                                                                    json_data['MultiBandAccelerationFactor']))
+                                
+                                ## and save 
+                                with open(runj, 'w') as f:
+                                    json.dump(json_data, f, indent=4)
+                                
+                            else:
+                                print('No parrec file for func run-%i, not updating params'%(r+1))
+
+                    else:
+                        print('No json file for task %s func run-%i'%(tsk,(r+1)))
 
 
     def crop_fieldmaps(self, participant, dummys = 5, input_pth = None, output_pth = None):
@@ -1110,5 +1165,107 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
             print('submitting ' + js_name + ' to queue')
             os.system('sh ' + js_name) if self.base_dir == 'local' else os.system('sbatch ' + js_name)
+
+
+    def post_fmriprep_proc(self, output_pth = None, tasks = ['pRF', 'FA'], save_subcortical = True, hemispheres = ['hemi-L','hemi-R']):
+
+        """
+        Run final processing steps on functional data (after fmriprep)
+        """ 
+
+        ## some relevant parameters
+        acq = self.params['mri']['acq'] # if using standard files or nordic files
+        space = self.params['mri']['space'] # subject space
+        file_ext = self.params['mri']['file_ext'][space] # file extension
+        confound_ext = self.params['mri']['confounds']['file_ext'] # file extension
+
+
+        # loop over participants
+        for pp in self.sj_num:
+            
+            # and over sessions (if more than one)
+            for ses in self.session['sub-{sj}'.format(sj=pp)]:
+                
+                if output_pth is None:
+                    output_pth = op.join(self.derivatives_pth, 'post_fmriprep', space, 'sub-{sj}'.format(sj=pp), ses)
+
+                # if output path doesn't exist, create it
+                if not op.isdir(output_pth): 
+                    os.makedirs(output_pth)
+                print('saving files in %s'%output_pth)
+
+                # get list of functional files to process, per task
+                fmriprep_pth = op.join(self.derivatives_pth, 'fmriprep', 'sub-{sj}'.format(sj=pp), ses, 'func')
+
+                for tsk in tasks:
+                    # bold files
+                    bold_files = [op.join(fmriprep_pth,run) for run in os.listdir(fmriprep_pth) if space in run \
+                        and acq in run and tsk in run and run.endswith(file_ext)]
+
+                    # confounds
+                    confound_files = [op.join(fmriprep_pth,run) for run in os.listdir(fmriprep_pth) if space in run \
+                        and acq in run and tsk in run and run.endswith(confound_ext)]
+
+                    # due to params yml notation, should change later
+                    task_name = 'feature' if tsk == 'FA' else 'prf' 
+
+                    ### load and convert files in numpy arrays, to make format issue obsolete
+                    epi_files = mri_utils.load_data_save_npz(epi_files, output_pth, save_subcortical=save_subcortical)
+
+                    ### crop files, due to "dummies"
+                    crop_TR = self.params[task_name]['dummy_TR'] + self.params[task_name]['crop_TR'] if self.params[task_name]['crop'] == True else self.params[task_name]['dummy_TR'] 
+
+                    proc_files= mri_utils.crop_epi(epi_files, output_pth, num_TR_crop = crop_TR)
+
+                    ### filtering 
+                    # if regressing confounds
+                    if self.params[task_name]['regress_confounds']: 
+    
+                        # first sub select confounds that we are using, and store in output dir
+                        confounds_list = mri_utils.select_confounds(confound_files, output_pth, reg_names = self.params['mri']['confounds']['regs'],
+                                                                    CumulativeVarianceExplained = self.params['mri']['confounds']['CumulativeVarianceExplained'],
+                                                                    select =  'num', num_components = 5, num_TR_crop = crop_TR)
+                        
+                        ### regress out confounds, and percent signal change
+                        proc_files = mri_utils.regressOUT_confounds(proc_files, confounds_list, output_pth, TR = self.params['mri']['TR'])
+
+                    else: 
+                        # filter files, to remove drifts
+                        proc_files = mri_utils.filter_data(proc_files, output_pth, filter_type = self.params['mri']['filtering']['type'], 
+                                                first_modes_to_remove = self.params['mri']['filtering']['first_modes_to_remove'], plot_vert=True)
+                        
+                        ### percent signal change ##
+                        proc_files = mri_utils.psc_epi(proc_files, output_pth)
+
+
+                    ## make new outdir, to save final files that will be used for further analysis
+                    # avoids mistakes later on
+                    final_output_dir =  op.join(output_pth, 'processed')
+                    # if output path doesn't exist, create it
+                    if not op.isdir(final_output_dir): 
+                        os.makedirs(final_output_dir)
+                    print('saving FINAL processed files in %s'%final_output_dir)
+
+                    ## average all runs for pRF task
+                    if tsk == 'pRF':
+                        
+                        if '.func.gii' in file_ext:
+                            
+                            hemi_files = []
+                            
+                            for hemi in hemispheres:
+                                hemi_files.append(mri_utils.average_epi([val for val in proc_files if hemi in val], 
+                                                            final_output_dir, method = 'mean'))
+                        
+                            proc_files = hemi_files
+                            
+                        else:
+                            proc_files = mri_utils.average_epi(proc_files, final_output_dir, method = 'mean')
+                        
+                    
+                    else:
+                        # save FA files in final output folder too
+                        for f in proc_files:
+                            copyfile(f, op.join(final_output_dir,op.split(f)[-1]))
 
 

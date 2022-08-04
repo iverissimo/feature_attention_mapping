@@ -115,9 +115,11 @@ mri: # refers to the Psychopy SyncGenerator class
   dummy_TR: 5
 
   space: 'fsLR_den-170k' #'fsaverage' # space of the files to be used in analysis
+
   file_ext:  {'fsLR_den-170k': '_bold.dtseries.nii', 
               'fsaverage': '_bold.func.gii'} # file extension
-  acq: 'nordic' #'nordic' # "acquisition" type to use
+
+  acq: 'nordic' #'standard' # "acquisition" type to use
 
   nr_runs: 4 # number of runs per task
 

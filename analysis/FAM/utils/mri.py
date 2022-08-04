@@ -1307,7 +1307,6 @@ def load_data_save_npz(file, outdir, save_subcortical=False):
             os.makedirs(subcort_dir)
         
     # check if single filename or list of filenames
-    
     if isinstance(file, list): 
         file_list = file  
     else:

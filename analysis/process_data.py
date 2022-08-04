@@ -28,7 +28,8 @@ parser.add_argument("--partition_name", type = str, help="Partition name, to sen
 parser.add_argument("--freeview", type = str, help="Check Freesurfer segmentations (view [default] vs movie)")
 # fmriprep fmap input
 parser.add_argument("--use_fmap", type = int, help="Use/ignore fieldmaps if present during fmriprep processing, 1 [default] vs 0")
-
+# update jsons
+parser.add_argument("--json_folder", type = str, help="Update jason files from which folder (fmap [default] vs func)")
 
 # set variables 
 args = parser.parse_args()
@@ -57,6 +58,8 @@ fs_cmd = args.fs_cmd if args.fs_cmd is not None else 'all' # freesurfer command 
 freeview_cmd = args.freeview if args.freeview is not None else 'view' # freeview command to run
 
 use_fmap = bool(args.use_fmap) if args.use_fmap is not None else True # make it boolean
+
+json_folder = args.json_folder if args.json_folder is not None else 'fmap' # freeview command to run
 
 ## Load data object
 print("Preprocessing {data} data for subject {sj}!".format(data=data_type, sj=sj))
@@ -96,3 +99,7 @@ elif step == 'check_fs':
 
     plotter = MRIViewer(preproc_data)
     plotter.check_fs_seg(check_type = freeview_cmd, use_T2 = T2_file)
+
+elif step == 'up_json':
+
+    preproc_data.update_jsons(participant = sj, json_folder = json_folder)

@@ -4,6 +4,7 @@ import os.path as op
 import pandas as pd
 import yaml
 import glob
+import json
 
 from shutil import copy2
 import subprocess
@@ -795,7 +796,107 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
                 # to see if we cropped initial dummy scans
                 print('Cropping fieldmaps for participant {pp}, session-{ses}'.format(pp = pp, ses = ses))
                 self.crop_fieldmaps(participant = pp, input_pth = fmap_pth, dummys = self.params['mri']['dummy_TR'])
+
+                ## update fieldmap params (specifically effective echo spacing)
+                print('updating jason files')
+                self.update_jsons(participant = pp, input_pth = fmap_pth, json_folder = 'fmap',
+                                    parrec_pth = op.join(self.proj_root_pth, 'raw_data', 'parrec', 
+                                    'sub-{sj}'.format(sj = pp), ses))
+
+    
+    def update_jsons(self, participant, input_pth = None, parrec_pth = None, json_folder = 'fmap'):
+
+        """
+        Update json params for a given file type
+        given raw PAR/REC header info
+        (default is fmap epis, to added effective echospacing, but want to generalize to all later on)
+
+        """ 
                 
+        ## zero pad participant number, just in case
+        participant = str(participant).zfill(3)
+
+        ## set input path where sourcedata json files are
+        if input_pth is None:
+            input_pth = op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=participant), 'ses-1', json_folder)
+
+        ## set parrec path where raw data PAR/REC files are
+        if parrec_pth is None:
+            parrec_pth = op.join(self.proj_root_pth, 'raw_data', 'parrec', 'sub-{sj}'.format(sj=participant), 'ses-1')
+
+
+        ## for fieldmap data json
+        if json_folder == 'fmap':
+
+            ## get json file list we want to update
+            json_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if 'dir-PA' in val \
+                            and val.endswith('_epi.json')]; json_files.sort()
+
+            ## get PAR/REC file list 
+            parrec_files = [op.join(parrec_pth, val) for val in os.listdir(parrec_pth) if 'TOPUP' in val \
+                            and val.endswith('.PAR')]
+
+            ## loop over runs
+            for r in range(self.params['mri']['nr_runs']):
+                
+                # check if run file exists
+                jfile = [val for val in json_files if 'run-%i'%(r+1) in val or 'run-0%i'%(r+1) in val]
+
+                if len(jfile)>0:
+                    ## load jason file
+                    jfile = jfile[0]
+                    with open(jfile) as f:
+                        json_data = json.load(f)
+                        
+                    # check if we have respective parrec
+                    parfile = [val for val in parrec_files if 'run-%i'%(r+1) in val or 'run-0%i'%(r+1) in val]
+
+                    if len(parfile)>0:
+                        par_data = nib.parrec.load(parfile[0])
+                    
+                        ## get waterfat shift value and calculate other necessart params for fmriprep ##
+                        
+                        #BIDS wants TRT to be specified for epi files. long story short, we MUST to put that AND EES in
+                        WFS = par_data.header.get_water_fat_shift()
+                        #magnetic field strength * water fat difference in ppm * gyromagnetic hydrogen ratio
+                        WFS_hz = 7 * 3.35 * 42.576
+                        TRT = WFS/WFS_hz
+                        epi_factor = par_data.header.general_info['epi_factor']
+                        #trt/(epi factor +1)
+                        EES = TRT / (epi_factor+1)
+                        
+                        ## update params
+                        json_data['WaterFatShift'] = WFS
+                        json_data['EffectiveEchoSpacing'] = EES
+                        json_data['TotalReadoutTime'] = TRT
+                        json_data['EPIFactor'] = epi_factor
+                        json_data['SliceTiming'] = list(np.tile(np.linspace(0, json_data['RepetitionTime'],
+                                                        int(par_data.header.general_info['max_slices']/json_data['MultiBandAccelerationFactor']),endpoint=False),
+                                                            json_data['MultiBandAccelerationFactor']))
+                        
+                        ## and save 
+                        with open(jfile, 'w') as f:
+                            json.dump(json_data, f, indent=4)
+                        
+                    else:
+                        print('No parrec file for topup run-%i, not updating params'%(r+1))
+
+                else:
+                    print('No json file for topup run-%i'%(r+1))
+                
+
+        ## for functional data json
+        elif json_folder == 'func':
+            ## get json file list we want to update
+            json_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if 'task-' in val \
+                            and val.endswith('_bold.json')]; json_files.sort()
+        
+            ## get PAR/REC file list 
+            parrec_files = [op.join(parrec_pth, val) for val in os.listdir(parrec_pth) if 'task-' in val \
+                            and val.endswith('.PAR')]
+
+            ## 
+            raise NameError('not implemented yet, only works for fmaps')
 
 
     def crop_fieldmaps(self, participant, dummys = 5, input_pth = None, output_pth = None):

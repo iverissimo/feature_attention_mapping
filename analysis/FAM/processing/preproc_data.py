@@ -185,7 +185,7 @@ class PreprocMRI:
 
             if ori_val != 'Left-to-Right':
                 print('anat file not RAS, reorienting')
-                self.MRIObj.reorient_nii_2RAS(participant=pp, input_pth = anat_preproc_sub)
+                self.reorient_nii_2RAS(participant=pp, input_pth = anat_preproc_sub)
 
             
             ##### if we collected T2w files for participant #######
@@ -206,7 +206,7 @@ class PreprocMRI:
                             
                             # run BFC
                             print('Running BFC for participant {pp}'.format(pp = pp))
-                            self.MRIObj.BiasFieldCorrec(participant=pp)
+                            self.BiasFieldCorrec(participant=pp)
                     
                     print('Participant T2w files already processed')
                     
@@ -688,21 +688,21 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
                 
                 # actually run it
                 print('Running NORDIC for participant {pp}, session-{ses}'.format(pp = pp, ses = ses))
-                self.MRIObj.NORDIC(participant = pp, input_pth = sub_prenordic, output_pth = func_pth, calc_tsnr=True)
+                self.NORDIC(participant = pp, input_pth = sub_prenordic, output_pth = func_pth, calc_tsnr=True)
 
                 print('updating jason files')
-                self.MRIObj.update_jsons(participant = pp, input_pth = func_pth, json_folder = 'func',
+                self.update_jsons(participant = pp, input_pth = func_pth, json_folder = 'func',
                                     parrec_pth = op.join(self.MRIObj.proj_root_pth, 'raw_data', 'parrec', 
                                     'sub-{sj}'.format(sj = pp), ses))
                 
                 ## check fmaps ##
                 # to see if we cropped initial dummy scans
                 print('Cropping fieldmaps for participant {pp}, session-{ses}'.format(pp = pp, ses = ses))
-                self.MRIObj.crop_fieldmaps(participant = pp, input_pth = fmap_pth, dummys = self.MRIObj.params['mri']['dummy_TR'])
+                self.crop_fieldmaps(participant = pp, input_pth = fmap_pth, dummys = self.MRIObj.params['mri']['dummy_TR'])
 
                 ## update fieldmap params (specifically effective echo spacing)
                 print('updating jason files')
-                self.MRIObj.update_jsons(participant = pp, input_pth = fmap_pth, json_folder = 'fmap',
+                self.update_jsons(participant = pp, input_pth = fmap_pth, json_folder = 'fmap',
                                     parrec_pth = op.join(self.MRIObj.proj_root_pth, 'raw_data', 'parrec', 
                                     'sub-{sj}'.format(sj = pp), ses))
 

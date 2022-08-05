@@ -3,7 +3,7 @@ import os.path as op
 import argparse
 
 import yaml
-from FAM.processing import load_exp_data
+from FAM.processing import load_exp_settings, preproc_data
 from FAM.visualize.preproc_viewer import MRIViewer
 
 # load settings from yaml
@@ -63,47 +63,50 @@ json_folder = args.json_folder if args.json_folder is not None else 'fmap' # fre
 
 ## Load data object
 print("Preprocessing {data} data for subject {sj}!".format(data=data_type, sj=sj))
-preproc_data = load_exp_data.MRIData(params, sj, repo_pth = op.split(load_exp_data.__file__)[0], base_dir=system_dir)
+FAM_data = load_exp_settings.MRIData(params, sj, repo_pth = op.split(load_exp_settings.__file__)[0], base_dir=system_dir)
+
+## Load preprocessing class for each data type
+FAM_mri_preprocess = preproc_data.PreprocMRI(FAM_data)
 
 ## run specific steps
 print('Running {step}'.format(step=step))
 
 if step == 'anat_preproc':
     
-    preproc_data.check_anatpreproc(T2file = T2_file)
+    FAM_mri_preprocess.check_anatpreproc(T2file = T2_file)
 
 elif step == 'freesurfer':
 
-    preproc_data.call_freesurfer(cmd = fs_cmd)
+    FAM_mri_preprocess.call_freesurfer(cmd = fs_cmd)
 
 elif step == 'fmriprep':
     
-    preproc_data.call_fmriprep(data_type = data_type, node_name = node_name, partition_name = partition_name, use_fmap=use_fmap)
+    FAM_mri_preprocess.call_fmriprep(data_type = data_type, node_name = node_name, partition_name = partition_name, use_fmap=use_fmap)
 
 elif step == 'nordic':
 
-    preproc_data.NORDIC(participant=sj)
+    FAM_mri_preprocess.NORDIC(participant=sj)
 
 elif step == 'func_preproc':
 
-    preproc_data.check_funcpreproc()
+    FAM_mri_preprocess.check_funcpreproc()
 
 elif step == 'mriqc':
 
-    if preproc_data.base_dir == 'local':
-        preproc_data.call_mriqc(batch_dir = op.join(preproc_data.proj_root_pth, 'batch'))
+    if FAM_data.base_dir == 'local':
+        FAM_mri_preprocess.call_mriqc(batch_dir = op.join(FAM_data.proj_root_pth, 'batch'))
     else:
-        preproc_data.call_mriqc()
+        FAM_mri_preprocess.call_mriqc()
 
 elif step == 'check_fs':
 
-    plotter = MRIViewer(preproc_data)
+    plotter = MRIViewer(FAM_data)
     plotter.check_fs_seg(check_type = freeview_cmd, use_T2 = T2_file)
 
 elif step == 'up_json':
 
-    preproc_data.update_jsons(participant = sj, json_folder = json_folder)
+    FAM_mri_preprocess.update_jsons(participant = sj, json_folder = json_folder)
 
 elif step == 'post_fmriprep':
 
-    preproc_data.post_fmriprep_proc(save_subcortical = True)
+    FAM_mri_preprocess.post_fmriprep_proc(save_subcortical = True)

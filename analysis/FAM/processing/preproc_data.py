@@ -1,3 +1,4 @@
+
 import numpy as np
 import os, sys
 import os.path as op
@@ -18,127 +19,24 @@ import seaborn as sns
 from FAM.utils import mri as mri_utils
 
 
-class FAMData:
-    
-    """FAMData
-    Class that loads relevant paths and settings for FAM data
-    """
-    
-    def __init__(self, params, sj_num, exclude_sj = [], base_dir = None):
+class PreprocMRI:
+
+    def __init__(self, MRIObj):
         
         """__init__
-        constructor for class, takes experiment params and subject num as input
+        constructor for class 
         
         Parameters
         ----------
-        params : str/yaml dict
-            where parameters from experiment and analysis live
-        sj_num : str/list/arr
-            participant number(s)
-        exclude_sj: list/arr
-            list with subject numbers to exclude
+        MRIObj : MRIData object
+            object from one of the classes defined in processing.load_exp_data
             
         """
-        
-        # set params
-        
-        if isinstance(params, str):
-            # load settings from yaml
-            with open(params, 'r') as f_in:
-                self.params = yaml.safe_load(f_in)
-        else:
-            self.params = params
-            
-        # excluded participants
-        self.exclude_sj = exclude_sj
-        if len(self.exclude_sj)>0:
-            self.exclude_sj = [str(val).zfill(3) for val in exclude_sj]
 
-        ## set some paths
-        # which machine we run the data
-        if base_dir is None:
-            self.base_dir = self.params['general']['current_dir'] 
-        else:
-            self.base_dir = base_dir
-        
-        # project root folder
-        self.proj_root_pth = self.params['mri']['paths'][self.base_dir]['root']
-        
-        # sourcedata dir
-        self.sourcedata_pth = op.join(self.proj_root_pth,'sourcedata')
-        
-        # derivatives dir
-        self.derivatives_pth = op.join(self.proj_root_pth,'derivatives')
-        
-        ## set sj number
-        if sj_num in ['group', 'all']: # if we want all participants in sourcedata folder
-            sj_num = [op.split(val)[-1].zfill(3)[4:] for val in glob.glob(op.join(self.sourcedata_pth, 'sub-*'))]
-            self.sj_num = [val for val in sj_num if val not in self.exclude_sj ]
-        
-        elif isinstance(sj_num, list) or isinstance(sj_num, np.ndarray): # if we provide list of sj numbers
-            self.sj_num = [str(s).zfill(3) for s in sj_num if str(s).zfill(3) not in self.exclude_sj ]
-        
-        else:
-            self.sj_num = [str(sj_num).zfill(3)] # if only one participant, put in list to make life easier later
-        
-        ## get session number (can be more than one)
-        self.session = {}
-        for s in self.sj_num:
-            self.session['sub-{sj}'.format(sj=s)] = [op.split(val)[-1] for val in glob.glob(op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=s), 'ses-*'))] 
-        
-        
-    
-class MRIData(FAMData):
-    
-    """MRIData
+        # set data object to use later on
+        self.MRIObj = MRIObj
 
-    Class that loads relevant paths and settings for (f)MRI data
-    """
-    
-    def __init__(self, params, sj_num, exclude_sj = [], repo_pth = '', base_dir = None):  # initialize child class
 
-        """ Initializes MRIData object. 
-
-        Parameters
-        ----------
-        params : str/yaml dict
-            where parameters from experiment and analysis live
-        sj_num : str/list/arr
-            participant number(s)
-        exclude_sj: list/arr
-            list with subject numbers to exclude
-        repo_pth: str
-            string with absolute path where module is installed in system - needed to get MATLAB .m files 
-        """
-
-        # need to initialize parent class (BehTask), indicating output infos
-        super().__init__(params = params, sj_num = sj_num, exclude_sj = exclude_sj, base_dir=base_dir)
-
-        ## some paths
-        # anat preprocessing path, 
-        # where we run linescanning preprocessing pipeline
-        self.anat_preproc_pth = op.join(self.proj_root_pth, 'anat_preprocessing')
-
-        # path to BFC files
-        self.bfc_pth = op.join(self.proj_root_pth, 'BiasFieldCorrection')
-
-        # path to NORDIC files
-        self.nordic_pth = op.join(self.proj_root_pth, 'NORDIC')
-        
-        # path to freesurfer
-        self.freesurfer_pth = op.join(self.derivatives_pth, 'freesurfer')
-        
-        # path to fmriprep
-        self.fmriprep_pth = op.join(self.derivatives_pth, 'fmriprep')
-
-        # path to repo install (needed to run mat files)
-        self.repo_pth = repo_pth
-
-        # path to matlab install
-        if self.base_dir == 'local':
-            self.matlab_pth = self.params['mri']['paths'][self.base_dir]['matlab']
-        
-        
     def BiasFieldCorrec(self, participant, file_type='T2w', input_pth = None):
         
         """
@@ -156,13 +54,13 @@ class MRIData(FAMData):
         """ 
         
         if input_pth is None:
-            input_pth = glob.glob(op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=participant), 'ses-*', 'anat'))[0]
+            input_pth = glob.glob(op.join(self.MRIObj.sourcedata_pth, 'sub-{sj}'.format(sj=participant), 'ses-*', 'anat'))[0]
         
         # list original (uncorrected) files (can be T1 or T2)
         orig_files = [op.join(input_pth,run) for run in os.listdir(input_pth) if run.endswith('{file}.nii.gz'.format(file=file_type))]
 
         # make output folder to store copy of original, tmp and output files
-        out_pth = self.bfc_pth
+        out_pth = self.MRIObj.bfc_pth
         
         if not op.exists(out_pth):
             os.makedirs(out_pth)
@@ -215,7 +113,7 @@ class MRIData(FAMData):
 
                 """
 
-                batch_dir = op.join(self.proj_root_pth,'batch')
+                batch_dir = op.join(self.MRIObj.proj_root_pth,'batch')
                 if not op.exists(batch_dir):
                         os.makedirs(batch_dir)
                         
@@ -223,9 +121,9 @@ class MRIData(FAMData):
                         '$ORIG': orig, 
                         '$OUTFOLDER': outfolder, 
                         '$INPUT': op.split(orig)[-1].replace('.nii.gz','.nii'),
-                        '$REPO': self.repo_pth,
-                        '$MATLAB': self.matlab_pth,
-                        '$ROOTFOLDER': self.proj_root_pth 
+                        '$REPO': self.MRIObj.repo_pth,
+                        '$MATLAB': self.MRIObj.matlab_pth,
+                        '$ROOTFOLDER': self.MRIObj.proj_root_pth 
                          }
 
                 # replace all key-value pairs in batch string
@@ -269,16 +167,16 @@ class MRIData(FAMData):
         """ 
         
         # loop over participants
-        for pp in self.sj_num:
+        for pp in self.MRIObj.sj_num:
 
             # path for sourcedata anat files of that participant
-            anat_pth = glob.glob(op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=pp), 'ses-*', 'anat'))[0]
+            anat_pth = glob.glob(op.join(self.MRIObj.sourcedata_pth, 'sub-{sj}'.format(sj=pp), 'ses-*', 'anat'))[0]
             
 
             #### first check if anat files are in correct orientation, ######
             # if not we need to reorient 
             # to avoid running into issues with linescanning pipeline
-            anat_preproc_sub = glob.glob(op.join(self.anat_preproc_pth,'sub-{sj}'.format(sj=pp), 'ses-*', 'anat'))[0]
+            anat_preproc_sub = glob.glob(op.join(self.MRIObj.anat_preproc_pth,'sub-{sj}'.format(sj=pp), 'ses-*', 'anat'))[0]
             anat_preproc_files = [op.join(anat_preproc_sub,val) for val in os.listdir(anat_preproc_sub) if val.endswith('.nii.gz')]
             
             # check first file in list, should be representative of rest
@@ -287,7 +185,7 @@ class MRIData(FAMData):
 
             if ori_val != 'Left-to-Right':
                 print('anat file not RAS, reorienting')
-                self.reorient_nii_2RAS(participant=pp, input_pth = anat_preproc_sub)
+                self.MRIObj.reorient_nii_2RAS(participant=pp, input_pth = anat_preproc_sub)
 
             
             ##### if we collected T2w files for participant #######
@@ -300,15 +198,15 @@ class MRIData(FAMData):
                     raise NameError('No T2w files in {folder}!'.format(folder=anat_pth))
                 else:
                     # check if we bias field correct T2 files
-                    if self.params['mri']['preproc']['BFC_T2']:
-                        bfc_sj = [op.join(self.bfc_pth, val) for val in os.listdir(self.bfc_pth) if val.startswith('sub-{sj}'.format(sj=pp)) and \
+                    if self.MRIObj.params['mri']['preproc']['BFC_T2']:
+                        bfc_sj = [op.join(self.MRIObj.bfc_pth, val) for val in os.listdir(self.MRIObj.bfc_pth) if val.startswith('sub-{sj}'.format(sj=pp)) and \
                                                                                                                   val.endswith('_T2w')]
                         # if no BFC folder or folder empty
                         if (len(bfc_sj) == 0) or (len(os.listdir(bfc_sj[0])) == 0):
                             
                             # run BFC
                             print('Running BFC for participant {pp}'.format(pp = pp))
-                            self.BiasFieldCorrec(participant=pp)
+                            self.MRIObj.BiasFieldCorrec(participant=pp)
                     
                     print('Participant T2w files already processed')
                     
@@ -320,7 +218,7 @@ class MRIData(FAMData):
                 print('No  masked T1w files in {folder}!'.format(folder=anat_pth))
                 
                 # check if files in anat_preprocessing folder and we forgot to copy
-                masked_T1_pth = op.join(self.anat_preproc_pth, 'derivatives', 'masked_mp2rage', 
+                masked_T1_pth = op.join(self.MRIObj.anat_preproc_pth, 'derivatives', 'masked_mp2rage', 
                                        'sub-{sj}'.format(sj=pp), 'ses-1', 'anat')
                 
                 if not op.exists(masked_T1_pth):
@@ -375,17 +273,17 @@ class MRIData(FAMData):
             path to store .sh jobs, for later check of what was actually ran
         """ 
         
-        if self.base_dir == 'local':
+        if self.MRIObj.base_dir == 'local':
             raise NameError('Dont run freesurfer locally - only implemented in slurm systems')
         
         # loop over participants
-        for pp in self.sj_num:
+        for pp in self.MRIObj.sj_num:
             
             ## freesurfer command ##
             freesurfer_cmd = 'recon-all -s {sj} -hires '.format(sj=pp)
             
             # path to store freesurfer outputs, in derivatives
-            out_dir = op.join(self.freesurfer_pth, 'sub-{sj}'.format(sj=pp))
+            out_dir = op.join(self.MRIObj.freesurfer_pth, 'sub-{sj}'.format(sj=pp))
             print('saving files in %s'%out_dir)
 
             if not op.exists(out_dir):
@@ -398,7 +296,7 @@ class MRIData(FAMData):
                     raise NameError('directory already has files\nstopping analysis!')
                     
             # path for sourcedata anat files of that participant
-            anat_pth = glob.glob(op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=pp), 'ses-*', 'anat'))[0]
+            anat_pth = glob.glob(op.join(self.MRIObj.sourcedata_pth, 'sub-{sj}'.format(sj=pp), 'ses-*', 'anat'))[0]
             
             # T1 and T2 filenames
             t1_filename = [op.join(anat_pth,run) for run in os.listdir(anat_pth) if run.endswith('masked_T1w.nii.gz')]
@@ -520,11 +418,11 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             path to store .sh jobs, for later check of what was actually ran
         """ 
         
-        if self.base_dir == 'local':
+        if self.MRIObj.base_dir == 'local':
             raise NameError('Dont run freesurfer locally - only implemented in slurm systems')
         
         # loop over participants
-        for pp in self.sj_num:
+        for pp in self.MRIObj.sj_num:
             
             fmriprep_cmd = """#!/bin/bash
 #SBATCH -t 40:00:00
@@ -538,8 +436,8 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                 fmriprep_cmd += '#SBATCH -w {n}\n'.format(n=node_name)
             
             # make fmriprep folder if it does not exist
-            #if not op.exists(self.fmriprep_pth):
-            #    os.makedirs(self.fmriprep_pth)
+            #if not op.exists(self.MRIObj.fmriprep_pth):
+            #    os.makedirs(self.MRIObj.fmriprep_pth)
                 
             if data_type == 'anat':
                 fmriprep_cmd +="""\n# call the programs
@@ -597,8 +495,8 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             batch_string = fmriprep_cmd
 
             keys2replace = {'$SJ_NR': 'sub-{sj}'.format(sj=pp),
-                            '$SINGIMG': op.join(self.params['mri']['paths'][self.base_dir]['singularity'], self.params['mri']['fmriprep_sing']),
-                            '$ROOTFOLDER': op.split(self.sourcedata_pth)[0],
+                            '$SINGIMG': op.join(self.MRIObj.params['mri']['paths'][self.MRIObj.base_dir]['singularity'], self.MRIObj.params['mri']['fmriprep_sing']),
+                            '$ROOTFOLDER': op.split(self.MRIObj.sourcedata_pth)[0],
                             '$WF_DIR': wf_dir,
                             '$BD': batch_dir,
                             '$FMAP_CMD': fmap_cmd
@@ -646,13 +544,13 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
         sub_tsnr = {'pre_nordic': [], 'post_nordic': []}
         
         ## to save shell scripts created
-        batch_dir = op.join(self.proj_root_pth,'batch')
+        batch_dir = op.join(self.MRIObj.proj_root_pth,'batch')
         if not op.exists(batch_dir):
             os.makedirs(batch_dir)
         
         ## set input path where standard files are stored
         if input_pth is None:
-            input_pth = op.join(self.nordic_pth, 'pre_nordic', 'sub-{sj}'.format(sj=participant), 'ses-1')
+            input_pth = op.join(self.MRIObj.nordic_pth, 'pre_nordic', 'sub-{sj}'.format(sj=participant), 'ses-1')
             
         # if input path doesnt exist or is empty
         if not op.exists(input_pth) or len(os.listdir(input_pth)) == 0:
@@ -661,7 +559,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
         ## output path to copy NORDIC files 
         # (if not set, then will copy to sourcedata folder)
         if output_pth is None:
-            output_pth = op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=participant), 'ses-1', 'func')
+            output_pth = op.join(self.MRIObj.sourcedata_pth, 'sub-{sj}'.format(sj=participant), 'ses-1', 'func')
             
         # list original (uncorrected) mag files 
         input_mag = [op.join(input_pth,run) for run in os.listdir(input_pth) if run.endswith('_bold.nii.gz') \
@@ -714,13 +612,13 @@ wait
 mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
 
 """
-                keys2replace = {'$FILEPATH': self.nordic_pth,
-                            '$REPO': self.repo_pth,
+                keys2replace = {'$FILEPATH': self.MRIObj.nordic_pth,
+                            '$REPO': self.MRIObj.repo_pth,
                             '$INMAG': mag_filename,
                             '$INPHASE': phase_filename, 
                             '$OUTFILE': op.split(nordic_nii)[-1].replace('.nii.gz',''),
                             '$OUTPATH': nordic_nii,
-                            '$MATLAB': self.matlab_pth
+                            '$MATLAB': self.MRIObj.matlab_pth
                             }
                     
                 # replace all key-value pairs in batch string
@@ -774,38 +672,38 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
         """ 
 
         # loop over participants
-        for pp in self.sj_num:
+        for pp in self.MRIObj.sj_num:
             
             # and over sessions (if more than one)
-            for ses in self.session['sub-{sj}'.format(sj=pp)]:
+            for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
 
                 # path for sourcedata func files of that participant
-                func_pth = op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=pp), ses, 'func')
+                func_pth = op.join(self.MRIObj.sourcedata_pth, 'sub-{sj}'.format(sj=pp), ses, 'func')
                 # path for sourcedata fmap files of that participant
-                fmap_pth = op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=pp), ses, 'fmap')
+                fmap_pth = op.join(self.MRIObj.sourcedata_pth, 'sub-{sj}'.format(sj=pp), ses, 'fmap')
                 
                 ## Run NORDIC on func files ##
                 #set pre-NORDIC dir 
-                sub_prenordic = op.join(self.nordic_pth, 'pre_nordic', 'sub-{sj}'.format(sj=pp), ses)
+                sub_prenordic = op.join(self.MRIObj.nordic_pth, 'pre_nordic', 'sub-{sj}'.format(sj=pp), ses)
                 
                 # actually run it
                 print('Running NORDIC for participant {pp}, session-{ses}'.format(pp = pp, ses = ses))
-                self.NORDIC(participant = pp, input_pth = sub_prenordic, output_pth = func_pth, calc_tsnr=True)
+                self.MRIObj.NORDIC(participant = pp, input_pth = sub_prenordic, output_pth = func_pth, calc_tsnr=True)
 
                 print('updating jason files')
-                self.update_jsons(participant = pp, input_pth = func_pth, json_folder = 'func',
-                                    parrec_pth = op.join(self.proj_root_pth, 'raw_data', 'parrec', 
+                self.MRIObj.update_jsons(participant = pp, input_pth = func_pth, json_folder = 'func',
+                                    parrec_pth = op.join(self.MRIObj.proj_root_pth, 'raw_data', 'parrec', 
                                     'sub-{sj}'.format(sj = pp), ses))
                 
                 ## check fmaps ##
                 # to see if we cropped initial dummy scans
                 print('Cropping fieldmaps for participant {pp}, session-{ses}'.format(pp = pp, ses = ses))
-                self.crop_fieldmaps(participant = pp, input_pth = fmap_pth, dummys = self.params['mri']['dummy_TR'])
+                self.MRIObj.crop_fieldmaps(participant = pp, input_pth = fmap_pth, dummys = self.MRIObj.params['mri']['dummy_TR'])
 
                 ## update fieldmap params (specifically effective echo spacing)
                 print('updating jason files')
-                self.update_jsons(participant = pp, input_pth = fmap_pth, json_folder = 'fmap',
-                                    parrec_pth = op.join(self.proj_root_pth, 'raw_data', 'parrec', 
+                self.MRIObj.update_jsons(participant = pp, input_pth = fmap_pth, json_folder = 'fmap',
+                                    parrec_pth = op.join(self.MRIObj.proj_root_pth, 'raw_data', 'parrec', 
                                     'sub-{sj}'.format(sj = pp), ses))
 
     
@@ -823,11 +721,11 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
 
         ## set input path where sourcedata json files are
         if input_pth is None:
-            input_pth = op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=participant), 'ses-1', json_folder)
+            input_pth = op.join(self.MRIObj.sourcedata_pth, 'sub-{sj}'.format(sj=participant), 'ses-1', json_folder)
 
         ## set parrec path where raw data PAR/REC files are
         if parrec_pth is None:
-            parrec_pth = op.join(self.proj_root_pth, 'raw_data', 'parrec', 'sub-{sj}'.format(sj=participant), 'ses-1')
+            parrec_pth = op.join(self.MRIObj.proj_root_pth, 'raw_data', 'parrec', 'sub-{sj}'.format(sj=participant), 'ses-1')
 
 
         ## for fieldmap data json
@@ -842,7 +740,7 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
                             and val.endswith('.PAR')]
 
             ## loop over runs
-            for r in range(self.params['mri']['nr_runs']):
+            for r in range(self.MRIObj.params['mri']['nr_runs']):
                 
                 # check if run file exists
                 jfile = [val for val in json_files if 'run-%i'%(r+1) in val or 'run-0%i'%(r+1) in val]
@@ -894,7 +792,7 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
         elif json_folder == 'func':
 
             ## loop over tasks
-            for tsk in self.params['general']['tasks']:
+            for tsk in self.MRIObj.params['general']['tasks']:
 
                 ## get json file list we want to update
                 json_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if 'task-{tsk}'.format(tsk=tsk) in val \
@@ -905,7 +803,7 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
                                 and val.endswith('.PAR')]
 
                 ## loop over runs
-                for r in range(self.params['mri']['nr_runs']):
+                for r in range(self.MRIObj.params['mri']['nr_runs']):
                     
                     # check if run file exists
                     jfile = [val for val in json_files if 'run-%i'%(r+1) in val or 'run-0%i'%(r+1) in val]
@@ -977,14 +875,14 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
 
         ## set input path where fmaps are
         if input_pth is None:
-            input_pth = op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=participant), 'ses-1', 'fmap')
+            input_pth = op.join(self.MRIObj.sourcedata_pth, 'sub-{sj}'.format(sj=participant), 'ses-1', 'fmap')
 
         # list of original niftis
         orig_nii_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if val.endswith('_epi.nii.gz')]
 
         ## set output path where we want to store original (uncropped) fmaps
         if output_pth is None:
-            output_pth = op.join(self.proj_root_pth, 'orig_fmaps' , 'sub-{sj}'.format(sj=participant))
+            output_pth = op.join(self.MRIObj.proj_root_pth, 'orig_fmaps' , 'sub-{sj}'.format(sj=participant))
 
         if not op.isdir(output_pth):
             os.makedirs(output_pth)
@@ -1038,14 +936,14 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
 
         ## set input path where fmaps are
         if input_pth is None:
-            input_pth = op.join(self.anat_preproc_pth, 'sub-{sj}'.format(sj=participant), 'ses-1', 'anat')
+            input_pth = op.join(self.MRIObj.anat_preproc_pth, 'sub-{sj}'.format(sj=participant), 'ses-1', 'anat')
 
         # list of original niftis
         orig_nii_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if val.endswith('.nii.gz')]
 
         ## set output path where we want to store original (uncropped) fmaps
         if output_pth is None:
-            output_pth = op.join(self.proj_root_pth, 'orig_anat' , 'sub-{sj}'.format(sj=participant))
+            output_pth = op.join(self.MRIObj.proj_root_pth, 'orig_anat' , 'sub-{sj}'.format(sj=participant))
 
         if not op.isdir(output_pth):
             os.makedirs(output_pth)
@@ -1093,19 +991,19 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
         """ 
 
         # path to singularity image
-        sing_img = op.join(self.params['mri']['paths'][self.base_dir]['singularity'], self.params['mri']['mriqc_sing'])
+        sing_img = op.join(self.MRIObj.params['mri']['paths'][self.MRIObj.base_dir]['singularity'], self.MRIObj.params['mri']['mriqc_sing'])
 
         # loop over participants
-        for pp in self.sj_num:
+        for pp in self.MRIObj.sj_num:
 
             # path to store mriqc outputs, in derivatives
-            out_dir = op.join(self.derivatives_pth, 'mriqc', 'sub-{sj}'.format(sj=pp))
+            out_dir = op.join(self.MRIObj.derivatives_pth, 'mriqc', 'sub-{sj}'.format(sj=pp))
             if not op.exists(out_dir):
                 os.makedirs(out_dir)
             print('saving files in %s'%out_dir)
 
             # if running in local machine
-            if self.base_dir == 'local':
+            if self.MRIObj.base_dir == 'local':
                 batch_string = """#!/bin/bash
 conda activate i38
 wait
@@ -1146,7 +1044,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
             keys2replace = {'$SJ_NR': pp,
                             '$SINGIMG': sing_img,
-                            '$ROOTFOLDER': op.split(self.sourcedata_pth)[0],
+                            '$ROOTFOLDER': op.split(self.MRIObj.sourcedata_pth)[0],
                             '$WF_DIR': wf_dir,
                             '$BD': batch_dir
                              }
@@ -1164,7 +1062,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             of.close()
 
             print('submitting ' + js_name + ' to queue')
-            os.system('sh ' + js_name) if self.base_dir == 'local' else os.system('sbatch ' + js_name)
+            os.system('sh ' + js_name) if self.MRIObj.base_dir == 'local' else os.system('sbatch ' + js_name)
 
 
     def post_fmriprep_proc(self, output_pth = None, tasks = ['pRF', 'FA'], save_subcortical = True, hemispheres = ['hemi-L','hemi-R']):
@@ -1174,19 +1072,19 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
         """ 
 
         ## some relevant parameters
-        acq = self.params['mri']['acq'] # if using standard files or nordic files
-        space = self.params['mri']['space'] # subject space
-        file_ext = self.params['mri']['file_ext'][space] # file extension
-        confound_ext = self.params['mri']['confounds']['file_ext'] # file extension
+        acq = self.MRIObj.params['mri']['acq'] # if using standard files or nordic files
+        space = self.MRIObj.params['mri']['space'] # subject space
+        file_ext = self.MRIObj.params['mri']['file_ext'][space] # file extension
+        confound_ext = self.MRIObj.params['mri']['confounds']['file_ext'] # file extension
 
         # loop over participants
-        for pp in self.sj_num:
+        for pp in self.MRIObj.sj_num:
             
             # and over sessions (if more than one)
-            for ses in self.session['sub-{sj}'.format(sj=pp)]:
+            for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
                 
                 if output_pth is None:
-                    output_pth = op.join(self.derivatives_pth, 'post_fmriprep', space, 'sub-{sj}'.format(sj=pp), ses)
+                    output_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', space, 'sub-{sj}'.format(sj=pp), ses)
 
                 # if output path doesn't exist, create it
                 if not op.isdir(output_pth): 
@@ -1194,7 +1092,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                 print('saving files in %s'%output_pth)
 
                 # get list of functional files to process, per task
-                fmriprep_pth = op.join(self.derivatives_pth, 'fmriprep', 'sub-{sj}'.format(sj=pp), ses, 'func')
+                fmriprep_pth = op.join(self.MRIObj.derivatives_pth, 'fmriprep', 'sub-{sj}'.format(sj=pp), ses, 'func')
 
                 for tsk in tasks:
                     print('Processign bold files from task-{t}'.format(t=tsk))
@@ -1213,27 +1111,27 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
                     ### crop files, due to dummies TRs that were saved ##
                     # and extra ones, if we want to
-                    crop_TR = self.params['mri']['dummy_TR'] + self.params[tsk]['crop_TR'] if self.params[tsk]['crop'] == True else self.params['mri']['dummy_TR'] 
+                    crop_TR = self.MRIObj.params['mri']['dummy_TR'] + self.MRIObj.params[tsk]['crop_TR'] if self.MRIObj.params[tsk]['crop'] == True else self.MRIObj.params['mri']['dummy_TR'] 
 
                     proc_files = mri_utils.crop_epi(bold_files, output_pth, num_TR_crop = crop_TR)
 
                     ### filtering ###
                     # if regressing confounds
-                    if self.params[tsk]['regress_confounds']: 
+                    if self.MRIObj.params[tsk]['regress_confounds']: 
     
                         ## first sub select confounds that we are using, and store in output dir
-                        confounds_list = mri_utils.select_confounds(confound_files, output_pth, reg_names = self.params['mri']['confounds']['regs'],
-                                                                    CumulativeVarianceExplained = self.params['mri']['confounds']['CumulativeVarianceExplained'],
+                        confounds_list = mri_utils.select_confounds(confound_files, output_pth, reg_names = self.MRIObj.params['mri']['confounds']['regs'],
+                                                                    CumulativeVarianceExplained = self.MRIObj.params['mri']['confounds']['CumulativeVarianceExplained'],
                                                                     select =  'num', num_components = 5, num_TR_crop = crop_TR)
                         
                         ## regress out confounds, 
                         ## and percent signal change
-                        proc_files = mri_utils.regressOUT_confounds(proc_files, confounds_list, output_pth, TR = self.params['mri']['TR'], plot_vert = True)
+                        proc_files = mri_utils.regressOUT_confounds(proc_files, confounds_list, output_pth, TR = self.MRIObj.params['mri']['TR'], plot_vert = True)
 
                     else: 
                         ## filter files, to remove drifts ##
-                        proc_files = mri_utils.filter_data(proc_files, output_pth, filter_type = self.params['mri']['filtering']['type'], 
-                                                first_modes_to_remove = self.params['mri']['filtering']['first_modes_to_remove'], plot_vert = True)
+                        proc_files = mri_utils.filter_data(proc_files, output_pth, filter_type = self.MRIObj.params['mri']['filtering']['type'], 
+                                                first_modes_to_remove = self.MRIObj.params['mri']['filtering']['first_modes_to_remove'], plot_vert = True)
                         
                         ### percent signal change ##
                         proc_files = mri_utils.psc_epi(proc_files, output_pth)
@@ -1266,5 +1164,8 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                         # save FA files in final output folder too
                         for f in proc_files:
                             copyfile(f, op.join(final_output_dir,op.split(f)[-1]))
+
+
+
 
 

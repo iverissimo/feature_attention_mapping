@@ -103,3 +103,7 @@ elif step == 'check_fs':
 elif step == 'up_json':
 
     preproc_data.update_jsons(participant = sj, json_folder = json_folder)
+
+elif step == 'post_fmriprep':
+
+    preproc_data.post_fmriprep_proc(save_subcortical = True)

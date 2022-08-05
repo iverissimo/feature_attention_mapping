@@ -1,61 +1,49 @@
-
-# script to calculate tSNR
-# for the different sequences piloted
-
-
+## general packages
 from filecmp import cmp
 import numpy as np
 import os
 from os import path as op
-import nibabel as nib
-import re
-
 import pandas as pd
-import json
+import re, json
+
+## imaging, processing, stats packages
+import nibabel as nib
 
 from scipy.ndimage import gaussian_filter
-from scipy.signal import savgol_filter
+from scipy.signal import savgol_filter, fftconvolve
 from scipy import fft, interpolate
-
-from nilearn import surface
-
-from joblib import Parallel, delayed
-
-import matplotlib.pyplot as plt
-
-import cortex
-from cortex import fmriprep
-
-from PIL import Image, ImageDraw
-
-from matplotlib import cm
-import matplotlib.colors as colors
-
 from scipy.stats import t, norm
 
-import scipy.signal as signal
-from nilearn.glm.first_level.hemodynamic_models import spm_hrf, spm_time_derivative, spm_dispersion_derivative
-
+from nilearn import surface
 from nilearn.signal import clean
 
-from prfpy.stimulus import PRFStimulus2D
-from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
-
+from nilearn.glm.first_level.hemodynamic_models import spm_hrf, spm_time_derivative, spm_dispersion_derivative
 from nilearn.glm.first_level import first_level
 from nilearn.glm.regression import ARModel
 
+from statsmodels.stats import weightstats
+
+## plotting packages
+import matplotlib.pyplot as plt
+from matplotlib import cm
+import matplotlib.colors as colors
+import cortex
+from PIL import Image, ImageDraw
+
+## fitting packages 
+from prfpy.stimulus import PRFStimulus2D
+from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel
 from prfpy.rf import gauss2D_iso_cart
-from prfpy.timecourse import stimulus_through_prf
+from prfpy.timecourse import stimulus_through_prf, filter_predictions
 
-from prfpy.timecourse import filter_predictions
-
+from joblib import Parallel, delayed
 from lmfit import Parameters, minimize
 from tqdm import tqdm
 
 import functools
 import operator
 
-from statsmodels.stats import weightstats
+
 
 def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=None):
     
@@ -85,18 +73,39 @@ def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=N
     else:
         
         # import subject into pycortex database
-        fmriprep.import_subj(subject = sj, source_dir = source_directory, 
+        cortex.fmriprep.import_subj(subject = sj, source_dir = source_directory, 
                              session = ses, dataset = dataset, acq = acq)
 
 
 def get_tsnr(input_file, return_mean=True, affine=[], hdr=[], filename=None):
     
     """
-    Compute the tSNR of nifti file
-    and generate the equivalent nifti SNR 3Ds. 
+    Compute the tSNR of NIFTI file
+    and generate the equivalent NIFTI SNR 3Ds. 
+
+    Parameters
+    ----------
+    input_file : str/array
+        if str then absolute NIFTI filename to load, else it should be array with data
+    return_mean : bool
+        if we want to return mean tsnr value over volume, or array with tsnr value per voxel
+    affine : array
+        if we input data array, then we also need to input affine
+    hdr : array
+        if we input data array, then we also need to input header
+    filename : str or None
+        if str is provided, then it will save tSNR NIFTI with said filename
+    
+    Outputs
+    -------
+    mean_tsnr: float
+        mean tsnr value over volume
+    OR
+    tsnr: arr
+        array with tsnr value per voxel
     
     """
-
+    
     if isinstance(input_file, np.ndarray): # if already data array, then just use it 
         data = input_file
     else:
@@ -177,27 +186,26 @@ def correlate_vol(data1,data2,outfile):
 def crop_epi(file, outdir, num_TR_crop = 5):
 
     """ crop epi file (expects numpy file)
-    and thus remove the first recorded "dummy" trials, if such was the case
+    and thus remove the first TRs
     
     Parameters
     ----------
     file : str/list/array
-        absolute filename to be filtered (or list of filenames)
+        absolute filename to be cropped (or list of filenames)
     outdir : str
-        path to save new file
+        path to save new file(s)
     num_TR_crop : int
         number of TRs to remove from beginning of file
     
     Outputs
     -------
-    out_file: str
+    out_file: str/list/arr
         absolute output filename (or list of filenames)
     
     """
     
     # check if single filename or list of filenames
-    
-    if isinstance(file, list): 
+    if isinstance(file, list) or isinstance(file, np.ndarray): 
         file_list = file  
     else:
         file_list = [file]
@@ -235,14 +243,14 @@ def crop_epi(file, outdir, num_TR_crop = 5):
         outfiles.append(output_file)
         
     # if input file was not list, then return output that is also not list
-    if not isinstance(file, list): 
+    if not isinstance(file, list) and not isinstance(file, np.ndarray): 
         outfiles = outfiles[0] 
 
     return outfiles
 
 
-def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False,
-                first_modes_to_remove=5, **kwargs):
+def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert = False,
+                first_modes_to_remove = 5, **kwargs):
     
     """ 
     Generic filtering function, implemented different types of filters
@@ -266,7 +274,7 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False,
     
     # check if single filename or list of filenames
     
-    if isinstance(file, list): 
+    if isinstance(file, list) or isinstance(file, np.ndarray):
         file_list = file  
     else:
         file_list = [file]
@@ -308,13 +316,16 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False,
                 data_filt = dc_data(data, first_modes_to_remove = first_modes_to_remove, **kwargs) 
                 
             else:
-                raise NameError('Not implemented')
+                raise NameError('filter type not implemented')
                 
-            # if plotting true, make figure of voxel with high variance,
+            # if plotting true, make figure of vertix with high tSNR,
             # to compare the difference
-            if plot_vert == True:
+            if plot_vert:
+
+                tsnr = np.mean(data, axis = -1)/np.std(data, axis = -1)
+                tsnr[np.where(np.isinf(tsnr))] = np.nan
                 
-                ind2plot = np.argwhere(np.std(data, axis=-1)==np.max(np.std(data, axis=-1)))[0][0]
+                ind2plot = np.where(tsnr == np.nanmax(tsnr))[0][0]
                 fig = plt.figure()
                 plt.plot(data[ind2plot,...], color='dimgray',label='Original data')
                 plt.plot(data_filt[ind2plot,...], color='mediumseagreen',label='Filtered data')
@@ -325,7 +336,6 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False,
 
                 fig.savefig(output_file.replace(file_extension,'_vertex_%i.png'%ind2plot))
             
-
             ## save filtered file
             np.save(output_file,data_filt)
 
@@ -333,12 +343,13 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert=False,
         outfiles.append(output_file)
         
     # if input file was not list, then return output that is also not list
-    if not isinstance(file, list): 
+    if not isinstance(file, list) and not isinstance(file, np.ndarray): 
         outfiles = outfiles[0] 
     
     return outfiles
 
-def gausskernel_data(data, TR = 1.2, cut_off_hz = 0.01, **kwargs):
+
+def gausskernel_data(data, TR = 1.6, cut_off_hz = 0.01, **kwargs):
     
     """ 
     High pass filter array with gaussian kernel
@@ -458,7 +469,7 @@ def psc_epi(file, outdir):
     
     # check if single filename or list of filenames
     
-    if isinstance(file, list): 
+    if isinstance(file, list) or isinstance(file, np.ndarray): 
         file_list = file  
     else:
         file_list = [file]
@@ -483,20 +494,20 @@ def psc_epi(file, outdir):
         else:
             print('making %s'%output_file)
             
-            data = np.load(input_file,allow_pickle=True)
+            data = np.load(input_file, allow_pickle=True)
             
             mean_signal = data.mean(axis = -1)[..., np.newaxis]
             data_psc = (data - mean_signal)/np.absolute(mean_signal)
             data_psc *= 100
                 
             ## save psc file
-            np.save(output_file,data_psc)
+            np.save(output_file, data_psc)
 
         # append out files
         outfiles.append(output_file)
         
     # if input file was not list, then return output that is also not list
-    if not isinstance(file, list): 
+    if not isinstance(file, list) and not isinstance(file, np.ndarray): 
         outfiles = outfiles[0] 
     
     return outfiles
@@ -522,7 +533,7 @@ def average_epi(file, outdir, method = 'mean'):
     """
     
     # check if single filename or list of filenames
-    if not isinstance(file, list): 
+    if not isinstance(file, list) and not isinstance(file, np.ndarray): 
         raise NameError('List of files not provided')
         
     file_list = file
@@ -1307,7 +1318,7 @@ def load_data_save_npz(file, outdir, save_subcortical=False):
             os.makedirs(subcort_dir)
         
     # check if single filename or list of filenames
-    if isinstance(file, list): 
+    if isinstance(file, list) or isinstance(file, np.ndarray): 
         file_list = file  
     else:
         file_list = [file]
@@ -1341,7 +1352,7 @@ def load_data_save_npz(file, outdir, save_subcortical=False):
                 cifti_hdr = cifti.header
                 axes = [cifti_hdr.get_axis(i) for i in range(cifti.ndim)]
 
-                # save gii, per hemisphere
+                # load data, per hemisphere
                 # note that surface data is (time, "vertex")
                 data = np.vstack([surf_data_from_cifti(cifti_data, axes[1], cifti_hemis[hemi]) for hemi in hemispheres])
 
@@ -1359,10 +1370,16 @@ def load_data_save_npz(file, outdir, save_subcortical=False):
                     np.savez(op.join(subcort_dir, op.split(output_file)[-1].replace('_bold_','_struct-subcortical_bold_').replace('.npy','.npz')), **subcort_dict)
             
             elif file_extension == '.func.gii': # load gifti file
-                
-                print('implement later')
-            else:
-                print('implement later')
+
+                bold_gii = nib.load(input_file)
+                # Each time point is an individual data array with intent NIFTI_INTENT_TIME_SERIES. agg_data() will aggregate these into a single array
+                data = bold_gii.agg_data('time series')
+            
+            elif file_extension == '.nii.gz': # load nifti file
+                img = nib.load(input_file)
+                #affine = img.affine
+                #header = img.header
+                data = img.get_fdata()
                 
             # actually save
             np.save(output_file, data)
@@ -1965,7 +1982,7 @@ def CV_FA(voxel,dm,betas):
 
 def select_confounds(file, outdir, reg_names = ['a_comp_cor','cosine','framewise_displacement'],
                     CumulativeVarianceExplained = 0.4, num_TR_crop = 5, 
-                    select = 'num',num_components = 5):
+                    select = 'num', num_components = 5):
     
     """ 
     function to subselect relevant nuisance regressors
@@ -1984,6 +2001,10 @@ def select_confounds(file, outdir, reg_names = ['a_comp_cor','cosine','framewise
         selection factor ('num' - select x number of components, 'cve' - use CVE as threshold)
     CumulativeVarianceExplained: float
         value of CVE up to which a_comp_cor components are selected
+    num_components: int
+        number of components to select
+    num_TR_crop: int
+        if we are cropping bold file TRs, also need to do it with confounds, to match
         
     Outputs
     -------
@@ -1993,8 +2014,7 @@ def select_confounds(file, outdir, reg_names = ['a_comp_cor','cosine','framewise
     """
     
     # check if single filename or list of filenames
-    
-    if isinstance(file, list): 
+    if isinstance(file, list) or isinstance(file, np.ndarray): 
         file_list = file  
     else:
         file_list = [file]
@@ -2063,13 +2083,13 @@ def select_confounds(file, outdir, reg_names = ['a_comp_cor','cosine','framewise
         outfiles.append(output_file)
         
     # if input file was not list, then return output that is also not list
-    if not isinstance(file, list): 
+    if not isinstance(file, list) and not isinstance(file, np.ndarray): 
         outfiles = outfiles[0] 
 
     return outfiles
 
 
-def regressOUT_confounds(file, counfounds, outdir, TR=1.2):
+def regressOUT_confounds(file, counfounds, outdir, TR=1.6, plot_vert = False):
     
     """ 
     regress out confounds from data
@@ -2091,7 +2111,7 @@ def regressOUT_confounds(file, counfounds, outdir, TR=1.2):
 
     # check if single filename or list of filenames
     
-    if isinstance(file, list): 
+    if isinstance(file, list) or isinstance(file, np.ndarray): 
         file_list = file  
     else:
         file_list = [file]
@@ -2116,7 +2136,7 @@ def regressOUT_confounds(file, counfounds, outdir, TR=1.2):
         else:
             print('making %s'%output_file)
             
-            data = np.load(input_file,allow_pickle=True)
+            data = np.load(input_file, allow_pickle = True)
             
             # get confound file for that run
             run_id = re.search(r'run-._', input_file).group(0)
@@ -2129,18 +2149,39 @@ def regressOUT_confounds(file, counfounds, outdir, TR=1.2):
             
             # clean confounds from data
             filtered_signal = clean(signals = data.T, confounds = conf_df.values, detrend = True, 
-                              standardize='psc', standardize_confounds = True, filter = False, t_r = TR)
+                              standardize = 'psc', standardize_confounds = True, filter = False, t_r = TR)
             
             data_filt = filtered_signal.T
             
             ## save filtered file
             np.save(output_file,data_filt)
 
+            ## if we want to compare a high tSNR voxel before and after filtering
+            if plot_vert:
+                tsnr = np.mean(data, axis = -1)/np.std(data, axis = -1)
+                tsnr[np.where(np.isinf(tsnr))] = np.nan
+
+                # psc original data, so they are in same scale
+                mean_signal = data.mean(axis = -1)[..., np.newaxis]
+                data_psc = (data - mean_signal)/np.absolute(mean_signal)
+                data_psc *= 100
+                
+                ind2plot = np.where(tsnr == np.nanmax(tsnr))[0][0]
+                fig = plt.figure()
+                plt.plot(data_psc[ind2plot,...], color='dimgray',label='Original data')
+                plt.plot(data_filt[ind2plot,...], color='mediumseagreen',label='Filtered data')
+
+                plt.xlabel('Time (TR)')
+                plt.ylabel('Signal amplitude (a.u.)')
+                plt.legend(loc = 'upper right')
+
+                fig.savefig(output_file.replace(file_extension,'_vertex_%i.png'%ind2plot))
+
         # append out files
         outfiles.append(output_file)
         
     # if input file was not list, then return output that is also not list
-    if not isinstance(file, list): 
+    if not isinstance(file, list) and not isinstance(file, np.ndarray): 
         outfiles = outfiles[0] 
     
     return outfiles
@@ -2341,7 +2382,7 @@ def get_cue_regressor(trial_info, hrf_params = [1,1,0], cues = [0,1,2,3], TR = 1
     padded_cue = np.hstack((pad,cue_regs_upsampled))
 
     print('convolving cue regressor')
-    cue_regs_upsampled = np.array(Parallel(n_jobs=16)(delayed(signal.fftconvolve)(padded_cue[vertex], hrf[vertex], axes=(-1))
+    cue_regs_upsampled = np.array(Parallel(n_jobs=16)(delayed(fftconvolve)(padded_cue[vertex], hrf[vertex], axes=(-1))
                                              for _,vertex in enumerate(tqdm(range(padded_cue.shape[0])))))[..., pad_length*oversampling_time:cue_regs_upsampled.shape[-1]+pad_length*oversampling_time] 
     
     ## resample to data sampling rate
@@ -2439,7 +2480,7 @@ def get_FA_regressor(fa_dm, params, pRFfit_pars, filter = True, stim_ind = [],
     pad = np.tile(neural_tc[:,0], (pad_length*oversampling_time,1)).T
     padded_cue = np.hstack((pad,neural_tc))
 
-    tc_convolved = signal.fftconvolve(padded_cue, hrf, axes=(-1))[..., pad_length*oversampling_time:neural_tc.shape[-1]+pad_length*oversampling_time]  
+    tc_convolved = fftconvolve(padded_cue, hrf, axes=(-1))[..., pad_length*oversampling_time:neural_tc.shape[-1]+pad_length*oversampling_time]  
 
     # save convolved upsampled cue in array
     tc_convolved = np.array(tc_convolved)
@@ -2636,10 +2677,10 @@ def make_nuisance_tc(pars, timecourse = [], onsets = [1], hrf = [], fit = True,
     
     # nuisance
     padded_tc = np.hstack((pad, nuisance_reg))
-    conv_nuisance_reg = signal.fftconvolve(padded_tc, hrf)[pad_length:timecourse.shape[0]*osf+pad_length]
+    conv_nuisance_reg = fftconvolve(padded_tc, hrf)[pad_length:timecourse.shape[0]*osf+pad_length]
     # on-off
     padded_tc = np.hstack((pad, blkON_reg))
-    conv_blkON_reg = signal.fftconvolve(padded_tc, hrf)[pad_length:timecourse.shape[0]*osf+pad_length]
+    conv_blkON_reg = fftconvolve(padded_tc, hrf)[pad_length:timecourse.shape[0]*osf+pad_length]
     
     ## donwsample again
     conv_nuisance_reg = resample_arr(conv_nuisance_reg, osf = osf, final_sf = 1)

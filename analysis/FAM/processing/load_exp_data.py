@@ -1179,7 +1179,6 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
         file_ext = self.params['mri']['file_ext'][space] # file extension
         confound_ext = self.params['mri']['confounds']['file_ext'] # file extension
 
-
         # loop over participants
         for pp in self.sj_num:
             
@@ -1198,41 +1197,43 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                 fmriprep_pth = op.join(self.derivatives_pth, 'fmriprep', 'sub-{sj}'.format(sj=pp), ses, 'func')
 
                 for tsk in tasks:
+                    print('Processign bold files from task-{t}'.format(t=tsk))
+
                     # bold files
-                    bold_files = [op.join(fmriprep_pth,run) for run in os.listdir(fmriprep_pth) if space in run \
-                        and acq in run and tsk in run and run.endswith(file_ext)]
+                    bold_files = [op.join(fmriprep_pth,run) for run in os.listdir(fmriprep_pth) if 'space-{sp}'.format(sp=space) in run \
+                        and 'acq-{a}'.format(a=acq) in run and 'task-{t}'.format(t=tsk) in run and run.endswith(file_ext)]
 
                     # confounds
-                    confound_files = [op.join(fmriprep_pth,run) for run in os.listdir(fmriprep_pth) if space in run \
-                        and acq in run and tsk in run and run.endswith(confound_ext)]
+                    confound_files = [op.join(fmriprep_pth,run) for run in os.listdir(fmriprep_pth) if 'acq-{a}'.format(a=acq) in run \
+                        and 'task-{t}'.format(t=tsk) in run and run.endswith(confound_ext)]
 
-                    # due to params yml notation, should change later
-                    task_name = 'feature' if tsk == 'FA' else 'prf' 
+                    ### load and convert files in numpy arrays, to make format issue obsolete ###
+                    # note, if we need headers or affines later on, we will need to get them from fmriprep folder
+                    bold_files = mri_utils.load_data_save_npz(bold_files, output_pth, save_subcortical=save_subcortical)
 
-                    ### load and convert files in numpy arrays, to make format issue obsolete
-                    epi_files = mri_utils.load_data_save_npz(epi_files, output_pth, save_subcortical=save_subcortical)
+                    ### crop files, due to dummies TRs that were saved ##
+                    # and extra ones, if we want to
+                    crop_TR = self.params['mri']['dummy_TR'] + self.params[tsk]['crop_TR'] if self.params[tsk]['crop'] == True else self.params['mri']['dummy_TR'] 
 
-                    ### crop files, due to "dummies"
-                    crop_TR = self.params[task_name]['dummy_TR'] + self.params[task_name]['crop_TR'] if self.params[task_name]['crop'] == True else self.params[task_name]['dummy_TR'] 
+                    proc_files = mri_utils.crop_epi(bold_files, output_pth, num_TR_crop = crop_TR)
 
-                    proc_files= mri_utils.crop_epi(epi_files, output_pth, num_TR_crop = crop_TR)
-
-                    ### filtering 
+                    ### filtering ###
                     # if regressing confounds
-                    if self.params[task_name]['regress_confounds']: 
+                    if self.params[tsk]['regress_confounds']: 
     
-                        # first sub select confounds that we are using, and store in output dir
+                        ## first sub select confounds that we are using, and store in output dir
                         confounds_list = mri_utils.select_confounds(confound_files, output_pth, reg_names = self.params['mri']['confounds']['regs'],
                                                                     CumulativeVarianceExplained = self.params['mri']['confounds']['CumulativeVarianceExplained'],
                                                                     select =  'num', num_components = 5, num_TR_crop = crop_TR)
                         
-                        ### regress out confounds, and percent signal change
-                        proc_files = mri_utils.regressOUT_confounds(proc_files, confounds_list, output_pth, TR = self.params['mri']['TR'])
+                        ## regress out confounds, 
+                        ## and percent signal change
+                        proc_files = mri_utils.regressOUT_confounds(proc_files, confounds_list, output_pth, TR = self.params['mri']['TR'], plot_vert = True)
 
                     else: 
-                        # filter files, to remove drifts
+                        ## filter files, to remove drifts ##
                         proc_files = mri_utils.filter_data(proc_files, output_pth, filter_type = self.params['mri']['filtering']['type'], 
-                                                first_modes_to_remove = self.params['mri']['filtering']['first_modes_to_remove'], plot_vert=True)
+                                                first_modes_to_remove = self.params['mri']['filtering']['first_modes_to_remove'], plot_vert = True)
                         
                         ### percent signal change ##
                         proc_files = mri_utils.psc_epi(proc_files, output_pth)
@@ -1249,20 +1250,18 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                     ## average all runs for pRF task
                     if tsk == 'pRF':
                         
-                        if '.func.gii' in file_ext:
+                        if '.func.gii' in file_ext: # combine hemispheres into one array
                             
                             hemi_files = []
                             
                             for hemi in hemispheres:
                                 hemi_files.append(mri_utils.average_epi([val for val in proc_files if hemi in val], 
                                                             final_output_dir, method = 'mean'))
-                        
                             proc_files = hemi_files
                             
                         else:
                             proc_files = mri_utils.average_epi(proc_files, final_output_dir, method = 'mean')
                         
-                    
                     else:
                         # save FA files in final output folder too
                         for f in proc_files:

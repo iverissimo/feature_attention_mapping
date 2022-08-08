@@ -185,7 +185,8 @@ class PreprocMRI:
 
             if ori_val != 'Left-to-Right':
                 print('anat file not RAS, reorienting')
-                self.reorient_nii_2RAS(participant=pp, input_pth = anat_preproc_sub)
+                mri_utils.reorient_nii_2RAS(input_pth = anat_preproc_sub,
+                                    output_pth = op.join(self.MRIObj.proj_root_pth,'orig_anat', 'sub-{sj}'.format(sj=pp)))
 
             
             ##### if we collected T2w files for participant #######
@@ -489,7 +490,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             if use_fmap:
                 fmap_cmd = '--use-syn-sdc --force-syn'  
             else:  
-                fmap_cmd = '--use-syn-sdc --force-syn --ignore fieldmaps'
+                fmap_cmd = '--use-syn-sdc --ignore fieldmaps'
             
             #os.chdir(batch_dir)
             batch_string = fmriprep_cmd
@@ -912,69 +913,6 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
             else:
                 print('already cropped {file}, nr TRs is {nt}'.format(file=file, 
                                                                     nt=file_trs))
-
-
-    def reorient_nii_2RAS(self, participant, input_pth = None, output_pth = None):
-
-        """
-        Reorient niftis to RAS
-        (useful for anat files after dcm2niix)
-
-        Parameters
-        ----------
-        participant : str
-            participant number
-        input_pth: str
-            path to look for files, if None then will get them from root/anat_preprocessing/sub-X/ses-1/anat folder
-        output_pth: str
-            path to save original files, if None then will save them in root/orig_anat/sub-X folder
-
-        """
-
-        ## zero pad participant number, just in case
-        participant = str(participant).zfill(3)
-
-        ## set input path where fmaps are
-        if input_pth is None:
-            input_pth = op.join(self.MRIObj.anat_preproc_pth, 'sub-{sj}'.format(sj=participant), 'ses-1', 'anat')
-
-        # list of original niftis
-        orig_nii_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if val.endswith('.nii.gz')]
-
-        ## set output path where we want to store original (uncropped) fmaps
-        if output_pth is None:
-            output_pth = op.join(self.MRIObj.proj_root_pth, 'orig_anat' , 'sub-{sj}'.format(sj=participant))
-
-        if not op.isdir(output_pth):
-            os.makedirs(output_pth)
-
-        # then for each file
-        for file in orig_nii_files:
-
-            # copy the original to the new folder
-            ogfile = op.join(output_pth, op.split(file)[-1])
-
-            if op.exists(ogfile):
-                print('already exists %s'%ogfile)
-            else:
-                copy2(file, ogfile)
-                print('file copied to %s'%ogfile)
-
-            # reorient all files to RAS+ (used by nibabel & fMRIprep) 
-            orig_img = nib.load(file)
-            orig_img_hdr = orig_img.header
-
-            qform = orig_img_hdr['qform_code'] # set qform code to original
-
-            canonical_img = nib.as_closest_canonical(orig_img)
-
-            if qform != 0:
-                canonical_img.header['qform_code'] = np.array([qform], dtype=np.int16)
-            else:
-                # set to 1 if original qform code = 0
-                canonical_img.header['qform_code'] = np.array([1], dtype=np.int16)
-
-            nib.save(canonical_img, file)
 
 
     def call_mriqc(self, wf_dir = '/scratch/FAM_wf', batch_dir ='/home/inesv/batch'):

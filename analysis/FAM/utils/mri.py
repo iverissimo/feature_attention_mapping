@@ -5,6 +5,7 @@ import os
 from os import path as op
 import pandas as pd
 import re, json
+from shutil import copy2
 
 ## imaging, processing, stats packages
 import nibabel as nib
@@ -572,6 +573,56 @@ def average_epi(file, outdir, method = 'mean'):
 
 
     return output_file
+
+def reorient_nii_2RAS(input_pth, output_pth):
+
+    """
+    Reorient niftis to RAS
+    (useful for anat files after dcm2niix)
+
+    Parameters
+    ----------
+    input_pth: str
+        path to look for files, ex: root/anat_preprocessing/sub-X/ses-1/anat folder
+    output_pth: str
+        path to save original files, ex: root/orig_anat/sub-X folder
+
+    """
+
+    ## set output path where we want to store original files
+    if not op.isdir(output_pth):
+        os.makedirs(output_pth)
+
+    # list of original niftis
+    orig_nii_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if val.endswith('.nii.gz')]
+
+    # then for each file
+    for file in orig_nii_files:
+
+        # copy the original to the new folder
+        ogfile = op.join(output_pth, op.split(file)[-1])
+
+        if op.exists(ogfile):
+            print('already exists %s'%ogfile)
+        else:
+            copy2(file, ogfile)
+            print('file copied to %s'%ogfile)
+
+        # reorient all files to RAS+ (used by nibabel & fMRIprep) 
+        orig_img = nib.load(file)
+        orig_img_hdr = orig_img.header
+
+        qform = orig_img_hdr['qform_code'] # set qform code to original
+
+        canonical_img = nib.as_closest_canonical(orig_img)
+
+        if qform != 0:
+            canonical_img.header['qform_code'] = np.array([qform], dtype=np.int16)
+        else:
+            # set to 1 if original qform code = 0
+            canonical_img.header['qform_code'] = np.array([1], dtype=np.int16)
+
+        nib.save(canonical_img, file)
 
 
 def load_and_mask_data(file, chunk_num = 1, total_chunks = 1):

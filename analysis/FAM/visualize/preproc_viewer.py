@@ -40,7 +40,7 @@ class MRIViewer:
         self.nr_pp = len(self.MRIObj.sj_num)
 
 
-    def check_fs_seg(self, participant_list=[], input_pth = None, check_type = 'view', output_pth = None, use_T2=False):
+    def check_fs_seg(self, participant_list=[], input_pth = None, check_type = 'view', use_T2=False):
 
         """
         Check FREESURFER segmentations
@@ -103,8 +103,7 @@ freeview -v \
             elif check_type == 'movie':
 
                 ## set output path where we want to store movie
-                if output_pth is None:
-                    output_pth = op.join(self.MRIObj.derivatives_pth, 'check_segmentations', 'sub-{sj}'.format(sj=pp))
+                output_pth = op.join(self.MRIObj.derivatives_pth, 'check_segmentations', 'sub-{sj}'.format(sj=pp))
 
                 if not op.isdir(output_pth):
                     os.makedirs(output_pth)

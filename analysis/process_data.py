@@ -63,7 +63,8 @@ json_folder = args.json_folder if args.json_folder is not None else 'fmap' # fre
 
 ## Load data object
 print("Preprocessing {data} data for subject {sj}!".format(data=data_type, sj=sj))
-FAM_data = load_exp_settings.MRIData(params, sj, repo_pth = op.split(load_exp_settings.__file__)[0], base_dir=system_dir)
+FAM_data = load_exp_settings.MRIData(params, sj, repo_pth = op.split(load_exp_settings.__file__)[0], base_dir=system_dir, exclude_sj = exclude_sj)
+#print(FAM_data.sj_num)
 
 ## Load preprocessing class for each data type
 FAM_mri_preprocess = preproc_data.PreprocMRI(FAM_data)
@@ -101,7 +102,7 @@ elif step == 'mriqc':
 elif step == 'check_fs':
 
     plotter = MRIViewer(FAM_data)
-    plotter.check_fs_seg(check_type = freeview_cmd, use_T2 = T2_file)
+    plotter.check_fs_seg(check_type = freeview_cmd, use_T2 = T2_file, participant_list = FAM_data.sj_num)
 
 elif step == 'up_json':
 

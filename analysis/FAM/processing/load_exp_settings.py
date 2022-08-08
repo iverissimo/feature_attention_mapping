@@ -122,6 +122,8 @@ class MRIData(FAMData):
         # path to matlab install
         if self.base_dir == 'local':
             self.matlab_pth = self.params['mri']['paths'][self.base_dir]['matlab']
+
+
         
         
     

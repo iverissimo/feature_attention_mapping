@@ -11,6 +11,8 @@ import ptitprince as pt # raincloud plots
 import matplotlib.patches as mpatches
 from  matplotlib.ticker import FuncFormatter
 
+import cortex
+
 import subprocess
 
 from FAM.utils import mri as mri_utils
@@ -182,6 +184,8 @@ freeview -v \
         ## empty dataframe to save mean values per run
         corr_df = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'acq': [], 'ROI': [], 'mean_r': [], 'Wmean_r': []})
         tsnr_df = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'acq': [], 'ROI': [], 'mean_tsnr': []})
+        ## also save full corr arrays
+        surf_avg_corr = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'acq': [], 'ROI': [], 'vertex': [], 'pearson_r': []})
 
         ## loop over participants
         for pp in self.MRIObj.sj_num:
@@ -211,6 +215,7 @@ freeview -v \
                                             and 'acq-{a}'.format(a=acq) in run and 'task-{t}'.format(t=tsk) in run and run.endswith(file_ext[tsk])]
 
                         ## calculate tSNR for each run
+                        tsnr_arr = []
                         for ind,r in enumerate(bold_files[tsk]):
                             
                             ## use non-PSC file to calculate tSNR
@@ -220,10 +225,7 @@ freeview -v \
                                 r = r.replace(file_ext[tsk], '.npy')
                             
                             ## stack whole brain tsnr - will be used to weight correlations
-                            if ind == 0:
-                                tsnr_arr = np.mean(np.load(r),axis=-1)/np.std(np.load(r),axis=-1)
-                            else:
-                                tsnr_arr = np.vstack((tsnr_arr, np.mean(np.load(r),axis=-1)/np.std(np.load(r),axis=-1)))
+                            tsnr_arr.append(np.mean(np.load(r),axis=-1)/np.std(np.load(r),axis=-1))
 
                             tsnr_df = pd.concat((tsnr_df, 
                                                 pd.DataFrame({'sj': np.tile(pp, len(ROIs)), 
@@ -233,29 +235,134 @@ freeview -v \
                                                             'ROI': ROIs, 
                                                             'mean_tsnr': [np.nanmean((np.mean(np.load(r),axis=-1)/np.std(np.load(r),axis=-1))[roi_verts[roi_name]]) for roi_name in ROIs]})
                                                 ))
+                        # make it an array, for simplicity 
+                        tsnr_arr = np.array(tsnr_arr)
 
                         ## split runs in half and get unique combinations
                         run_sh_lists = mri_utils.split_half_comb(bold_files[tsk])
                         
-                        # for each combination
+                        # get correlation value for each combination
+                        corr_arr = []
                         for r in run_sh_lists:
                             ## correlate the two halfs
                             correlations = mri_utils.correlate_arrs(list(r[0]), list(r[-1]))
-                            ## correlate weighting by tSNR (average across runs)
-                            #Wcorrelations =  mri_utils.correlate_arrs(list(r[0]), list(r[-1]), weights=np.mean(tsnr_arr, axis = 0))
+                            corr_arr.append(correlations)
 
-                            # ## save in dataframe
-                            # corr_df = pd.concat((corr_df, 
-                            #                     pd.DataFrame({'sj': np.tile(pp, len(ROIs)), 
-                            #                                 'ses': np.tile(ses, len(ROIs)), 
-                            #                                 'task': np.tile(tsk, len(ROIs)), 
-                            #                                 'acq': np.tile(acq, len(ROIs)), 
-                            #                                 'ROI': ROIs, 
-                            #                                 'mean_r': [np.nanmean(correlations[roi_verts[roi_name]]) for roi_name in ROIs],
-                            #                                 'Wmean_r': [np.nanmean(Wcorrelations[roi_verts[roi_name]]) for roi_name in ROIs]})
-                            #                     ))
+                            ## save in dataframe
+                            corr_df = pd.concat((corr_df, 
+                                                pd.DataFrame({'sj': np.tile(pp, len(ROIs)), 
+                                                            'ses': np.tile(ses, len(ROIs)), 
+                                                            'task': np.tile(tsk, len(ROIs)), 
+                                                            'acq': np.tile(acq, len(ROIs)), 
+                                                            'ROI': ROIs, 
+                                                            'mean_r': [np.nanmean(correlations[roi_verts[roi_name]]) for roi_name in ROIs],
+                                                            'Wmean_r': [mri_utils.weighted_mean(correlations[roi_verts[roi_name]],
+                                                                          weights=mri_utils.normalize(np.mean(tsnr_arr, axis = 0))[roi_verts[roi_name]]) for roi_name in ROIs]})
+                                                ))
 
+                        ## plot average correlation values on flatmap surface ##
+                        corr_flatmap = cortex.Vertex(np.mean(corr_arr, axis=0), 
+                                                    self.MRIObj.params['plotting']['pycortex_sub'],
+                                                    vmin = 0, vmax = 1,
+                                                    cmap='hot')
+                        #cortex.quickshow(corr_flatmap, with_curvature=True, with_sulci=True)
+                        _ = cortex.quickflat.make_png(op.join(outdir,
+                                        'half_split_correlation_flatmap_sub-{sj}_{ses}_task-{tsk}_acq-{acq}.png'.format(sj=pp, ses=ses, tsk=tsk, acq=acq)), 
+                                        corr_flatmap, 
+                                        recache = False, with_colorbar = True,
+                                        with_curvature = True, with_sulci = True,
+                                        curvature_brightness = 0.4, curvature_contrast = 0.1)
 
-        return tsnr_df, corr_df, tsnr_arr, correlations
+                        ## save surface correlation for relevant ROIS
+                        # to make distribution plots
+                        for roi_name in ROIs:
+                            surf_avg_corr = pd.concat((surf_avg_corr, 
+                                                    pd.DataFrame({'sj': np.tile(pp, len(roi_verts[roi_name])), 
+                                                                'ses': np.tile(ses, len(roi_verts[roi_name])), 
+                                                                'task': np.tile(tsk, len(roi_verts[roi_name])), 
+                                                                'acq': np.tile(acq, len(roi_verts[roi_name])), 
+                                                                'ROI': np.tile(roi_name, len(roi_verts[roi_name])), 
+                                                                'vertex': roi_verts[roi_name],
+                                                                'pearson_r': np.mean(corr_arr, axis=0)[roi_verts[roi_name]]})
+                                                    ))
+
+                ### PLOTS ####
+                
+                ## split half correlation across runs for the participant and session ##
+
+                fig, all_axis = plt.subplots(2, 2, figsize=(20,15), dpi=100, facecolor='w', edgecolor='k')
+                sns.set_theme(style="darkgrid")
+                sns.set(font_scale=1.5) 
+                key = ['mean_r', 'Wmean_r']
+                key2 = ['Mean', 'Weighted Mean']
+
+                for ind,axs in enumerate(all_axis):
+
+                    b1 = sns.barplot(x = 'ROI', y = key[ind], 
+                            hue = 'acq', data = corr_df[corr_df['task'] == 'pRF'], 
+                            capsize = .2 ,linewidth = 1.8, ax=axs[0])
+                    b1.set(xlabel=None)
+                    b1.set(ylabel=None)
+                    axs[0].set_ylabel('{k} Pearson R'.format(k=key2[ind]),fontsize = 18,labelpad=12)
+                    axs[0].set_ylim(-.1,.6)
+                    axs[0].set_title('Half-split correlation pRF runs, sub-{sj}_{ses}'.format(sj=pp, ses=ses)) 
+
+                    b2 = sns.barplot(x = 'ROI', y = key[ind], 
+                                    hue = 'acq', data = corr_df[corr_df['task'] == 'FA'], 
+                                    capsize = .2 ,linewidth = 1.8, ax=axs[1])
+                    b2.set(xlabel=None)
+                    b2.set(ylabel=None)
+                    axs[1].set_ylabel('{k} Pearson R'.format(k=key2[ind]),fontsize = 18,labelpad=12)
+                    axs[1].set_ylim(-.1,.6)
+                    axs[1].set_title('Half-split correlation FA runs, sub-{sj}_{ses}'.format(sj=pp, ses=ses)) 
+
+                fig.savefig(op.join(outdir,'half_split_correlation_ROIS_sub-{sj}_{ses}.png'.format(sj=pp, ses=ses)), dpi=100,bbox_inches = 'tight')
+
+                ### tSNR across runs for the participant and session
+
+                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20,5), dpi=100, facecolor='w', edgecolor='k')
+
+                b1 = sns.barplot(x = 'ROI', y = 'mean_tsnr', 
+                                hue = 'acq', data = tsnr_df[tsnr_df['task'] == 'pRF'], 
+                                capsize = .2 ,linewidth = 1.8, ax=ax1)
+                b1.set(xlabel=None)
+                b1.set(ylabel=None)
+                ax1.set_ylabel('mean tSNR',fontsize = 20,labelpad=18)
+                ax1.set_ylim(0,130)
+                ax1.set_title('tSNR pRF runs, sub-{sj}_{ses}'.format(sj=pp, ses=ses)) 
+
+                b2 = sns.barplot(x = 'ROI', y = 'mean_tsnr', 
+                                hue = 'acq', data = tsnr_df[tsnr_df['task'] == 'FA'], 
+                                capsize = .2 ,linewidth = 1.8, ax=ax2)
+                ax2.set_ylabel('mean tSNR',fontsize = 20,labelpad=18)
+                ax2.set_ylim(0,130)
+                ax2.set_title('tSNR FA runs, sub-{sj}_{ses}'.format(sj=pp, ses=ses)) 
+
+                fig.savefig(op.join(outdir,'tSNR_ROIS_sub-{sj}_{ses}.png'.format(sj=pp, ses=ses)), dpi=100,bbox_inches = 'tight')
+
+                ### split half correlation distribution per ROI ##
+                fig, ax1 = plt.subplots(1, len(ROIs), figsize=(50,5), dpi=100, facecolor='w', edgecolor='k')
+
+                for i in np.arange(len(ROIs)):
+                    A = surf_avg_corr[(surf_avg_corr['task']=='pRF')&\
+                            (surf_avg_corr['ROI']==ROIs[i])&\
+                            (surf_avg_corr['acq']=='standard')].sort_values(by=['vertex'])['pearson_r'].values
+
+                    B = surf_avg_corr[(surf_avg_corr['task']=='pRF')&\
+                                (surf_avg_corr['ROI']==ROIs[i])&\
+                                (surf_avg_corr['acq']=='nordic')].sort_values(by=['vertex'])['pearson_r'].values
+
+                    sns.scatterplot(A,B, ax=ax1[i])
+                    sns.lineplot([-1,1],[-1,1], color='red', ax=ax1[i])
+
+                    ax1[i].set_xlabel('STANDARD',fontsize = 12,labelpad=18)
+                    ax1[i].set_ylabel('NORDIC',fontsize = 12,labelpad=18)
+                    ax1[i].set_ylim(-.2,1)
+                    ax1[i].set_xlim(-.2,1)
+                    ax1[i].set_title(ROIs[i]) 
+
+                fig.savefig(op.join(outdir,'half_split_correlation_ROIS_distribution_sub-{sj}_{ses}.png'.format(sj=pp, ses=ses)), dpi=100,bbox_inches = 'tight')
+
+        return tsnr_df, corr_df, surf_avg_corr
                             
                         

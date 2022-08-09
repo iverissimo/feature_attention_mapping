@@ -163,6 +163,32 @@ def weighted_corr(data1, data2, weights=None):
     return corr
 
 
+def weighted_mean(data1, weights=None, norm=False):
+    
+    """
+    Compute (Weighted) mean 
+    with statsmodel
+    
+    Parameters
+    ----------
+    data1 : arr
+        numpy array 
+    weights : arr
+    
+    """ 
+
+    if norm:
+        weights = normalize(weights)
+
+    if weights is not None:
+        weights[np.where((np.isinf(weights)) | (np.isnan(weights)) | (weights == 0))] = 0.000000001
+
+    avg_data = weightstats.DescrStatsW(data1,weights=weights).mean
+
+    return avg_data
+    
+
+
 def correlate_arrs(data1, data2, n_jobs = 4, weights=[]):
     
     """
@@ -196,25 +222,9 @@ def correlate_arrs(data1, data2, n_jobs = 4, weights=[]):
         data2_arr = np.load(data2)
     elif isinstance(data2, np.ndarray):
         data2_arr = data2
-
-    ## to make computation more efficient,
-    # run this in batches
-    nr_batches = [val for val in np.arange(100) if data1_arr.shape[0] % val == 0]
-    nr_batches = nr_batches[-1] if len(nr_batches)>0 else data1_arr.shape[0]
-    # number of vertices of batch
-    num_vert = int(data1_arr.shape[0]/nr_batches)
-    print('Splitting data in %i batches with %i vertices each'%(nr_batches,num_vert))
                 
     ## actually correlate
-    # if we provided weights, will be weighted correlation
-    if len(weights) > 0:
-        correlations = np.array(Parallel(n_jobs=n_jobs)(delayed(weighted_corr)(data1_arr[i*num_vert:int(i+1)*num_vert], 
-                                                                            data2_arr[i*num_vert:int(i+1)*num_vert], 
-                                                                            weights = weights[i*num_vert:int(i+1)*num_vert]) for i in np.arange(nr_batches)))[...,0,1]
-        
-    else:
-        correlations = np.array(Parallel(n_jobs=n_jobs)(delayed(weighted_corr)(data1_arr[i*num_vert:int(i+1)*num_vert], 
-                                                                            data2_arr[i*num_vert:int(i+1)*num_vert]) for i in np.arange(nr_batches)))#[...,0,1]
+    correlations = np.array(Parallel(n_jobs=n_jobs)(delayed(np.corrcoef)(data1_arr[i], data2_arr[i]) for i in np.arange(data1_arr.shape[0])))[...,0,1]
             
     return correlations
 

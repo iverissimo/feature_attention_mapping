@@ -34,6 +34,9 @@ class FAMData:
                 self.params = yaml.safe_load(f_in)
         else:
             self.params = params
+
+        # relevant tasks
+        self.tasks = ['pRF', 'FA']
             
         # excluded participants
         self.exclude_sj = exclude_sj
@@ -123,6 +126,11 @@ class MRIData(FAMData):
         if self.base_dir == 'local':
             self.matlab_pth = self.params['mri']['paths'][self.base_dir]['matlab']
 
+        ## some relevant params
+        self.acq = self.params['mri']['acq'] # if using standard files or nordic files
+        self.sj_space = self.params['mri']['space'] # subject space
+        self.file_ext = self.params['mri']['file_ext'][self.sj_space] # file extension
+        self.confound_ext = self.params['mri']['confounds']['file_ext'] # file extension
 
         
         

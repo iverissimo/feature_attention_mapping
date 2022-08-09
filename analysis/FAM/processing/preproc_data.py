@@ -1009,12 +1009,6 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
         Run final processing steps on functional data (after fmriprep)
         """ 
 
-        ## some relevant parameters
-        acq = self.MRIObj.params['mri']['acq'] # if using standard files or nordic files
-        space = self.MRIObj.params['mri']['space'] # subject space
-        file_ext = self.MRIObj.params['mri']['file_ext'][space] # file extension
-        confound_ext = self.MRIObj.params['mri']['confounds']['file_ext'] # file extension
-
         # loop over participants
         for pp in self.MRIObj.sj_num:
             
@@ -1022,7 +1016,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
                 
                 if output_pth is None:
-                    output_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', space, 'sub-{sj}'.format(sj=pp), ses)
+                    output_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 'sub-{sj}'.format(sj=pp), ses)
 
                 # if output path doesn't exist, create it
                 if not op.isdir(output_pth): 
@@ -1036,12 +1030,12 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                     print('Processign bold files from task-{t}'.format(t=tsk))
 
                     # bold files
-                    bold_files = [op.join(fmriprep_pth,run) for run in os.listdir(fmriprep_pth) if 'space-{sp}'.format(sp=space) in run \
-                        and 'acq-{a}'.format(a=acq) in run and 'task-{t}'.format(t=tsk) in run and run.endswith(file_ext)]
+                    bold_files = [op.join(fmriprep_pth,run) for run in os.listdir(fmriprep_pth) if 'space-{sp}'.format(sp=self.MRIObj.sj_space) in run \
+                        and 'acq-{a}'.format(a=self.MRIObj.acq) in run and 'task-{t}'.format(t=tsk) in run and run.endswith(self.MRIObj.file_ext)]
 
                     # confounds
-                    confound_files = [op.join(fmriprep_pth,run) for run in os.listdir(fmriprep_pth) if 'acq-{a}'.format(a=acq) in run \
-                        and 'task-{t}'.format(t=tsk) in run and run.endswith(confound_ext)]
+                    confound_files = [op.join(fmriprep_pth,run) for run in os.listdir(fmriprep_pth) if 'acq-{a}'.format(a=self.MRIObj.acq) in run \
+                        and 'task-{t}'.format(t=tsk) in run and run.endswith(self.MRIObj.confound_ext)]
 
                     ### load and convert files in numpy arrays, to make format issue obsolete ###
                     # note, if we need headers or affines later on, we will need to get them from fmriprep folder
@@ -1086,7 +1080,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                     ## average all runs for pRF task
                     if tsk == 'pRF':
                         
-                        if '.func.gii' in file_ext: # combine hemispheres into one array
+                        if '.func.gii' in self.MRIObj.file_ext: # combine hemispheres into one array
                             
                             hemi_files = []
                             
@@ -1104,6 +1098,28 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                             copyfile(f, op.join(final_output_dir,op.split(f)[-1]))
 
 
+    def get_mrifile_ext(self):
 
+        """
+        Helper script to get processed (post fmriprep) file extension
+        """ 
 
+        ## define file extension that we want to use, 
+        # should include processing key words
+        file_ext = {'pRF': '', 'FA': ''}
+        
+        for tsk in self.MRIObj.tasks:
+            # if cropped first
+            if self.MRIObj.params[tsk]['crop']:
+                file_ext[tsk] += '_{name}'.format(name='cropped')
+            # type of filtering/denoising
+            if self.MRIObj.params[tsk]['regress_confounds']:
+                file_ext[tsk] += '_{name}'.format(name='confound')
+            else:
+                file_ext[tsk] += '_{name}'.format(name = self.MRIObj.params['mri']['filtering']['type'])
+            # type of standardization 
+            file_ext[tsk] += '_{name}'.format(name = self.MRIObj.params[tsk]['standardize'])
+            # don't forget its a numpy array
+            file_ext[tsk] += '.npy'
 
+        return file_ext

@@ -115,14 +115,14 @@ mri: # refers to the Psychopy SyncGenerator class
   file_ext:  {'fsLR_den-170k': '_bold.dtseries.nii', 
               'fsaverage': '_bold.func.gii'} # file extension
 
-  acq: 'nordic' #'standard' # "acquisition" type to use
+  acq: 'standard' #'nordic' #'standard' # "acquisition" type to use
 
   nr_runs: 4 # number of runs per task
 
   fmriprep_sing: 'fmriprep.21.0.2.simg' # fmriprep singularity image name
   mriqc_sing: 'mriqc-0.15.1.simg' # mriqc singularity image name
 
-  save_subcortical: True # saving subcortical surface data
+  save_subcortical: False # saving subcortical surface data
 
   slicetimecorrection: True
 

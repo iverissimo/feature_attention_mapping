@@ -6,6 +6,7 @@ from os import path as op
 import pandas as pd
 import re, json
 from shutil import copy2
+import itertools
 
 ## imaging, processing, stats packages
 import nibabel as nib
@@ -138,49 +139,83 @@ def get_tsnr(input_file, return_mean=True, affine=[], hdr=[], filename=None):
         return tsnr
 
 
-def correlate_vol(data1,data2,outfile):
+def weighted_corr(data1, data2, weights=None):
+
     """
-    Compute Pearson correlation between 2 of nifti files
-    and generate the equivalent correlation nifti. 
+    Compute (Weighted) correlation between two numpy arrays
+    with statsmodel
+    
+    Parameters
+    ----------
+    data1 : arr
+        numpy array 
+    data2 : arr
+        same as data1
+    weights : arr
+    
     """ 
 
-    if not op.exists(outfile): 
-        print('making %s'%outfile)
+    if weights is not None:
+        weights[np.where((np.isinf(weights)) | (np.isnan(weights)) | (weights == 0))] = 0.000000001
+
+    corr = weightstats.DescrStatsW(np.vstack((data1,data2)), weights=weights).corrcoef
+
+    return corr
+
+
+def correlate_arrs(data1, data2, n_jobs = 4, weights=[]):
     
-        # get affine for one of the runs
-        nibber = nib.load(data1)
-        affine = nibber.affine
+    """
+    Compute Pearson correlation between two numpy arrays
+    
+    Parameters
+    ----------
+    data1 : str/list/array
+        numpy array OR absolute filename of array OR list filenames
+    data2 : str/list/array
+        same as data1
+    n_jobs : int
+        number of jobs for parallel
+    
+    """ 
+    
+    data1_arr = []
+    data2_arr = []
+    
+    ## if list was provided, then load and average
+    if isinstance(data1, list):
+        data1_arr = np.mean(np.stack(np.load(v) for v in list(data1)), axis = 0)
+    elif isinstance(data1, str):
+        data1_arr = np.load(data1)
+    elif isinstance(data1, np.ndarray):
+        data1_arr = data1
         
-        # load data 
-        data1 = np.array(nib.load(data1).dataobj)
-        data2 = np.array(nib.load(data2).dataobj)
+    if isinstance(data2, list):
+        data2_arr = np.mean(np.stack(np.load(v) for v in list(data2)), axis = 0)
+    elif isinstance(data2, str):
+        data2_arr = np.load(data2)
+    elif isinstance(data2, np.ndarray):
+        data2_arr = data2
+
+    ## to make computation more efficient,
+    # run this in batches
+    nr_batches = [val for val in np.arange(100) if data1_arr.shape[0] % val == 0]
+    nr_batches = nr_batches[-1] if len(nr_batches)>0 else data1_arr.shape[0]
+    # number of vertices of batch
+    num_vert = int(data1_arr.shape[0]/nr_batches)
+    print('Splitting data in %i batches with %i vertices each'%(nr_batches,num_vert))
+                
+    ## actually correlate
+    # if we provided weights, will be weighted correlation
+    if len(weights) > 0:
+        correlations = np.array(Parallel(n_jobs=n_jobs)(delayed(weighted_corr)(data1_arr[i*num_vert:int(i+1)*num_vert], 
+                                                                            data2_arr[i*num_vert:int(i+1)*num_vert], 
+                                                                            weights = weights[i*num_vert:int(i+1)*num_vert]) for i in np.arange(nr_batches)))[...,0,1]
         
-        #- Calculate the number of voxels (number of elements in one volume)
-        n_voxels = np.prod(data1.shape[:-1])
-
-        #- Reshape 4D array to 2D array n_voxels by n_volumes
-        data1_2d = np.reshape(data1, (n_voxels, data1.shape[-1]))
-        data2_2d = np.reshape(data2, (n_voxels, data2.shape[-1]))
-
-        #- Make a 1D array of size (n_voxels,) to hold the correlation values
-        correlations_1d = np.zeros((n_voxels,))
-
-        #- Loop over voxels filling in correlation at this voxel
-        for i in range(n_voxels):
-            correlations_1d[i] = np.corrcoef(data1_2d[i, :], data2_2d[i, :])[0, 1]
-            
-        #- Reshape the correlations array back to 3D
-        correlations = np.reshape(correlations_1d, data1.shape[:-1])
-        
-        corr_image = nib.nifti1.Nifti1Image(correlations,affine)
-        
-        nib.save(corr_image,outfile)
-
     else:
-        print('already exists, skipping %s'%outfile)
-        correlations = nib.load(outfile)
-        correlations = np.array(correlations.dataobj)
-    
+        correlations = np.array(Parallel(n_jobs=n_jobs)(delayed(weighted_corr)(data1_arr[i*num_vert:int(i+1)*num_vert], 
+                                                                            data2_arr[i*num_vert:int(i+1)*num_vert]) for i in np.arange(nr_batches)))#[...,0,1]
+            
     return correlations
 
 
@@ -623,6 +658,32 @@ def reorient_nii_2RAS(input_pth, output_pth):
             canonical_img.header['qform_code'] = np.array([1], dtype=np.int16)
 
         nib.save(canonical_img, file)
+
+def convert64bit_to_16bit(input_file, output_file):
+
+    """
+    Convert niftis from 64-bit (float) to 16-bit (int)
+    (useful for nifits obtained from parrec2nii)
+
+    Parameters
+    ----------
+    input_file: str
+        absolute filename of original file
+    output_file: str
+        absolute filename of new file
+    """
+
+    # load nifti image
+    image_nii = nib. load(input_file)
+
+    ## try saving and int16 but preserving scaling
+    new_image = nib.Nifti1Image(image_nii.dataobj.get_unscaled(), image_nii.affine, image_nii.header)
+    new_image.header['scl_inter'] = 0
+    new_image.set_data_dtype(np.int16)
+
+    # save in same dir
+    nib.save(new_image, output_file)
+
 
 
 def load_and_mask_data(file, chunk_num = 1, total_chunks = 1):
@@ -1922,6 +1983,35 @@ def leave_one_out(input_list):
         out_lists.append([y for y in input_list if y != x])
 
     return out_lists
+
+
+def split_half_comb(input_list):
+
+    """ make list of lists, by spliting half
+    and getting all unique combinations
+    
+    Parameters
+    ----------
+    input_list : list/arr
+        list of items
+    Outputs
+    -------
+    unique_pairs : list/arr
+        list of tuples
+    
+    """
+
+    A = list(itertools.combinations(input_list, int(len(input_list)/2)))
+    
+    combined_pairs = []
+    for pair in A:
+        combined_pairs.append(tuple([pair, tuple([r for r in input_list if r not in pair])]))
+
+    # get unique pairs
+    seen = set()
+    unique_pairs = [t for t in combined_pairs if tuple(sorted(t)) not in seen and not seen.add(tuple(sorted(t)))]
+
+    return unique_pairs
 
 
 def create_hrf(hrf_params=[1.0, 1.0, 0.0], TR = 1.6, osf = 1, onset = 0):

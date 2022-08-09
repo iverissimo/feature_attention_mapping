@@ -13,6 +13,9 @@ from  matplotlib.ticker import FuncFormatter
 
 import subprocess
 
+from FAM.utils import mri as mri_utils
+
+
 class MRIViewer:
 
     def __init__(self, MRIObj, outputdir = None):
@@ -140,3 +143,119 @@ freeview -v \
                 subject = 'sub-{sj}'.format(sj=pp)
                 convert_command = f'ffmpeg -framerate 5 -pattern_type glob -i "{output_pth}/*.png" -b:v 2M -c:v mpeg4 {output_pth}/{subject}.mp4'
                 subprocess.call(convert_command, shell=True)
+
+
+    def compare_nordic2standard(self, participant_list = [], input_pth = None, file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'},
+                                use_atlas_rois = True, acq_keys = ['standard', 'nordic']):
+
+        """
+        Make nordic vs standard comparison plots
+        
+        NOTE - expects that we already ran postfmriprep, for both 
+        
+        Parameters
+        ----------
+        input_pth: str
+            path to look for files, if None then will get them from derivatives/freesurfer/sub-X folder
+        output_pth: str
+            path to save original files, if None then will save them in derivatives/check_segmentations/sub-X folder
+        check_type : str
+            if viewing or making movie (view, movie) 
+        """ 
+
+        ## output path to save plots
+        output_pth = op.join(self.MRIObj.derivatives_pth, 'nordic_comparison')
+
+        ## input path, if not defined get's it from post-fmriprep dir
+        if input_pth is None:
+            input_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space)
+
+        ## get vertices for each relevant ROI
+        # from glasser atlas
+        ROIs, roi_verts, color_codes = mri_utils.get_rois4plotting(self.MRIObj.params, 
+                                                                pysub = self.MRIObj.params['plotting']['pycortex_sub'], 
+                                                                use_atlas = use_atlas_rois, 
+                                                                atlas_pth = op.join(self.MRIObj.derivatives_pth,
+                                                                                    'glasser_atlas','59k_mesh'), 
+                                                                space = self.MRIObj.sj_space)
+
+        ## empty dataframe to save mean values per run
+        corr_df = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'acq': [], 'ROI': [], 'mean_r': [], 'Wmean_r': []})
+        tsnr_df = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'acq': [], 'ROI': [], 'mean_tsnr': []})
+
+        ## loop over participants
+        for pp in self.MRIObj.sj_num:
+
+            # and over sessions (if more than one)
+            for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
+                
+                bold_files = {}
+                
+                # path to post fmriprep dir
+                postfmriprep_pth = op.join(input_pth, 'sub-{sj}'.format(sj=pp), ses)
+
+                outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp), ses)
+                # if output path doesn't exist, create it
+                if not op.isdir(outdir): 
+                    os.makedirs(outdir)
+                print('saving files in %s'%outdir)
+                
+                # and acquisition types
+                for acq in acq_keys:
+                    
+                    ## load data for both tasks
+                    for tsk in self.MRIObj.tasks:
+
+                        ## bold filenames
+                        bold_files[tsk] = [op.join(postfmriprep_pth, run) for run in os.listdir(postfmriprep_pth) if 'space-{sp}'.format(sp=self.MRIObj.sj_space) in run \
+                                            and 'acq-{a}'.format(a=acq) in run and 'task-{t}'.format(t=tsk) in run and run.endswith(file_ext[tsk])]
+
+                        ## calculate tSNR for each run
+                        for ind,r in enumerate(bold_files[tsk]):
+                            
+                            ## use non-PSC file to calculate tSNR
+                            if 'cropped' in file_ext[tsk]:
+                                r = r.replace(file_ext[tsk], '_cropped.npy')
+                            else:
+                                r = r.replace(file_ext[tsk], '.npy')
+                            
+                            ## stack whole brain tsnr - will be used to weight correlations
+                            if ind == 0:
+                                tsnr_arr = np.mean(np.load(r),axis=-1)/np.std(np.load(r),axis=-1)
+                            else:
+                                tsnr_arr = np.vstack((tsnr_arr, np.mean(np.load(r),axis=-1)/np.std(np.load(r),axis=-1)))
+
+                            tsnr_df = pd.concat((tsnr_df, 
+                                                pd.DataFrame({'sj': np.tile(pp, len(ROIs)), 
+                                                            'ses': np.tile(ses, len(ROIs)), 
+                                                            'task': np.tile(tsk, len(ROIs)), 
+                                                            'acq': np.tile(acq, len(ROIs)), 
+                                                            'ROI': ROIs, 
+                                                            'mean_tsnr': [np.nanmean((np.mean(np.load(r),axis=-1)/np.std(np.load(r),axis=-1))[roi_verts[roi_name]]) for roi_name in ROIs]})
+                                                ))
+
+                        ## split runs in half and get unique combinations
+                        run_sh_lists = mri_utils.split_half_comb(bold_files[tsk])
+                        
+                        # for each combination
+                        for r in run_sh_lists:
+                            ## correlate the two halfs
+                            correlations = mri_utils.correlate_arrs(list(r[0]), list(r[-1]))
+                            ## correlate weighting by tSNR (average across runs)
+                            #Wcorrelations =  mri_utils.correlate_arrs(list(r[0]), list(r[-1]), weights=np.mean(tsnr_arr, axis = 0))
+
+                            # ## save in dataframe
+                            # corr_df = pd.concat((corr_df, 
+                            #                     pd.DataFrame({'sj': np.tile(pp, len(ROIs)), 
+                            #                                 'ses': np.tile(ses, len(ROIs)), 
+                            #                                 'task': np.tile(tsk, len(ROIs)), 
+                            #                                 'acq': np.tile(acq, len(ROIs)), 
+                            #                                 'ROI': ROIs, 
+                            #                                 'mean_r': [np.nanmean(correlations[roi_verts[roi_name]]) for roi_name in ROIs],
+                            #                                 'Wmean_r': [np.nanmean(Wcorrelations[roi_verts[roi_name]]) for roi_name in ROIs]})
+                            #                     ))
+
+
+        return tsnr_df, corr_df, tsnr_arr, correlations
+                            
+                        

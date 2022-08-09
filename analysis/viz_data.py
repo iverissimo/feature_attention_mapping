@@ -66,3 +66,13 @@ if viz == 'freeview':
 
     plotter = MRIViewer(FAM_data)
     plotter.check_fs_seg(check_type = freeview_cmd, use_T2 = T2_file, participant_list = FAM_preproc.MRIObj.sj_num)
+
+elif viz == 'nordic':
+
+    print('Comparing NORDIC to standard runs')
+
+    plotter = MRIViewer(FAM_data)
+    plotter.compare_nordic2standard(participant_list = FAM_preproc.MRIObj.sj_num, 
+                                     input_pth = None, 
+                                     file_ext = FAM_preproc.get_mrifile_ext())
+    

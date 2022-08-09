@@ -225,7 +225,7 @@ freeview -v \
                                 r = r.replace(file_ext[tsk], '.npy')
                             
                             ## stack whole brain tsnr - will be used to weight correlations
-                            tsnr_arr.append(np.mean(np.load(r),axis=-1)/np.std(np.load(r),axis=-1))
+                            tsnr_arr.append(mri_utils.get_tsnr(np.load(r), return_mean = False))
 
                             tsnr_df = pd.concat((tsnr_df, 
                                                 pd.DataFrame({'sj': np.tile(pp, len(ROIs)), 
@@ -233,7 +233,7 @@ freeview -v \
                                                             'task': np.tile(tsk, len(ROIs)), 
                                                             'acq': np.tile(acq, len(ROIs)), 
                                                             'ROI': ROIs, 
-                                                            'mean_tsnr': [np.nanmean((np.mean(np.load(r),axis=-1)/np.std(np.load(r),axis=-1))[roi_verts[roi_name]]) for roi_name in ROIs]})
+                                                            'mean_tsnr': [np.nanmean(mri_utils.get_tsnr(np.load(r), return_mean = False)[roi_verts[roi_name]]) for roi_name in ROIs]})
                                                 ))
                         # make it an array, for simplicity 
                         tsnr_arr = np.array(tsnr_arr)
@@ -366,3 +366,182 @@ freeview -v \
         return tsnr_df, corr_df, surf_avg_corr
                             
                         
+    def plot_tsnr(self, participant_list = [], input_pth = None, use_atlas_rois = True,
+              file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'}):
+
+        """
+        Plot tSNR
+        
+        NOTE - expects that we already ran postfmriprep, for both 
+        
+        Parameters
+        ----------
+        input_pth: str
+            path to look for files, if None then will get them from derivatives/freesurfer/sub-X folder
+        """ 
+
+        ## output path to save plots
+        output_pth = op.join(self.outputdir, 'tSNR')
+
+        ## input path, if not defined get's it from post-fmriprep dir
+        if input_pth is None:
+            input_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space)
+
+        ## get vertices for each relevant ROI
+        # from glasser atlas
+        ROIs, roi_verts, color_codes = mri_utils.get_rois4plotting(self.MRIObj.params, 
+                                                                pysub = self.MRIObj.params['plotting']['pycortex_sub'], 
+                                                                use_atlas = use_atlas_rois, 
+                                                                atlas_pth = op.join(self.MRIObj.derivatives_pth,
+                                                                                    'glasser_atlas','59k_mesh'), 
+                                                                space = self.MRIObj.sj_space)
+
+        ## empty dataframe to save mean values per run
+        tsnr_df = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'ROI': [], 'mean_tsnr': []})
+        
+        ## loop over participants
+        for pp in self.MRIObj.sj_num:
+
+            # and over sessions (if more than one)
+            for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
+                
+                bold_files = {}
+                
+                # path to post fmriprep dir
+                postfmriprep_pth = op.join(input_pth, 'sub-{sj}'.format(sj=pp), ses)
+
+                outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp), ses)
+                # if output path doesn't exist, create it
+                if not op.isdir(outdir): 
+                    os.makedirs(outdir)
+                print('saving files in %s'%outdir)
+                    
+                ## load data for both tasks
+                for tsk in self.MRIObj.tasks:
+
+                    ## bold filenames
+                    bold_files[tsk] = [op.join(postfmriprep_pth, run) for run in os.listdir(postfmriprep_pth) if 'space-{sp}'.format(sp=self.MRIObj.sj_space) in run \
+                                        and 'acq-{a}'.format(a=self.MRIObj.acq) in run and 'task-{t}'.format(t=tsk) in run and run.endswith(file_ext[tsk])]
+
+                    ## calculate tSNR for each run
+                    tsnr_arr = []
+                    for ind,r in enumerate(bold_files[tsk]):
+
+                        ## use non-PSC file to calculate tSNR
+                        if 'cropped' in file_ext[tsk]:
+                            r = r.replace(file_ext[tsk], '_cropped.npy')
+                        else:
+                            r = r.replace(file_ext[tsk], '.npy')
+
+                        ## stack whole brain tsnr - will be used to weight correlations
+                        tsnr_arr.append(mri_utils.get_tsnr(np.load(r), return_mean = False))
+
+                        tsnr_df = pd.concat((tsnr_df, 
+                                            pd.DataFrame({'sj': np.tile(pp, len(ROIs)), 
+                                                        'ses': np.tile(ses, len(ROIs)), 
+                                                        'task': np.tile(tsk, len(ROIs)), 
+                                                        'ROI': ROIs, 
+                                                        'mean_tsnr': [np.nanmean(mri_utils.get_tsnr(np.load(r), return_mean = False)[roi_verts[roi_name]]) for roi_name in ROIs]})
+                                            ))
+                    
+                    ## plot average tSNR values on flatmap surface ##
+                    tSNR_flatmap = cortex.Vertex(np.mean(tsnr_arr, axis=0), 
+                                                self.MRIObj.params['plotting']['pycortex_sub'],
+                                                vmin = 0, vmax = 150,
+                                                cmap='hot')
+                    #cortex.quickshow(tSNR_flatmap, with_curvature=True, with_sulci=True)
+                    _ = cortex.quickflat.make_png(op.join(outdir,
+                                    'tSNR_flatmap_sub-{sj}_{ses}_task-{tsk}.png'.format(sj=pp, ses=ses, tsk=tsk)), 
+                                    tSNR_flatmap, 
+                                    recache = False, with_colorbar = True,
+                                    with_curvature = True, with_sulci = True,
+                                    curvature_brightness = 0.4, curvature_contrast = 0.1)
+
+                ### plot tSNR across runs for the participant and session
+                fig, ax1 = plt.subplots(1, 1, figsize=(15,5), dpi=100, facecolor='w', edgecolor='k')
+                sns.set_theme(style="darkgrid")
+                sns.set(font_scale=1.5) 
+                b1 = sns.barplot(x = 'ROI', y = 'mean_tsnr', hue = 'task', data = tsnr_df,
+                            capsize = .2 ,linewidth = 1.8, ax=ax1)
+                b1.set(xlabel=None)
+                b1.set(ylabel=None)
+                ax1.set_ylabel('mean tSNR',fontsize = 20,labelpad=18)
+                ax1.set_ylim(0,130)
+                         
+                fig.savefig(op.join(outdir,'tSNR_ROIS_sub-{sj}_{ses}.png'.format(sj=pp, ses=ses)), dpi=100,bbox_inches = 'tight')
+
+        #return tsnr_df
+
+
+    def plot_vasculature(self, participant_list = [], input_pth = None, 
+              file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'}):
+
+        """
+        Plot mean EPI across pRF runs as a proxy of vasculature
+        
+        NOTE - expects that we already ran postfmriprep, 
+        
+        Parameters
+        ----------
+        input_pth: str
+            path to look for files, if None then will get them from derivatives/freesurfer/sub-X folder
+        """ 
+
+        ## output path to save plots
+        output_pth = op.join(self.outputdir, 'vasculature')
+
+        ## input path, if not defined get's it from post-fmriprep dir
+        if input_pth is None:
+            input_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space)
+
+        ## loop over participants
+        for pp in self.MRIObj.sj_num:
+
+            # and over sessions (if more than one)
+            for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
+                
+                # path to post fmriprep dir
+                postfmriprep_pth = op.join(input_pth, 'sub-{sj}'.format(sj=pp), ses)
+
+                outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp), ses)
+                # if output path doesn't exist, create it
+                if not op.isdir(outdir): 
+                    os.makedirs(outdir)
+                print('saving files in %s'%outdir)
+
+                ## bold filenames
+                bold_files = [op.join(postfmriprep_pth, run) for run in os.listdir(postfmriprep_pth) if 'space-{sp}'.format(sp=self.MRIObj.sj_space) in run \
+                                    and 'acq-{a}'.format(a=self.MRIObj.acq) in run and 'task-pRF' in run and run.endswith(file_ext['pRF'])]
+
+                mean_epi = []
+
+                for file in bold_files:
+                    ## use non-PSC file
+                    if 'cropped' in file:
+                        file = file.replace(file_ext['pRF'], '_cropped.npy')
+                    else:
+                        file = file.replace(file_ext['pRF'], '.npy')
+                    mean_epi.append(np.load(file,allow_pickle=True)) 
+
+                # average the EPI time course
+                mean_epi = np.nanmean(np.nanmean(mean_epi, axis=0), axis=-1)
+                
+                # normalize image by dividing the value of each vertex 
+                # by the value of the vertex with the maximum intensity
+                norm_data = mri_utils.normalize(mean_epi)
+
+                ## plot average tSNR values on flatmap surface ##
+                epi_flatmap = cortex.Vertex(norm_data, 
+                                            self.MRIObj.params['plotting']['pycortex_sub'],
+                                            vmin = 0, vmax = 1,
+                                            cmap='hot')
+                #cortex.quickshow(epi_flatmap, with_curvature=True, with_sulci=True)
+                _ = cortex.quickflat.make_png(op.join(outdir,
+                                'mean_epi_flatmap_sub-{sj}_{ses}_task-pRF.png'.format(sj=pp, ses=ses)), 
+                                epi_flatmap, 
+                                recache = False, with_colorbar = True,
+                                with_curvature = True, with_sulci = True,
+                                curvature_brightness = 0.4, curvature_contrast = 0.1)
+
+
+        

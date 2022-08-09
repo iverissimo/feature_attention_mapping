@@ -76,3 +76,23 @@ elif viz == 'nordic':
                                      input_pth = None, 
                                      file_ext = FAM_preproc.get_mrifile_ext())
     
+elif viz == 'tsnr':
+
+    print('Plotting tSNR')
+
+    plotter = MRIViewer(FAM_data)
+    plotter.plot_tsnr(participant_list = FAM_preproc.MRIObj.sj_num, 
+                                     input_pth = None, 
+                                     file_ext = FAM_preproc.get_mrifile_ext())
+    
+elif viz == 'vasculature':
+
+    print('Plotting vasculature proxy for pRF task')
+
+    plotter = MRIViewer(FAM_data)
+    plotter.plot_vasculature(participant_list = FAM_preproc.MRIObj.sj_num, 
+                                     input_pth = None, 
+                                     file_ext = FAM_preproc.get_mrifile_ext())
+
+#elif viz == 'bold':
+    

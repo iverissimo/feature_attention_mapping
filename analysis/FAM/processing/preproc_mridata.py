@@ -436,7 +436,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             if node_name is not None:
                 fmriprep_cmd += '#SBATCH -w {n}\n'.format(n=node_name)
             else:
-                fmriprep_cmd += '#SBATCH --mem={mem}G\n'.format(mem=mem)
+                fmriprep_cmd += '#SBATCH --mem={mem}G\n'.format(mem=batch_mem_Gib)
             
             # make fmriprep folder if it does not exist
             #if not op.exists(self.MRIObj.fmriprep_pth):

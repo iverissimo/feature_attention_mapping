@@ -116,7 +116,11 @@ class BehData(FAMData):
         # color categories used (with two per color category)
         self.color_categories_dict = self.params['general']['task_colors']
         # actual colors used
-        self.bar_colors = [element for sublist in self.color_categories_dict.values() for element in sublist] 
+        self.bar_colors = [element for sublist in self.color_categories_dict.values() for element in sublist]
+
+        ## some pRF params relevant for setting task
+        self.pRF_bar_pass = self.params['pRF']['bar_pass_direction']
+        self.pRF_nr_TRs = self.params['pRF']['num_TRs'] 
 
 
 class MRIData(BehData):

@@ -3,8 +3,9 @@ import os.path as op
 import argparse
 
 import yaml
-from FAM.processing import load_exp_settings, preproc_data
+from FAM.processing import load_exp_settings, preproc_mridata, preproc_behdata
 from FAM.visualize.preproc_viewer import MRIViewer
+from FAM.visualize.beh_viewer import BehViewer
 
 # load settings from yaml
 with open('exp_params.yml', 'r') as f_in:
@@ -50,7 +51,9 @@ FAM_data = load_exp_settings.MRIData(params, sj, repo_pth = op.split(load_exp_se
 
 ## Load preprocessing class for each data type
 if data_type == 'mri':
-    FAM_preproc = preproc_data.PreprocMRI(FAM_data)
+    FAM_preproc = preproc_mridata.PreprocMRI(FAM_data)
+elif data_type == 'beh':
+    FAM_preproc = preproc_behdata.PreprocBeh(FAM_data)
 else:
     raise NameError('Not specified')
 
@@ -95,4 +98,15 @@ elif viz == 'vasculature':
                                      file_ext = FAM_preproc.get_mrifile_ext())
 
 #elif viz == 'bold':
+
+elif viz == 'behavior':
     
+    print('Plotting behavior results for pRF task') ## should do for both
+    
+    # first get the dataframe with the mean results
+    df_beh_summary = FAM_preproc.get_pRF_behavioral_results(ses_type = 'func')
+
+    plotter = BehViewer(FAM_data)
+    plotter.plot_pRF_behavior(results_df = df_beh_summary, plot_group = True)
+
+

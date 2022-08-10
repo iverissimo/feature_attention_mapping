@@ -3,7 +3,7 @@ import os.path as op
 import argparse
 
 import yaml
-from FAM.processing import load_exp_settings, preproc_data
+from FAM.processing import load_exp_settings, preproc_mridata
 
 # load settings from yaml
 with open('exp_params.yml', 'r') as f_in:
@@ -62,7 +62,7 @@ FAM_data = load_exp_settings.MRIData(params, sj, repo_pth = op.split(load_exp_se
 #print(FAM_data.sj_num)
 
 ## Load preprocessing class for each data type
-FAM_mri_preprocess = preproc_data.PreprocMRI(FAM_data)
+FAM_mri_preprocess = preproc_mridata.PreprocMRI(FAM_data)
 
 ## run specific steps
 print('Running {step}'.format(step=step))

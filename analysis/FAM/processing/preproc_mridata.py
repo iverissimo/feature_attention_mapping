@@ -503,7 +503,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                             '$WF_DIR': wf_dir,
                             '$BD': batch_dir,
                             '$FMAP_CMD': fmap_cmd,
-                            '$MEM': node_mem
+                            '$MEM': str(node_mem)
                              }
 
             # replace all key-value pairs in batch string

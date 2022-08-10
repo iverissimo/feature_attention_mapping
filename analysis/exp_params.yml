@@ -115,7 +115,7 @@ mri: # refers to the Psychopy SyncGenerator class
   file_ext:  {'fsLR_den-170k': '_bold.dtseries.nii', 
               'fsaverage': '_bold.func.gii'} # file extension
 
-  acq: 'nordic' #'nordic' #'standard' # "acquisition" type to use
+  acq: 'standard' #'nordic' #'nordic' #'standard' # "acquisition" type to use
 
   nr_runs: 4 # number of runs per task
 

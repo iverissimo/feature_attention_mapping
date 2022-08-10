@@ -23,6 +23,7 @@ parser.add_argument("--exclude_sj", nargs='+', help="List of subjects to exclude
 # only relevant for LISA/slurm system
 parser.add_argument("--node_name", type = str, help="Node name, to send job to [default None]")
 parser.add_argument("--partition_name", type = str, help="Partition name, to send job to [default None]")
+parser.add_argument("--node_mem", type = int, help="Node memory limit, to send job fmriprep command [default 5000]")
 # fmriprep fmap input
 parser.add_argument("--use_fmap", type = int, help="Use/ignore fieldmaps if present during fmriprep processing, 1 [default] vs 0")
 # update jsons
@@ -42,6 +43,7 @@ T2_file = bool(args.T2) if args.T2 is not None else False # make it boolean
 
 node_name = args.node_name # node name to submit slurm job (or None)
 partition_name = args.partition_name # partition name to submit slurm job (or None)
+node_mem = args.node_mem if args.node_mem is not None else 5000
 
 exclude_sj = args.exclude_sj # list of excluded subjects
 if len(exclude_sj)>0:
@@ -77,7 +79,7 @@ elif step == 'freesurfer':
 
 elif step == 'fmriprep':
     
-    FAM_mri_preprocess.call_fmriprep(data_type = data_type, node_name = node_name, partition_name = partition_name, use_fmap=use_fmap, node_mem = 15000)
+    FAM_mri_preprocess.call_fmriprep(data_type = data_type, node_name = node_name, partition_name = partition_name, use_fmap=use_fmap, node_mem = node_mem)
 
 elif step == 'nordic':
 

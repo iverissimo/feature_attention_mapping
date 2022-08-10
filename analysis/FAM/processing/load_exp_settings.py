@@ -37,6 +37,9 @@ class FAMData:
 
         # relevant tasks
         self.tasks = ['pRF', 'FA']
+
+        # timing
+        self.TR = self.params['mri']['TR']
             
         # excluded participants
         self.exclude_sj = exclude_sj
@@ -75,8 +78,48 @@ class FAMData:
         for s in self.sj_num:
             self.session['sub-{sj}'.format(sj=s)] = [op.split(val)[-1] for val in glob.glob(op.join(self.sourcedata_pth, 'sub-{sj}'.format(sj=s), 'ses-*'))] 
         
-        
-class MRIData(FAMData):
+
+class BehData(FAMData):
+
+    """BehData
+
+    Class that loads relevant paths and settings for behavioral data
+    """
+    
+    def __init__(self, params, sj_num, exclude_sj = [], repo_pth = '', base_dir = None):  # initialize child class
+
+        """ Initializes MRIData object. 
+
+        Parameters
+        ----------
+        params : str/yaml dict
+            where parameters from experiment and analysis live
+        sj_num : str/list/arr
+            participant number(s)
+        exclude_sj: list/arr
+            list with subject numbers to exclude
+        repo_pth: str
+            string with absolute path where module is installed in system - needed to get MATLAB .m files 
+        """
+
+        # need to initialize parent class (BehTask), indicating output infos
+        super().__init__(params = params, sj_num = sj_num, exclude_sj = exclude_sj, base_dir=base_dir)
+
+        ## relevant file extensions
+        self.events_ext = '_events.tsv'
+        self.trial_info_ext = '_trial_info.csv'
+        self.bar_pos_ext = '_bar_positions.pkl'
+
+        ## some relevant params
+        # session type (if beh, then training session, if func then scanning session)
+        self.ses_type = ['beh','func'] 
+        # color categories used (with two per color category)
+        self.color_categories_dict = self.params['general']['task_colors']
+        # actual colors used
+        self.bar_colors = [element for sublist in self.color_categories_dict.values() for element in sublist] 
+
+
+class MRIData(BehData):
     
     """MRIData
 

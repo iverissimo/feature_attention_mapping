@@ -402,7 +402,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
             
     def call_fmriprep(self, data_type='anat', wf_dir = '/scratch/FAM_wf', batch_dir ='/home/inesv/batch',
-                     partition_name = None, node_name = None, use_fmap = True, node_mem = 5000):
+                     partition_name = None, node_name = None, use_fmap = True, node_mem = 5000, batch_mem_Gib = 90):
         
         """
         Run FMRIPREP on anat or functional data
@@ -436,7 +436,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             if node_name is not None:
                 fmriprep_cmd += '#SBATCH -w {n}\n'.format(n=node_name)
             else:
-                fmriprep_cmd += '#SBATCH --mem=90G\n'
+                fmriprep_cmd += '#SBATCH --mem={mem}G\n'.format(mem=mem)
             
             # make fmriprep folder if it does not exist
             #if not op.exists(self.MRIObj.fmriprep_pth):

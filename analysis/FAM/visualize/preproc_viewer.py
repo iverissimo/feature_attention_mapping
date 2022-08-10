@@ -148,7 +148,7 @@ freeview -v \
 
 
     def compare_nordic2standard(self, participant_list = [], input_pth = None, file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'},
-                                use_atlas_rois = True, acq_keys = ['standard', 'nordic']):
+                                use_atlas_rois = True, acq_keys = ['standard', 'nordic'], plot_group=True):
 
         """
         Make nordic vs standard comparison plots
@@ -363,7 +363,87 @@ freeview -v \
 
                 fig.savefig(op.join(outdir,'half_split_correlation_ROIS_distribution_sub-{sj}_{ses}.png'.format(sj=pp, ses=ses)), dpi=100,bbox_inches = 'tight')
 
-        return tsnr_df, corr_df, surf_avg_corr
+        ## if we want a group plot
+        if plot_group:
+            ## group df
+            group_corr_df = corr_df.groupby(['sj', 'task', 'acq', 'ROI'])['mean_r', 'Wmean_r'].mean().reset_index()
+            group_tsnr_df = tsnr_df.groupby(['sj', 'task', 'acq', 'ROI'])['mean_tsnr'].mean().reset_index()
+            group_surf_avg_corr = surf_avg_corr.groupby(['sj', 'task', 'acq', 'ROI', 'vertex'])['pearson_r'].mean().reset_index()
+
+            fig, all_axis = plt.subplots(2, 2, figsize=(20,15), dpi=100, facecolor='w', edgecolor='k')
+            sns.set_theme(style="darkgrid")
+            sns.set(font_scale=1.5) 
+            key = ['mean_r', 'Wmean_r']
+            key2 = ['Mean', 'Weighted Mean']
+
+            for ind,axs in enumerate(all_axis):
+
+                b1 = sns.boxplot(x = 'ROI', y = key[ind], 
+                        hue = 'acq', data = group_corr_df[group_corr_df['task'] == 'pRF'], 
+                        ax=axs[0])
+                b1.set(xlabel=None)
+                b1.set(ylabel=None)
+                axs[0].set_ylabel('{k} Pearson R'.format(k=key2[ind]),fontsize = 18,labelpad=12)
+                axs[0].set_ylim(-.1,.6)
+                axs[0].set_title('Half-split correlation pRF runs') 
+
+                b2 = sns.boxplot(x = 'ROI', y = key[ind], 
+                                hue = 'acq', data = group_corr_df[group_corr_df['task'] == 'FA'], 
+                                ax=axs[1])
+                b2.set(xlabel=None)
+                b2.set(ylabel=None)
+                axs[1].set_ylabel('{k} Pearson R'.format(k=key2[ind]),fontsize = 18,labelpad=12)
+                axs[1].set_ylim(-.1,.6)
+                axs[1].set_title('Half-split correlation FA runs') 
+
+            fig.savefig(op.join(output_pth,'half_split_correlation_ROIS_sub-GROUP.png'), dpi=100,bbox_inches = 'tight')
+
+            ### tSNR across runs for the participant and session
+
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20,5), dpi=100, facecolor='w', edgecolor='k')
+
+            b1 = sns.boxplot(x = 'ROI', y = 'mean_tsnr', 
+                            hue = 'acq', data = group_tsnr_df[group_tsnr_df['task'] == 'pRF'], 
+                            ax=ax1)
+            b1.set(xlabel=None)
+            b1.set(ylabel=None)
+            ax1.set_ylabel('mean tSNR',fontsize = 20,labelpad=18)
+            ax1.set_ylim(0,130)
+            ax1.set_title('tSNR pRF runs') 
+
+            b2 = sns.boxplot(x = 'ROI', y = 'mean_tsnr', 
+                            hue = 'acq', data = group_tsnr_df[group_tsnr_df['task'] == 'FA'], 
+                            ax=ax2)
+            ax2.set_ylabel('mean tSNR',fontsize = 20,labelpad=18)
+            ax2.set_ylim(0,130)
+            ax2.set_title('tSNR FA runs') 
+
+            fig.savefig(op.join(outdir,'tSNR_ROIS_sub-GROUP.png'), dpi=100,bbox_inches = 'tight')
+
+            ### split half correlation distribution per ROI ##
+            fig, ax1 = plt.subplots(1, len(ROIs), figsize=(50,5), dpi=100, facecolor='w', edgecolor='k')
+
+            for i in np.arange(len(ROIs)):
+                A = group_surf_avg_corr[(group_surf_avg_corr['task']=='pRF')&\
+                        (group_surf_avg_corr['ROI']==ROIs[i])&\
+                        (group_surf_avg_corr['acq']=='standard')].sort_values(by=['vertex'])['pearson_r'].values
+
+                B = group_surf_avg_corr[(group_surf_avg_corr['task']=='pRF')&\
+                            (group_surf_avg_corr['ROI']==ROIs[i])&\
+                            (group_surf_avg_corr['acq']=='nordic')].sort_values(by=['vertex'])['pearson_r'].values
+
+                sns.scatterplot(A,B, ax=ax1[i])
+                sns.lineplot([-1,1],[-1,1], color='red', ax=ax1[i])
+
+                ax1[i].set_xlabel('STANDARD',fontsize = 12,labelpad=18)
+                ax1[i].set_ylabel('NORDIC',fontsize = 12,labelpad=18)
+                ax1[i].set_ylim(-.2,1)
+                ax1[i].set_xlim(-.2,1)
+                ax1[i].set_title(ROIs[i]) 
+
+            fig.savefig(op.join(outdir,'half_split_correlation_ROIS_distribution_sub-GROUP.png'), dpi=100,bbox_inches = 'tight')
+
+        #return tsnr_df, corr_df, surf_avg_corr
                             
                         
     def plot_tsnr(self, participant_list = [], input_pth = None, use_atlas_rois = True,
@@ -544,4 +624,3 @@ freeview -v \
                                 curvature_brightness = 0.4, curvature_contrast = 0.1)
 
 
-        

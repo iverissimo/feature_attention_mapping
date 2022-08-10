@@ -402,7 +402,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
             
     def call_fmriprep(self, data_type='anat', wf_dir = '/scratch/FAM_wf', batch_dir ='/home/inesv/batch',
-                     partition_name = None, node_name = None, use_fmap = True):
+                     partition_name = None, node_name = None, use_fmap = True, node_mem = 5000):
         
         """
         Run FMRIPREP on anat or functional data
@@ -427,7 +427,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             
             fmriprep_cmd = """#!/bin/bash
 #SBATCH -t 40:00:00
-#SBATCH -N 1 --mem=90G
+#SBATCH -N 1
 #SBATCH -v
 #SBATCH --output=$BD/slurm_FMRIPREP_%A.out\n"""
             
@@ -435,6 +435,8 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                 fmriprep_cmd += '#SBATCH --partition {p}\n'.format(p=partition_name)
             if node_name is not None:
                 fmriprep_cmd += '#SBATCH -w {n}\n'.format(n=node_name)
+            else:
+                fmriprep_cmd += '#SBATCH --mem=90G\n'
             
             # make fmriprep folder if it does not exist
             #if not op.exists(self.MRIObj.fmriprep_pth):
@@ -478,7 +480,7 @@ $SINGIMG \
 $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/fmriprep/ participant \
 --participant-label $SJ_NR --fs-subjects-dir $ROOTFOLDER/derivatives/freesurfer/ \
 --output-space T1w fsnative fsaverage MNI152NLin2009cAsym --cifti-output 170k \
---bold2t1w-init register --nthread 16 --mem_mb 5000 --low-mem --fs-license-file $FREESURFER/license.txt \
+--bold2t1w-init register --nthread 16 --mem_mb $MEM --low-mem --fs-license-file $FREESURFER/license.txt \
 $FMAP_CMD --bold2t1w-dof 6 --stop-on-first-crash --verbose --skip_bids_validation --dummy-scans 5 \
 -w $WF_DIR
 
@@ -500,7 +502,8 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                             '$ROOTFOLDER': op.split(self.MRIObj.sourcedata_pth)[0],
                             '$WF_DIR': wf_dir,
                             '$BD': batch_dir,
-                            '$FMAP_CMD': fmap_cmd
+                            '$FMAP_CMD': fmap_cmd,
+                            '$MEM': node_mem
                              }
 
             # replace all key-value pairs in batch string
@@ -1003,7 +1006,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             os.system('sh ' + js_name) if self.MRIObj.base_dir == 'local' else os.system('sbatch ' + js_name)
 
 
-    def post_fmriprep_proc(self, output_pth = None, tasks = ['pRF', 'FA'], save_subcortical = True, hemispheres = ['hemi-L','hemi-R']):
+    def post_fmriprep_proc(self, tasks = ['pRF', 'FA'], save_subcortical = False, hemispheres = ['hemi-L','hemi-R']):
 
         """
         Run final processing steps on functional data (after fmriprep)
@@ -1015,8 +1018,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             # and over sessions (if more than one)
             for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
                 
-                if output_pth is None:
-                    output_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 'sub-{sj}'.format(sj=pp), ses)
+                output_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 'sub-{sj}'.format(sj=pp), ses)
 
                 # if output path doesn't exist, create it
                 if not op.isdir(output_pth): 

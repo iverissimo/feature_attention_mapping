@@ -77,7 +77,7 @@ elif step == 'freesurfer':
 
 elif step == 'fmriprep':
     
-    FAM_mri_preprocess.call_fmriprep(data_type = data_type, node_name = node_name, partition_name = partition_name, use_fmap=use_fmap)
+    FAM_mri_preprocess.call_fmriprep(data_type = data_type, node_name = node_name, partition_name = partition_name, use_fmap=use_fmap, node_mem = 15000)
 
 elif step == 'nordic':
 
@@ -100,4 +100,4 @@ elif step == 'up_json':
 
 elif step == 'post_fmriprep':
 
-    FAM_mri_preprocess.post_fmriprep_proc(save_subcortical = True)
+    FAM_mri_preprocess.post_fmriprep_proc(save_subcortical = False)

@@ -60,8 +60,42 @@ def get_pRF_trials_bar_color(run_df, total_trials = None,
     return category_color, bar_color
 
 
+def get_FA_trials_bar_color(run_info_df, total_trials = None):
+
+    """"
+    helper function to get bar colors 
+    and color category for all trials of FA run
+    
+    return dict for attended and unattended bar 
+    """
+    
+    # if no list of trials provided, then get values for each trial
+    if total_trials is None:
+        total_trials = run_info_df['trial_num'].unique()
+        
+    bar_color = {'attend_bar': [], 'unattend_bar': []}
+    category_color = {'attend_bar': [], 'unattend_bar': []}
+    
+    # find bar color in that trial
+    for t in total_trials:
+        
+        # get colors for attended/UNattended bar
+        for cond in bar_color.keys():
+            
+            if cond == 'attend_bar':
+                bar_color[cond].append(run_info_df[run_info_df['trial_num']==t]['attend_task_color'].values[0]) 
+                category_color[cond].append(run_info_df[run_info_df['trial_num']==t]['attend_color'].values[0])
+            else:
+                bar_color[cond].append(run_info_df[run_info_df['trial_num']==t]['unattend_task_color'].values[0]) 
+                category_color[cond].append(run_info_df[run_info_df['trial_num']==t]['unattend_color'].values[0])
+                
+    return category_color, bar_color
+
+
 def get_pp_response_bool(trial_df, trial_bar_color, task = 'pRF',
-                        task_key_name = {'left_index': ['color_red'], 'right_index': ['color_green']},
+                        task_key_name = {'pRF':{'left_index': ['color_red'], 'right_index': ['color_green']},
+                                        'FA':{'left_index': ['pink', 'blue'], 
+                                              'right_index': ['orange', 'yellow']}},
                         keys = {'right_index': ['right','b', 2, '2','num_2'],
                                 'left_index': ['left','e', 1, '1','num_1']}):
     
@@ -70,20 +104,15 @@ def get_pp_response_bool(trial_df, trial_bar_color, task = 'pRF',
     
     return True or False 
     """
-    
-    if task == 'pRF':
         
-        ## get value of key pressed
-        key_val = trial_df[trial_df['event_type'] == 'response']['response'].values[0]
-        
-        ## get name of key pressed
-        key_name = [k for k, v in keys.items() if key_val in v][0]
-        
-        response_bool = True if trial_bar_color in task_key_name[key_name] else False   
-        
-    elif task == 'FA':
-        
-        raise NameError('Not implemented yet')
+    ## get value of key pressed
+    key_val = trial_df[trial_df['event_type'] == 'response']['response'].values[0]
+
+    ## get name of key pressed
+    key_name = [k for k, v in keys.items() if key_val in v][0]
+
+    response_bool = True if trial_bar_color in task_key_name[task][key_name] else False   
+
     
     return response_bool
 
@@ -104,7 +133,7 @@ def get_pp_response_rt(trial_df, task = 'pRF', TR = 1.6):
         
     elif task == 'FA':
         
-        raise NameError('Not implemented yet')
+        RT = trial_df[trial_df['event_type'] == 'response']['onset'].values[0] - trial_df[trial_df['event_type'] == 'stim']['onset'].values[0]
     
     return RT
 

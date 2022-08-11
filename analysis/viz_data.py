@@ -104,6 +104,17 @@ match data_type:
                 
                 print('Plotting BOLD amplitude')
 
+                plotter = MRIViewer(FAM_data)
+                plotter.plot_bold_on_surface(participant_list = FAM_preproc.MRIObj.sj_num, 
+                                            input_pth = None, 
+                                            run_type = 'mean', 
+                                            task = 'pRF',
+                                            stim_on_screen = None,
+                                            file_ext = FAM_preproc.get_mrifile_ext())
+
+            case TypeError:
+                print('viz option NOT VALID')
+
 
     case 'beh':
         
@@ -121,4 +132,8 @@ match data_type:
                 plotter = BehViewer(FAM_data)
                 plotter.plot_pRF_behavior(results_df = df_beh_summary, plot_group = True)
 
+            case TypeError: 
+                print('viz option NOT VALID')
 
+    case TypeError: 
+        print('data type option NOT VALID')

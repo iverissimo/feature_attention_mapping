@@ -695,6 +695,38 @@ def convert64bit_to_16bit(input_file, output_file):
     nib.save(new_image, output_file)
 
 
+def crop_shift_arr(arr, crop_nr = None, shift = 0):
+    
+    """
+    helper function to crop and shift array
+    
+    Parameters
+    ----------
+    arr : array
+       original array
+       assumes time dim is last one (arr.shape[-1])
+    crop_nr : None or int
+        if not none, expects int with number of FIRST time points to crop
+    shift : int
+        positive or negative int, of number of time points to shift (if neg, will shift leftwards)
+        
+    """
+        
+    # if cropping
+    if crop_nr:
+        new_arr = arr[...,crop_nr:]
+    else:
+        new_arr = arr
+        
+    # if shiftting
+    out_arr = new_arr.copy()
+    if shift > 0:
+        out_arr[...,shift:] = new_arr[..., :-int(shift)]
+    elif shift < 0:
+        out_arr[...,:shift] = new_arr[..., np.abs(shift):]
+        
+    return out_arr
+    
 
 def load_and_mask_data(file, chunk_num = 1, total_chunks = 1):
     
@@ -2336,8 +2368,6 @@ def regressOUT_confounds(file, counfounds, outdir, TR=1.6, plot_vert = False):
         outfiles = outfiles[0] 
     
     return outfiles
-
-
 
 
 def get_ecc_limits(visual_dm, params, screen_size_deg = [11,11]):

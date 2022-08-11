@@ -115,7 +115,7 @@ mri: # refers to the Psychopy SyncGenerator class
   file_ext:  {'fsLR_den-170k': '_bold.dtseries.nii', 
               'fsaverage': '_bold.func.gii'} # file extension
 
-  acq: 'standard' #'nordic' #'nordic' #'standard' # "acquisition" type to use
+  acq: 'nordic' #'nordic' #'standard' # "acquisition" type to use
 
   nr_runs: 4 # number of runs per task
 
@@ -125,6 +125,8 @@ mri: # refers to the Psychopy SyncGenerator class
   save_subcortical: False # saving subcortical surface data
 
   slicetimecorrection: True
+
+  shift_DM_TRs: -1 # accounts for dynamic trigger sent on last dummy
 
   confounds:
     file_ext: '_desc-confounds_timeseries.tsv' # file extension for confounds
@@ -177,9 +179,6 @@ mri: # refers to the Psychopy SyncGenerator class
       fix_bold_baseline: True
       correct_baseline: True
       num_baseline_TRs: 8
-
-      shift_DM: True # True
-      shift_DM_TRs: 1 # accounts for dynamic trigger sent on last dummy
 
       grid_nr: 40 # number of grid steps
       min_eccen: 0.2

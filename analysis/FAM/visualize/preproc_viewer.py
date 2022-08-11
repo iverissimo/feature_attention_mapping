@@ -16,6 +16,7 @@ import cortex
 import subprocess
 
 from FAM.utils import mri as mri_utils
+from FAM.processing import preproc_behdata
 
 
 class MRIViewer:
@@ -188,7 +189,12 @@ freeview -v \
         surf_avg_corr = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'acq': [], 'ROI': [], 'vertex': [], 'pearson_r': []})
 
         ## loop over participants
-        for pp in self.MRIObj.sj_num:
+
+        ## if no participant list set, then run all
+        if len(participant_list) == 0:
+            participant_list = self.MRIObj.sj_num
+        
+        for pp in participant_list:
 
             # and over sessions (if more than one)
             for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
@@ -480,7 +486,12 @@ freeview -v \
         tsnr_df = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'ROI': [], 'mean_tsnr': []})
         
         ## loop over participants
-        for pp in self.MRIObj.sj_num:
+
+        ## if no participant list set, then run all
+        if len(participant_list) == 0:
+            participant_list = self.MRIObj.sj_num
+        
+        for pp in participant_list:
 
             # and over sessions (if more than one)
             for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
@@ -575,7 +586,12 @@ freeview -v \
             input_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space)
 
         ## loop over participants
-        for pp in self.MRIObj.sj_num:
+
+        ## if no participant list set, then run all
+        if len(participant_list) == 0:
+            participant_list = self.MRIObj.sj_num
+        
+        for pp in participant_list:
 
             # and over sessions (if more than one)
             for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
@@ -624,3 +640,143 @@ freeview -v \
                                 curvature_brightness = 0.4, curvature_contrast = 0.1)
 
 
+    def plot_bold_on_surface(self, participant_list = [], input_pth = None, run_type = 'mean', task = 'pRF',
+                         stim_on_screen = None,
+                         file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'}):
+
+        """
+        Plot bold func data, 
+        and make video of bold change by TR
+        to check for visual stimuli
+        
+        NOTE - expects that we already ran postfmriprep
+        
+        Parameters
+        ----------
+        participant_list: list
+            list with participant ID
+        input_pth: str or None
+            path to look for files, if None then will get them from derivatives/postfmriprep/<space>/sub-X folder
+        run_type: string or int
+            if we want to average (mean vs median) or just plot a single run (1)
+        stim_on_screen: arr
+            boolean array with moments where stim was on screen
+        file_ext: dict
+            dictionary with file extension per task, to select appropriate files
+        """ 
+        
+        ## if not array provided with instances where stim was on screen, make it
+        if not stim_on_screen:
+            
+            # load preproc functions for object
+            mri_beh = preproc_behdata.PreprocBeh(self.MRIObj)
+            
+            # make stim on screen arr
+            if task == 'pRF':
+                stim_on_screen = np.zeros(mri_beh.pRF_total_trials)
+                stim_on_screen[mri_beh.pRF_bar_pass_trials] = 1
+                
+            # crop and shift if it's the case
+            crop_nr = self.MRIObj.params[task]['crop_TR'] if self.MRIObj.params[task]['crop'] else None
+    
+            stim_on_screen = mri_utils.crop_shift_arr(stim_on_screen, 
+                                                    crop_nr = crop_nr, 
+                                                    shift = self.MRIObj.params['mri']['shift_DM_TRs'])
+            
+        ## output path to save plots
+        output_pth = op.join(self.outputdir, 'BOLD', task)
+
+        ## input path, if not defined get's it from post-fmriprep dir
+        if input_pth is None:
+            input_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space)
+
+        ## loop over participants
+
+        ## if no participant list set, then run all
+        if len(participant_list) == 0:
+            participant_list = self.MRIObj.sj_num
+        
+        for pp in participant_list:
+
+            # and over sessions (if more than one)
+            for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
+                
+                # path to post fmriprep dir
+                postfmriprep_pth = op.join(input_pth, 'sub-{sj}'.format(sj=pp), ses)
+
+                outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp), ses, 'run-{rt}'.format(rt=run_type))
+                # if output path doesn't exist, create it
+                if not op.isdir(outdir): 
+                    os.makedirs(outdir)
+                print('saving files in %s'%outdir)
+
+                ## bold filenames
+                bold_files = [op.join(postfmriprep_pth, run) for run in os.listdir(postfmriprep_pth) if 'space-{sp}'.format(sp=self.MRIObj.sj_space) in run \
+                                    and 'acq-{a}'.format(a=self.MRIObj.acq) in run and \
+                              'task-{tsk}'.format(tsk=task) in run and run.endswith(file_ext[task])]
+
+                ## Load data we want to look at 
+                # single run
+                if isinstance(run_type, int):
+                    bold_files = [val for val in bold_files if 'run-{rt}'.format(rt=run_type) in val]
+                    if len(bold_files)>0:
+                        data_arr = np.load(bold_files[0],allow_pickle=True)
+                    else:
+                        raise NameError('run-{rt} doesnt exist in {ip}'.format(rt=run_type,
+                                                                                ip=input_pth))
+                # average runs
+                elif isinstance(run_type, str):
+                    match run_type:
+                        case 'mean':
+                            data_arr = np.mean(np.stack((np.load(val,allow_pickle=True) for val in bold_files)), axis = 0)
+                        case 'median':
+                            data_arr = np.median(np.stack((np.load(val,allow_pickle=True) for val in bold_files)), axis = 0)
+                        case TypeError:
+                            print('run-{rt} not implemented/exists'.format(rt=run_type))
+                            
+                            
+                ######## make movie #########
+                movie_name = op.join(outdir,
+                                     'flatmap_space-{space}_type-BOLD_visual_movie.mp4'.format(space=self.MRIObj.sj_space))
+
+                if not op.isfile(movie_name):
+                    for num_tr in range(data_arr.shape[-1]):
+
+                        filename = op.join(outdir,'flatmap_space-{space}_type-BOLD_visual_TR-{time}.png'.format(space = self.MRIObj.sj_space,
+                                                                                                                time = str(num_tr).zfill(3)))
+                        if not op.isfile(filename): # if image already in dir, skip
+                        
+                            # set figure grid 
+                            full_fig = plt.figure(constrained_layout = True, figsize = (15,8))
+                            gs = full_fig.add_gridspec(5, 6)
+                            ## set axis
+                            dm_ax = full_fig.add_subplot(gs[:1,2:4])
+                            flatmap_ax = full_fig.add_subplot(gs[1:,:])
+                            # set flatmap
+                            flatmap = cortex.Vertex(data_arr[...,num_tr], 
+                                                    self.MRIObj.params['plotting']['pycortex_sub'],
+                                                    vmin = -5, vmax = 5,
+                                                    cmap='BuBkRd')
+                            cortex.quickshow(flatmap, 
+                                            with_colorbar = True, with_curvature = True, with_sulci = True,
+                                            with_labels = False, fig = flatmap_ax)
+
+                            flatmap_ax.set_xticks([])
+                            flatmap_ax.set_yticks([])
+
+                            # set dm timecourse
+                            dm_ax.plot(stim_on_screen)
+                            dm_ax.axvline(num_tr, color='red', linestyle='solid', lw=1)
+                            dm_ax.set_yticks([])
+
+                            print('saving %s' %filename)
+                            full_fig.savefig(filename)
+
+                    ## save as video
+                    img_name = filename.replace('_TR-%s.png'%str(num_tr).zfill(3),'_TR-%3d.png')
+                    os.system("ffmpeg -r 6 -start_number 0 -i %s -vcodec mpeg4 -y %s"%(img_name,movie_name)) 
+
+                else:
+                    print('movie already exists as %s'%movie_name)
+                    
+                #########

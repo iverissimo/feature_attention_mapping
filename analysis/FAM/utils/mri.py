@@ -2338,66 +2338,6 @@ def regressOUT_confounds(file, counfounds, outdir, TR=1.6, plot_vert = False):
     return outfiles
 
 
-def get_beh_mask(files,params):
-    
-    """Make boolean mask 
-    to use in design matrix for pRF task
-    based on subject responses
-    
-    Parameters
-    ----------
-    files : list/array
-       list with absolute filenames for all pRF runs
-    params : yml dict
-        with experiment params
-    """
-    
-    # number TRs per condition
-    TR_conditions = {'L-R': params['prf']['num_TRs']['L-R'],
-                     'R-L': params['prf']['num_TRs']['R-L'],
-                     'U-D': params['prf']['num_TRs']['U-D'],
-                     'D-U': params['prf']['num_TRs']['D-U'],
-                     'empty': params['prf']['num_TRs']['empty'],
-                     'empty_long': params['prf']['num_TRs']['empty_long']}
-
-    # order of conditions in run
-    bar_pass_direction = params['prf']['bar_pass_direction']
-
-    # list of bar orientation at all TRs
-    condition_per_TR = []
-    for _,bartype in enumerate(bar_pass_direction):
-        condition_per_TR = np.concatenate((condition_per_TR,np.tile(bartype, TR_conditions[bartype])))
-      
-    # make mask
-    mask_bool = []
-    for t in range(len(condition_per_TR)):
-
-        if 'empty' in condition_per_TR[t]: # true for empty trials (nothing on screen)
-
-            mask_bool += [True]
-
-        else:
-            trial_response = 0
-
-            for _, file in enumerate(files): # iterate over run df, to check for responses
-                
-                df_run = pd.read_csv(file, sep='\t')
-
-                response = df_run[(df_run['trial_nr']==t)&(df_run['event_type']=='response')]['response'].values
-
-                if (len(response) and response[0] in params['keys']['right_index']+params['keys']['left_index'])>0: 
-
-                    trial_response += 1 # if there was a response, increment counter
-
-            if trial_response < len(files)*.75: # if no response for trial in the majority of runs
-
-                mask_bool += [True]
-
-            else:
-                mask_bool += [False] # when something was on screen and they could see it
-
-            
-    return np.array(mask_bool)
 
 
 def get_ecc_limits(visual_dm, params, screen_size_deg = [11,11]):

@@ -14,11 +14,11 @@ with open('exp_params.yml', 'r') as f_in:
 ## to get inputs 
 parser = argparse.ArgumentParser()
 parser.add_argument("--subject", help="Subject number (ex: 001, or 'group'/'all')", required=True)
-parser.add_argument("--viz", type = str, help="Vizualization step of processed data: freeview, nordic, tsnr, bold, etc...", required=True)
+parser.add_argument("--viz", type = str.lower, help="Vizualization step of processed data: freeview, nordic, tsnr, bold, etc...", required=True)
 
 # optional
-parser.add_argument("--data_type", type = str, help="Type of data to process (mri [default], beh or eye)")
-parser.add_argument("--dir", type = str, help="System we are making plots in (local [default] vs lisa)")
+parser.add_argument("--data_type", type = str.lower, help="Type of data to process (mri [default], beh or eye)")
+parser.add_argument("--dir", type = str.lower, help="System we are making plots in (local [default] vs lisa)")
 parser.add_argument("--T2", type = int, help="Consider T2 file - only for freeview command (0 [default] vs 1)")
 #  only relevant if subject == group/all
 parser.add_argument("--exclude_sj", nargs='+', help="List of subjects to exclude, define as --exclude_sj 0 1 ...", default=[])
@@ -43,70 +43,82 @@ if len(exclude_sj)>0:
 else:
     exclude_sj = []
 
-
 ## Load data object
 print("Loading {data} data for subject {sj}!".format(data=data_type, sj=sj))
-FAM_data = load_exp_settings.MRIData(params, sj, repo_pth = op.split(load_exp_settings.__file__)[0], base_dir=system_dir, exclude_sj = exclude_sj)
-#print(FAM_data.sj_num)
 
-## Load preprocessing class for each data type
-if data_type == 'mri':
-    FAM_preproc = preproc_mridata.PreprocMRI(FAM_data)
-elif data_type == 'beh':
-    FAM_preproc = preproc_behdata.PreprocBeh(FAM_data)
-else:
-    raise NameError('Not specified')
+FAM_data = load_exp_settings.MRIData(params, sj, 
+                                    repo_pth = op.split(load_exp_settings.__file__)[0], 
+                                    base_dir=system_dir, exclude_sj = exclude_sj)
+
+print('Subject list to vizualize is {l}'.format(l=str(FAM_data.sj_num)))
+
+## Load preprocessing class for each data type ###
+
+match data_type:
+
+    case 'mri':
+
+        FAM_preproc = preproc_mridata.PreprocMRI(FAM_data)
+
+        ## run specific vizualizer
+        match viz:
+            case 'freeview':
+
+                print('Opening Freeview...')
+
+                freeview_cmd = ''
+                while freeview_cmd not in ('movie','view'):
+                    freeview_cmd = input("View segmentations (view) or make movie (movie)?: ")
+
+                plotter = MRIViewer(FAM_data)
+                plotter.check_fs_seg(check_type = freeview_cmd, use_T2 = T2_file, participant_list = FAM_preproc.MRIObj.sj_num)
+
+            case 'nordic':
+
+                print('Comparing NORDIC to standard runs')
+
+                plotter = MRIViewer(FAM_data)
+                plotter.compare_nordic2standard(participant_list = FAM_preproc.MRIObj.sj_num, 
+                                                input_pth = None, 
+                                                file_ext = FAM_preproc.get_mrifile_ext())
+
+            case 'tsnr':
+
+                print('Plotting tSNR')
+
+                plotter = MRIViewer(FAM_data)
+                plotter.plot_tsnr(participant_list = FAM_preproc.MRIObj.sj_num, 
+                                                input_pth = None, 
+                                                file_ext = FAM_preproc.get_mrifile_ext())
+
+            case 'vasculature':
+
+                print('Plotting vasculature proxy for pRF task')
+
+                plotter = MRIViewer(FAM_data)
+                plotter.plot_vasculature(participant_list = FAM_preproc.MRIObj.sj_num, 
+                                                input_pth = None, 
+                                                file_ext = FAM_preproc.get_mrifile_ext())
+
+            case 'bold':
+                
+                print('Plotting BOLD amplitude')
 
 
-## run specific vizualizer
-if viz == 'freeview':
+    case 'beh':
+        
+        FAM_preproc = preproc_behdata.PreprocBeh(FAM_data)
 
-    print('Opening Freeview...')
+        ## run specific vizualizer
+        match viz:
+            case 'behavior':
+        
+                print('Plotting behavior results for pRF task') ## should do for both
+                
+                # first get the dataframe with the mean results
+                df_beh_summary = FAM_preproc.get_pRF_behavioral_results(ses_type = 'func')
 
-    freeview_cmd = ''
-    while freeview_cmd not in ('movie','view'):
-        freeview_cmd = input("View segmentations (view) or make movie (movie)?: ")
-
-    plotter = MRIViewer(FAM_data)
-    plotter.check_fs_seg(check_type = freeview_cmd, use_T2 = T2_file, participant_list = FAM_preproc.MRIObj.sj_num)
-
-elif viz == 'nordic':
-
-    print('Comparing NORDIC to standard runs')
-
-    plotter = MRIViewer(FAM_data)
-    plotter.compare_nordic2standard(participant_list = FAM_preproc.MRIObj.sj_num, 
-                                     input_pth = None, 
-                                     file_ext = FAM_preproc.get_mrifile_ext())
-    
-elif viz == 'tsnr':
-
-    print('Plotting tSNR')
-
-    plotter = MRIViewer(FAM_data)
-    plotter.plot_tsnr(participant_list = FAM_preproc.MRIObj.sj_num, 
-                                     input_pth = None, 
-                                     file_ext = FAM_preproc.get_mrifile_ext())
-    
-elif viz == 'vasculature':
-
-    print('Plotting vasculature proxy for pRF task')
-
-    plotter = MRIViewer(FAM_data)
-    plotter.plot_vasculature(participant_list = FAM_preproc.MRIObj.sj_num, 
-                                     input_pth = None, 
-                                     file_ext = FAM_preproc.get_mrifile_ext())
-
-#elif viz == 'bold':
-
-elif viz == 'behavior':
-    
-    print('Plotting behavior results for pRF task') ## should do for both
-    
-    # first get the dataframe with the mean results
-    df_beh_summary = FAM_preproc.get_pRF_behavioral_results(ses_type = 'func')
-
-    plotter = BehViewer(FAM_data)
-    plotter.plot_pRF_behavior(results_df = df_beh_summary, plot_group = True)
+                plotter = BehViewer(FAM_data)
+                plotter.plot_pRF_behavior(results_df = df_beh_summary, plot_group = True)
 
 

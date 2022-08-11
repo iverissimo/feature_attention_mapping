@@ -4,7 +4,7 @@ import os.path as op
 import pandas as pd
 
 from FAM.utils import beh as beh_utils
-
+from FAM.utils import mri as mri_utils
 
 class PreprocBeh:
 
@@ -22,6 +22,18 @@ class PreprocBeh:
 
         # set data object to use later on
         self.MRIObj = MRIObj
+
+        ## general stuff
+        #
+        ## set type of bar pass per TR
+        self.pRF_bar_pass_all = beh_utils.get_pRF_cond_per_TR(self.MRIObj.pRF_nr_TRs, 
+                                                            self.MRIObj.pRF_bar_pass)
+        ## number of trials (= total #TRs)
+        self.pRF_total_trials = len(self.pRF_bar_pass_all)
+        
+        ## actual bar pass trials indexes (not accounting for empty TRs)
+        self.pRF_bar_pass_trials = np.array([ind for ind,val in enumerate(self.pRF_bar_pass_all) if 'empty' not in val])
+        #
         
     
     def load_events(self, participant, ses = 'ses-1', ses_type = 'func'):
@@ -139,19 +151,6 @@ class PreprocBeh:
         
         """ 
         
-        ## general stuff
-        #
-        ## set type of bar pass per TR
-        bar_pass_all = beh_utils.get_pRF_cond_per_TR(self.MRIObj.pRF_nr_TRs, 
-                                                     self.MRIObj.pRF_bar_pass)
-        ## number of trials (= total #TRs)
-        total_trials = len(bar_pass_all)
-        
-        ## actual bar pass trials indexes (not accounting for empty TRs)
-        bar_pass_trials = np.array([ind for ind,val in enumerate(bar_pass_all) if 'empty' not in val])
-        #
-        
-        
         # summarize results in dataframe
         df_summary = pd.DataFrame({'sj': [], 'ses': [], 'run': [], 
                                    'color_category': [], 'accuracy': [], 'RT': []})
@@ -179,8 +178,8 @@ class PreprocBeh:
                     category_color, bar_color = beh_utils.get_pRF_trials_bar_color(run_ev_df)     
         
                     ## initialize a response array filled with nans for all trials in run
-                    all_responses_bool = np.zeros(total_trials); all_responses_bool[:] = np.nan
-                    all_responses_RT = np.zeros(total_trials); all_responses_RT[:] = np.nan
+                    all_responses_bool = np.zeros(self.pRF_total_trials); all_responses_bool[:] = np.nan
+                    all_responses_RT = np.zeros(self.pRF_total_trials); all_responses_RT[:] = np.nan
 
                     ## get boolean array showing if participant response was correct or not
                     # for trials where they responded
@@ -197,12 +196,12 @@ class PreprocBeh:
 
                     ## now slice array for ONLY bar passing trials
                     #
-                    RUN_category_color = np.array(category_color)[bar_pass_trials]
-                    RUN_bar_color = np.array(bar_color)[bar_pass_trials]
+                    RUN_category_color = np.array(category_color)[self.pRF_bar_pass_trials]
+                    RUN_bar_color = np.array(bar_color)[self.pRF_bar_pass_trials]
                     
-                    RUN_responses_bool = all_responses_bool[bar_pass_trials]
+                    RUN_responses_bool = all_responses_bool[self.pRF_bar_pass_trials]
                     
-                    RUN_response_RT = all_responses_RT[bar_pass_trials]; 
+                    RUN_response_RT = all_responses_RT[self.pRF_bar_pass_trials]; 
                     RUN_response_RT[RUN_responses_bool!=1] = np.nan
 
                     ## Fill results DF for each color category 
@@ -223,3 +222,67 @@ class PreprocBeh:
                                                
                                                
         return df_summary
+
+
+    def get_pRF_mask_bool(self, ses_type = 'func'):
+        
+        """
+        Make boolean mask 
+        to use in design matrix for pRF task
+        based on subject responses
+        
+        """ 
+        
+        ## save mask in a dataframe for each participant
+        df_mask_bool = pd.DataFrame({'sj': [], 'ses': [], 'mask_bool': []})
+        
+         # loop over participants
+        for pp in self.MRIObj.sj_num:
+            
+            # and over sessions (if more than one)
+            for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
+                
+                ## load events files for that session
+                events_df = self.load_events(pp, ses = ses, ses_type = ses_type)
+                
+                ## loop over runs
+                run_bool = []
+                for run in events_df['pRF'].keys():
+                    
+                    # get run event dataframe
+                    run_ev_df = events_df['pRF'][run]
+
+                    ## trial numbers where participant responsed
+                    sub_response_trials = np.unique(run_ev_df[run_ev_df['event_type']=='response']['trial_nr'].values)
+                    
+                    ## get bar color and 
+                    # bar color category for all trials
+                    category_color, bar_color = beh_utils.get_pRF_trials_bar_color(run_ev_df)     
+        
+                     ## initialize a response array filled with 0 for all trials in run
+                    all_responses_bool = np.zeros(self.pRF_total_trials)
+
+                    ## get boolean array showing if participant response was correct or not
+                    # for trials where they responded
+                    sub_response_bool = np.array([beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'] == t], 
+                                                                    category_color[t]) for t in sub_response_trials])
+
+                    all_responses_bool[sub_response_trials] = sub_response_bool
+
+                    # append responses for that run
+                    run_bool.append(all_responses_bool)
+                    
+                ## sums responses across runs
+                # mask trials where wrong answer for more than 25% of runs 
+                mask_bool = mri_utils.normalize(np.sum(np.array(run_bool), axis = 0))
+                mask_bool[mask_bool>=.75] = 1
+                mask_bool[mask_bool!=1] = 0
+
+                ## append in df
+                df_mask_bool = pd.concat((df_mask_bool,
+                                            pd.DataFrame({'sj': ['sub-{sj}'.format(sj=pp)], 
+                                                        'ses': [ses],
+                                                        'mask_bool': [mask_bool]})
+                                        ))
+        
+        return df_mask_bool

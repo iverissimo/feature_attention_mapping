@@ -402,7 +402,8 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
             
     def call_fmriprep(self, data_type='anat', wf_dir = '/scratch/FAM_wf', batch_dir ='/home/inesv/batch',
-                     partition_name = None, node_name = None, use_fmap = True, node_mem = 5000, batch_mem_Gib = 90):
+                     partition_name = None, node_name = None, use_fmap = True, low_mem = True,
+                     node_mem = 5000, batch_mem_Gib = 90, run_time = '50:00:00'):
         
         """
         Run FMRIPREP on anat or functional data
@@ -426,7 +427,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
         for pp in self.MRIObj.sj_num:
             
             fmriprep_cmd = """#!/bin/bash
-#SBATCH -t 40:00:00
+#SBATCH -t $RUNTIME
 #SBATCH -N 1
 #SBATCH -v
 #SBATCH --output=$BD/slurm_FMRIPREP_%A.out\n"""
@@ -481,19 +482,28 @@ $SINGIMG \
 $ROOTFOLDER/sourcedata $ROOTFOLDER/derivatives/fmriprep/ participant \
 --participant-label $SJ_NR --fs-subjects-dir $ROOTFOLDER/derivatives/freesurfer/ \
 --output-space T1w fsnative fsaverage MNI152NLin2009cAsym --cifti-output 170k \
---bold2t1w-init register --nthread 16 --mem_mb $MEM --low-mem --fs-license-file $FREESURFER/license.txt \
-$FMAP_CMD --bold2t1w-dof 6 --stop-on-first-crash --verbose --skip_bids_validation --dummy-scans 5 \
--w $WF_DIR
+--bold2t1w-init register --nthread 16 --mem_mb $MEM $LM\
+--fs-license-file $FREESURFER/license.txt \
+$FMAP_CMD --bold2t1w-dof 6 --stop-on-first-crash \
+--verbose --skip_bids_validation --dummy-scans 5 \
+-w $WF_DIR 
 
 wait          # wait until programs are finished
 
 echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 """
 
+            # type of fieldmap pipeline we are doing
             if use_fmap:
                 fmap_cmd = '--use-syn-sdc --force-syn'  
             else:  
                 fmap_cmd = '--use-syn-sdc --ignore fieldmaps'
+
+            # if we want to reduce memory usage - which might impact disk space though
+            if low_mem:
+                low_mem = '--low-mem '
+            else:
+                low_mem = ''
             
             #os.chdir(batch_dir)
             batch_string = fmriprep_cmd
@@ -504,7 +514,9 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                             '$WF_DIR': wf_dir,
                             '$BD': batch_dir,
                             '$FMAP_CMD': fmap_cmd,
-                            '$MEM': str(node_mem)
+                            '$MEM': str(node_mem),
+                            '$LM': low_mem,
+                            '$RUNTIME': run_time
                              }
 
             # replace all key-value pairs in batch string

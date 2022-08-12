@@ -424,7 +424,7 @@ freeview -v \
             ax2.set_ylim(0,130)
             ax2.set_title('tSNR FA runs') 
 
-            fig.savefig(op.join(outdir,'tSNR_ROIS_sub-GROUP.png'), dpi=100,bbox_inches = 'tight')
+            fig.savefig(op.join(output_pth,'tSNR_ROIS_sub-GROUP.png'), dpi=100,bbox_inches = 'tight')
 
             ### split half correlation distribution per ROI ##
             fig, ax1 = plt.subplots(1, len(ROIs), figsize=(50,5), dpi=100, facecolor='w', edgecolor='k')
@@ -447,7 +447,7 @@ freeview -v \
                 ax1[i].set_xlim(-.2,1)
                 ax1[i].set_title(ROIs[i]) 
 
-            fig.savefig(op.join(outdir,'half_split_correlation_ROIS_distribution_sub-GROUP.png'), dpi=100,bbox_inches = 'tight')
+            fig.savefig(op.join(output_pth,'half_split_correlation_ROIS_distribution_sub-GROUP.png'), dpi=100,bbox_inches = 'tight')
 
         #return tsnr_df, corr_df, surf_avg_corr
                             

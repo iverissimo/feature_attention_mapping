@@ -35,6 +35,15 @@ class PreprocBeh:
         self.pRF_bar_pass_trials = np.array([ind for ind,val in enumerate(self.pRF_bar_pass_all) if 'empty' not in val])
         #
         
+        ## same for FA ##
+        #
+        self.FA_bar_pass_all, self.FA_bar_pass_trials = beh_utils.get_FA_run_struct(self.MRIObj.params['FA']['bar_pass_direction'], 
+                                                                                    num_bar_pos = self.MRIObj.params['FA']['num_bar_position'], 
+                                                                                    empty_TR = self.MRIObj.params['FA']['empty_TR'], 
+                                                                                    task_trial_TR = self.MRIObj.params['FA']['task_trial_TR'])
+        ## number of trials (= total #TRs)
+        self.FA_total_trials = len(self.FA_bar_pass_all)
+        
     
     def load_events(self, participant, ses = 'ses-1', ses_type = 'func'):
         
@@ -318,21 +327,15 @@ class PreprocBeh:
                     run_ev_df = events_df['FA'][run]
                     # and trial info
                     run_trl_info_df = trial_info_df['FA'][run]
- 
-                    ## get trials where bar on screen
-                    FA_bar_pass_trials = np.where(run_trl_info_df['trial_type'].values == 'task')[0]
 
                     ## trial numbers where participant responded
                     # will include bar stim on screen + TR after
-                    sub_response_trials = [[trl,trl+1] for trl in FA_bar_pass_trials if 'response' in run_ev_df[run_ev_df['trial_nr'].isin([trl,trl+1])]['event_type'].values]
+                    sub_response_trials = [[trl,trl+1] for trl in self.FA_bar_pass_trials if 'response' in run_ev_df[run_ev_df['trial_nr'].isin([trl,trl+1])]['event_type'].values]
                                         
                     ## get bar color and bar color category 
                     # for attended and unattended bars
                     # for all trials
                     category_color, bar_color = beh_utils.get_FA_trials_bar_color(run_trl_info_df)    
-                    
-                    # total number of trials - ##### should define somewhere else, like pRF ######
-                    FA_total_trials = len(category_color['attend_bar'])
         
                     ## loop over attended and unattended conditions
                     # (we might want to compare)
@@ -340,8 +343,8 @@ class PreprocBeh:
                     for cond in category_color.keys():
                         
                         ## initialize a response array filled with nans for all trials in run
-                        all_responses_bool = np.zeros(FA_total_trials); all_responses_bool[:] = np.nan
-                        all_responses_RT = np.zeros(FA_total_trials); all_responses_RT[:] = np.nan
+                        all_responses_bool = np.zeros(self.FA_total_trials); all_responses_bool[:] = np.nan
+                        all_responses_RT = np.zeros(self.FA_total_trials); all_responses_RT[:] = np.nan
                         
                         ## get boolean array showing if participant response was correct or not
                         # for trials where they responded
@@ -359,12 +362,12 @@ class PreprocBeh:
                         
                         ## now slice array for ONLY bar passing trials
                         #
-                        RUN_category_color = np.array(category_color[cond])[FA_bar_pass_trials]
-                        RUN_bar_color = np.array(bar_color[cond])[FA_bar_pass_trials]
+                        RUN_category_color = np.array(category_color[cond])[self.FA_bar_pass_trials]
+                        RUN_bar_color = np.array(bar_color[cond])[self.FA_bar_pass_trials]
 
-                        RUN_responses_bool = all_responses_bool[FA_bar_pass_trials]
+                        RUN_responses_bool = all_responses_bool[self.FA_bar_pass_trials]
 
-                        RUN_response_RT = all_responses_RT[FA_bar_pass_trials]; 
+                        RUN_response_RT = all_responses_RT[self.FA_bar_pass_trials]; 
                         RUN_response_RT[RUN_responses_bool!=1] = np.nan
                         
                         

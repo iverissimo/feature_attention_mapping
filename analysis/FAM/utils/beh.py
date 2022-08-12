@@ -138,6 +138,57 @@ def get_pp_response_rt(trial_df, task = 'pRF', TR = 1.6):
     return RT
 
 
+def get_FA_run_struct(bar_pass_direction, num_bar_pos = [6,6], 
+                      empty_TR = 20, task_trial_TR = 2):
+    
+    """ get FA run general structure
+    This is which trials where task trials etc
+    
+    Parameters
+    ----------
+    bar_pass_direction: array/list
+        list with order of "type of stimuli" throughout experiment
+    num_bar_pos: list
+        number of potential bar positions per axis
+    empty_TR: int
+        number of TRs for empty intervals of experiment
+    task_trial_TR: int
+        number of TRs for task trials of experiment (bar presentation + ITI)
+
+    """
+    
+    ## 
+    # define number of possible bar positions per axis
+    num_bar_pos = np.array(num_bar_pos)
+    
+    ## total number of bar on screen trials (task trials)
+    #6 AC vertical * 6 UC horizontal (36) +
+    #6 AC vertical * 5 UC vertical (30) +
+    #6 AC horizontal * 6 UC vertical (36)
+    #6 AC horizontal * 5 UC horizontal (30) = 132 trials
+    #
+    num_task_trials = 2 * (num_bar_pos[0] * num_bar_pos[1] + num_bar_pos[0] * (num_bar_pos[1] - 1))
+    
+    # list of str with trial type at all TRs
+    trial_type_all = [] 
+    
+    for _,bartype in enumerate(bar_pass_direction):
+        
+        if bartype in np.array(['empty']): # empty screen
+            
+            trial_type_all = trial_type_all + np.repeat(bartype,empty_TR).tolist()
+        
+        elif 'task' in bartype: # bars on screen
+            
+            # NOTE one feature trial is 1TR of bar display + 1TR of empty screen
+            trial_type_all = trial_type_all + list([bartype]+list(np.tile('empty', task_trial_TR-1))) * num_task_trials
+
+    ## then get task trial indices
+    bar_pass_trials = np.where((np.array(trial_type_all) == 'task'))[0]
+    
+    return np.array(trial_type_all), bar_pass_trials
+
+
 def rgb255_2_hsv(arr):
     
     """ convert RGB 255 to HSV

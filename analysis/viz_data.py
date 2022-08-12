@@ -124,13 +124,17 @@ match data_type:
         match viz:
             case 'behavior':
         
-                print('Plotting behavior results for pRF task') ## should do for both
-                
-                # first get the dataframe with the mean results
-                df_beh_summary = FAM_preproc.get_pRF_behavioral_results(ses_type = 'func')
+                print('Plotting behavior results for pRF and FA task') ## should do for both
 
                 plotter = BehViewer(FAM_data)
-                plotter.plot_pRF_behavior(results_df = df_beh_summary, plot_group = True)
+                
+                # first get the dataframe with the mean results
+                df_pRF_beh_summary = FAM_preproc.get_pRF_behavioral_results(ses_type = 'func')
+                df_FA_beh_summary = FAM_preproc.get_FA_behavioral_results(ses_type = 'func')
+
+                # actually plot
+                plotter.plot_pRF_behavior(results_df = df_pRF_beh_summary, plot_group = True)
+                plotter.plot_FA_behavior(results_df = df_FA_beh_summary, plot_group = True)
 
             case TypeError: 
                 print('viz option NOT VALID')

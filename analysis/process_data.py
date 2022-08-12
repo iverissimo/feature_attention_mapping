@@ -25,7 +25,7 @@ parser.add_argument("--node_name", type = str, help="Node name, to send job to [
 parser.add_argument("--partition_name", type = str, help="Partition name, to send job to [default None]")
 parser.add_argument("--node_mem", type = int, help="fmriprep memory limit for processes [default 5000]")
 parser.add_argument("--batch_mem_Gib", type = int, help="Node memory limit [default 90]")
-parser.add_argument("--low_mem", type = bool, help="Set to True we are passing the --low-mem option in fmriprep [default True]")
+parser.add_argument("--low_mem", type = int, help="Set to True we are passing the --low-mem option in fmriprep [default True]")
 # fmriprep fmap input
 parser.add_argument("--use_fmap", type = int, help="Use/ignore fieldmaps if present during fmriprep processing, 1 [default] vs 0")
 # update jsons

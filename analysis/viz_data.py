@@ -20,6 +20,8 @@ parser.add_argument("--viz", type = str.lower, help="Vizualization step of proce
 parser.add_argument("--data_type", type = str.lower, help="Type of data to process (mri [default], beh or eye)")
 parser.add_argument("--dir", type = str.lower, help="System we are making plots in (local [default] vs lisa)")
 parser.add_argument("--T2", type = int, help="Consider T2 file - only for freeview command (0 [default] vs 1)")
+parser.add_argument("--task", type = str, help="Task to look at (pRF [default] vs FA)")
+
 #  only relevant if subject == group/all
 parser.add_argument("--exclude_sj", nargs='+', help="List of subjects to exclude, define as --exclude_sj 0 1 ...", default=[])
 
@@ -31,6 +33,7 @@ sj = str(args.subject).zfill(3) # subject
 viz = args.viz # what step of pipeline we want to run
 
 data_type = args.data_type if args.data_type is not None else "mri" # type of data 
+task = args.task if args.task is not None else "pRF" # type of task 
 
 system_dir = args.dir if args.dir is not None else "local" # system location
 
@@ -104,11 +107,13 @@ match data_type:
                 
                 print('Plotting BOLD amplitude')
 
+                task_name = 'pRF' if task.lower == 'prf' else 'FA' 
+
                 plotter = MRIViewer(FAM_data)
                 plotter.plot_bold_on_surface(participant_list = FAM_preproc.MRIObj.sj_num, 
                                             input_pth = None, 
                                             run_type = 'mean', 
-                                            task = 'pRF',
+                                            task = task_name,
                                             stim_on_screen = None,
                                             file_ext = FAM_preproc.get_mrifile_ext())
 

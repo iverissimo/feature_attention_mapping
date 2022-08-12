@@ -641,7 +641,7 @@ freeview -v \
 
 
     def plot_bold_on_surface(self, participant_list = [], input_pth = None, run_type = 'mean', task = 'pRF',
-                         stim_on_screen = None,
+                         stim_on_screen = None, use_atlas_rois = True,
                          file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'}):
 
         """
@@ -675,6 +675,9 @@ freeview -v \
             if task == 'pRF':
                 stim_on_screen = np.zeros(mri_beh.pRF_total_trials)
                 stim_on_screen[mri_beh.pRF_bar_pass_trials] = 1
+            elif task == 'FA':
+                stim_on_screen = np.zeros(mri_beh.FA_total_trials)
+                stim_on_screen[mri_beh.FA_bar_pass_trials] = 1
                 
             # crop and shift if it's the case
             crop_nr = self.MRIObj.params[task]['crop_TR'] if self.MRIObj.params[task]['crop'] else None
@@ -735,6 +738,47 @@ freeview -v \
                             print('run-{rt} not implemented/exists'.format(rt=run_type))
                             
                             
+                ### if FA then we also want to get average timecourse across ROI ####
+                # to check if something is off (some arousal artifact or so) 
+                if (task == 'FA') and (run_type in ['mean', 'median']):
+
+                    ## get vertices for each relevant ROI
+                    # from glasser atlas
+                    ROIs, roi_verts, color_codes = mri_utils.get_rois4plotting(self.MRIObj.params, 
+                                                                            pysub = self.MRIObj.params['plotting']['pycortex_sub'], 
+                                                                            use_atlas = use_atlas_rois, 
+                                                                            atlas_pth = op.join(self.MRIObj.derivatives_pth,
+                                                                                                'glasser_atlas','59k_mesh'), 
+                                                                            space = self.MRIObj.sj_space)
+
+                    avg_bold_roi = {} #empty dictionary 
+
+                    for _,val in enumerate(ROIs):    
+                        avg_bold_roi[val] = np.nanmean(data_arr[roi_verts[val]], axis=0)
+                        
+                    # plot data with model
+                    fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
+
+                    time_sec = np.linspace(0,len(data_arr[0]) * self.MRIObj.params['mri']['TR'], num=len(data_arr[0])) # array with timepoints, in seconds
+                    
+                    plt.plot(time_sec, stim_on_screen, linewidth = 5, alpha = 1, linestyle = 'solid', color = 'gray')
+
+                    for _,key in enumerate(ROIs):
+                        plt.plot(time_sec, avg_bold_roi[key], linewidth = 1.5, label = '%s'%key, color = color_codes[key], alpha = .6)
+
+                    # also plot average of all time courses
+                    plt.plot(time_sec, np.mean(np.stack((avg_bold_roi[val] for val in ROIs), axis = 0), axis = 0),
+                            linewidth = 2.5, label = 'average', linestyle = 'solid', color = 'k')
+
+                    axis.set_xlabel('Time (s)',fontsize=20, labelpad=20)
+                    axis.set_ylabel('BOLD signal change (%)',fontsize=20, labelpad=10)
+                    axis.legend(loc='upper left',fontsize=7)  # doing this to guarantee that legend is how I want it 
+                    #axis.set_xlim([0, time_sec[-1]])
+
+                    fig.savefig(op.join(outdir, 'average_BOLD_across_runs_rois.png'))
+                ###
+
+
                 ######## make movie #########
                 movie_name = op.join(outdir,
                                      'flatmap_space-{space}_type-BOLD_visual_movie.mp4'.format(space=self.MRIObj.sj_space))

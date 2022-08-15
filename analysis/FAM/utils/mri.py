@@ -2760,8 +2760,8 @@ def get_weighted_bins(data_df, x_key = 'ecc', y_key = 'size', weight_key = 'rsq'
     return mean_x, mean_x_std, mean_y, mean_y_std
 
 
-def baseline_correction(data, params, num_baseline_TRs = 6, baseline_interval = 'empty_long', 
-                        avg_type = 'median', crop = False, crop_TR = 8):
+def baseline_correction(data, condition_per_TR, num_baseline_TRs = 6, baseline_interval = 'empty_long', 
+                        avg_type = 'median'):
     
     """Do baseline correction to timecourse
      Useful when we want a fix baseline during fitting
@@ -2770,43 +2770,24 @@ def baseline_correction(data, params, num_baseline_TRs = 6, baseline_interval = 
     ----------
     data : array
        2D array with data timecourses
-    params : yml dict
-        with experiment params
     num_baseline_TRs: int
         number of baseline TRs to consider (will always be the last X TRs of the interval)
     baseline_interval : str
        name of the condition to get baseline values
     avg_type: str
         type of averaging done
-    crop: bool
-        if data is cropped or not
-    crop_TR: int
-        how many TRs from beginning were cropped (=/= from dummy)
-
     """
 
-    # number TRs per condition
-    TR_conditions = {'L-R': params['prf']['num_TRs']['L-R'],
-                    'R-L': params['prf']['num_TRs']['R-L'],
-                    'U-D': params['prf']['num_TRs']['U-D'],
-                    'D-U': params['prf']['num_TRs']['D-U'],
-                    'empty': params['prf']['num_TRs']['empty'],
-                    'empty_long': params['prf']['num_TRs']['empty_long']}
 
-    # order of conditions in run
-    bar_pass_direction = params['prf']['bar_pass_direction']
+    baseline_index = [i for i, val in enumerate(condition_per_TR) if str(val) == baseline_interval]
+    interval_ind = []
+    for i, ind in enumerate(baseline_index):
+        if i > 0:
+            if (ind - baseline_index[i-1]) > 1: ## transition point
+                interval_ind.append([baseline_index[i-1] - num_baseline_TRs, baseline_index[i-1]]) 
 
-    num_TRs = 0
-    interval_ind = [] # indices for baseline intervals
-    for _,bartype in enumerate(bar_pass_direction):
-
-        num_TRs += TR_conditions[bartype]
-
-        if bartype == baseline_interval:
-            interval_ind.append([num_TRs - num_baseline_TRs, num_TRs - 1]) # -1 because python is 0 index
-
-    if crop:
-        interval_ind = np.array(interval_ind) - crop_TR
+    if condition_per_TR[-1] == 'empty_long':
+        interval_ind.append([baseline_index[-1] - num_baseline_TRs, baseline_index[-1]]) 
 
     # get baseline values
     baseline_arr = np.hstack([data[..., ind[0]:ind[1]] for ind in interval_ind])

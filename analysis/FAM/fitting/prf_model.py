@@ -6,6 +6,7 @@ import pandas as pd
 import seaborn as sns
 import yaml
 import utils
+import glob
 
 import ptitprince as pt # raincloud plots
 import matplotlib.patches as mpatches
@@ -20,6 +21,8 @@ import subprocess
 from FAM.utils import mri as mri_utils
 from FAM.processing import preproc_behdata
 
+from prfpy.stimulus import PRFStimulus2D
+from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel, Norm_Iso2DGaussianModel
 
 class pRF_model:
 
@@ -81,11 +84,8 @@ class pRF_model:
         self.corr_base_TRs = self.MRIObj.params['mri']['fitting']['pRF']['num_baseline_TRs'] 
 
 
-    # def get_data4fitting(self, input_pth = None, run_type = 'mean',
-    #                         chunk_num = None, vertex = None, ROI = None):
 
-
-    def get_DM(self, participant, ses = None, ses_type = 'func', mask_DM = True, filename = None, 
+    def get_DM(self, participant, ses = 'ses-mean', ses_type = 'func', mask_DM = True, filename = None, 
                                     osf = 1, res_scaling = .1):
 
         """
@@ -128,11 +128,11 @@ class pRF_model:
             if mask_DM:
                 mask_bool_df = mri_beh.get_pRF_mask_bool(ses_type = ses_type)
                 # if we set a specific session, then select that one
-                if ses:
+                if ses == 'ses-mean':
+                    mask_bool = mask_bool_df[mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant)]['mask_bool'].values
+                else:
                     mask_bool = mask_bool_df[(mask_bool_df['ses'] == ses) & \
                                         (mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant))]['mask_bool'].values
-                else:
-                    mask_bool = mask_bool_df[mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant)]['mask_bool'].values
                 dm_mask = np.prod(mask_bool, axis = 0)
             else:
                 dm_mask = np.ones(mri_beh.pRF_total_trials)
@@ -204,12 +204,104 @@ class pRF_model:
         return mri_utils.normalize(visual_dm)
 
 
-
-    def set_models(self,  participant_list = [], input_pth = None,
-                            run_type = 'mean', file_ext = '_cropped_dc_psc.npy', mask_DM = True, combine_ses = True):
+    def set_models(self, participant_list = [], mask_DM = True, combine_ses = True):
 
         """
         define pRF models to be used for each participant in participant list
+                
+        Parameters
+        ----------
+        participant_list: list
+            list with participant ID
+        mask_DM: bool
+            if we want to mask design matrix given behavioral performance
+        combine_ses: bool
+            if we want to combine runs from different sessions (relevant for fitting of average across runs)
+        """                 
+
+        ## loop over participants
+
+        ## if no participant list set, then run all
+        if len(participant_list) == 0:
+            participant_list = self.MRIObj.sj_num
+        
+        # empty dict where we'll store all participant models
+        pp_models = {}
+        
+        for pp in participant_list:
+
+            pp_models['sub-{sj}'.format(sj=pp)] = {}
+
+            # if we're combining sessions
+            if combine_ses:
+                sessions = ['ses-mean']
+            else:
+                sessions = self.MRIObj.session['sub-{sj}'.format(sj=pp)]
+
+            ## go over sessions (if its the case)
+            # and save DM and models
+            for ses in sessions:
+
+                pp_models['sub-{sj}'.format(sj=pp)][ses] = {}
+
+                visual_dm = self.get_DM(pp, ses = ses, ses_type = 'func', mask_DM = mask_DM, 
+                                        filename = None, osf = 1, res_scaling = .1)
+
+                # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
+                prf_stim = PRFStimulus2D(screen_size_cm = self.MRIObj.params['monitor']['height'],
+                                        screen_distance_cm = self.MRIObj.params['monitor']['distance'],
+                                        design_matrix = visual_dm,
+                                        TR = self.MRIObj.TR)
+
+                pp_models['sub-{sj}'.format(sj=pp)][ses]['prf_stim'] = prf_stim
+                                
+                ## define models ##
+                # GAUSS
+                gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
+                                                    filter_predictions = True,
+                                                    filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                    filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
+                                                                    'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
+                                                                    'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
+                                                                    'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']}
+                                                )
+
+                pp_models['sub-{sj}'.format(sj=pp)][ses]['gauss_model'] = gauss_model
+
+                # CSS
+                css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
+                                                    filter_predictions = True,
+                                                    filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                    filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
+                                                                    'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
+                                                                    'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
+                                                                    'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']}
+                                                )
+
+                pp_models['sub-{sj}'.format(sj=pp)][ses]['css_model'] = css_model
+
+                # DN 
+                dn_model =  Norm_Iso2DGaussianModel(stimulus = prf_stim,
+                                                    filter_predictions = True,
+                                                    filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                    filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
+                                                                    'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
+                                                                    'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
+                                                                    'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']}
+                                                )
+
+                pp_models['sub-{sj}'.format(sj=pp)][ses]['dn_model'] = dn_model
+
+
+        return pp_models
+
+
+    def fit_data(self, participant, pp_models, ses = 'ses-mean',
+                            run_type = 'mean', chunk_num = None, vertex = None, ROI = None,
+                            model2fit = None, file_ext = '_cropped_dc_psc.npy'):
+
+        """
+        fit inputted pRF models to each participant in participant list
                 
         Parameters
         ----------
@@ -225,28 +317,106 @@ class pRF_model:
             if we want to mask design matrix given behavioral performance
         combine_ses: bool
             if we want to combine runs from different sessions (relevant for fitting of average across runs)
-        """                 
+        """  
 
-        ## input path, if not defined get's it from post-fmriprep dir
-        if input_pth is None:
-            input_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space)
+        ## get list of possible input paths
+        # (sessions)
+        input_list = glob.glob(op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 'ses-*'))
 
-        ## loop over participants
-
-        ## if no participant list set, then run all
-        if len(participant_list) == 0:
-            participant_list = self.MRIObj.sj_num
+        # list with absolute file names to be fitted
+        bold_filelist = [file for file_path in input_list for file in os.listdir(file_path) if 'task-pRF' in file and \
+                        'acq-{acq}'.format(acq = self.MRIObj) in file and file.endswith(file_ext)]
         
-        for pp in participant_list:
+        # if we're not combining sessions
+        if ses != 'ses-mean':
+            bold_filelist = [file for file in bold_filelist if ses in file]
+        
+        ## Load data array
+        data = self.get_data4fitting(bold_filelist, run_type = run_type, chunk_num = chunk_num, vertex = vertex)
 
-            ## and over sessions (if more than one)
-            for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
+        ## now need to mask array for nans
+        # set fitters 
+        # actually fit
+        # save? -- for that need to define filenames somewhere else
+        # this func will be called from other one (that will submit batch jobs or just run functions depending on system)
 
 
-                # path to post fmriprep dir
-                postfmriprep_pth = op.join(input_pth, 'sub-{sj}'.format(sj=pp), ses)
 
-                ## bold filenames
-                bold_files = [op.join(postfmriprep_pth, run) for run in os.listdir(postfmriprep_pth) if 'space-{sp}'.format(sp=self.MRIObj.sj_space) in run \
-                                    and 'acq-{a}'.format(a=self.MRIObj.acq) in run and \
-                              'task-{tsk}'.format(tsk=task) in run and run.endswith(file_ext[task])]
+    def get_data4fitting(self, file_list, run_type = 'mean',
+                            chunk_num = None, vertex = None):
+
+        """
+        load data from file list
+                
+        Parameters
+        ----------
+        file_list: list
+            list with files to combine into unique data array
+        run_type: string or int
+            type of run to fit, mean (default), or if int will do single run fit
+        chunk_num: int or None
+            if we want to fit specific chunk of data, then will return chunk array
+        vertex: int, or list of indices or None
+            if we want to fit specific vertex of data, or list of vertices (from an ROI for example) then will return vertex array
+
+        """  
+
+        ## Load data array
+        # average runs (or loo or get single run)
+        if run_type == 'mean':
+            print('averaging runs')
+            data_arr = np.vstack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
+            data_arr = np.mean(data_arr, axis = 0)
+        elif run_type == 'median':
+            print('getting median of runs')
+            data_arr = np.vstack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
+            data_arr = np.median(data_arr, axis = 0)
+        elif 'loo_' in run_type:
+            print('Leave-one out averaging runs ({r})'.format(r = run_type))
+            file_list = [file for file in file_list if 'run-{r}'.format(r = run_type.split('_')[1]) in file]
+            data_arr = np.vstack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
+            data_arr = np.mean(data_arr, axis = 0)
+        elif isinstance(run_type, int):
+            print('Loading run-{r}'.format(r = run_type))
+            file_list = [file for file in file_list if 'run-{r}'.format(r = run_type) in file]
+            data_arr = np.vstack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
+            data_arr = np.mean(data_arr, axis = 0)
+        
+        # if we want to chunk it
+        if chunk_num:
+            # number of vertices of chunk
+            num_vox_chunk = int(data_arr.shape[0]/self.MRIObj.params['mri']['fitting']['pRF']['total_chunks'][self.MRIObj.sj_space])
+    
+            # chunk it
+            data_out = data_arr[num_vox_chunk * int(chunk_num):num_vox_chunk * int(chunk_num + 1), :]
+        
+        # if we want specific vertex
+        elif vertex:
+            data_out = data_arr[vertex]
+            
+            if isinstance(vertex, int):
+                data_out = data_out[np.newaxis,...]
+        
+        # return whole array
+        else:
+            data_out = data_arr
+
+        ## if we want to keep baseline fix, we need to correct it!
+        if self.correct_baseline:
+
+            ## get behavioral info 
+            mri_beh = preproc_behdata.PreprocBeh(self.MRIObj)
+            # do same to bar pass direction str array
+            condition_per_TR = mri_utils.crop_shift_arr(mri_beh.pRF_bar_pass_all, 
+                                                        crop_nr = self.crop_TRs_num, 
+                                                        shift = self.shift_TRs_num)
+
+            data_out = mri_utils.baseline_correction(data_out, condition_per_TR, 
+                                                    num_baseline_TRs = 6, 
+                                                    baseline_interval = 'empty_long', 
+                                                    avg_type = 'median')
+
+        return data_out
+
+
+        

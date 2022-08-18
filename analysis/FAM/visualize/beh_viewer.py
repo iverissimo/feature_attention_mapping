@@ -283,7 +283,7 @@ class BehViewer:
             axs[2].set_ylim(0,1)
             axs[2].set_title('Mean RT', fontsize=18)
 
-            fig.savefig(op.join(output_pth,'sub-GROUP_task-pRF_RT_accuracy_color_categories.png'), dpi=100,bbox_inches = 'tight')
+            fig.savefig(op.join(output_pth,'sub-GROUP_task-FA_RT_accuracy_color_categories.png'), dpi=100,bbox_inches = 'tight')
 
             ### for each bar color ###
             fig, axs = plt.subplots(1, 3, figsize=(20,7.5))
@@ -324,7 +324,7 @@ class BehViewer:
             axs[2].set_ylim(0,1)
             axs[2].set_title('Mean RT', fontsize=18)
 
-            fig.savefig(op.join(output_pth,'sub-GROUP_task-pRF_RT_accuracy_bar_colors.png'), dpi=100,bbox_inches = 'tight')
+            fig.savefig(op.join(output_pth,'sub-GROUP_task-FA_RT_accuracy_bar_colors.png'), dpi=100,bbox_inches = 'tight')
 
 
 

@@ -192,8 +192,12 @@ class PreprocBeh:
 
                     ## get boolean array showing if participant response was correct or not
                     # for trials where they responded
+
+                    # some participants swapped the buttons, so make exceptions
+                    pp_task_keys = self.get_pp_task_keys(pp)
+
                     sub_response_bool = np.array([beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'] == t], 
-                                                                    category_color[t]) for t in sub_response_trials])
+                                                                    category_color[t], task = 'pRF', keys = pp_task_keys) for t in sub_response_trials])
 
                     all_responses_bool[sub_response_trials] = sub_response_bool
                     
@@ -273,8 +277,12 @@ class PreprocBeh:
 
                     ## get boolean array showing if participant response was correct or not
                     # for trials where they responded
+
+                    # some participants swapped the buttons, so make exceptions
+                    pp_task_keys = self.get_pp_task_keys(pp)
+
                     sub_response_bool = np.array([beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'] == t], 
-                                                                    category_color[t]) for t in sub_response_trials])
+                                                                    category_color[t], task = 'pRF', keys = pp_task_keys) for t in sub_response_trials])
 
                     all_responses_bool[sub_response_trials] = sub_response_bool
 
@@ -348,8 +356,12 @@ class PreprocBeh:
                         
                         ## get boolean array showing if participant response was correct or not
                         # for trials where they responded
+                        
+                        # some participants swapped the buttons, so make exceptions
+                        pp_task_keys = self.get_pp_task_keys(pp)
+
                         sub_response_bool = np.array([beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'].isin(t)], 
-                                                                    bar_color[cond][t[0]], task = 'FA') for t in sub_response_trials])
+                                                                    bar_color[cond][t[0]], task = 'FA', keys = pp_task_keys) for t in sub_response_trials])
                         
                         all_responses_bool[np.ravel(sub_response_trials)[::2]] = sub_response_bool
                         
@@ -391,3 +403,29 @@ class PreprocBeh:
                                                                 })))
                          
         return df_summary
+
+
+    def get_pp_task_keys(self, participant):
+
+        """
+        
+        Get participant task keys, 
+        because some participants swapped them
+        
+        """ 
+
+        if participant == '004':
+
+            keys = {'right_index': ['right','b', 2, '2','num_2', 'y'],
+                    'left_index': ['left','e', 1, '1','num_1', 'w']}
+        
+        elif participant == '010':
+
+             keys = {'right_index': ['left','e', 1, '1','num_1'],
+                    'left_index': ['right','b', 2, '2','num_2']}
+
+        else:
+            keys = {'right_index': ['right','b', 2, '2','num_2'],
+                    'left_index': ['left','e', 1, '1','num_1']}
+    
+        return keys

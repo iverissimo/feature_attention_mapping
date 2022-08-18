@@ -684,15 +684,52 @@ def convert64bit_to_16bit(input_file, output_file):
     """
 
     # load nifti image
-    image_nii = nib. load(input_file)
+    image_nii = nib.load(input_file)
+
+    image_nii_hdr = image_nii.header
+    qform = image_nii_hdr['qform_code'] # set qform code to original
 
     ## try saving and int16 but preserving scaling
     new_image = nib.Nifti1Image(image_nii.dataobj.get_unscaled(), image_nii.affine, image_nii.header)
     new_image.header['scl_inter'] = 0
     new_image.set_data_dtype(np.int16)
 
+    if qform != 0:
+        new_image.header['qform_code'] = np.array([qform], dtype=np.int16)
+    else:
+        # set to 1 if original qform code = 0
+        new_image.header['qform_code'] = np.array([1], dtype=np.int16)
+
     # save in same dir
     nib.save(new_image, output_file)
+
+
+def convert_parrec2nii(input_dir, output_dir, cmd = None):
+
+    """
+    convert PAR/REC to nifti
+
+    Parameters
+    ----------
+    input_dir: str
+        absolute path to input folder (where we have the parrecs)
+    output_dir: str
+        absolute path to output folder (where we want to store the niftis)
+    cmd: str or None
+        if not specified, command will be dcm2niix version from conda environment. But we can also specify the specific dcm2niix version
+        by giving the path where it's installed (in terminal write which dcm2niix and will output path [e.g: /Users/verissimo/anaconda3/bin/dcm2niix])
+    """
+
+    if cmd is None:
+        cmd = 'dcm2niix'
+
+    cmd_txt = "{cmd} -d 0 -b y -f %n_%p -o {out} -z y {in_folder}".format(cmd = cmd, 
+                                                                        out = output_dir, 
+                                                                        in_folder = input_dir)
+
+    # convert files
+    print("Converting files to nifti-format")
+    os.system(cmd_txt)
 
 
 def crop_shift_arr(arr, crop_nr = None, shift = 0):

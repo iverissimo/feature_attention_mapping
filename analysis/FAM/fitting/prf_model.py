@@ -298,7 +298,7 @@ class pRF_model:
 
     def fit_data(self, participant, pp_models, ses = 'ses-mean',
                             run_type = 'mean', chunk_num = None, vertex = None, ROI = None,
-                            model2fit = None, file_ext = '_cropped_dc_psc.npy'):
+                            model2fit = None, file_ext = '_cropped_dc_psc.npy', outdir = None, save_estimates = False):
 
         """
         fit inputted pRF models to each participant in participant list
@@ -324,8 +324,8 @@ class pRF_model:
         input_list = glob.glob(op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 'ses-*'))
 
         # list with absolute file names to be fitted
-        bold_filelist = [file for file_path in input_list for file in os.listdir(file_path) if 'task-pRF' in file and \
-                        'acq-{acq}'.format(acq = self.MRIObj) in file and file.endswith(file_ext)]
+        bold_filelist = [op.join(file_path, file) for file_path in input_list for file in os.listdir(file_path) if 'task-pRF' in file and \
+                        'acq-{acq}'.format(acq = self.MRIObj.acq) in file and file.endswith(file_ext)]
         
         # if we're not combining sessions
         if ses != 'ses-mean':
@@ -333,6 +333,30 @@ class pRF_model:
         
         ## Load data array
         data = self.get_data4fitting(bold_filelist, run_type = run_type, chunk_num = chunk_num, vertex = vertex)
+
+        ## set output dir to save estimates
+        if outdir is None:
+            outdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), ses)
+            
+        if not op.exists(outdir):
+            os.makedirs(outdir)
+        print('saving files in %s'%outdir)
+
+        ## set base filename that will be used for estimates
+        basefilename = op.join(outdir, 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
+                                                                            acq = self.MRIObj.acq,
+                                                                            rt = run_type))
+        if chunk_num:
+            basefilename += '_chunk-{ch}'.format(ch = str(chunk_num).zfill(3))
+        elif vertex:
+            basefilename += '_vertex-{ver}'.format(ver = str(vertex))
+        elif ROI:
+            basefilename += '_ROI-{roi}'.format(roi = str(ROI))
+        
+        basefilename += file_ext.replace('.npy', '.npz')
+
+        ## set fitters
+
 
         ## now need to mask array for nans
         # set fitters 
@@ -365,33 +389,36 @@ class pRF_model:
         # average runs (or loo or get single run)
         if run_type == 'mean':
             print('averaging runs')
-            data_arr = np.vstack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
+            data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
             data_arr = np.mean(data_arr, axis = 0)
         elif run_type == 'median':
             print('getting median of runs')
-            data_arr = np.vstack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
+            data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
             data_arr = np.median(data_arr, axis = 0)
         elif 'loo_' in run_type:
             print('Leave-one out averaging runs ({r})'.format(r = run_type))
-            file_list = [file for file in file_list if 'run-{r}'.format(r = run_type.split('_')[1]) in file]
-            data_arr = np.vstack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
+            file_list = [file for file in file_list if 'run-{r}'.format(r = run_type.split('_')[1]) not in file]
+            data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
             data_arr = np.mean(data_arr, axis = 0)
         elif isinstance(run_type, int):
             print('Loading run-{r}'.format(r = run_type))
             file_list = [file for file in file_list if 'run-{r}'.format(r = run_type) in file]
-            data_arr = np.vstack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
+            data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
             data_arr = np.mean(data_arr, axis = 0)
         
         # if we want to chunk it
-        if chunk_num:
+        if isinstance(chunk_num, int):
             # number of vertices of chunk
             num_vox_chunk = int(data_arr.shape[0]/self.MRIObj.params['mri']['fitting']['pRF']['total_chunks'][self.MRIObj.sj_space])
+            print('Slicing data into chunk {ch} of {ch_total}'.format(ch = chunk_num, 
+                                        ch_total = self.MRIObj.params['mri']['fitting']['pRF']['total_chunks'][self.MRIObj.sj_space]))
     
             # chunk it
             data_out = data_arr[num_vox_chunk * int(chunk_num):num_vox_chunk * int(chunk_num + 1), :]
         
         # if we want specific vertex
-        elif vertex:
+        elif isinstance(vertex, int) or isinstance(vertex, list) or isinstance(vertex, np.ndarray):
+            print('Slicing data into vertex {ver}'.format(ver = vertex))
             data_out = data_arr[vertex]
             
             if isinstance(vertex, int):
@@ -399,10 +426,12 @@ class pRF_model:
         
         # return whole array
         else:
+            print('Returning whole data array')
             data_out = data_arr
 
         ## if we want to keep baseline fix, we need to correct it!
         if self.correct_baseline:
+            print('Correcting baseline to be 0 centered')
 
             ## get behavioral info 
             mri_beh = preproc_behdata.PreprocBeh(self.MRIObj)

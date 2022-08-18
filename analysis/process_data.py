@@ -95,7 +95,8 @@ match step:
 
         print('Running {step}\ Running Freesurfer 7.2 on T1w and T2w (if available)'.format(step=step))
 
-        FAM_mri_preprocess.call_freesurfer(cmd = fs_cmd)
+        FAM_mri_preprocess.call_freesurfer(cmd = fs_cmd, node_name = node_name, partition_name = partition_name,
+                                            batch_mem_Gib = batch_mem_Gib)
 
     case 'fmriprep':
 

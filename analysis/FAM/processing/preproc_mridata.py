@@ -256,7 +256,9 @@ class PreprocMRI:
                 
                 
                 
-    def call_freesurfer(self, cmd='all', wf_dir = '/scratch/FAM_wf', batch_dir ='/home/inesv/batch'):
+    def call_freesurfer(self, cmd='all', wf_dir = '/scratch/FAM_wf', batch_dir ='/home/inesv/batch',
+                        partition_name = None, node_name = None,
+                        batch_mem_Gib = 90, run_time = '50:00:00'):
         
         """
         Run FREESURFER 7.2 on T1w and T2w (if available)
@@ -276,6 +278,21 @@ class PreprocMRI:
         
         if self.MRIObj.base_dir == 'local':
             raise NameError('Dont run freesurfer locally - only implemented in slurm systems')
+
+        slurm_fs_cmd = """#!/bin/bash
+#SBATCH -t {rtime}
+#SBATCH -N 1
+#SBATCH -v
+#SBATCH --cpus-per-task=16
+#SBATCH --output=$BD/slurm_FREESURFER_%A.out""".format(rtime=run_time)
+            
+        if partition_name is not None:
+            slurm_fs_cmd += '#SBATCH --partition {p}\n'.format(p=partition_name)
+        if node_name is not None:
+            slurm_fs_cmd += '#SBATCH -w {n}\n'.format(n=node_name)
+        
+        # add memory for node
+        slurm_fs_cmd += '#SBATCH --mem={mem}G\n'.format(mem=batch_mem_Gib)
         
         # loop over participants
         for pp in self.MRIObj.sj_num:
@@ -331,12 +348,7 @@ class PreprocMRI:
             
             
             # set batch string
-            batch_string = """#!/bin/bash
-#SBATCH -t 96:00:00
-#SBATCH -N 1 --mem=65536
-#SBATCH --cpus-per-task=16
-#SBATCH -v
-#SBATCH --output=$BD/slurm_FREESURFER_%A.out
+            batch_string = slurm_fs_cmd + """
 
 # call the programs
 echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"

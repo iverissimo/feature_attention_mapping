@@ -94,7 +94,8 @@ class pRF_model:
         # number of TRs to use for correction
         self.corr_base_TRs = self.MRIObj.params['mri']['fitting']['pRF']['num_baseline_TRs'] 
 
-
+        ## total number of chunks we divide data when fitting
+        self.total_chunks = self.MRIObj.params['mri']['fitting']['pRF']['total_chunks'][self.MRIObj.sj_space]
 
     def get_DM(self, participant, ses = 'ses-mean', ses_type = 'func', mask_DM = True, filename = None, 
                                     osf = 1, res_scaling = .1):
@@ -757,9 +758,9 @@ class pRF_model:
         # if we want to chunk it
         if isinstance(chunk_num, int):
             # number of vertices of chunk
-            num_vox_chunk = int(data_arr.shape[0]/self.MRIObj.params['mri']['fitting']['pRF']['total_chunks'][self.MRIObj.sj_space])
+            num_vox_chunk = int(data_arr.shape[0]/self.total_chunks)
             print('Slicing data into chunk {ch} of {ch_total}'.format(ch = chunk_num, 
-                                        ch_total = self.MRIObj.params['mri']['fitting']['pRF']['total_chunks'][self.MRIObj.sj_space]))
+                                        ch_total = self.total_chunks))
     
             # chunk it
             data_out = data_arr[num_vox_chunk * int(chunk_num):num_vox_chunk * int(chunk_num + 1), :]

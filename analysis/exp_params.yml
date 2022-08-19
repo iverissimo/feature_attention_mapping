@@ -180,7 +180,7 @@ mri: # refers to the Psychopy SyncGenerator class
       correct_baseline: True
       num_baseline_TRs: 8
 
-      grid_nr: 40 # number of grid steps
+      grid_nr: 20 #40 # number of grid steps
       min_eccen: 0.2
       max_eccen: 10
 

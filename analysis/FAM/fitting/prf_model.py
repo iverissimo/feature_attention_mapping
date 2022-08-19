@@ -1,3 +1,4 @@
+from turtle import screensize
 import numpy as np
 import os
 import os.path as op
@@ -22,7 +23,8 @@ from FAM.utils import mri as mri_utils
 from FAM.processing import preproc_behdata
 
 from prfpy.stimulus import PRFStimulus2D
-from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel, Norm_Iso2DGaussianModel
+from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel, Norm_Iso2DGaussianModel, DoG_Iso2DGaussianModel
+from prfpy.fit import Iso2DGaussianFitter, CSS_Iso2DGaussianFitter, Norm_Iso2DGaussianFitter, DoG_Iso2DGaussianFitter
 
 class pRF_model:
 
@@ -74,6 +76,15 @@ class pRF_model:
 
         ## if we did slicetime correction
         self.stc = self.MRIObj.params['mri']['slicetimecorrection']
+
+        # if we did stc, then we need to hrf onset
+        if self.stc:
+            self.hrf_onset = -self.MRIObj.TR/2
+        else:
+            self.hrf_onset = 0
+
+        ## if we want to oversample when fitting
+        self.osf = 1
 
         ## if we want to keep the model baseline fixed a 0
         self.fix_bold_baseline = self.MRIObj.params['mri']['fitting']['pRF']['fix_bold_baseline'] 
@@ -245,7 +256,7 @@ class pRF_model:
                 pp_models['sub-{sj}'.format(sj=pp)][ses] = {}
 
                 visual_dm = self.get_DM(pp, ses = ses, ses_type = 'func', mask_DM = mask_DM, 
-                                        filename = None, osf = 1, res_scaling = .1)
+                                        filename = None, osf = self.osf, res_scaling = .1)
 
                 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
                 prf_stim = PRFStimulus2D(screen_size_cm = self.MRIObj.params['monitor']['height'],
@@ -263,7 +274,9 @@ class pRF_model:
                                                     filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                     'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                     'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
-                                                                    'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']}
+                                                                    'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
+                                                    osf = self.osf,
+                                                    hrf_onset = self.hrf_onset,
                                                 )
 
                 pp_models['sub-{sj}'.format(sj=pp)][ses]['gauss_model'] = gauss_model
@@ -275,7 +288,9 @@ class pRF_model:
                                                     filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                     'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                     'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
-                                                                    'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']}
+                                                                    'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
+                                                    osf = self.osf,
+                                                    hrf_onset = self.hrf_onset,
                                                 )
 
                 pp_models['sub-{sj}'.format(sj=pp)][ses]['css_model'] = css_model
@@ -287,18 +302,36 @@ class pRF_model:
                                                     filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                     'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                     'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
-                                                                    'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']}
+                                                                    'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
+                                                    osf = self.osf,
+                                                    hrf_onset = self.hrf_onset,
                                                 )
 
                 pp_models['sub-{sj}'.format(sj=pp)][ses]['dn_model'] = dn_model
+
+                # DOG
+                dog_model = DoG_Iso2DGaussianModel(stimulus = prf_stim,
+                                                    filter_predictions = True,
+                                                    filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                    filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
+                                                                    'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
+                                                                    'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
+                                                                    'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
+                                                    osf = self.osf,
+                                                    hrf_onset = self.hrf_onset,
+                                                )
+                
+                pp_models['sub-{sj}'.format(sj=pp)][ses]['dog_model'] = dog_model
 
 
         return pp_models
 
 
     def fit_data(self, participant, pp_models, ses = 'ses-mean',
-                            run_type = 'mean', chunk_num = None, vertex = None, ROI = None,
-                            model2fit = None, file_ext = '_cropped_dc_psc.npy', outdir = None, save_estimates = False):
+                    run_type = 'mean', chunk_num = None, vertex = None, ROI = None,
+                    model2fit = 'gauss', file_ext = '_cropped_dc_psc.npy', 
+                    outdir = None, save_estimates = False,
+                    xtol = 1e-3, ftol = 1e-4, n_jobs = 16):
 
         """
         fit inputted pRF models to each participant in participant list
@@ -334,6 +367,10 @@ class pRF_model:
         ## Load data array
         data = self.get_data4fitting(bold_filelist, run_type = run_type, chunk_num = chunk_num, vertex = vertex)
 
+        ## Set nan voxels to 0, to avoid issues when fitting
+        masked_data = data.copy()
+        masked_data[np.where(np.isnan(data[...,0]))[0]] = 0
+
         ## set output dir to save estimates
         if outdir is None:
             outdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), ses)
@@ -355,14 +392,325 @@ class pRF_model:
         
         basefilename += file_ext.replace('.npy', '.npz')
 
-        ## set fitters
+        ## set model parameters 
+        # relevant for grid and iterative fitting
+        fit_params = self.get_fit_startparams(max_ecc_size = pp_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].screen_size_degrees/2.0,
+                                            fit_hrf = self.fit_hrf, fix_bold_baseline = self.fix_bold_baseline)
+
+        ## set constraints
+        # for now only changes minimizer used, but can also be useful to put contraints on dog and dn
+        constraints = self.get_fit_constraints(method = 'L-BFGS-B')
+
+        ## ACTUALLY FIT 
+
+        # always start with gauss of course
+        grid_gauss_filename = op.join(outdir, 'grid_gauss', basefilename.replace('.npz', '_grid_gauss_estimates.npz'))
+        it_gauss_filename = op.join(outdir, 'it_gauss', basefilename.replace('.npz', '_it_gauss_estimates.npz'))
+
+        if model2fit != 'gauss' or not op.exists(it_gauss_filename):
+
+            print("Gauss model GRID fit")
+            gauss_fitter = Iso2DGaussianFitter(data = masked_data, 
+                                                model = pp_models['sub-{sj}'.format(sj = participant)][ses]['gauss_model'], 
+                                                n_jobs = n_jobs,
+                                                fit_hrf = self.fit_hrf)
+
+            gauss_fitter.grid_fit(ecc_grid = fit_params['gauss']['eccs'], 
+                                    polar_grid = fit_params['gauss']['polars'], 
+                                    size_grid = fit_params['gauss']['sizes'], 
+                                    fixed_grid_baseline = fit_params['gauss']['fixed_grid_baseline'],
+                                    grid_bounds = fit_params['gauss']['grid_bounds'])
+
+            # iterative fit
+            print("Gauss model ITERATIVE fit")
+            gauss_fitter.iterative_fit(rsq_threshold = 0.05, 
+                                        verbose = True,
+                                        bounds = fit_params['gauss']['bounds'],
+                                        constraints = constraints['gauss'],
+                                        xtol = xtol,
+                                        ftol = ftol)
+
+            # if we want to save estimates
+            if save_estimates:
+                # for grid
+                print('saving %s'%grid_gauss_filename)
+                mri_utils.save_estimates(grid_gauss_filename, gauss_fitter.gridsearch_params, 
+                                        model_type = 'gauss', fit_hrf = self.fit_hrf)
+                # for it
+                print('saving %s'%it_gauss_filename)
+                mri_utils.save_estimates(it_gauss_filename, gauss_fitter.iterative_search_params, 
+                                        model_type = 'gauss', fit_hrf = self.fit_hrf)
+
+       
+        if model2fit != 'gauss':
+            
+            grid_model_filename = grid_gauss_filename.replace('gauss', model2fit)
+            it_model_filename = it_gauss_filename.replace('gauss', model2fit)
+
+            if not op.exists(it_model_filename):
+
+                print("{key} model GRID fit".format(key = model2fit))
+                
+                if model2fit == 'css':
+
+                    fitter = CSS_Iso2DGaussianFitter(data = masked_data, 
+                                                    model = pp_models['sub-{sj}'.format(sj = participant)][ses]['{key}_model'.format(key = model2fit)], 
+                                                    n_jobs = n_jobs,
+                                                    fit_hrf = self.fit_hrf,
+                                                    previous_gaussian_fitter = gauss_fitter)
+
+                    fitter.grid_fit(fit_params['css']['n_grid'],
+                                fixed_grid_baseline = fit_params['css']['fixed_grid_baseline'],
+                                grid_bounds = fit_params['css']['grid_bounds'],
+                                rsq_threshold = 0.05)
+                
+                elif model2fit == 'dn':
+
+                    fitter = Norm_Iso2DGaussianFitter(data = masked_data, 
+                                                    model = pp_models['sub-{sj}'.format(sj = participant)][ses]['{key}_model'.format(key = model2fit)], 
+                                                    n_jobs = n_jobs,
+                                                    fit_hrf = self.fit_hrf,
+                                                    previous_gaussian_fitter = gauss_fitter)
+
+                    fitter.grid_fit(fit_params['dn']['surround_amplitude_grid'],
+                                    fit_params['dn']['surround_size_grid'],
+                                    fit_params['dn']['neural_baseline_grid'],
+                                    fit_params['dn']['surround_baseline_grid'],
+                                fixed_grid_baseline = fit_params['dn']['fixed_grid_baseline'],
+                                grid_bounds = fit_params['dn']['grid_bounds'],
+                                rsq_threshold = 0.05)
+
+                
+                elif model2fit == 'dog':
+
+                    fitter = DoG_Iso2DGaussianFitter(data = masked_data, 
+                                                    model = pp_models['sub-{sj}'.format(sj = participant)][ses]['{key}_model'.format(key = model2fit)], 
+                                                    n_jobs = n_jobs,
+                                                    fit_hrf = self.fit_hrf,
+                                                    previous_gaussian_fitter = gauss_fitter)
+
+                    fitter.grid_fit(fit_params['dog']['surround_amplitude_grid'],
+                                    fit_params['dog']['surround_size_grid'],
+                                fixed_grid_baseline = fit_params['dog']['fixed_grid_baseline'],
+                                grid_bounds = fit_params['dog']['grid_bounds'],
+                                rsq_threshold = 0.05)
 
 
-        ## now need to mask array for nans
-        # set fitters 
-        # actually fit
-        # save? -- for that need to define filenames somewhere else
-        # this func will be called from other one (that will submit batch jobs or just run functions depending on system)
+                # iterative fit
+                print("{key} model ITERATIVE fit".format(key = model2fit))
+                fitter.iterative_fit(rsq_threshold = 0.05, 
+                                    verbose = True,
+                                    bounds = fit_params[model2fit]['bounds'],
+                                    constraints = constraints[model2fit],
+                                    xtol = xtol,
+                                    ftol = ftol)
+
+                # if we want to save estimates
+                if save_estimates:
+                    # for grid
+                    print('saving %s'%grid_model_filename)
+                    mri_utils.save_estimates(grid_model_filename, fitter.gridsearch_params, 
+                                            model_type = model2fit, fit_hrf = self.fit_hrf)
+                    # for it
+                    print('saving %s'%it_model_filename)
+                    mri_utils.save_estimates(it_model_filename, fitter.iterative_search_params, 
+                                            model_type = model2fit, fit_hrf = self.fit_hrf)
+
+        if not save_estimates:
+            # if we're not saving them, assume we are running on the spot
+            # and want to get back the estimates
+            estimates = {}
+            estimates['grid_gauss'] = gauss_fitter.gridsearch_params
+            estimates['it_gauss'] = gauss_fitter.iterative_search_params
+            if model2fit != 'gauss':
+                estimates['grid_{key}'.format(key = model2fit)] = fitter.gridsearch_params
+                estimates['it_{key}'.format(key = model2fit)] = fitter.iterative_search_params
+
+            return estimates, masked_data
+
+        # this func will be called from other one (that will submit batch jobs or just run functions depending on system) 
+
+    def get_fit_startparams(self, max_ecc_size = 6, fit_hrf = False,  fix_bold_baseline = True):
+
+        """
+        Helper function that loads all fitting starting params
+        and bounds into a dictionary
+
+        Parameters
+        ----------
+        max_ecc_size: int/float
+            max eccentricity (and size) to set grid array
+        fit_hrf: bool
+            if we are fitting hrf params or not
+        fix_bold_baseline: bool
+            if we are keeping the baseline fixed at 0 
+
+        """
+
+        eps = 1e-1
+
+        fitpar_dict = {'gauss': {}, 'css': {}, 'dn': {}, 'dog': {}}
+
+        ######################### GAUSS #########################
+
+        ## number of grid points 
+        fitpar_dict['gauss']['grid_nr'] = self.MRIObj.params['mri']['fitting']['pRF']['grid_nr']
+
+        # size, ecc, polar angle
+        fitpar_dict['gauss']['sizes'] = max_ecc_size * np.linspace(0.25, 1, fitpar_dict['gauss']['grid_nr'])**2
+        fitpar_dict['gauss']['eccs'] = max_ecc_size * np.linspace(0.1, 1, fitpar_dict['gauss']['grid_nr'])**2
+        fitpar_dict['gauss']['polars'] = np.linspace(0, 2*np.pi, fitpar_dict['gauss']['grid_nr'])
+
+        ## bounds
+        fitpar_dict['gauss']['bounds'] = [(-1.5 * (max_ecc_size * 2), 1.5 * (max_ecc_size * 2)),  # x
+                                        (-1.5 * (max_ecc_size * 2), 1.5 * (max_ecc_size * 2)),  # y
+                                        (eps, 1.5 * (max_ecc_size * 2)),  # prf size
+                                        (0, 1000),  # prf amplitude
+                                        (-500, 1000)] # bold baseline
+        
+        # if we want to also fit hrf
+        if fit_hrf:
+            fitpar_dict['gauss']['bounds'] += [(0,10),(0,0)]
+        
+        # if we want to keep the baseline fixed at 0
+        if fix_bold_baseline:
+            fitpar_dict['gauss']['bounds'][4] = (0,0)
+            fitpar_dict['gauss']['fixed_grid_baseline'] = 0 
+        else:
+            fitpar_dict['gauss']['fixed_grid_baseline'] = None
+
+        # latest change in prfpy requires separate grid bound array
+        fitpar_dict['gauss']['grid_bounds'] = [(0,1000)] #only prf amplitudes between 0 and 1000
+
+        ######################### CSS #########################
+
+        ## grid exponent parameter
+        fitpar_dict['css']['n_grid'] = np.linspace(self.MRIObj.params['mri']['fitting']['pRF']['min_n'], 
+                                                    self.MRIObj.params['mri']['fitting']['pRF']['max_n'], 
+                                                    self.MRIObj.params['mri']['fitting']['pRF']['n_nr'], dtype='float32')
+
+        ## bounds
+        fitpar_dict['css']['bounds'] = [(-1.5 * (max_ecc_size * 2), 1.5 * (max_ecc_size * 2)),  # x
+                                        (-1.5 * (max_ecc_size * 2), 1.5 * (max_ecc_size * 2)),  # y
+                                        (eps, 1.5 * (max_ecc_size * 2)),  # prf size
+                                        (0, 1000),  # prf amplitude
+                                        (-500, 1000), # bold baseline
+                                        (0.01, 1.5)]  # CSS exponent
+
+        # if we want to also fit hrf
+        if fit_hrf:
+            fitpar_dict['css']['bounds'] += [(0,10),(0,0)]
+        
+        # if we want to keep the baseline fixed at 0
+        if fix_bold_baseline:
+            fitpar_dict['css']['bounds'][4] = (0,0)
+            fitpar_dict['css']['fixed_grid_baseline'] = 0 
+        else:
+            fitpar_dict['css']['fixed_grid_baseline'] = None
+
+        # latest change in prfpy requires separate grid bound array
+        fitpar_dict['css']['grid_bounds'] = [(0,1000)] #only prf amplitudes between 0 and 1000
+
+        ######################### DN #########################
+
+        # Surround amplitude (Normalization parameter C)
+        fitpar_dict['dn']['surround_amplitude_grid'] = np.array([0.1,0.2,0.4,0.7,1,3], dtype='float32') 
+        
+        # Surround size (gauss sigma_2)
+        fitpar_dict['dn']['surround_size_grid'] = np.array([3,5,8,12,18], dtype='float32')
+        
+        # Neural baseline (Normalization parameter B)
+        fitpar_dict['dn']['neural_baseline_grid'] = np.array([0,1,10,100], dtype='float32')
+
+        # Surround baseline (Normalization parameter D)
+        fitpar_dict['dn']['surround_baseline_grid'] = np.array([0.1,1.0,10.0,100.0], dtype='float32')
+
+        ## bounds
+        fitpar_dict['dn']['bounds'] = [(-1.5 * (max_ecc_size * 2), 1.5 * (max_ecc_size * 2)),  # x
+                                        (-1.5 * (max_ecc_size * 2), 1.5 * (max_ecc_size * 2)),  # y
+                                        (eps, 1.5 * (max_ecc_size * 2)),  # prf size
+                                        (0, 1000),  # prf amplitude
+                                        (-500, 1000), # bold baseline
+                                        (0, 1000),  # surround amplitude
+                                        (eps, 3 * (max_ecc_size * 2)),  # surround size
+                                        (0, 1000),  # neural baseline
+                                        (1e-6, 1000)]  # surround baseline
+
+        # if we want to also fit hrf
+        if fit_hrf:
+            fitpar_dict['dn']['bounds'] += [(0,10),(0,0)]
+        
+        # if we want to keep the baseline fixed at 0
+        if fix_bold_baseline:
+            fitpar_dict['dn']['bounds'][4] = (0,0)
+            fitpar_dict['dn']['fixed_grid_baseline'] = 0 
+        else:
+            fitpar_dict['dn']['fixed_grid_baseline'] = None
+
+        # latest change in prfpy requires separate grid bound array
+        fitpar_dict['dn']['grid_bounds'] = [(0,1000),(0,1000)] #only prf amplitudes between 0 and 1000
+
+        ######################### DOG #########################
+        
+        # amplitude for surround 
+        fitpar_dict['dog']['surround_amplitude_grid'] = np.array([0.05,0.1,0.25,0.5,0.75,1,2], dtype='float32')
+
+        # size for surround
+        fitpar_dict['dog']['surround_size_grid'] = np.array([3,5,8,11,14,17,20,23,26], dtype='float32')
+
+        ## bounds
+        fitpar_dict['dog']['bounds'] = [(-1.5 * (max_ecc_size * 2), 1.5 * (max_ecc_size * 2)),  # x
+                                        (-1.5 * (max_ecc_size * 2), 1.5 * (max_ecc_size * 2)),  # y
+                                        (eps, 1.5 * (max_ecc_size * 2)),  # prf size
+                                        (0, 1000),  # prf amplitude
+                                        (-500, 1000), # bold baseline
+                                        (0, 1000),  # surround amplitude
+                                        (eps, 3 * (max_ecc_size * 2))]  # surround size
+
+        # if we want to also fit hrf
+        if fit_hrf:
+            fitpar_dict['dog']['bounds'] += [(0,10),(0,0)]
+        
+        # if we want to keep the baseline fixed at 0
+        if fix_bold_baseline:
+            fitpar_dict['dog']['bounds'][4] = (0,0)
+            fitpar_dict['dog']['fixed_grid_baseline'] = 0 
+        else:
+            fitpar_dict['dog']['fixed_grid_baseline'] = None
+
+        # latest change in prfpy requires separate grid bound array
+        fitpar_dict['dog']['grid_bounds'] = [(0,1000),(0,1000)] #only prf amplitudes between 0 and 1000
+
+                                        
+        return fitpar_dict
+
+    
+    def get_fit_constraints(self, method = 'L-BFGS-B'):
+
+        """
+        Helper function sets constraints - which depend on minimizer used -
+        for all model types and saves in dictionary
+
+        Parameters
+        ----------
+        method: str
+            minimizer that we want to use, ex: 'L-BFGS-B', 'trust-constr'
+
+        """
+
+        constraints = {'gauss': {}, 'css': {}, 'dn': {}, 'dog': {}}
+
+        for key in constraints.keys():
+
+            if method == 'L-BFGS-B':
+                
+                constraints[key] = None
+            
+            elif method == 'trust-constr':
+
+                constraints[key] = []
+
+        return constraints
 
 
 

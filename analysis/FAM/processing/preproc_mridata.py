@@ -284,7 +284,7 @@ class PreprocMRI:
 #SBATCH -N 1
 #SBATCH -v
 #SBATCH --cpus-per-task=16
-#SBATCH --output=$BD/slurm_FREESURFER_%A.out""".format(rtime=run_time)
+#SBATCH --output=$BD/slurm_FREESURFER_%A.out\n""".format(rtime=run_time)
             
         if partition_name is not None:
             slurm_fs_cmd += '#SBATCH --partition {p}\n'.format(p=partition_name)
@@ -353,7 +353,7 @@ class PreprocMRI:
 # call the programs
 echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
-conda activate i38
+conda activate i310
 
 # make working directory in node
 mkdir $WF_DIR

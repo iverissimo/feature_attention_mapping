@@ -766,74 +766,7 @@ def crop_shift_arr(arr, crop_nr = None, shift = 0):
     
 
 
-def load_and_mask_data(file, chunk_num = 1, total_chunks = 1):
-    
-    """ load data, split into chunk/slice and mask nan voxels
-    used to create a 2D array for pRF fitting
-    with only relevant voxels/vertices
-    
-    Parameters
-    ----------
-    file : str
-        absolute filename of the data to be fitted
-    chunk_num: int
-        number of chunk for slicing
-    total_chunks: int
-        total amount of chunks, if 1 then returns orig data array size (no chunking)
-
-    Outputs
-    -------
-    masked_data: arr
-        (masked) data array
-    not_nan_vox: list/arr
-        voxel indices that were NOT masked out
-    orig_shape: tuple
-        shape of original data chunk/slice (for later reshaping)
-    """
-    
-    # get file extension
-    file_extension = '.{a}.{b}'.format(a = file.rsplit('.', 2)[-2],
-                                       b = file.rsplit('.', 2)[-1])
-    
-    # load data array, if necessary convert to 2D (vertex, time)
-    # and select only relevant chunk/slice
-
-    if file_extension == '.func.gii':
-
-        # load surface data
-        data_all = np.array(surface.load_surf_data(file))
-
-        # number of vertices of chunk
-        num_vox_chunk = int(data_all.shape[0]/total_chunks) 
-
-        # new data chunk to fit
-        data = data_all[num_vox_chunk*(int(chunk_num)-1):num_vox_chunk*int(chunk_num),:]
-
-        # store chunk shape, useful later
-        orig_shape = data.shape
-
-        print('fitting chunk %s/%d of data with shape %s'%(chunk_num,total_chunks,str(data.shape)))
-        
-    elif file_extension == '.nii.gz':
-        
-        print('not implemented')  
-
-    # define non nan voxels for sanity check
-    not_nan_vox = np.where(~np.isnan(data[...,0]))[0]
-    print('masked data with shape %s'%(str(data[not_nan_vox].shape)))
-
-    # mask data
-    # to avoid errors in fitting (all nan batches) and make fitting faster
-    masked_data = data[not_nan_vox]
-
-    return masked_data, not_nan_vox, orig_shape
-
-
-
-
-
-def save_estimates(filename, estimates, mask_indices, orig_shape = np.array([1974,220]), 
-                    model_type = 'gauss', fit_hrf = False):
+def save_estimates(filename, final_estimates, model_type = 'gauss', fit_hrf = False):
     
     """
     re-arrange estimates that were masked
@@ -847,21 +780,14 @@ def save_estimates(filename, estimates, mask_indices, orig_shape = np.array([197
         absolute filename of estimates to be saved
     estimates : arr
         2d estimates (datapoints,estimates)
-    mask_indices : arr
-        array with voxel indices that were NOT masked out
-    orig_shape: tuple/arr
-        original data shape 
     model_type: str
         model type used for fitting
         
     
     """ 
-    final_estimates = np.zeros((orig_shape[0], estimates.shape[-1])); final_estimates[:] = np.nan
-
-    counter = 0
-    for _,ind in enumerate(mask_indices):
-        final_estimates[ind] = estimates[counter]
-        counter += 1
+    # make dir if it doesnt exist already
+    if not op.exists(op.split(filename)[0]):
+        os.makedirs(op.split(filename)[0])
             
     if model_type == 'gauss':
 

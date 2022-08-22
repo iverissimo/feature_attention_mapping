@@ -188,7 +188,8 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                 print(working_string)
 
                 # run it
-                js_name = op.join(batch_dir, '{fname}_sub-{sj}_FAM.sh'.format(fname=fitfolder,
+                js_name = op.join(batch_dir, '{fname}_sub-{sj}_chunk-{ch}_FAM.sh'.format(fname=fitfolder,
+                                                                                        ch=ch,
                                                                                         sj=pp))
                 of = open(js_name, 'w')
                 of.write(working_string)

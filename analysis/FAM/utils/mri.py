@@ -778,13 +778,15 @@ def save_estimates(filename, final_estimates, model_type = 'gauss', fit_hrf = Fa
     ----------
     filename : str
         absolute filename of estimates to be saved
-    estimates : arr
+    final_estimates : arr
         2d estimates (datapoints,estimates)
     model_type: str
         model type used for fitting
-        
+    fit_hrf: bool
+        if we fitted hrf or not
     
     """ 
+
     # make dir if it doesnt exist already
     if not op.exists(op.split(filename)[0]):
         os.makedirs(op.split(filename)[0])
@@ -866,58 +868,6 @@ def save_estimates(filename, final_estimates, model_type = 'gauss', fit_hrf = Fa
                     r2 = final_estimates[..., 9])
         
 
-def combine_slices(file_list,outdir,num_slices=89, ax=2):
-    
-    """ High pass filter NIFTI run with gaussian kernel
-    
-    Parameters
-    ----------
-    file_list : list
-        list of absolute filenames of all volumes to combine
-    outdir : str
-        path to save new file
-    num_slices : int
-        number of slices to combine
-    ax: int
-        which ax to stack slices
-    
-    Outputs
-    -------
-    out_file: str
-        absolute output filename
-    
-    """
-    
-
-    for num in np.arange(num_slices):
-        
-        vol = [x for _,x in enumerate(file_list) if '_slice-{num}.nii.gz'.format(num = str(num).zfill(2)) in x]
-        
-        if len(vol)==0: # if empty
-            raise NameError('Slice %s doesnt exist!'%str(num).zfill(2)) 
-        
-        else:
-            nibber = nib.load(vol[0])
-            data = np.array(nibber.dataobj)
-            data = np.take(data, indices = num, axis=ax)
-            
-            if num == 0: # for first slice    
-                outdata = data[np.newaxis,...] 
-            else:
-                outdata = np.vstack((outdata,data[np.newaxis,...] ))
-                
-    outdata = np.moveaxis(outdata,0,ax)
-    
-    out_file = op.split(vol[0])[-1].replace('_slice-{num}.nii.gz'.format(num = str(num).zfill(2)),'.nii.gz')
-    out_file = op.join(outdir,out_file)
-    
-    # Save estimates data
-    new_img = nib.Nifti1Image(dataobj = outdata, affine = nibber.affine, header = nibber.header)
-    new_img.to_filename(out_file)
-    
-    return out_file
-
-  
 def make_colormap(colormap = 'rainbow_r', bins = 256, add_alpha = True, invert_alpha = False, cmap_name = 'costum',
                       discrete = False, return_cmap = False):
 
@@ -1005,21 +955,24 @@ def make_colormap(colormap = 'rainbow_r', bins = 256, add_alpha = True, invert_a
     else:
         return rgb_fn 
 
-def join_chunks(path, out_name, chunk_num = 83, fit_model = 'css', fit_hrf = False):
-    """ combine all chunks into one single estimate numpy array
-        assumes input is whole brain ("vertex", time)
+
+def load_chunks(fit_path, chunk_num = 54, fit_model = 'css', fit_hrf = False, basefilename = None):
+
+    """ 
+    combine all chunks 
+    into one single estimate numpy array
+    assumes input is whole brain ("vertex", time)
+
     Parameters
     ----------
-    path : str
+    fit_path : str
         absolute path to files
-    out_name: str
-        absolute output name of combined estimates
-    hemi : str
-        'hemi_L' or 'hemi_R' hemisphere
     chunk_num : int
-        total number of chunks to combine (per hemi)
+        total number of chunks to combine
     fit_model: str
         fit model of estimates
+    fit_hrf: bool
+        if we fitted hrf or not
     
     Outputs
     -------
@@ -1028,109 +981,130 @@ def join_chunks(path, out_name, chunk_num = 83, fit_model = 'css', fit_hrf = Fal
     
     """
     
-    for ch in range(chunk_num):
-        
-        chunk_name = [x for _,x in enumerate(os.listdir(path)) if fit_model in x and 'chunk-%s'%str(ch+1).zfill(3) in x][0]
-        print('loading chunk %s'%chunk_name)
-        chunk = np.load(op.join(path, chunk_name)) # load chunk
-        
-        if ch == 0:
-            xx = chunk['x']
-            yy = chunk['y']
+    filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-001'in x]
+    
+    ## if we defined a base filename that should be used to fish out right estimates
+    if basefilename:
+        filename = [file for file in filename_list if basefilename in file][0]
+    else:
+        filename = filename_list[0]
+    
+    filename = filename.replace('_chunk-001', '')
 
-            size = chunk['size']
-
-            beta = chunk['betas']
-            baseline = chunk['baseline']
-
-            if 'css' in fit_model: 
-                ns = chunk['ns']
-            elif 'dn' in fit_model:
-                sa = chunk['sa']
-                ss = chunk['ss']
-                nb = chunk['nb']
-                sb = chunk['sb']
-
-            rsq = chunk['r2']
-
-            if fit_hrf:
-                hrf_derivative = chunk['hrf_derivative']
-                hrf_dispersion = chunk['hrf_dispersion']
-            else: # assumes standard spm params
-                hrf_derivative = np.ones(xx.shape)
-                hrf_dispersion = np.zeros(xx.shape) 
-
-        else:
-            xx = np.concatenate((xx, chunk['x']))
-            yy = np.concatenate((yy, chunk['y']))
-
-            size = np.concatenate((size, chunk['size']))
-
-            beta = np.concatenate((beta, chunk['betas']))
-            baseline = np.concatenate((baseline, chunk['baseline']))
-
-            if 'css' in fit_model:
-                ns = np.concatenate((ns, chunk['ns']))
-            elif 'dn' in fit_model:
-                sa = np.concatenate((sa, chunk['sa']))
-                ss = np.concatenate((ss, chunk['ss']))
-                nb = np.concatenate((nb, chunk['nb']))
-                sb = np.concatenate((sb, chunk['sb']))
-
-            rsq = np.concatenate((rsq, chunk['r2']))
+    if not op.exists(filename):
+    
+        for ch in np.arange(chunk_num)[:-1]:
             
-            if fit_hrf:
-                hrf_derivative = np.concatenate((hrf_derivative, chunk['hrf_derivative']))
-                hrf_dispersion = np.concatenate((hrf_dispersion, chunk['hrf_dispersion']))
-            else: # assumes standard spm params
-                hrf_derivative = np.concatenate((hrf_derivative, np.ones(xx.shape)))
-                hrf_dispersion = np.concatenate((hrf_dispersion, np.zeros(xx.shape))) 
-    
-    print('shape of estimates is %s'%(str(xx.shape)))
+            chunk_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-%s'%str(ch+1).zfill(3) in x]
+            
+            ## if we defined a base filename that should be used to fish out right estimates
+            if basefilename:
+                chunk_name = [file for file in chunk_name_list if basefilename in file][0]
+            else:
+                chunk_name = chunk_name_list[0]
 
-    # save file
-    output = op.join(out_name)
-    print('saving %s'%output)
+            print('loading chunk %s'%chunk_name)
+            chunk = np.load(chunk_name) # load chunk
+            
+            if ch == 0:
+                xx = chunk['x']
+                yy = chunk['y']
 
-    if 'css' in fit_model:
-        np.savez(output,
-                x = xx,
-                y = yy,
-                size = size,
-                betas = beta,
-                baseline = baseline,
-                ns = ns,
-                hrf_derivative = hrf_derivative,
-                hrf_dispersion = hrf_dispersion,
-                r2 = rsq)
+                size = chunk['size']
 
-    elif 'dn' in fit_model:
-        np.savez(output,
-                x = xx,
-                y = yy,
-                size = size,
-                betas = beta,
-                baseline = baseline,
-                sa = sa,
-                ss = ss,
-                nb = nb,
-                sb = sb,
-                hrf_derivative = hrf_derivative,
-                hrf_dispersion = hrf_dispersion,
-                r2 = rsq)
-    
-    else: # assumes gauss
-        np.savez(output,
-                x = xx,
-                y = yy,
-                size = size,
-                betas = beta,
-                baseline = baseline,
-                hrf_derivative = hrf_derivative,
-                hrf_dispersion = hrf_dispersion,
-                r2 = rsq)
+                beta = chunk['betas']
+                baseline = chunk['baseline']
+
+                if 'css' in fit_model: 
+                    ns = chunk['ns']
+                elif 'dn' in fit_model:
+                    sa = chunk['sa']
+                    ss = chunk['ss']
+                    nb = chunk['nb']
+                    sb = chunk['sb']
+
+                rsq = chunk['r2']
+
+                if fit_hrf:
+                    hrf_derivative = chunk['hrf_derivative']
+                    hrf_dispersion = chunk['hrf_dispersion']
+                else: # assumes standard spm params
+                    hrf_derivative = np.ones(xx.shape)
+                    hrf_dispersion = np.zeros(xx.shape) 
+
+            else:
+                xx = np.concatenate((xx, chunk['x']))
+                yy = np.concatenate((yy, chunk['y']))
+
+                size = np.concatenate((size, chunk['size']))
+
+                beta = np.concatenate((beta, chunk['betas']))
+                baseline = np.concatenate((baseline, chunk['baseline']))
+
+                if 'css' in fit_model:
+                    ns = np.concatenate((ns, chunk['ns']))
+                elif 'dn' in fit_model:
+                    sa = np.concatenate((sa, chunk['sa']))
+                    ss = np.concatenate((ss, chunk['ss']))
+                    nb = np.concatenate((nb, chunk['nb']))
+                    sb = np.concatenate((sb, chunk['sb']))
+
+                rsq = np.concatenate((rsq, chunk['r2']))
+                
+                if fit_hrf:
+                    hrf_derivative = np.concatenate((hrf_derivative, chunk['hrf_derivative']))
+                    hrf_dispersion = np.concatenate((hrf_dispersion, chunk['hrf_dispersion']))
+                else: # assumes standard spm params
+                    hrf_derivative = np.concatenate((hrf_derivative, np.ones(xx.shape)))
+                    hrf_dispersion = np.concatenate((hrf_dispersion, np.zeros(xx.shape))) 
+        
+        print('shape of estimates is %s'%(str(xx.shape)))
+
+        # save file
+        print('saving %s'%filename)
+
+        if 'css' in fit_model:
+            np.savez(filename,
+                    x = xx,
+                    y = yy,
+                    size = size,
+                    betas = beta,
+                    baseline = baseline,
+                    ns = ns,
+                    hrf_derivative = hrf_derivative,
+                    hrf_dispersion = hrf_dispersion,
+                    r2 = rsq)
+
+        elif 'dn' in fit_model:
+            np.savez(filename,
+                    x = xx,
+                    y = yy,
+                    size = size,
+                    betas = beta,
+                    baseline = baseline,
+                    sa = sa,
+                    ss = ss,
+                    nb = nb,
+                    sb = sb,
+                    hrf_derivative = hrf_derivative,
+                    hrf_dispersion = hrf_dispersion,
+                    r2 = rsq)
+        
+        else: # assumes gauss
+            np.savez(filename,
+                    x = xx,
+                    y = yy,
+                    size = size,
+                    betas = beta,
+                    baseline = baseline,
+                    hrf_derivative = hrf_derivative,
+                    hrf_dispersion = hrf_dispersion,
+                    r2 = rsq)
+    else:
+        print('file already exists, loading %s'%filename)
      
-    return np.load(output)
+    return np.load(filename)
+
 
 def dva_per_pix(height_cm,distance_cm,vert_res_pix):
 
@@ -3040,38 +3014,3 @@ def fwhmax_fwatmin(model, estimates, normalize_RFs=False, return_profiles=False)
         return result
 
 
-def load_pRF_estimates(fits_pth, params, total_chunks = 54, model_type = 'gauss'):
-
-    """ Load pRF estimates and combined them
-    
-    Parameters
-    ----------
-    fits_pth : str
-        absolute path to fits locations
-    params : dict
-        yaml dict with task related infos 
-    """
-    
-    # path to combined estimates
-    estimates_pth = op.join(fits_pth,'combined')
-
-    # combined estimates filename
-    est_name = [x for _,x in enumerate(os.listdir(fits_pth)) if 'chunk-001' in x][0]
-    est_name = est_name.replace('chunk-001_of_{ch}'.format(ch=str(total_chunks).zfill(3)),'chunk-combined')
-
-    # total path to estimates path
-    estimates_combi = op.join(estimates_pth, est_name)
-
-    if op.isfile(estimates_combi): # if combined estimates exists
-
-        print('loading %s'%estimates_combi)
-        estimates = np.load(estimates_combi) # load it
-
-    else: # if not join chunks and save file
-        if not op.exists(estimates_pth):
-            os.makedirs(estimates_pth) 
-
-        estimates = join_chunks(fits_pth, estimates_combi, fit_hrf = params['mri']['fitting']['pRF']['fit_hrf'],
-                                chunk_num = total_chunks, fit_model = 'it{model}'.format(model=model_type)) #'{model}'.format(model=model_type)))#
-    
-    return estimates

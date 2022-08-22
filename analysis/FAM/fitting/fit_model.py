@@ -11,7 +11,7 @@ from FAM.processing import load_exp_settings, preproc_mridata
 from FAM.fitting import prf_model
 
 # load settings from yaml
-with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
+with open('exp_params.yml', 'r') as f_in:
     params = yaml.safe_load(f_in)
 
 ## to get inputs 

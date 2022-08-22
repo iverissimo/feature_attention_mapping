@@ -385,9 +385,9 @@ class pRF_model:
         basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
                                                                             acq = self.MRIObj.acq,
                                                                             rt = run_type)
-        if chunk_num:
+        if chunk_num is not None:
             basefilename += '_chunk-{ch}'.format(ch = str(chunk_num).zfill(3))
-        elif vertex:
+        elif vertex is not None:
             basefilename += '_vertex-{ver}'.format(ver = str(vertex))
         elif ROI:
             basefilename += '_ROI-{roi}'.format(roi = str(ROI))

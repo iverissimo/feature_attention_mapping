@@ -32,6 +32,8 @@ class pRFViewer:
         ----------
         MRIObj : MRIData object
             object from one of the classes defined in processing.load_exp_data
+        pRFModelObj: pRF Model object
+            object from one of the classes defined in prf_model.pRF_model
             
         """
 
@@ -204,6 +206,14 @@ class pRFViewer:
                     
             #plt.show()
             fig.savefig(op.join(figures_pth, fig_name))
+
+
+    
+    
+    
+    
+    
+    #def plot_prf_results(self, participant_list = [])
 
 
             

@@ -191,7 +191,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                 js_name = op.join(batch_dir, '{fname}_sub-{sj}_FAM.sh'.format(fname=fitfolder,
                                                                                         sj=pp))
                 of = open(js_name, 'w')
-                of.write(batch_string)
+                of.write(working_string)
                 of.close()
 
                 print('submitting ' + js_name + ' to queue')

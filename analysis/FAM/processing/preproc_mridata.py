@@ -298,7 +298,7 @@ class PreprocMRI:
         for pp in self.MRIObj.sj_num:
             
             ## freesurfer command ##
-            freesurfer_cmd = 'recon-all -s {sj} -hires '.format(sj=pp)
+            freesurfer_cmd = 'recon-all -s sub-{sj} -hires '.format(sj=pp)
             
             # path to store freesurfer outputs, in derivatives
             out_dir = op.join(self.MRIObj.freesurfer_pth, 'sub-{sj}'.format(sj=pp))

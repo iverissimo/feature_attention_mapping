@@ -151,17 +151,17 @@ mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR
 
 wait
 
-cp -r $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR
+cp -r $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/post_fmriprep/$SPACE
 
 wait
 
-cp -r $SOURCE_DIR/sub-$SJ_NR/ $TMPDIR/sourcedata/sub-$SJ_NR
+cp -r $SOURCE_DIR/sub-$SJ_NR $TMPDIR/sourcedata/
 
 wait
 
 if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ] 
 then
-    cp -r $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR
+    cp -r $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/$FITFOLDER/$SPACE
 fi
 
 wait

@@ -97,6 +97,7 @@ class pRF_model:
         ## total number of chunks we divide data when fitting
         self.total_chunks = self.MRIObj.params['mri']['fitting']['pRF']['total_chunks'][self.MRIObj.sj_space]
 
+    
     def get_DM(self, participant, ses = 'ses-mean', ses_type = 'func', mask_DM = True, filename = None, 
                                     osf = 1, res_scaling = .1):
 

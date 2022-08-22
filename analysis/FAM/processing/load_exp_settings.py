@@ -10,7 +10,7 @@ class FAMData:
     Class that loads relevant paths and settings for FAM data
     """
     
-    def __init__(self, params, sj_num, exclude_sj = [], base_dir = None):
+    def __init__(self, params, sj_num, exclude_sj = [], base_dir = 'local', wf_dir = None):
         
         """__init__
         constructor for class, takes experiment params and subject num as input
@@ -48,13 +48,15 @@ class FAMData:
 
         ## set some paths
         # which machine we run the data
-        if base_dir is None:
-            self.base_dir = self.params['general']['current_dir'] 
-        else:
-            self.base_dir = base_dir
+        self.base_dir = base_dir
         
         # project root folder
         self.proj_root_pth = self.params['mri']['paths'][self.base_dir]['root']
+
+        # in case we are computing things in a different worflow dir
+        # useful when fitting models in /scratch node
+        if wf_dir is not None:
+            self.proj_root_pth = wf_dir
         
         # sourcedata dir
         self.sourcedata_pth = op.join(self.proj_root_pth,'sourcedata')
@@ -86,7 +88,7 @@ class BehData(FAMData):
     Class that loads relevant paths and settings for behavioral data
     """
     
-    def __init__(self, params, sj_num, exclude_sj = [], repo_pth = '', base_dir = None):  # initialize child class
+    def __init__(self, params, sj_num, exclude_sj = [], repo_pth = '', base_dir = None, wf_dir = None):  # initialize child class
 
         """ Initializes MRIData object. 
 
@@ -103,7 +105,7 @@ class BehData(FAMData):
         """
 
         # need to initialize parent class (BehTask), indicating output infos
-        super().__init__(params = params, sj_num = sj_num, exclude_sj = exclude_sj, base_dir=base_dir)
+        super().__init__(params = params, sj_num = sj_num, exclude_sj = exclude_sj, base_dir = base_dir, wf_dir = wf_dir)
 
         ## relevant file extensions
         self.events_ext = '_events.tsv'
@@ -130,7 +132,7 @@ class MRIData(BehData):
     Class that loads relevant paths and settings for (f)MRI data
     """
     
-    def __init__(self, params, sj_num, exclude_sj = [], repo_pth = '', base_dir = None):  # initialize child class
+    def __init__(self, params, sj_num, exclude_sj = [], repo_pth = '', base_dir = None, wf_dir = None):  # initialize child class
 
         """ Initializes MRIData object. 
 
@@ -147,7 +149,7 @@ class MRIData(BehData):
         """
 
         # need to initialize parent class (BehTask), indicating output infos
-        super().__init__(params = params, sj_num = sj_num, exclude_sj = exclude_sj, base_dir=base_dir)
+        super().__init__(params = params, sj_num = sj_num, exclude_sj = exclude_sj, base_dir = base_dir, wf_dir = wf_dir)
 
         ## some paths
         # anat preprocessing path, 

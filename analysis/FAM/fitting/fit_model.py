@@ -1,14 +1,17 @@
 import os, sys
 import os.path as op
+from pathlib import Path
 import argparse
 import ast
+
+import time
 
 import yaml
 from FAM.processing import load_exp_settings, preproc_mridata
 from FAM.fitting import prf_model
 
 # load settings from yaml
-with open('exp_params.yml', 'r') as f_in:
+with open(op.join(str(Path(os.getcwd()).parents[1]),'exp_params.yml'), 'r') as f_in:
     params = yaml.safe_load(f_in)
 
 ## to get inputs 
@@ -17,12 +20,14 @@ parser.add_argument("--participant", help="Subject number (ex: 001)", required=T
 parser.add_argument("--task2model", type = str, help="On which task to fit model (pRF/FA)", required=True)
 # optional
 parser.add_argument("--dir", type = str, help="System we are running analysis (lisa [default] vs local)")
+parser.add_argument("--wf_dir", type = str, help="Path to workflow dir, if such if not standard root dirs(None [default] vs /scratch)")
 
 # data arguments
 parser.add_argument("--ses", type = str, help="Session to fit (if ses-mean [default] then will average both session when that's possible)")
 parser.add_argument("--run_type", help="Type of run to fit (mean [default], median, 1, loo_1, ...)")
 parser.add_argument("--chunk_num", type = int, help="Chunk number to fit or None [default]")
-#parser.add_argument("--vertex", nargs='+', type=int, help="Vertex index to fit, or list of indexes or None [default]")
+
+#parser.add_argument("--vertex", nargs='+', type=int, help="Vertex index to fit, or list of indexes or None [default]", default =[])
 parser.add_argument("--vertex", type = str, help="Vertex index to fit, or list of indexes or None [default]")
 parser.add_argument("--ROI",type = str, help="ROI name to fit")
 
@@ -53,6 +58,7 @@ ROI = args.ROI
 #
 # system location
 system_dir = args.dir if args.dir is not None else "lisa" 
+wf_dir = args.wf_dir
 #
 #
 # prf model name and options
@@ -60,12 +66,12 @@ prf_model_name = args.prf_model_name if args.prf_model_name is not None else "ga
 fit_hrf = bool(args.fit_hrf) if args.fit_hrf is not None else False 
 
 
-
 ## Load data object
 print("Fitting data for subject {sj}!".format(sj=participant))
 FAM_data = load_exp_settings.MRIData(params, participant, 
                                     repo_pth = op.split(load_exp_settings.__file__)[0], 
                                     base_dir = system_dir, 
+                                    wf_dir = wf_dir,
                                     exclude_sj = [])
 
 ## Load preprocessing class for each data type
@@ -95,12 +101,18 @@ match task2model:
         file_ext = FAM_mri_preprocess.get_mrifile_ext()['pRF']
 
         ## actually fit
+        print('Fitting started!')
+        # to time it
+        start_time = time.time()
+
         FAM_pRF.fit_data(participant, pp_prf_models, 
                         ses = ses, run_type = run_type, file_ext = file_ext,
                         vertex = vertex, chunk_num = chunk_num, ROI = ROI,
                         model2fit = prf_model_name,
                         save_estimates = True,
                         xtol = 1e-2, ftol = 1e-4, n_jobs = 16)
+
+        print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
 
     case 'FA':
 

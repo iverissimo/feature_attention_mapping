@@ -19,12 +19,12 @@ parser.add_argument("--task", type = str, help="On which task to fit model (pRF/
 parser.add_argument("--dir", type = str, help="System we are running analysis (lisa [default] vs local)")
 
 # only relevant for pRF fitting
-parser.add_argument("--prf_model_name", type = str, help="Type of model to fit: gauss [default], css, dn, etc...")
-parser.add_argument("--fit_hrf", type = int, help="1/0 - if we want tp fit hrf on the data or not [default]")
+parser.add_argument("--prf_model_name", type = str, help="Type of pRF model to fit: gauss [default], css, dn, etc...")
+parser.add_argument("--fit_hrf", type = int, help="1/0 - if we want to fit hrf on the data or not [default]")
 
 # data arguments
 parser.add_argument("--ses2fit", type = str, help="Session to fit (if ses-mean [default] then will average both session when that's possible)")
-parser.add_argument("--run_type", help="Type of run to fit (mean [default], median, 1, loo_1, ...)")
+parser.add_argument("--run_type", help="Type of run to fit (mean of runs [default], median, 1, loo_1, ...)")
 
 # if we want to divide in batches (chunks)
 parser.add_argument("--chunk_data", type = int, help="1/0 - if we want to divide the data into chunks [default] or not")
@@ -119,7 +119,7 @@ match system_dir:
             # if we're chunking the data, then need to submit each chunk at a time
             if chunk_data:
                 # total number of chunks
-                total_ch = FAM_data.params['mri']['fitting']['pRF']['total_chunks'][FAM_data.sj_space]
+                total_ch = FAM_data.params['mri']['fitting'][task]['total_chunks'][FAM_data.sj_space]
                 ch_list = np.arange(total_ch)
             else:
                 ch_list = [None]
@@ -128,9 +128,9 @@ match system_dir:
 
                 # set fitting model command 
 
-                fit_cmd = """python {pth}/fit_model.py --participant {pp} --task2model {task} --dir {dir}
---ses {ses} --run_type {rt} --chunk_num {ch} 
---prf_model_name {prf_mod} --fit_hrf {fh}\n\n""".format(pth = op.split(prf_model.__file__)[0],
+                fit_cmd = """python {pth}/fit_model.py --participant {pp} --task2model {task} --dir {dir} \
+--ses {ses} --run_type {rt} --chunk_num {ch} \
+--prf_model_name {prf_mod} --fit_hrf {fh} --wf_dir $TMPDIR\n\n""".format(pth = op.split(prf_model.__file__)[0],
                                                         pp = pp,
                                                         task = task,
                                                         dir = system_dir,
@@ -145,12 +145,17 @@ match system_dir:
                 batch_string =  slurm_cmd + """# call the programs
 echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
-# make derivatives dir in node
+# make derivatives dir in node and sourcedata because we want to access behav files
 mkdir -p $TMPDIR/derivatives/{post_fmriprep,$FITFOLDER}/$SPACE/sub-$SJ_NR
+mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR
 
 wait
 
 cp -r $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR
+
+wait
+
+cp -r $SOURCE_DIR/sub-$SJ_NR/ $TMPDIR/sourcedata/sub-$SJ_NR
 
 wait
 
@@ -178,6 +183,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                 working_string = working_string.replace('$PY_CMD', fit_cmd)
                 working_string = working_string.replace('$BD', batch_dir)
                 working_string = working_string.replace('$DERIV_DIR', FAM_data.derivatives_pth)
+                working_string = working_string.replace('$SOURCE_DIR', FAM_data.sourcedata_pth)
 
                 print(working_string)
 

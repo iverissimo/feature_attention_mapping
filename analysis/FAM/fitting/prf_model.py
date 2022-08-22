@@ -382,9 +382,9 @@ class pRF_model:
         print('saving files in %s'%outdir)
 
         ## set base filename that will be used for estimates
-        basefilename = op.join(outdir, 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
+        basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
                                                                             acq = self.MRIObj.acq,
-                                                                            rt = run_type))
+                                                                            rt = run_type)
         if chunk_num:
             basefilename += '_chunk-{ch}'.format(ch = str(chunk_num).zfill(3))
         elif vertex:

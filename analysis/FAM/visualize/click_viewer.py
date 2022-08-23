@@ -80,16 +80,23 @@ class visualize_on_click:
 
         ## set participant ID
         self.participant = participant
-        self.ses = ses
-        self.run_type = run_type
+        self.session = ses
+        self.pRFmodel_name = pRFmodel_name
 
         ## load model and prf estimates for that participant
-        self.pp_prf_est_dict, self.pp_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant, ses = ses, run_type = run_type, model_name = pRFmodel_name, iterative = True)
+        self.pp_prf_est_dict, self.pp_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant, ses = self.session, run_type = run_type, model_name = pRFmodel_name, iterative = True)
+
+        # when loading, dict has key-value pairs stored,
+        # need to convert it to make it in same format as when fitting on the spot
+        self.pRF_keys = self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][pRFmodel_name]
         
+        if self.pRFModelObj.fit_hrf:
+            self.pRF_keys = self.pRF_keys[:-1]+self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys']['hrf']+['r2']
+
         ## set figure grid 
         self.full_fig = plt.figure(constrained_layout = True, figsize = self.full_figsize)
 
-        if self.task2viz in ['both', 'FA', 'feature']:
+        if task2viz in ['both', 'FA', 'feature']:
 
             gs = self.full_fig.add_gridspec(4, 3)
 
@@ -105,7 +112,7 @@ class visualize_on_click:
             self.prf_timecourse_ax.set_title('pRF timecourse')
             self.prf_ax.set_title('prf')
         
-        elif self.task2viz in ['prf', 'pRF']:
+        elif task2viz in ['prf', 'pRF']:
 
             gs = self.full_fig.add_gridspec(4, 2)
 
@@ -134,28 +141,30 @@ class visualize_on_click:
 
         # if we fitted hrf, need to also get that from params
         # and set model array
+
+        estimates_arr = np.stack((self.pp_prf_est_dict[val][vertex] for val in self.pRF_keys))
         
         # define spm hrf
-        spm_hrf = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.ses]['{name}_model'.format(name = self.pRFModelObj.model_type)].create_hrf(hrf_params = [1, 1, 0],
+        spm_hrf = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type)].create_hrf(hrf_params = [1, 1, 0],
                                                                                                                     onset=self.pRFModelObj.hrf_onset)
 
         if self.pRFModelObj.fit_hrf:
-            hrf = self.pp_prf_models[ 'sub-{sj}'.format(sj = self.participant)][self.ses]['{name}_model'.format(name = self.pRFModelObj.model_type)].create_hrf(hrf_params = [1.0,
-                                                                                                                                self.pp_prf_est_dict['it_{name}'.format(name = self.pRFModelObj.model_type)][0][-3],
-                                                                                                                                self.pp_prf_est_dict['it_{name}'.format(name = self.pRFModelObj.model_type)][0][-2]],
+            hrf = self.pp_prf_models[ 'sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type)].create_hrf(hrf_params = [1.0,
+                                                                                                                                estimates_arr[-3],
+                                                                                                                                estimates_arr[-2]],
                                                                                                                     onset=self.pRFModelObj.hrf_onset)
         
-            self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.ses]['{name}_model'.format(name = self.pRFModelObj.model_type)].hrf = hrf
+            self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type)].hrf = hrf
 
-            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.ses]['{name}_model'.format(name = self.pRFModelObj.model_type)].return_prediction(*list(self.pp_prf_est_dict['it_{name}'.format(name = self.pRFModelObj.model_type)][0, :-3]))
+            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type)].return_prediction(*list(estimates_arr[:-3]))
         
         else:
-            self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.ses]['{name}_model'.format(name = self.pRFModelObj.model_type)].hrf = spm_hrf
+            self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type)].hrf = spm_hrf
 
-            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.ses]['{name}_model'.format(name = self.pRFModelObj.model_type)].return_prediction(*list(self.pp_prf_est_dict['it_{name}'.format(name = self.pRFModelObj.model_type)][0, :-1]))
+            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type)].return_prediction(*list(estimates_arr[:-1]))
 
             
-        return model_arr[0], self.pp_prf_est_dict['r2'][vertex]
+        return model_arr[0], estimates_arr[-1]
 
 
 
@@ -178,7 +187,7 @@ class visualize_on_click:
         axis.plot(time_sec, timecourse,'k--', label = 'data')
         
         if plot_model:
-            prediction, r2 = self.get_vertex_model_tc(self.vertex, model_type = self.pRFModelObj.model_type, fit_hrf = self.pRFModelObj.fit_hrf)
+            prediction, r2 = self.get_vertex_model_tc(self.vertex)
             axis.plot(time_sec, prediction, c = 'red',lw=3,label='model R$^2$ = %.2f'%r2,zorder=1)
             print('pRF model R$^2$ = %.2f'%r2)
             
@@ -307,7 +316,7 @@ class visualize_on_click:
             cortex.quickshow(self.images['PA'], with_rois = False, with_curvature = True,
                         fig = self.flatmap_ax, with_colorbar = False)
             self.flatmap_ax.set_title('pRF PA')
-        elif (event.key == '6') & (self.prf_model_type == 'css'):  # pRF exponent
+        elif (event.key == '6') & (self.pRFmodel_name == 'css'):  # pRF exponent
             cortex.quickshow(self.images['ns'], with_rois = False, with_curvature = True,
                         fig = self.flatmap_ax, with_colorbar = False)
             self.flatmap_ax.set_title('pRF exponent')

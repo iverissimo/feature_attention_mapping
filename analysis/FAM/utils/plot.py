@@ -331,7 +331,7 @@ def get_rois4plotting(params, pysub = 'hcp_999999', use_atlas = True, atlas_pth 
             
     return ROIs, roi_verts, color_codes
 
-    
+
 
 def fwhmax_fwatmin(model, estimates, normalize_RFs=False, return_profiles=False):
     
@@ -423,3 +423,59 @@ def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=N
         # import subject into pycortex database
         cortex.fmriprep.import_subj(subject = sj, source_dir = source_directory, 
                              session = ses, dataset = dataset, acq = acq)
+
+
+def plot_pRF_DM(dm_array, filename):
+
+    """
+    Function to plot design matrix frame by frame 
+    and save movie in folder
+
+    """
+
+    # if output path doesn't exist, create it
+
+    outfolder = op.split(filename)[0]
+
+    if not op.isdir(outfolder): 
+        os.makedirs(outfolder)
+    print('saving files in %s'%filename)
+
+    dm_array = (dm_array * 255).astype(np.uint8)
+
+    for w in range(dm_array.shape[-1]):
+        im = Image.fromarray(dm_array[...,w])
+        im.save(op.join(outfolder,"DM_TR-%s.png"%str(w).zfill(4)))  
+
+    ## save as video
+    img_name = op.join(outfolder,'DM_TR-%4d.png')
+    os.system("ffmpeg -r 6 -start_number 0 -i %s -vcodec mpeg4 -y %s"%(img_name, filename))  
+
+
+def get_estimates_roi_df(participant, est_pp_dict, ROIs = None, roi_verts = None, est_key = 'r2'):
+
+    """
+
+    Helper function to get estimates dataframe values for each ROI
+    will select values based on est key param 
+
+    """
+
+    ## save rsq values in dataframe, for plotting
+    df_est = pd.DataFrame({'sj': [], 'index': [], 'ROI': [], 'value': []})
+
+    for idx,rois_ks in enumerate(ROIs): 
+        
+        # mask estimates
+        print('masking estimates for ROI %s'%rois_ks)
+        
+        roi_arr = est_pp_dict[est_key][roi_verts[rois_ks]]
+
+        df_est = pd.concat((df_est,
+                            pd.DataFrame({'sj': np.tile('sub-{sj}'.format(sj = participant), len(roi_arr)), 
+                                        'index': roi_verts[rois_ks], 
+                                        'ROI': np.tile(rois_ks, len(roi_arr)), 
+                                        'value': roi_arr})
+                        ))
+
+    return df_est

@@ -47,37 +47,6 @@ import operator
 
 
 
-def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=None):
-    
-    """Import a subject from fmriprep-output to pycortex
-    
-    Parameters
-    ----------
-    source_directory : string
-       Local directory that contains both fmriprep and freesurfer subfolders 
-    sj : string
-        Fmriprep subject name (without "sub-")
-    dataset : string
-       If you have multiple fmriprep outputs from different datasets, use this attribute
-       to add a prefix to every subject id ('ds01.01' rather than '01')
-    ses : string, optional
-       BIDS session that contains the anatomical data
-    acq : string, optional
-        If we intend to specific the acquisition of the T1w file (for naming purposes)
-    """
-    if dataset is not None:
-        pycortex_sub = '{ds}.{sub}'.format(ds=dataset, sub=sj)
-    else:
-        pycortex_sub = '{sub}'.format(sub=sj)
-
-    if pycortex_sub in cortex.database.db.subjects.keys():
-        print('subject %s already in filestore, will not overwrite'%pycortex_sub)
-    else:
-        
-        # import subject into pycortex database
-        cortex.fmriprep.import_subj(subject = sj, source_dir = source_directory, 
-                             session = ses, dataset = dataset, acq = acq)
-
 
 def get_tsnr(input_file, return_mean=True, affine=[], hdr=[], filename=None):
     
@@ -187,7 +156,6 @@ def weighted_mean(data1, weights=None, norm=False):
 
     return avg_data
     
-
 
 def correlate_arrs(data1, data2, n_jobs = 4, weights=[]):
     
@@ -619,6 +587,7 @@ def average_epi(file, outdir, method = 'mean'):
 
     return output_file
 
+
 def reorient_nii_2RAS(input_pth, output_pth):
 
     """
@@ -668,6 +637,7 @@ def reorient_nii_2RAS(input_pth, output_pth):
             canonical_img.header['qform_code'] = np.array([1], dtype=np.int16)
 
         nib.save(canonical_img, file)
+
 
 def convert64bit_to_16bit(input_file, output_file):
 
@@ -764,7 +734,6 @@ def crop_shift_arr(arr, crop_nr = None, shift = 0):
         
     return out_arr
     
-
 
 def save_estimates(filename, final_estimates, model_type = 'gauss', fit_hrf = False):
     
@@ -868,95 +837,7 @@ def save_estimates(filename, final_estimates, model_type = 'gauss', fit_hrf = Fa
                     r2 = final_estimates[..., 9])
         
 
-def make_colormap(colormap = 'rainbow_r', bins = 256, add_alpha = True, invert_alpha = False, cmap_name = 'costum',
-                      discrete = False, return_cmap = False):
-
-    """ make custom colormap
-    can add alpha channel to colormap,
-    and save to pycortex filestore
-    Parameters
-    ----------
-    colormap : str or List/arr
-        if string then has to be a matplolib existent colormap
-        if list/array then contains strings with color names, to create linear segmented cmap
-    bins : int
-        number of bins for colormap
-    invert_alpha : bool
-        if we want to invert direction of alpha channel
-        (y can be from 0 to 1 or 1 to 0)
-    cmap_name : str
-        new cmap filename, final one will have _alpha_#-bins added to it
-    discrete : bool
-        if we want a discrete colormap or not (then will be continuous)
-    Outputs
-    -------
-    rgb_fn : str
-        absolute path to new colormap
-    """
-    
-    if isinstance(colormap, str): # if input is string (so existent colormap)
-
-        # get colormap
-        cmap = cm.get_cmap(colormap)
-
-    else: # is list of strings
-        cvals  = np.arange(len(colormap))
-        norm = plt.Normalize(min(cvals),max(cvals))
-        tuples = list(zip(map(norm,cvals), colormap))
-        cmap = colors.LinearSegmentedColormap.from_list("", tuples)
-        
-        if discrete == True: # if we want a discrete colormap from list
-            cmap = colors.ListedColormap(colormap)
-            bins = int(len(colormap))
-
-    # convert into array
-    cmap_array = cmap(range(bins))
-
-    # reshape array for map
-    new_map = []
-    for i in range(cmap_array.shape[-1]):
-        new_map.append(np.tile(cmap_array[...,i],(bins,1)))
-
-    new_map = np.moveaxis(np.array(new_map), 0, -1)
-    
-    if add_alpha: 
-        # make alpha array
-        if invert_alpha == True: # in case we want to invert alpha (y from 1 to 0 instead pf 0 to 1)
-            _, alpha = np.meshgrid(np.linspace(0, 1, bins, endpoint=False), 1-np.linspace(0, 1, bins))
-        else:
-            _, alpha = np.meshgrid(np.linspace(0, 1, bins, endpoint=False), np.linspace(0, 1, bins, endpoint=False))
-
-        # add alpha channel
-        new_map[...,-1] = alpha
-        cmap_ext = (0,1,0,1)
-    else:
-        new_map = new_map[:1,...].copy() 
-        cmap_ext = (0,100,0,1)
-    
-    fig = plt.figure(figsize=(1,1))
-    ax = fig.add_axes([0,0,1,1])
-    # plot 
-    plt.imshow(new_map,
-    extent = cmap_ext,
-    origin = 'lower')
-    ax.axis('off')
-
-    if add_alpha: 
-        rgb_fn = op.join(op.split(cortex.database.default_filestore)[
-                          0], 'colormaps', cmap_name+'_alpha_bins_%d.png'%bins)
-    else:
-        rgb_fn = op.join(op.split(cortex.database.default_filestore)[
-                          0], 'colormaps', cmap_name+'_bins_%d.png'%bins)
-    #misc.imsave(rgb_fn, new_map)
-    plt.savefig(rgb_fn, dpi = 200,transparent=True)
-
-    if return_cmap:
-        return cmap
-    else:
-        return rgb_fn 
-
-
-def load_chunks(fit_path, chunk_num = 54, fit_model = 'css', fit_hrf = False, basefilename = None):
+def load_chunks(fit_path, chunk_num = 54, fit_model = 'css', fit_hrf = False, basefilename = None, overwrite = False):
 
     """ 
     combine all chunks 
@@ -981,7 +862,7 @@ def load_chunks(fit_path, chunk_num = 54, fit_model = 'css', fit_hrf = False, ba
     
     """
     
-    filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-001'in x]
+    filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-000'in x]
     
     ## if we defined a base filename that should be used to fish out right estimates
     if basefilename:
@@ -989,13 +870,13 @@ def load_chunks(fit_path, chunk_num = 54, fit_model = 'css', fit_hrf = False, ba
     else:
         filename = filename_list[0]
     
-    filename = filename.replace('_chunk-001', '')
+    filename = filename.replace('_chunk-000', '')
 
-    if not op.exists(filename):
+    if not op.exists(filename) or overwrite:
     
-        for ch in np.arange(chunk_num)[:-1]:
+        for ch in np.arange(chunk_num):
             
-            chunk_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-%s'%str(ch+1).zfill(3) in x]
+            chunk_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-%s'%str(ch).zfill(3) in x]
             
             ## if we defined a base filename that should be used to fish out right estimates
             if basefilename:
@@ -1834,46 +1715,6 @@ def split_half_comb(input_list):
     return unique_pairs
 
 
-def create_hrf(hrf_params=[1.0, 1.0, 0.0], TR = 1.6, osf = 1, onset = 0):
-    """
-    construct single or multiple HRFs 
-    [taken from prfpy - all credits go to Marco]
-
-    Parameters
-    ----------
-    hrf_params : TYPE, optional
-        DESCRIPTION. The default is [1.0, 1.0, 0.0].
-    Returns
-    -------
-    hrf : ndarray
-        the hrf.
-    """
-
-    hrf = np.array(
-        [
-            np.ones_like(hrf_params[1])*hrf_params[0] *
-            spm_hrf(
-                tr = TR,
-                oversampling = osf,
-                onset=onset,
-                time_length = 40)[...,np.newaxis],
-            hrf_params[1] *
-            spm_time_derivative(
-                tr = TR,
-                oversampling = osf,
-                onset=onset,
-                time_length = 40)[...,np.newaxis],
-            hrf_params[2] *
-            spm_dispersion_derivative(
-                tr = TR,
-                oversampling = osf,
-                onset=onset,
-                time_length = 40)[...,np.newaxis]]).sum(
-        axis=0)                    
-
-    return hrf.T
-
-
 def resample_arr(upsample_data, osf = 10, final_sf = 1.6):
 
     """ resample array
@@ -2509,36 +2350,6 @@ def get_fa_prediction_tc(dm, betas,
     return prediction
 
 
-def create_glasser_df(path2file):
-    
-    # we read in the atlas data, which consists of 180 separate regions per hemisphere. 
-    # These are labeled separately, so the labels go to 360.
-    cifti = nib.load(op.join(path2file,
-                         'Q1-Q6_RelatedParcellation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.59k_fs_LR.dlabel.nii'))
-
-    # get index data array
-    cifti_data = np.array(cifti.get_fdata(dtype=np.float32))[0]
-    # from header get label dict with key + rgba
-    cifti_hdr = cifti.header
-    label_dict = cifti_hdr.get_axis(0)[0][1]
-    
-    ## make atlas data frame
-    atlas_df = pd.DataFrame(columns = ['ROI', 'index','R','G','B','A'])
-
-    for key in label_dict.keys():
-
-        if label_dict[key][0] != '???': 
-            atlas_df = atlas_df.append(pd.DataFrame({'ROI': label_dict[key][0].replace('_ROI',''),
-                                                     'index': key,
-                                                     'R': label_dict[key][1][0],
-                                                     'G': label_dict[key][1][1],
-                                                     'B': label_dict[key][1][2],
-                                                     'A': label_dict[key][1][3]
-                                                    }, index=[0]),ignore_index=True)
-            
-    return atlas_df, cifti_data
-
-
 def make_nuisance_tc(pars, timecourse = [], onsets = [1], hrf = [], fit = True, 
                      osf = 10, blk_duration = 45):
     
@@ -2599,102 +2410,6 @@ def make_nuisance_tc(pars, timecourse = [], onsets = [1], hrf = [], fit = True,
     else:
         return conv_nuisance_reg
 
-
-
-def make_raw_vertex_image(data1, cmap = 'hot', vmin = 0, vmax = 1, 
-                          data2 = [], vmin2 = 0, vmax2 = 1, subject = 'fsaverage', data2D = False):  
-    """ function to fix web browser bug in pycortex
-        allows masking of data with nans
-    
-    Parameters
-    ----------
-    data1 : array
-        data array
-    cmap : str
-        string with colormap name (not the alpha version)
-    vmin: int/float
-        minimum value
-    vmax: int/float 
-        maximum value
-    subject: str
-        overlay subject name to use
-    
-    Outputs
-    -------
-    vx_fin : VertexRGB
-        vertex object to call in webgl
-    
-    """
-    
-    # Get curvature
-    curv = cortex.db.get_surfinfo(subject, type = 'curvature', recache=False)#,smooth=1)
-    # Adjust curvature contrast / color. Alternately, you could work
-    # with curv.data, maybe threshold it, and apply a color map.     
-    curv.data[curv.data>0] = .1
-    curv.data[curv.data<=0] = -.1
-    #curv.data = np.sign(curv.data.data) * .25
-    
-    curv.vmin = -1
-    curv.vmax = 1
-    curv.cmap = 'gray'
-    
-    # Create display data 
-    vx = cortex.Vertex(data1, subject, cmap = cmap, vmin = vmin, vmax = vmax)
-    
-    # Pick an arbitrary region to mask out
-    # (in your case you could use np.isnan on your data in similar fashion)
-    if data2D:
-        data2[np.isnan(data2)] = vmin2
-        norm2 = colors.Normalize(vmin2, vmax2)  
-        alpha = np.clip(norm2(data2), 0, 1)
-    else:
-        alpha = ~np.isnan(data1) #(data < 0.2) | (data > 0.4)
-    alpha = alpha.astype(np.float)
-    
-    # Map to RGB
-    vx_rgb = np.vstack([vx.raw.red.data, vx.raw.green.data, vx.raw.blue.data])
-    vx_rgb[:,alpha>0] = vx_rgb[:,alpha>0] * alpha[alpha>0]
-    
-    curv_rgb = np.vstack([curv.raw.red.data, curv.raw.green.data, curv.raw.blue.data])
-    # do this to avoid artifacts where curvature gets color of 0 valur of colormap
-    curv_rgb[:,np.where((vx_rgb > 0))[-1]] = curv_rgb[:,np.where((vx_rgb > 0))[-1]] * (1-alpha)[np.where((vx_rgb > 0))[-1]]
-
-    # Alpha mask
-    display_data = curv_rgb + vx_rgb 
-
-    # Create vertex RGB object out of R, G, B channels
-    vx_fin = cortex.VertexRGB(*display_data, subject, curvature_brightness = 0.4, curvature_contrast = 0.1)
-
-    return vx_fin
-
-
-def get_weighted_bins(data_df, x_key = 'ecc', y_key = 'size', weight_key = 'rsq', n_bins = 10):
-    
-    # sort values by eccentricity
-    data_df = data_df.sort_values(by=[x_key])
-
-    #divide in equally sized bins
-    bin_size = int(len(data_df)/n_bins) 
-    
-    mean_x = []
-    mean_x_std = []
-    mean_y = []
-    mean_y_std = []
-    
-    # for each bin calculate rsq-weighted means and errors of binned ecc/gain 
-    for j in range(n_bins): 
-        
-        mean_x.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][x_key],
-                                              weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).mean)
-        mean_x_std.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][x_key],
-                                                  weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
-
-        mean_y.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][y_key],
-                                              weights = data_df[bin_size * j:bin_size*(j+1)][weight_key]).mean)
-        mean_y_std.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][y_key],
-                                                  weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
-
-    return mean_x, mean_x_std, mean_y, mean_y_std
 
 
 def baseline_correction(data, condition_per_TR, num_baseline_TRs = 6, baseline_interval = 'empty_long', 
@@ -2873,48 +2588,6 @@ def make_blk_nuisance_regressor(data, params, pRF_rsq,
     return nuisance_regressor_surf
 
 
-def get_rois4plotting(params, pysub = 'hcp_999999', use_atlas = True, atlas_pth = '', space = 'fsLR_den-170k'):
-
-    """ helper function to get ROI names, vertice index and color palette
-   to be used in plotting scripts
-    
-    Parameters
-    ----------
-    params : dict
-        yaml dict with task related infos  
-    """ 
-    
-    roi_verts = {} #empty dictionary  
-    
-    if use_atlas:
-        # Get Glasser atlas
-        atlas_df, atlas_array = create_glasser_df(atlas_pth)
-
-        # ROI names
-        ROIs = list(params['plotting']['ROIs']['glasser_atlas'].keys())
-        # colors
-        color_codes = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs}
-
-        # get vertices for ROI
-        for _,key in enumerate(ROIs):
-            roi_verts[key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
-
-    else:
-        # set ROI names
-        ROIs = params['plotting']['ROIs'][space]
-
-        # dictionary with one specific color per group - similar to fig3 colors
-        ROI_pal = params['plotting']['ROI_pal']
-        color_codes = {key: ROI_pal[key] for key in ROIs}
-
-        # get vertices for ROI
-        for _,val in enumerate(ROIs):
-            print(val)
-            roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
-            
-    return ROIs, roi_verts, color_codes
-
-
 def get_event_onsets(behav_files, TR = 1.6, crop = True, crop_TR = 8):
     
     """ Get behavioral event onsets
@@ -2954,63 +2627,5 @@ def get_event_onsets(behav_files, TR = 1.6, crop = True, crop_TR = 8):
     return avg_onset
 
 
-def fwhmax_fwatmin(model, estimates, normalize_RFs=False, return_profiles=False):
-    
-    """
-    taken from marco aqil's code, all credits go to him
-    """
-    
-    model = model.lower()
-    x=np.linspace(-50,50,1000).astype('float32')
-
-    prf = estimates['betas'] * np.exp(-0.5*x[...,np.newaxis]**2 / estimates['size']**2)
-    vol_prf =  2*np.pi*estimates['size']**2
-
-    if 'dog' in model or 'dn' in model:
-        srf = estimates['sa'] * np.exp(-0.5*x[...,np.newaxis]**2 / estimates['ss']**2)
-        vol_srf = 2*np.pi*estimates['ss']*2
-
-    if normalize_RFs==True:
-
-        if model == 'gauss':
-            profile =  prf / vol_prf
-        elif model == 'css':
-            #amplitude is outside exponent in CSS
-            profile = (prf / vol_prf)**estimates['ns'] * estimates['betas']**(1 - estimates['ns'])
-        elif model =='dog':
-            profile = prf / vol_prf - \
-                       srf / vol_srf
-        elif 'dn' in model:
-            profile = (prf / vol_prf + estimates['nb']) /\
-                      (srf / vol_srf + estimates['sb']) - estimates['nb']/estimates['sb']
-    else:
-        if model == 'gauss':
-            profile = prf
-        elif model == 'css':
-            #amplitude is outside exponent in CSS
-            profile = prf**estimates['ns'] * estimates['betas']**(1 - estimates['ns'])
-        elif model =='dog':
-            profile = prf - srf
-        elif 'dn' in model:
-            profile = (prf + estimates['nb'])/(srf + estimates['sb']) - estimates['nb']/estimates['sb']
-
-
-    half_max = np.max(profile, axis=0)/2
-    fwhmax = np.abs(2*x[np.argmin(np.abs(profile-half_max), axis=0)])
-
-
-    if 'dog' in model or 'dn' in model:
-
-        min_profile = np.min(profile, axis=0)
-        fwatmin = np.abs(2*x[np.argmin(np.abs(profile-min_profile), axis=0)])
-
-        result = fwhmax, fwatmin
-    else:
-        result = fwhmax
-
-    if return_profiles:
-        return result, profile.T
-    else:
-        return result
 
 

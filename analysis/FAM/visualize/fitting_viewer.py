@@ -19,6 +19,8 @@ import subprocess
 
 from FAM.utils import mri as mri_utils
 from FAM.processing import preproc_behdata
+from FAM.visualize import click_viewer
+
 from PIL import Image, ImageDraw
 
 class pRFViewer:
@@ -51,6 +53,11 @@ class pRFViewer:
             
         # number of participants to plot
         self.nr_pp = len(self.MRIObj.sj_num)
+
+        # # Load click viewer plotted object
+        # # which has useful functions to be used here
+        # self.click_plotter = click_viewer.visualize_on_click(self.MRIObj, pRFModelObj = self.pRFModelObj)
+
 
 
     def plot_pRF_DM(self, dm_array, filename):
@@ -108,6 +115,7 @@ class pRFViewer:
 
             # if we want to fit it now
             if fit_now:
+                print('Fitting estimates')
                 estimates_dict, data_arr = self.pRFModelObj.fit_data(participant, pp_prf_models, 
                                                                         vertex = vertex, 
                                                                         run_type = run_type, ses = ses,
@@ -116,8 +124,25 @@ class pRFViewer:
 
             else:
                 print('Loading estimates')
-                raise NameError('Not implemented')
+                ## load estimates to make it easier to load later
+                estimates_keys_dict, _ = self.pRFModelObj.load_pRF_model_estimates(participant,
+                                                                            ses = ses, run_type = run_type, 
+                                                                            model_name = prf_model_name, 
+                                                                            iterative = True)
 
+                # when loading, dict has key-value pairs stored,
+                # need to convert it to make it in same format as when fitting on the spot
+                keys = self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][prf_model_name]
+                
+                if self.pRFModelObj.fit_hrf:
+                    keys = keys[:-1]+self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys']['hrf']+['r2']
+                
+                estimates_dict = {}
+                estimates_dict['it_{name}'.format(name = prf_model_name)] = np.stack((estimates_keys_dict[val][vertex] for val in keys))[np.newaxis,...]
+
+                ## load data array
+                bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
+                data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, run_type = run_type, chunk_num = None, vertex = vertex)
 
             # if we fitted hrf, need to also get that from params
             # and set model array
@@ -160,6 +185,10 @@ class pRFViewer:
                                                                                                     model = prf_model_name,
                                                                                                     roi = str(ROI),
                                                                                                     vert = str(vertex))
+            if not fit_now:
+                fig_name = fig_name.replace('.png', '_loaded.png')
+
+
             if self.pRFModelObj.fit_hrf:
 
                 fig_name = fig_name.replace('.png','_withHRF.png') 
@@ -209,14 +238,22 @@ class pRFViewer:
 
 
     
-    
-    
-    
-    
-    #def plot_prf_results(self, participant_list = [])
+    def plot_prf_results(self, participant_list = [], 
+                                ses = 'ses-mean', run_type = 'mean', prf_model_name = 'gauss',
+                                mask_arr = False, iterative = True):
 
 
-            
+        for pp in participant_list:
+
+            ## load estimates
+            print('Loading estimates')
+            estimates_keys_dict, _ = self.pRFModelObj.load_pRF_model_estimates(pp,
+                                                                        ses = ses, run_type = run_type, 
+                                                                        model_name = prf_model_name, 
+                                                                        iterative = iterative)
+
+
+            ##### NEED TO MASK ESTIMATES FIRST ###
                 
 
 

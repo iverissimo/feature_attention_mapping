@@ -354,17 +354,8 @@ class pRF_model:
             if we want to combine runs from different sessions (relevant for fitting of average across runs)
         """  
 
-        ## get list of possible input paths
-        # (sessions)
-        input_list = glob.glob(op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 'ses-*'))
-
-        # list with absolute file names to be fitted
-        bold_filelist = [op.join(file_path, file) for file_path in input_list for file in os.listdir(file_path) if 'task-pRF' in file and \
-                        'acq-{acq}'.format(acq = self.MRIObj.acq) in file and file.endswith(file_ext)]
-        
-        # if we're not combining sessions
-        if ses != 'ses-mean':
-            bold_filelist = [file for file in bold_filelist if ses in file]
+        ## get list of files to load
+        bold_filelist = self.get_bold_file_list(participant, input_list = None, task = 'pRF', ses = ses, file_ext = file_ext)
         
         ## Load data array
         data = self.get_data4fitting(bold_filelist, run_type = run_type, chunk_num = chunk_num, vertex = vertex)
@@ -798,4 +789,86 @@ class pRF_model:
         return data_out
 
 
+    def load_pRF_model_estimates(self, participant, ses = 'ses-mean', run_type = 'mean', model_name = None, iterative = True):
+
+        """
+        Helper function to load pRF model estimates
+        when they already where fitted and save in out folder
+
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        ses: str
+            session we are looking at
+        run_type: str
+            run type we fitted
+        model_name: str or None
+            model name to be loaded (if None defaults to class model)
+        iterative: bool
+            if we want to load iterative fitting results [default] or grid results
+
+        """
+
+        # if model name to load not given, use the one set in the class
+        if model_name:
+            model_name = model_name
+        else:
+            model_name = self.model_type
+
+        # if we want to load iterative results, or grid (iterative = False)
+        if iterative:
+            est_folder = 'it_{model_name}'.format(model_name = model_name)
+        else:
+            est_folder = 'grid_{model_name}'.format(model_name = model_name)
+
+        # get participant models, which also will load 
+        # DM and mask it according to participants behavior
+        pp_prf_models = self.set_models(participant_list = [participant], 
+                                                    mask_DM = True, combine_ses = True)
+
+        ## load estimates to make it easier to load later
+        pRFdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', 
+                        self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 
+                        ses, est_folder)
+
+        pp_prf_est_dict = mri_utils.load_chunks(pRFdir, chunk_num = self.total_chunks,
+                                                fit_model = model_name,
+                                                basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
+                                                                                                                acq = self.MRIObj.acq,
+                                                                                                                rt = run_type))
+
+        return pp_prf_est_dict, pp_prf_models
+
+
+    def get_bold_file_list(self, participant, input_list = None, task = 'pRF', 
+                            ses = 'ses-mean', file_ext = '_cropped_dc_psc.npy'):
+
+        """
+        Helper function to get list of bold file names
+        to then be loaded and used
+
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        ses: str
+            session we are looking at
+
+        """
+
+        ## get list of possible input paths
+        # (sessions)
+        if input_list is None:
+            input_list = glob.glob(op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 
+                                    'sub-{sj}'.format(sj = participant), 'ses-*'))
+
+        # list with absolute file names to be fitted
+        bold_filelist = [op.join(file_path, file) for file_path in input_list for file in os.listdir(file_path) if 'task-{tsk}'.format(tsk = task) in file and \
+                        'acq-{acq}'.format(acq = self.MRIObj.acq) in file and file.endswith(file_ext)]
         
+        # if we're not combining sessions
+        if ses != 'ses-mean':
+            bold_filelist = [file for file in bold_filelist if ses in file]
+        
+        return bold_filelist

@@ -56,32 +56,13 @@ class visualize_on_click:
 
         # set prf dm
         self.prf_dm = prf_dm
+
         ## set grid of possible points in downsampled space
         self.point_grid_2D = np.array(np.meshgrid(np.linspace(-1, 1, prf_dm.shape[0]) * max_ecc_ext,
                                          np.linspace(1, -1, prf_dm.shape[0]) * max_ecc_ext))
 
-
-    def load_pRF_model_estimates(self, participant, ses = 'ses-mean', run_type = 'mean'):
-
-        # get participant models, which also will load 
-        # DM and mask it according to participants behavior
-        self.pp_prf_models = self.pRFModelObj.set_models(participant_list = [participant], 
-                                                    mask_DM = True, combine_ses = True)
-
-        ## load estimates to make it easier to load later
-        pRFdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', 
-                        self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 
-                        ses, 'it_{model_name}'.format(model_name = self.pRFModelObj.model_type))
-
-        self.prf_pars_dict = mri_utils.load_chunks(pRFdir, chunk_num = self.pRFModelObj.total_chunks,
-                                                    fit_model = self.pRFModelObj.model_type,
-                                                basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
-                                                                                                                acq = self.MRIObj.acq,
-                                                                                                                rt = run_type))
-
-
     def set_figure(self, participant, 
-                    task2viz = 'both', ses = 'ses-mean', run_type = 'mean'):
+                    task2viz = 'both', ses = 'ses-mean', run_type = 'mean', pRFmodel_name = None):
 
         """
         Set base figure with placeholders 
@@ -103,7 +84,7 @@ class visualize_on_click:
         self.run_type = run_type
 
         ## load model and prf estimates for that participant
-        self.load_pRF_model_estimates(participant, ses = ses, run_type = run_type)
+        self.pp_prf_est_dict, self.pp_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant, ses = ses, run_type = run_type, model_name = pRFmodel_name, iterative = True)
         
         ## set figure grid 
         self.full_fig = plt.figure(constrained_layout = True, figsize = self.full_figsize)
@@ -160,21 +141,21 @@ class visualize_on_click:
 
         if self.pRFModelObj.fit_hrf:
             hrf = self.pp_prf_models[ 'sub-{sj}'.format(sj = self.participant)][self.ses]['{name}_model'.format(name = self.pRFModelObj.model_type)].create_hrf(hrf_params = [1.0,
-                                                                                                                                self.prf_pars_dict['it_{name}'.format(name = self.pRFModelObj.model_type)][0][-3],
-                                                                                                                                self.prf_pars_dict['it_{name}'.format(name = self.pRFModelObj.model_type)][0][-2]],
+                                                                                                                                self.pp_prf_est_dict['it_{name}'.format(name = self.pRFModelObj.model_type)][0][-3],
+                                                                                                                                self.pp_prf_est_dict['it_{name}'.format(name = self.pRFModelObj.model_type)][0][-2]],
                                                                                                                     onset=self.pRFModelObj.hrf_onset)
         
             self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.ses]['{name}_model'.format(name = self.pRFModelObj.model_type)].hrf = hrf
 
-            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.ses]['{name}_model'.format(name = self.pRFModelObj.model_type)].return_prediction(*list(self.prf_pars_dict['it_{name}'.format(name = self.pRFModelObj.model_type)][0, :-3]))
+            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.ses]['{name}_model'.format(name = self.pRFModelObj.model_type)].return_prediction(*list(self.pp_prf_est_dict['it_{name}'.format(name = self.pRFModelObj.model_type)][0, :-3]))
         
         else:
             self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.ses]['{name}_model'.format(name = self.pRFModelObj.model_type)].hrf = spm_hrf
 
-            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.ses]['{name}_model'.format(name = self.pRFModelObj.model_type)].return_prediction(*list(self.prf_pars_dict['it_{name}'.format(name = self.pRFModelObj.model_type)][0, :-1]))
+            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.ses]['{name}_model'.format(name = self.pRFModelObj.model_type)].return_prediction(*list(self.pp_prf_est_dict['it_{name}'.format(name = self.pRFModelObj.model_type)][0, :-1]))
 
             
-        return model_arr[0], self.prf_pars_dict['r2'][vertex]
+        return model_arr[0], self.pp_prf_est_dict['r2'][vertex]
 
 
 
@@ -265,19 +246,19 @@ class visualize_on_click:
 
         prf = gauss2D_iso_cart(self.point_grid_2D[0],
                                self.point_grid_2D[1],
-                               mu = (self.prf_pars_dict['x'][vertex], 
-                                     self.prf_pars_dict['y'][vertex]),
-                               sigma = self.prf_pars_dict['size'][vertex]) #, alpha=0.6)
+                               mu = (self.pp_prf_est_dict['x'][vertex], 
+                                     self.pp_prf_est_dict['y'][vertex]),
+                               sigma = self.pp_prf_est_dict['size'][vertex]) #, alpha=0.6)
 
         self.prf_ax.clear()
         self.prf_ax.imshow(prf, cmap='cubehelix')
         self.prf_ax.axvline(self.prf_dm.shape[0]/2, color='white', linestyle='dashed', lw=0.5)
         self.prf_ax.axhline(self.prf_dm.shape[1]/2, color='white', linestyle='dashed', lw=0.5)
-        #prf_ax.set_title(f"x: {self.prf_pars_dict['x'][vertex]}, y: {self.prf_pars_dict['y'][vertex]}")
+        #prf_ax.set_title(f"x: {self.pp_prf_est_dict['x'][vertex]}, y: {self.pp_prf_est_dict['y'][vertex]}")
 
         # just to check if exponent values make sense
         if self.pRFModelObj.model_type == 'css':
-            print('pRF exponent = %.2f'%self.prf_pars_dict['ns'][vertex])
+            print('pRF exponent = %.2f'%self.pp_prf_est_dict['ns'][vertex])
         
         
     def onclick(self, event):

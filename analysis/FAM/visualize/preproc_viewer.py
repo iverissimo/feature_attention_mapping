@@ -16,6 +16,7 @@ import cortex
 import subprocess
 
 from FAM.utils import mri as mri_utils
+from FAM.utils import plot as plot_utils
 from FAM.processing import preproc_behdata
 
 
@@ -175,7 +176,7 @@ freeview -v \
 
         ## get vertices for each relevant ROI
         # from glasser atlas
-        ROIs, roi_verts, color_codes = mri_utils.get_rois4plotting(self.MRIObj.params, 
+        ROIs, roi_verts, color_codes = plot_utils.get_rois4plotting(self.MRIObj.params, 
                                                                 pysub = self.MRIObj.params['plotting']['pycortex_sub'], 
                                                                 use_atlas = use_atlas_rois, 
                                                                 atlas_pth = op.join(self.MRIObj.derivatives_pth,
@@ -475,7 +476,7 @@ freeview -v \
 
         ## get vertices for each relevant ROI
         # from glasser atlas
-        ROIs, roi_verts, color_codes = mri_utils.get_rois4plotting(self.MRIObj.params, 
+        ROIs, roi_verts, color_codes = plot_utils.get_rois4plotting(self.MRIObj.params, 
                                                                 pysub = self.MRIObj.params['plotting']['pycortex_sub'], 
                                                                 use_atlas = use_atlas_rois, 
                                                                 atlas_pth = op.join(self.MRIObj.derivatives_pth,
@@ -744,7 +745,7 @@ freeview -v \
 
                     ## get vertices for each relevant ROI
                     # from glasser atlas
-                    ROIs, roi_verts, color_codes = mri_utils.get_rois4plotting(self.MRIObj.params, 
+                    ROIs, roi_verts, color_codes = plot_utils.get_rois4plotting(self.MRIObj.params, 
                                                                             pysub = self.MRIObj.params['plotting']['pycortex_sub'], 
                                                                             use_atlas = use_atlas_rois, 
                                                                             atlas_pth = op.join(self.MRIObj.derivatives_pth,

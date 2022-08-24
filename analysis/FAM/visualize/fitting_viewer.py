@@ -54,9 +54,46 @@ class pRFViewer:
             
         # number of participants to plot
         self.nr_pp = len(self.MRIObj.sj_num)
-
+        
+        ## pycortex subject to be used in plotting
         self.pysub = pysub
 
+        ## load participant ROIs and color codes
+        self.get_group_prf_rois(use_atlas_rois = True)
+
+        ## load participant models
+        # which also will load DM and mask it according to participants behavior
+        self.pp_prf_models = self.pRFModelObj.set_models(participant_list = self.MRIObj.sj_num, 
+                                                    mask_DM = True, combine_ses = True)
+
+    
+    def get_group_prf_rois(self, use_atlas_rois = True):
+
+        """
+
+        Helper function to get each participants ROIS,
+        vertex ind and color codes
+        (for now from Glasser atlas but should generalize to use sub specific rois when available)
+
+        """
+
+        group_ROIs = {}
+        group_roi_verts = {}
+        group_color_codes = {}
+
+        for pp in self.MRIObj.sj_num:
+
+            ## Get ROI and color codes for plotting
+            group_ROIs['sub-{sj}'.format(sj = pp)], group_roi_verts['sub-{sj}'.format(sj = pp)], group_color_codes['sub-{sj}'.format(sj = pp)] = plot_utils.get_rois4plotting(self.MRIObj.params, 
+                                                                                                                                        pysub = self.pysub,
+                                                                                                                                        use_atlas = use_atlas_rois, 
+                                                                                                                                        atlas_pth = op.join(self.MRIObj.derivatives_pth,
+                                                                                                                                                            'glasser_atlas','59k_mesh'), 
+                                                                                                                                        space = self.MRIObj.sj_space)
+        ## make it accessible later 
+        self.group_ROIs = group_ROIs
+        self.group_roi_verts = group_roi_verts
+        self.group_color_codes = group_color_codes
         
    
     def plot_singlevert(self, participant, task = 'pRF',
@@ -79,16 +116,10 @@ class pRFViewer:
             if not op.exists(figures_pth):
                 os.makedirs(figures_pth)
 
-            # get participant models, which also will load 
-            # DM and mask it according to participants behavior
-            pp_prf_models = self.pRFModelObj.set_models(participant_list = [participant], 
-                                                        mask_DM = True, combine_ses = True)
-
-
             # if we want to fit it now
             if fit_now:
                 print('Fitting estimates')
-                estimates_dict, data_arr = self.pRFModelObj.fit_data(participant, pp_prf_models, 
+                estimates_dict, data_arr = self.pRFModelObj.fit_data(participant, self.pp_prf_models, 
                                                                         vertex = vertex, 
                                                                         run_type = run_type, ses = ses,
                                                                         model2fit = prf_model_name, xtol = 1e-2,
@@ -120,23 +151,23 @@ class pRFViewer:
             # and set model array
             
             # define spm hrf
-            spm_hrf = pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].create_hrf(hrf_params = [1, 1, 0],
+            spm_hrf = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].create_hrf(hrf_params = [1, 1, 0],
                                                                                                                      onset=self.pRFModelObj.hrf_onset)
 
             if self.pRFModelObj.fit_hrf:
-                hrf = pp_prf_models[ 'sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].create_hrf(hrf_params = [1.0,
+                hrf = self.pp_prf_models[ 'sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].create_hrf(hrf_params = [1.0,
                                                                                                                                  estimates_dict['it_{name}'.format(name = prf_model_name)][0][-3],
                                                                                                                                  estimates_dict['it_{name}'.format(name = prf_model_name)][0][-2]],
                                                                                                                      onset=self.pRFModelObj.hrf_onset)
             
-                pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].hrf = hrf
+                self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].hrf = hrf
 
-                model_arr = pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].return_prediction(*list(estimates_dict['it_{name}'.format(name = prf_model_name)][0, :-3]))
+                model_arr = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].return_prediction(*list(estimates_dict['it_{name}'.format(name = prf_model_name)][0, :-3]))
             
             else:
-                pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].hrf = spm_hrf
+                self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].hrf = spm_hrf
 
-                model_arr = pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].return_prediction(*list(estimates_dict['it_{name}'.format(name = prf_model_name)][0, :-1]))
+                model_arr = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].return_prediction(*list(estimates_dict['it_{name}'.format(name = prf_model_name)][0, :-1]))
             
             
             # get array with name of condition per TR, to plot in background
@@ -228,16 +259,12 @@ class pRFViewer:
         bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
         pRF_data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, run_type = run_type)
 
-        ## load DM
-        pp_prf_models = self.pRFModelObj.set_models(participant_list = [participant], 
-                                                        mask_DM = True, combine_ses = True)
-
-        max_ecc_ext = pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].screen_size_degrees/2
+        max_ecc_ext = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].screen_size_degrees/2
 
         ## Load click viewer plotted object
         click_plotter = click_viewer.visualize_on_click(self.MRIObj, pRFModelObj = self.pRFModelObj,
                                                         pRF_data = pRF_data_arr,
-                                                        prf_dm = pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].design_matrix,
+                                                        prf_dm = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].design_matrix,
                                                         pysub = self.pysub,
                                                         max_ecc_ext = max_ecc_ext)
 
@@ -346,25 +373,18 @@ class pRFViewer:
 
         plt.show()
 
-
     
     def plot_prf_results(self, participant_list = [], 
                                 ses = 'ses-mean', run_type = 'mean', prf_model_name = 'gauss',
                                 mask_arr = True, rsq_threshold =.1, iterative = True, figures_pth = None, use_atlas_rois = True):
 
 
-        ## Load pRF models for all participants in list
-        pp_prf_models = self.pRFModelObj.set_models(participant_list = participant_list, 
-                                                        mask_DM = True, combine_ses = True)
-
         ## stores estimates for all participants in dict, for ease of access
         group_estimates = {}
-        group_ROIs = {}
-        group_roi_verts = {}
-        group_color_codes = {}
-
+  
         for pp in participant_list:
 
+            max_ecc_ext = self.pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2
             
             ## load estimates
             print('Loading iterative estimates')
@@ -372,14 +392,6 @@ class pRFViewer:
                                                                         ses = ses, run_type = run_type, 
                                                                         model_name = prf_model_name, 
                                                                         iterative = iterative)
-
-            ## Get ROI and color codes for plotting
-            group_ROIs['sub-{sj}'.format(sj = pp)], group_roi_verts['sub-{sj}'.format(sj = pp)], group_color_codes['sub-{sj}'.format(sj = pp)] = plot_utils.get_rois4plotting(self.MRIObj.params, 
-                                                                                                                                        pysub = self.pysub,
-                                                                                                                                        use_atlas = use_atlas_rois, 
-                                                                                                                                        atlas_pth = op.join(self.MRIObj.derivatives_pth,
-                                                                                                                                                            'glasser_atlas','59k_mesh'), 
-                                                                                                                                        space = self.MRIObj.sj_space)
 
             ## mask the estimates, if such is the case
             if mask_arr:
@@ -394,10 +406,8 @@ class pRFViewer:
                 group_estimates['sub-{sj}'.format(sj = pp)] = self.pRFModelObj.mask_pRF_model_estimates(estimates_dict, 
                                                                             ROI = None,
                                                                             estimate_keys = keys,
-                                                                            x_ecc_lim = [- pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2, 
-                                                                                        pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2],
-                                                                            y_ecc_lim = [- pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2, 
-                                                                                        pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2],
+                                                                            x_ecc_lim = [- max_ecc_ext, max_ecc_ext],
+                                                                            y_ecc_lim = [- max_ecc_ext, max_ecc_ext],
                                                                             rsq_threshold = rsq_threshold,
                                                                             pysub = self.pysub
                                                                             )
@@ -409,12 +419,12 @@ class pRFViewer:
         # 
         ### RSQ ###
         self.plot_rsq(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
-                                            ROIs_dict = group_ROIs, roi_verts_dict = group_roi_verts, color_codes_dict = group_color_codes, model_name = prf_model_name)
+                                            model_name = prf_model_name)
 
 
 
     def plot_rsq(self, participant_list = [], group_estimates = {}, ses = 'ses-mean',  run_type = 'mean',
-                        ROIs_dict = {}, roi_verts_dict = {}, color_codes_dict = {}, figures_pth = None, model_name = 'gauss'):
+                        figures_pth = None, model_name = 'gauss'):
         
         # make output folder for figures
         if figures_pth is None:
@@ -449,15 +459,15 @@ class pRFViewer:
 
 
             pp_roi_df = plot_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)], 
-                                                ROIs = ROIs_dict['sub-{sj}'.format(sj = pp)], 
-                                                roi_verts = roi_verts_dict['sub-{sj}'.format(sj = pp)], 
+                                                ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
+                                                roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
                                                 est_key = 'r2')
 
             #### plot distribution ###
             fig, axis = plt.subplots(1, figsize=(10,5), dpi=100, facecolor='w', edgecolor='k')
 
             v1 = sns.violinplot(data = pp_roi_df, x = 'ROI', y = 'value', 
-                                cut=0, inner='box', palette = color_codes_dict['sub-{sj}'.format(sj = pp)], linewidth=1.8, ax = axis) 
+                                cut=0, inner='box', palette = self.group_color_codes['sub-{sj}'.format(sj = pp)], linewidth=1.8, ax = axis) 
 
             v1.set(xlabel=None)
             v1.set(ylabel=None)
@@ -484,7 +494,7 @@ class pRFViewer:
 
             v1 = sns.violinplot(data = avg_roi_df, x = 'ROI', y = 'value', 
                                 order = self.MRIObj.params['plotting']['ROIs']['glasser_atlas'].keys(),
-                                cut=0, inner='box', palette = color_codes_dict['sub-{sj}'.format(sj = pp)], 
+                                cut=0, inner='box', palette = self.group_color_codes['sub-{sj}'.format(sj = pp)], 
                                 linewidth=1.8, ax = axis)
 
             v1.set(xlabel=None)
@@ -508,15 +518,9 @@ class pRFViewer:
                                 prf_model_list = ['gauss', 'css'],
                                 mask_arr = True, rsq_threshold = .1, figures_pth = None, use_atlas_rois = True):
 
-        ## Load pRF models for all participants in list
-        pp_prf_models = self.pRFModelObj.set_models(participant_list = participant_list, 
-                                                        mask_DM = True, combine_ses = True)
 
         ## stores estimates for all participants in dict, for ease of access
         group_estimates = {}
-        group_ROIs = {}
-        group_roi_verts = {}
-        group_color_codes = {}
         pp_model_roi_df = pd.DataFrame()
 
         # if we only provided one model name, assumes we want to compare grid to iterative rsq
@@ -528,19 +532,14 @@ class pRFViewer:
 
         for pp in participant_list:
 
+            max_ecc_ext = self.pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2
+
             ## make sub specific fig path
             sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
             
             if not op.exists(sub_figures_pth):
                 os.makedirs(sub_figures_pth)
 
-            ## Get ROI and color codes for plotting
-            group_ROIs['sub-{sj}'.format(sj = pp)], group_roi_verts['sub-{sj}'.format(sj = pp)], group_color_codes['sub-{sj}'.format(sj = pp)] = plot_utils.get_rois4plotting(self.MRIObj.params, 
-                                                                                                                                        pysub = self.pysub,
-                                                                                                                                        use_atlas = use_atlas_rois, 
-                                                                                                                                        atlas_pth = op.join(self.MRIObj.derivatives_pth,
-                                                                                                                                                            'glasser_atlas','59k_mesh'), 
-                                                                                                                                        space = self.MRIObj.sj_space)
             group_estimates['sub-{sj}'.format(sj = pp)] = {}
 
             ## iterate over models
@@ -570,10 +569,8 @@ class pRFViewer:
                         group_estimates['sub-{sj}'.format(sj = pp)][mod_name][stage] = self.pRFModelObj.mask_pRF_model_estimates(estimates_dict, 
                                                                                                     ROI = None,
                                                                                                     estimate_keys = keys,
-                                                                                                    x_ecc_lim = [- pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2, 
-                                                                                                                pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2],
-                                                                                                    y_ecc_lim = [- pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2, 
-                                                                                                                pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2],
+                                                                                                    x_ecc_lim = [- max_ecc_ext, max_ecc_ext],
+                                                                                                    y_ecc_lim = [- max_ecc_ext, max_ecc_ext],
                                                                                                     rsq_threshold = rsq_threshold,
                                                                                                     pysub = self.pysub
                                                                                                     )
@@ -604,8 +601,8 @@ class pRFViewer:
                 ## get roi rsq for each model ########
                 pp_model_roi_df = pd.concat((pp_model_roi_df,
                                             plot_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)][mod_name]['iterative'], 
-                                                                                            ROIs = group_ROIs['sub-{sj}'.format(sj = pp)], 
-                                                                                            roi_verts = group_roi_verts['sub-{sj}'.format(sj = pp)], 
+                                                                                            ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
+                                                                                            roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
                                                                                             est_key = 'r2',
                                                                                             model = mod_name)
                                             ))

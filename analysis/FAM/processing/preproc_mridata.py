@@ -736,7 +736,7 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
                                     'sub-{sj}'.format(sj = pp), ses))
 
     
-    def update_jsons(self, participant, input_pth = None, parrec_pth = None, json_folder = 'fmap'):
+    def update_jsons(self, participant, input_pth = None, parrec_pth = None, json_folder = 'fmap', ses = 'ses-1', fmap_PE = 'AP'):
 
         """
         Update json params for a given file type
@@ -750,18 +750,18 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
 
         ## set input path where sourcedata json files are
         if input_pth is None:
-            input_pth = op.join(self.MRIObj.sourcedata_pth, 'sub-{sj}'.format(sj=participant), 'ses-1', json_folder)
+            input_pth = op.join(self.MRIObj.sourcedata_pth, 'sub-{sj}'.format(sj=participant), ses, json_folder)
 
         ## set parrec path where raw data PAR/REC files are
         if parrec_pth is None:
-            parrec_pth = op.join(self.MRIObj.proj_root_pth, 'raw_data', 'parrec', 'sub-{sj}'.format(sj=participant), 'ses-1')
+            parrec_pth = op.join(self.MRIObj.proj_root_pth, 'raw_data', 'parrec', 'sub-{sj}'.format(sj=participant), ses)
 
 
         ## for fieldmap data json
         if json_folder == 'fmap':
 
             ## get json file list we want to update
-            json_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if 'dir-PA' in val \
+            json_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if 'dir-{PE}'.format(PE = fmap_PE) in val \
                             and val.endswith('_epi.json')]; json_files.sort()
 
             ## get PAR/REC file list 

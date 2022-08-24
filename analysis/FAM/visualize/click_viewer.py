@@ -296,6 +296,10 @@ class visualize_on_click:
             plt.draw()
 
     def onkey(self, event):
+        
+        # clear flatmap axis
+        self.flatmap_ax.clear()
+
         if event.key == '1':  # pRF rsq
             cortex.quickshow(self.images['pRF_rsq'], with_rois = False, with_curvature = True,
                         fig = self.flatmap_ax, with_colorbar = False)
@@ -319,19 +323,7 @@ class visualize_on_click:
         elif (event.key == '6') & (self.pRFmodel_name == 'css'):  # pRF exponent
             cortex.quickshow(self.images['ns'], with_rois = False, with_curvature = True,
                         fig = self.flatmap_ax, with_colorbar = False)
-            self.flatmap_ax.set_title('pRF exponent')
-        # elif event.key == '3':  # polar angle
-        #     cx.quickshow(size_v, with_rois=True, with_curvature=True,
-        #                 fig=flatmap_ax, with_colorbar=False)
-        #     flatmap_ax.set_title('pRF Size')
-        # elif event.key == '4':  # polar angle
-        #     cx.quickshow(x_v, with_rois=True, with_curvature=True,
-        #                 fig=flatmap_ax, with_colorbar=False)
-        #     flatmap_ax.set_title('pRF X')
-        # elif event.key == '5':  # polar angle
-        #     cx.quickshow(y_v, with_rois=True, with_curvature=True,
-        #                 fig=flatmap_ax, with_colorbar=False)
-        #     flatmap_ax.set_title('pRF Y')        
+            self.flatmap_ax.set_title('pRF exponent')      
         plt.draw()
 
 

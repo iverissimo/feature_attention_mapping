@@ -211,7 +211,7 @@ class pRFViewer:
 
     def open_click_viewer(self, participant, task2viz = 'pRF',
                     ses = 'ses-mean', run_type = 'mean',
-                    prf_model_name = 'gauss', file_ext = '_cropped_dc_psc.npy'):
+                    prf_model_name = 'gauss', file_ext = '_cropped_dc_psc.npy', rsq_threshold = .1):
 
         """
 
@@ -260,19 +260,19 @@ class pRFViewer:
                                                                     estimate_keys = keys,
                                                                     x_ecc_lim = [- max_ecc_ext, max_ecc_ext],
                                                                     y_ecc_lim = [- max_ecc_ext, max_ecc_ext],
-                                                                    rsq_threshold = .1,
+                                                                    rsq_threshold = rsq_threshold,
                                                                     pysub = self.pysub
                                                                     )
 
         ## calculate pa + ecc + size
-        nan_mask = np.where(np.isnan(click_plotter.pp_prf_est_dict['r2']))[0]
-        val_mask = np.where(~np.isnan(click_plotter.pp_prf_est_dict['r2']))[0]
+        nan_mask = np.where((np.isnan(click_plotter.pp_prf_est_dict['r2'])) | (click_plotter.pp_prf_est_dict['r2'] < rsq_threshold))[0]
         
-        complex_location = np.zeros(click_plotter.pp_prf_est_dict['r2'].shape)
-        complex_location[val_mask] = click_plotter.pp_prf_est_dict['x'][val_mask] + click_plotter.pp_prf_est_dict['y'][val_mask] * 1j # calculate eccentricity values
+        complex_location = click_plotter.pp_prf_est_dict['x'] + click_plotter.pp_prf_est_dict['y'] * 1j # calculate eccentricity values
 
         polar_angle = np.angle(complex_location)
-        polar_angle[nan_mask] = np.nan
+        polar_angle_norm = ((polar_angle + np.pi) / (np.pi * 2.0))
+        polar_angle_norm[nan_mask] = np.nan
+
         eccentricity = np.abs(complex_location)
         eccentricity[nan_mask] = np.nan
 
@@ -282,6 +282,10 @@ class pRFViewer:
             size_fwhmax = plot_utils.fwhmax_fwatmin(prf_model_name, click_plotter.pp_prf_est_dict)
 
         size_fwhmax[nan_mask] = np.nan
+
+        ## make alpha mask
+        alpha_level = mri_utils.normalize(np.clip(click_plotter.pp_prf_est_dict['r2'], rsq_threshold, .6)) # normalize 
+        alpha_level[nan_mask] = np.nan
 
         ## set flatmaps ##
 
@@ -301,14 +305,15 @@ class pRFViewer:
         click_plotter.images['ecc'] = plot_utils.make_raw_vertex_image(eccentricity, 
                                                                             cmap = ecc_cmap, 
                                                                             vmin = 0, vmax = 6, 
-                                                                            data2 = np.ones(eccentricity.shape), 
+                                                                            data2 = alpha_level, 
                                                                             vmin2 = 0, vmax2 = 1, 
                                                                             subject = self.pysub, data2D = True)
 
         ## pRF Size
         click_plotter.images['size_fwhmax'] = plot_utils.make_raw_vertex_image(size_fwhmax, 
                                                     cmap = 'hot', vmin = 0, vmax = 7, 
-                                                    data2 = np.ones(eccentricity.shape), vmin2 = 0, vmax2 = 1, 
+                                                    data2 = alpha_level, 
+                                                    vmin2 = 0, vmax2 = 1, 
                                                     subject = self.pysub, data2D = True)
 
         ## pRF Polar Angle
@@ -319,9 +324,10 @@ class pRFViewer:
                                                     cmap_name = 'PA_mackey_costum',
                                                     discrete = False, add_alpha = False, return_cmap = True)
 
-        click_plotter.images['PA'] = plot_utils.make_raw_vertex_image(polar_angle, 
+        click_plotter.images['PA'] = plot_utils.make_raw_vertex_image(polar_angle_norm, 
                                                     cmap = PA_cmap, vmin = 0, vmax = 1, 
-                                                    data2 = np.ones(eccentricity.shape), vmin2 = 0, vmax2 = 1, 
+                                                    data2 = alpha_level, 
+                                                    vmin2 = 0, vmax2 = 1, 
                                                     subject = self.pysub, data2D = True)
 
         ## pRF Exponent 

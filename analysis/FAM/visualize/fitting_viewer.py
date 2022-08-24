@@ -350,7 +350,7 @@ class pRFViewer:
     
     def plot_prf_results(self, participant_list = [], 
                                 ses = 'ses-mean', run_type = 'mean', prf_model_name = 'gauss',
-                                mask_arr = True, iterative = True, figures_pth = None, use_atlas_rois = True):
+                                mask_arr = True, rsq_threshold =.1, iterative = True, figures_pth = None, use_atlas_rois = True):
 
 
         ## Load pRF models for all participants in list
@@ -398,7 +398,7 @@ class pRFViewer:
                                                                                         pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2],
                                                                             y_ecc_lim = [- pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2, 
                                                                                         pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2],
-                                                                            rsq_threshold = .1,
+                                                                            rsq_threshold = rsq_threshold,
                                                                             pysub = self.pysub
                                                                             )
             else:
@@ -408,13 +408,10 @@ class pRFViewer:
         ## Now actually plot results
         # 
         ### RSQ ###
-        avg_roi_df = self.plot_rsq(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
+        self.plot_rsq(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
                                             ROIs_dict = group_ROIs, roi_verts_dict = group_roi_verts, color_codes_dict = group_color_codes, model_name = prf_model_name)
 
-        return avg_roi_df
 
-
-                          
 
     def plot_rsq(self, participant_list = [], group_estimates = {}, ses = 'ses-mean',  run_type = 'mean',
                         ROIs_dict = {}, roi_verts_dict = {}, color_codes_dict = {}, figures_pth = None, model_name = 'gauss'):
@@ -473,14 +470,215 @@ class pRFViewer:
             plt.ylabel('RSQ',fontsize = 15,labelpad=18)
             plt.ylim(0, 1)
 
-            fig.save_fig(fig_name.replace('flatmap','violinplot'))
+            fig.savefig(fig_name.replace('flatmap','violinplot'))
 
 
             ## concatenate average per participant, to make group plot
             avg_roi_df = pd.concat((avg_roi_df,
                                     pp_roi_df.groupby(['sj', 'ROI'])['value'].median().reset_index()))
 
+        # if we provided several participants, make group plot
+        if len(participant_list) > 1:
 
-        return avg_roi_df
+            fig, axis = plt.subplots(1, figsize=(10,5), dpi=100, facecolor='w', edgecolor='k')
+
+            v1 = sns.violinplot(data = avg_roi_df, x = 'ROI', y = 'value', 
+                                order = self.MRIObj.params['plotting']['ROIs']['glasser_atlas'].keys(),
+                                cut=0, inner='box', palette = color_codes_dict['sub-{sj}'.format(sj = pp)], 
+                                linewidth=1.8, ax = axis)
+
+            v1.set(xlabel=None)
+            v1.set(ylabel=None)
+            plt.margins(y=0.025)
+            sns.stripplot(data = avg_roi_df, x = 'ROI', y = 'value', 
+                            order=self.MRIObj.params['plotting']['ROIs']['glasser_atlas'].keys(),
+                            color="white", alpha=0.5)
+            plt.xticks(fontsize = 10)
+            plt.yticks(fontsize = 10)
+
+            plt.xlabel('ROI',fontsize = 15,labelpad=18)
+            plt.ylabel('RSQ',fontsize = 15,labelpad=18)
+            plt.ylim(0, 1)
+
+            fig.savefig(op.join(figures_pth, op.split(fig_name)[-1].replace('flatmap','violinplot').replace('sub-{sj}'.format(sj = pp),'sub-GROUP')))
+
+
+    
+    def compare_pRF_model_rsq(self, participant_list = [], ses = 'ses-mean', run_type = 'mean', 
+                                prf_model_list = ['gauss', 'css'],
+                                mask_arr = True, rsq_threshold = .1, figures_pth = None, use_atlas_rois = True):
+
+        ## Load pRF models for all participants in list
+        pp_prf_models = self.pRFModelObj.set_models(participant_list = participant_list, 
+                                                        mask_DM = True, combine_ses = True)
+
+        ## stores estimates for all participants in dict, for ease of access
+        group_estimates = {}
+        group_ROIs = {}
+        group_roi_verts = {}
+        group_color_codes = {}
+        pp_model_roi_df = pd.DataFrame()
+
+        # if we only provided one model name, assumes we want to compare grid to iterative rsq
+        stage_names = ['iterative', 'grid'] if len(prf_model_list) == 1 else ['iterative']
+
+        # make general output folder for figures
+        if figures_pth is None:
+            figures_pth = op.join(self.outputdir, 'rsq', 'pRF_fit')
+
+        for pp in participant_list:
+
+            ## make sub specific fig path
+            sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
+            
+            if not op.exists(sub_figures_pth):
+                os.makedirs(sub_figures_pth)
+
+            ## Get ROI and color codes for plotting
+            group_ROIs['sub-{sj}'.format(sj = pp)], group_roi_verts['sub-{sj}'.format(sj = pp)], group_color_codes['sub-{sj}'.format(sj = pp)] = plot_utils.get_rois4plotting(self.MRIObj.params, 
+                                                                                                                                        pysub = self.pysub,
+                                                                                                                                        use_atlas = use_atlas_rois, 
+                                                                                                                                        atlas_pth = op.join(self.MRIObj.derivatives_pth,
+                                                                                                                                                            'glasser_atlas','59k_mesh'), 
+                                                                                                                                        space = self.MRIObj.sj_space)
+            group_estimates['sub-{sj}'.format(sj = pp)] = {}
+
+            ## iterate over models
+            for mod_name in prf_model_list:
+
+                # get estimate keys
+                keys = self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][mod_name]
+                if self.pRFModelObj.fit_hrf:
+                    keys = keys[:-1]+self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys']['hrf']+['r2']
+
+                group_estimates['sub-{sj}'.format(sj = pp)][mod_name] = {}
+                
+                ## iterate over fit stages
+                for stage in stage_names:
+
+                    it_bool = True if stage == 'iterative' else False
+
+                    ## load estimates
+                    print('Loading {st} estimates for model {n}'.format(st = stage, n = mod_name))
+                    estimates_dict, _ = self.pRFModelObj.load_pRF_model_estimates(pp,
+                                                                                ses = ses, run_type = run_type, 
+                                                                                model_name = mod_name, 
+                                                                                iterative = it_bool)
+
+                    ## mask the estimates, if such is the case
+                    if mask_arr:
+                        group_estimates['sub-{sj}'.format(sj = pp)][mod_name][stage] = self.pRFModelObj.mask_pRF_model_estimates(estimates_dict, 
+                                                                                                    ROI = None,
+                                                                                                    estimate_keys = keys,
+                                                                                                    x_ecc_lim = [- pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2, 
+                                                                                                                pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2],
+                                                                                                    y_ecc_lim = [- pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2, 
+                                                                                                                pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2],
+                                                                                                    rsq_threshold = rsq_threshold,
+                                                                                                    pysub = self.pysub
+                                                                                                    )
+                    else:
+                        group_estimates['sub-{sj}'.format(sj = pp)][mod_name][stage] = estimates_dict
+
+                
+                #### plot flatmap ###
+                if len(prf_model_list) == 1:
+
+                    ## plot rsq value difference from grid to iterative
+                    flatmap = plot_utils.get_flatmaps(group_estimates['sub-{sj}'.format(sj = pp)][mod_name]['iterative']['r2'] - group_estimates['sub-{sj}'.format(sj = pp)][mod_name]['grid']['r2'], 
+                                                                vmin1 = -.1, vmax1 = .1,
+                                                                pysub = self.pysub, 
+                                                                cmap = 'BuBkRd')
+                    
+                    fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_grid2iterative_diff_RSQ.png'.format(sj = pp,
+                                                                                                                                                                acq = self.MRIObj.acq,
+                                                                                                                                                                space = self.MRIObj.sj_space,
+                                                                                                                                                                run = run_type, 
+                                                                                                                                                                model = mod_name))
+                    if self.pRFModelObj.fit_hrf:
+                        fig_name = fig_name.replace('.png','_withHRF.png') 
+
+                    print('saving %s' %fig_name)
+                    _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
+                ## get roi rsq for each model ########
+                pp_model_roi_df = pd.concat((pp_model_roi_df,
+                                            plot_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)][mod_name]['iterative'], 
+                                                                                            ROIs = group_ROIs['sub-{sj}'.format(sj = pp)], 
+                                                                                            roi_verts = group_roi_verts['sub-{sj}'.format(sj = pp)], 
+                                                                                            est_key = 'r2',
+                                                                                            model = mod_name)
+                                            ))
+
+            ### plot flatmaps comparing gauss with other models ###
+            if len(prf_model_list) > 1:
+
+                non_gauss_mod = [mn for mn in prf_model_list if mn != 'gauss']
+
+                for non_g in non_gauss_mod:
+                    flatmap = plot_utils.get_flatmaps(group_estimates['sub-{sj}'.format(sj = pp)][non_g]['iterative']['r2'] - group_estimates['sub-{sj}'.format(sj = pp)]['gauss']['iterative']['r2'], 
+                                                                vmin1 = -.1, vmax1 = .1,
+                                                                pysub = self.pysub, 
+                                                                cmap = 'BuBkRd')
+                    
+                    fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_flatmap_gauss2{model}_diff_RSQ.png'.format(sj = pp,
+                                                                                                                                                        acq = self.MRIObj.acq,
+                                                                                                                                                        space = self.MRIObj.sj_space,
+                                                                                                                                                        run = run_type, 
+                                                                                                                                                        model = non_g))
+                    if self.pRFModelObj.fit_hrf:
+                        fig_name = fig_name.replace('.png','_withHRF.png') 
+
+                    print('saving %s' %fig_name)
+                    _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
+                #### plot distribution ###
+                fig, axis = plt.subplots(1, figsize=(10,5), dpi=100, facecolor='w', edgecolor='k')
+
+                v1 = sns.violinplot(data = pp_model_roi_df, x = 'ROI', y = 'value', hue = 'model',
+                                    cut=0, inner='box',linewidth=1.8, ax = axis) 
+                v1.set(xlabel=None)
+                v1.set(ylabel=None)
+                plt.margins(y=0.025)
+                #sns.swarmplot(x='ecc', y='cs', data=crwd_df4plot,color=".25",alpha=0.5)
+                plt.xticks(fontsize = 10)
+                plt.yticks(fontsize = 10)
+
+                plt.xlabel('ROI',fontsize = 15,labelpad=18)
+                plt.ylabel('RSQ',fontsize = 15,labelpad=18)
+                plt.ylim(0, 1)
+                fig.savefig(fig_name.replace('flatmap','violinplot'))
+
+        # if we provided several participants, make group plot
+        if len(participant_list) > 1:
+
+            fig, axis = plt.subplots(1, figsize=(10,5), dpi=100, facecolor='w', edgecolor='k')
+
+            v1 = sns.violinplot(data = pp_model_roi_df.groupby(['sj', 'ROI','model'])['value'].median().reset_index(), 
+                                        x = 'ROI', y = 'value',  hue = 'model',
+                                        order = self.MRIObj.params['plotting']['ROIs']['glasser_atlas'].keys(),
+                                        cut=0, inner='box',
+                                        linewidth=1.8, ax = axis)
+
+            v1.set(xlabel=None)
+            v1.set(ylabel=None)
+            plt.margins(y=0.025)
+            # sns.stripplot(data = pp_model_roi_df.groupby(['sj', 'ROI','model'])['value'].median().reset_index(), x = 'ROI', y = 'value', 
+            #                 order=self.MRIObj.params['plotting']['ROIs']['glasser_atlas'].keys(),
+            #                 color="white", alpha=0.5)
+            plt.xticks(fontsize = 10)
+            plt.yticks(fontsize = 10)
+
+            plt.xlabel('ROI',fontsize = 15,labelpad=18)
+            plt.ylabel('RSQ',fontsize = 15,labelpad=18)
+            plt.ylim(0, 1)
+
+            fig.savefig(op.join(figures_pth, op.split(fig_name)[-1].replace('flatmap','violinplot').replace('sub-{sj}'.format(sj = pp),'sub-GROUP')))
+
+            
+        return pp_model_roi_df
+
+
+
 
 

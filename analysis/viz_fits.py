@@ -123,8 +123,8 @@ match task:
 
             case 'click':
                 plotter.open_click_viewer(sj, task2viz = 'pRF',
-                                                ses = ses, run_type = run_type,
-                                                prf_model_name = prf_model_name, file_ext = file_ext)
+                                        ses = ses, run_type = run_type,
+                                        prf_model_name = prf_model_name, file_ext = file_ext)
 
 
 

@@ -452,7 +452,7 @@ def plot_pRF_DM(dm_array, filename):
     os.system("ffmpeg -r 6 -start_number 0 -i %s -vcodec mpeg4 -y %s"%(img_name, filename))  
 
 
-def get_estimates_roi_df(participant, est_pp_dict, ROIs = None, roi_verts = None, est_key = 'r2'):
+def get_estimates_roi_df(participant, est_pp_dict, ROIs = None, roi_verts = None, est_key = 'r2', model = 'gauss'):
 
     """
 
@@ -462,7 +462,7 @@ def get_estimates_roi_df(participant, est_pp_dict, ROIs = None, roi_verts = None
     """
 
     ## save rsq values in dataframe, for plotting
-    df_est = pd.DataFrame({'sj': [], 'index': [], 'ROI': [], 'value': []})
+    df_est = pd.DataFrame({'sj': [], 'index': [], 'ROI': [], 'value': [], 'model': []})
 
     for idx,rois_ks in enumerate(ROIs): 
         
@@ -475,7 +475,8 @@ def get_estimates_roi_df(participant, est_pp_dict, ROIs = None, roi_verts = None
                             pd.DataFrame({'sj': np.tile('sub-{sj}'.format(sj = participant), len(roi_arr)), 
                                         'index': roi_verts[rois_ks], 
                                         'ROI': np.tile(rois_ks, len(roi_arr)), 
-                                        'value': roi_arr})
+                                        'value': roi_arr,
+                                        'model': np.tile(model, len(roi_arr))})
                         ))
 
     return df_est

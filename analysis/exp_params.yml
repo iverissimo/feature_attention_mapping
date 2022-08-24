@@ -267,7 +267,7 @@ plotting:
                           'IPS1': {'ROI': ['L_IPS1', 'R_IPS1'], 'color': [0.99529412, 0.66901961, 0.2854902]}}
                           }
 
-  rsq_threshold: .3 #0.12
+  rsq_threshold: .25 
 
 
 

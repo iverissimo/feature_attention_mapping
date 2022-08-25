@@ -119,7 +119,7 @@ mri: # refers to the Psychopy SyncGenerator class
 
   nr_runs: 4 # number of runs per task
 
-  fmriprep_sing: 'fmriprep.21.0.2.simg' # fmriprep singularity image name
+  fmriprep_sing: 'fmriprep.20.2.7.simg' #'fmriprep.21.0.2.simg' # fmriprep singularity image name
   mriqc_sing: 'mriqc-0.15.1.simg' # mriqc singularity image name
 
   save_subcortical: False # saving subcortical surface data

@@ -424,10 +424,9 @@ class pRFViewer:
                                             model_name = prf_model_name)
 
         ### ECC and SIZE ###
-        ecc_pp_roi_df, size_pp_roi_df = self.plot_ecc_size(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
+        self.plot_ecc_size(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
                                             model_name = prf_model_name)
 
-        return ecc_pp_roi_df, size_pp_roi_df
 
 
 
@@ -688,7 +687,7 @@ class pRFViewer:
 
 
     def plot_ecc_size(self, participant_list = [], group_estimates = {}, ses = 'ses-mean',  run_type = 'mean',
-                        figures_pth = None, model_name = 'gauss', n_bins_colors = 256):
+                        figures_pth = None, model_name = 'gauss', n_bins_colors = 256, n_bins_dist = 5):
         
         ### make output folder for figures
         if figures_pth is None:
@@ -699,7 +698,7 @@ class pRFViewer:
                                             bins = n_bins_colors, cmap_name = 'ECC_mackey_costum', 
                                             discrete = False, add_alpha = False, return_cmap = True)
         
-        avg_roi_df = pd.DataFrame()
+        avg_bin_df = pd.DataFrame()
         
         ## loop over participants in list
         for pp in participant_list:
@@ -775,7 +774,114 @@ class pRFViewer:
                                                 ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
                                                 roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
                                                 model = model_name)
+            
+            rsq_pp_roi_df = plot_utils.get_estimates_roi_df(pp, r2, 
+                                                ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
+                                                roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
+                                                model = model_name)
 
-        return ecc_pp_roi_df, size_pp_roi_df
+            # merge them into one
+            df_ecc_siz = pd.merge(ecc_pp_roi_df.rename(columns={'value': 'ecc'}),
+                                size_pp_roi_df.rename(columns={'value': 'size'}))
+            df_ecc_siz = pd.merge(df_ecc_siz, rsq_pp_roi_df.rename(columns={'value': 'rsq'}))
+
+            ##### plot unbinned df #########
+            sns.set(font_scale=1.3)
+            sns.set_style("ticks")
+
+            g = sns.lmplot(x="ecc", y="size", hue = 'ROI', data = df_ecc_siz, scatter_kws={'alpha':0.15},
+                        scatter=True, palette = self.group_color_codes['sub-{sj}'.format(sj = pp)]) #, markers=['^', 's', 'o', 'v', 'D', 'h', 'P', '.', ','])
+
+            ax = plt.gca()
+            plt.xticks(fontsize = 18)
+            plt.yticks(fontsize = 18)
+            ax.axes.set_xlim(0, 6)
+            ax.axes.set_ylim(0.5,14)
+            ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
+            ax.set_ylabel('pRF size FWHMax [deg]', fontsize = 20, labelpad = 15)
+            sns.despine(offset=15)
+            # to make legend full alpha
+            for lh in g._legend.legendHandles: 
+                lh.set_alpha(1)
+            fig2 = plt.gcf()
+
+            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_ecc_vs_size_UNbinned.png'.format(sj = pp,
+                                                                                                                                        acq = self.MRIObj.acq,
+                                                                                                                                        space = self.MRIObj.sj_space,
+                                                                                                                                        run = run_type, 
+                                                                                                                                        model = model_name))
+            fig2.savefig(fig_name, dpi=100,bbox_inches = 'tight')
+
+            ## bin it, for cleaner plot
+            for r_name in self.group_ROIs['sub-{sj}'.format(sj = pp)]:
+
+                mean_x, _, mean_y, _ = plot_utils.get_weighted_bins(df_ecc_siz.loc[(df_ecc_siz['ROI'] == r_name) & \
+                                                                                     (df_ecc_siz['rsq'].notna())],
+                                                                                    x_key = 'ecc', y_key = 'size', weight_key = 'rsq', n_bins = n_bins_dist)
+
+                avg_bin_df = pd.concat((avg_bin_df,
+                                        pd.DataFrame({ 'sj': np.tile('sub-{sj}'.format(sj = pp), len(mean_x)),
+                                                    'ROI': np.tile(r_name, len(mean_x)),
+                                                    'ecc': mean_x,
+                                                    'size': mean_y
+                                        })))
+
+            ##### plot binned df #########
+            sns.set(font_scale=1.3)
+            sns.set_style("ticks")
+
+            g = sns.lmplot(x="ecc", y="size", hue = 'ROI', data = avg_bin_df.loc[avg_bin_df['sj'] == 'sub-{sj}'.format(sj = pp)], scatter_kws={'alpha':0.15},
+                        scatter=True, palette = self.group_color_codes['sub-{sj}'.format(sj = pp)]) #, markers=['^', 's', 'o', 'v', 'D', 'h', 'P', '.', ','])
+
+            ax = plt.gca()
+            plt.xticks(fontsize = 18)
+            plt.yticks(fontsize = 18)
+            ax.axes.set_xlim(0, 6)
+            ax.axes.set_ylim(0.5,14)
+            ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
+            ax.set_ylabel('pRF size FWHMax [deg]', fontsize = 20, labelpad = 15)
+            sns.despine(offset=15)
+            # to make legend full alpha
+            for lh in g._legend.legendHandles: 
+                lh.set_alpha(1)
+            fig2 = plt.gcf()
+
+            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_ecc_vs_size_binned.png'.format(sj = pp,
+                                                                                                                                        acq = self.MRIObj.acq,
+                                                                                                                                        space = self.MRIObj.sj_space,
+                                                                                                                                        run = run_type, 
+                                                                                                                                        model = model_name))
+            fig2.savefig(fig_name, dpi=100,bbox_inches = 'tight')
+
+        if len(participant_list) > 1:
+
+            ##### plot binned df for GROUP #########
+            sns.set(font_scale=1.3)
+            sns.set_style("ticks")
+
+            g = sns.lmplot(x="ecc", y="size", hue = 'ROI', data = avg_bin_df, 
+                        scatter=True, palette = self.group_color_codes['sub-{sj}'.format(sj = pp)],  
+                        x_bins = n_bins_dist) #, markers=['^', 's', 'o', 'v', 'D', 'h', 'P', '.', ','])
+
+            ax = plt.gca()
+            plt.xticks(fontsize = 18)
+            plt.yticks(fontsize = 18)
+            ax.axes.set_xlim(0, 6)
+            ax.axes.set_ylim(0.5,14)
+            ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
+            ax.set_ylabel('pRF size FWHMax [deg]', fontsize = 20, labelpad = 15)
+            sns.despine(offset=15)
+            # to make legend full alpha
+            for lh in g._legend.legendHandles: 
+                lh.set_alpha(1)
+            fig2 = plt.gcf()
+
+            fig_name = op.join(figures_pth,'sub-GROUP_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_ecc_vs_size_binned.png'.format(acq = self.MRIObj.acq,
+                                                                                                                                        space = self.MRIObj.sj_space,
+                                                                                                                                        run = run_type, 
+                                                                                                                                        model = model_name))
+            fig2.savefig(fig_name, dpi=100,bbox_inches = 'tight')
+
+
 
 

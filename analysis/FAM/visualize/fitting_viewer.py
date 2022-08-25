@@ -95,7 +95,18 @@ class pRFViewer:
         self.group_roi_verts = group_roi_verts
         self.group_color_codes = group_color_codes
         
-   
+    def get_prf_estimate_keys(self, prf_model_name = 'gauss'):
+
+        # get estimate key names, which vary per model used
+        
+        keys = self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][prf_model_name]
+        
+        if self.pRFModelObj.fit_hrf:
+            keys = keys[:-1]+self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys']['hrf']+['r2']
+
+        return keys
+                    
+
     def plot_singlevert(self, participant, task = 'pRF',
                     ses = 'ses-mean', run_type = 'mean', vertex = None, ROI = None,
                     prf_model_name = 'gauss', file_ext = '_cropped_dc_psc.npy', 
@@ -135,10 +146,7 @@ class pRFViewer:
 
                 # when loading, dict has key-value pairs stored,
                 # need to convert it to make it in same format as when fitting on the spot
-                keys = self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][prf_model_name]
-                
-                if self.pRFModelObj.fit_hrf:
-                    keys = keys[:-1]+self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys']['hrf']+['r2']
+                keys = self.get_prf_estimate_keys(prf_model_name = prf_model_name)
                 
                 estimates_dict = {}
                 estimates_dict['it_{name}'.format(name = prf_model_name)] = np.stack((estimates_keys_dict[val][vertex] for val in keys))[np.newaxis,...]
@@ -277,10 +285,7 @@ class pRFViewer:
         print('masking estimates')
 
         # get estimate keys
-        keys = self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][prf_model_name]
-        
-        if self.pRFModelObj.fit_hrf:
-            keys = keys[:-1]+self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys']['hrf']+['r2']
+        keys = self.get_prf_estimate_keys(prf_model_name = prf_model_name)
 
         click_plotter.pp_prf_est_dict = self.pRFModelObj.mask_pRF_model_estimates(click_plotter.pp_prf_est_dict, 
                                                                     ROI = None,
@@ -398,10 +403,7 @@ class pRFViewer:
                 print('masking estimates')
 
                 # get estimate keys
-                keys = self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][prf_model_name]
-                
-                if self.pRFModelObj.fit_hrf:
-                    keys = keys[:-1]+self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys']['hrf']+['r2']
+                keys = self.get_prf_estimate_keys(prf_model_name = prf_model_name)
 
                 group_estimates['sub-{sj}'.format(sj = pp)] = self.pRFModelObj.mask_pRF_model_estimates(estimates_dict, 
                                                                             ROI = None,
@@ -546,9 +548,7 @@ class pRFViewer:
             for mod_name in prf_model_list:
 
                 # get estimate keys
-                keys = self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][mod_name]
-                if self.pRFModelObj.fit_hrf:
-                    keys = keys[:-1]+self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys']['hrf']+['r2']
+                keys = self.get_prf_estimate_keys(prf_model_name = mod_name)
 
                 group_estimates['sub-{sj}'.format(sj = pp)][mod_name] = {}
                 

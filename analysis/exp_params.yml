@@ -176,6 +176,7 @@ mri: # refers to the Psychopy SyncGenerator class
       estimate_keys: {'gauss': ['x','y','size','betas','baseline','r2'],
                       'css': ['x','y','size','betas','baseline','ns', 'r2'],
                       'dn': ['x','y','size','betas','baseline', 'sa', 'ss', 'nb', 'sb', 'r2'],
+                      'dog': ['x','y','size','betas','baseline', 'sa', 'ss', 'r2'],
                       'hrf': ['hrf_derivative', 'hrf_dispersion']} # to keep track of variables throughout scripts
 
       fit_hrf: False #True

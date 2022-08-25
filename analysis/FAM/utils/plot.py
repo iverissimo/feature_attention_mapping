@@ -243,13 +243,15 @@ def create_glasser_df(path2file):
     for key in label_dict.keys():
 
         if label_dict[key][0] != '???': 
-            atlas_df = atlas_df.append(pd.DataFrame({'ROI': label_dict[key][0].replace('_ROI',''),
+            atlas_df = pd.concat((atlas_df,
+                                pd.DataFrame({'ROI': label_dict[key][0].replace('_ROI',''),
                                                      'index': key,
                                                      'R': label_dict[key][1][0],
                                                      'G': label_dict[key][1][1],
                                                      'B': label_dict[key][1][2],
                                                      'A': label_dict[key][1][3]
-                                                    }, index=[0]),ignore_index=True)
+                                                    }, index=[0])
+                                ))
             
     return atlas_df, cifti_data
 

@@ -410,7 +410,11 @@ class pRF_model:
             grid_gauss_filename = grid_gauss_filename.replace('_estimates.npz', '_HRF_estimates.npz')
             it_gauss_filename = it_gauss_filename.replace('_estimates.npz', '_HRF_estimates.npz')
 
-        if model2fit != 'gauss' or not op.exists(it_gauss_filename):
+        # already set other model name
+        grid_model_filename = grid_gauss_filename.replace('gauss', model2fit)
+        it_model_filename = it_gauss_filename.replace('gauss', model2fit)
+
+        if not op.exists(it_model_filename):
 
             print("Gauss model GRID fit")
             gauss_fitter = Iso2DGaussianFitter(data = masked_data, 
@@ -444,18 +448,7 @@ class pRF_model:
                 self.save_pRF_model_estimates(it_gauss_filename, gauss_fitter.iterative_search_params, 
                                                 model_type = 'gauss')
 
-       
-        if model2fit != 'gauss':
-            
-            grid_model_filename = grid_gauss_filename.replace('gauss', model2fit)
-            it_model_filename = it_gauss_filename.replace('gauss', model2fit)
-
-            # if we want to fit hrf, change output name
-            if self.fit_hrf:
-                grid_model_filename = grid_model_filename.replace('_estimates.npz', '_HRF_estimates.npz')
-                it_model_filename = it_model_filename.replace('_estimates.npz', '_HRF_estimates.npz')
-
-            if not op.exists(it_model_filename):
+            if model2fit != 'gauss':
 
                 print("{key} model GRID fit".format(key = model2fit))
                 

@@ -438,7 +438,7 @@ class pRF_model:
                                         ftol = ftol)
 
             # if we want to save estimates
-            if save_estimates:
+            if save_estimates and not op.exists(it_gauss_filename):
                 # for grid
                 print('saving %s'%grid_gauss_filename)
                 self.save_pRF_model_estimates(grid_gauss_filename, gauss_fitter.gridsearch_params, 

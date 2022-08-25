@@ -98,7 +98,7 @@ class pRFViewer:
     def get_prf_estimate_keys(self, prf_model_name = 'gauss'):
 
         # get estimate key names, which vary per model used
-        
+
         keys = self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][prf_model_name]
         
         if self.pRFModelObj.fit_hrf:
@@ -423,6 +423,12 @@ class pRFViewer:
         self.plot_rsq(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
                                             model_name = prf_model_name)
 
+        ### ECC and SIZE ###
+        ecc_pp_roi_df, size_pp_roi_df = self.plot_ecc_size(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
+                                            model_name = prf_model_name)
+
+        return ecc_pp_roi_df, size_pp_roi_df
+
 
 
     def plot_rsq(self, participant_list = [], group_estimates = {}, ses = 'ses-mean',  run_type = 'mean',
@@ -670,12 +676,106 @@ class pRFViewer:
             plt.ylabel('RSQ',fontsize = 15,labelpad=18)
             plt.ylim(0, 1)
 
-            fig.savefig(op.join(figures_pth, op.split(fig_name)[-1].replace('flatmap','violinplot').replace('sub-{sj}'.format(sj = pp),'sub-GROUP')))
+            fig_name = op.join(figures_pth,'sub-GROUP_task-pRF_acq-{acq}_space-{space}_run-{run}_violinplot_modelcomparison_RSQ.png'.format(acq = self.MRIObj.acq,
+                                                                                                                                                        space = self.MRIObj.sj_space,
+                                                                                                                                                        run = run_type))
+            if self.pRFModelObj.fit_hrf:
+                fig_name = fig_name.replace('.png','_withHRF.png')
 
+            fig.savefig(fig_name)
             
         return pp_model_roi_df
 
 
+    def plot_ecc_size(self, participant_list = [], group_estimates = {}, ses = 'ses-mean',  run_type = 'mean',
+                        figures_pth = None, model_name = 'gauss', n_bins_colors = 256):
+        
+        ### make output folder for figures
+        if figures_pth is None:
+            figures_pth = op.join(self.outputdir, 'ecc_size', 'pRF_fit')
+            
+        ## make costum ECC color map
+        ecc_cmap = plot_utils.make_colormap(colormap = ['#dd3933','#f3eb53','#7cb956','#82cbdb','#3d549f'],
+                                            bins = n_bins_colors, cmap_name = 'ECC_mackey_costum', 
+                                            discrete = False, add_alpha = False, return_cmap = True)
+        
+        avg_roi_df = pd.DataFrame()
+        
+        ## loop over participants in list
+        for pp in participant_list:
 
+            ## make sub specific folder
+            sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
+            
+            if not op.exists(sub_figures_pth):
+                os.makedirs(sub_figures_pth)
+                
+            ## use RSQ as alpha level for flatmaps
+            r2 = group_estimates['sub-{sj}'.format(sj = pp)]['r2']
+            alpha_level = mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
+                
+            ## get ECCENTRICITY estimates
+            complex_location = group_estimates['sub-{sj}'.format(sj = pp)]['x'] + group_estimates['sub-{sj}'.format(sj = pp)]['y'] * 1j # calculate eccentricity values
+            eccentricity = np.abs(complex_location)
+
+            #### plot flatmap ###
+            flatmap =  plot_utils.make_raw_vertex_image(eccentricity, 
+                                                        cmap = ecc_cmap, 
+                                                        vmin = 0, vmax = 6, 
+                                                        data2 = alpha_level, 
+                                                        vmin2 = 0, vmax2 = 1, 
+                                                        subject = self.pysub, data2D = True)
+            
+            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_ECC.png'.format(sj = pp,
+                                                                                                                                        acq = self.MRIObj.acq,
+                                                                                                                                        space = self.MRIObj.sj_space,
+                                                                                                                                        run = run_type, 
+                                                                                                                                        model = model_name))
+            if self.pRFModelObj.fit_hrf:
+                fig_name = fig_name.replace('.png','_withHRF.png') 
+
+            print('saving %s' %fig_name)
+            _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
+            
+            ## get SIZE estimates
+            if model_name in ['dn', 'dog']:
+                size_fwhmax, fwatmin = plot_utils.fwhmax_fwatmin(model_name, 
+                                                                 group_estimates['sub-{sj}'.format(sj = pp)])
+            else: 
+                size_fwhmax = plot_utils.fwhmax_fwatmin(model_name, 
+                                                        group_estimates['sub-{sj}'.format(sj = pp)])
+                
+            #### plot flatmap ###
+            flatmap =  plot_utils.make_raw_vertex_image(size_fwhmax, 
+                                                        cmap = 'hot', 
+                                                        vmin = 0, vmax = 7, 
+                                                        data2 = alpha_level, 
+                                                        vmin2 = 0, vmax2 = 1, 
+                                                        subject = self.pysub, data2D = True)
+            
+            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_SIZE-fwhmax.png'.format(sj = pp,
+                                                                                                                                        acq = self.MRIObj.acq,
+                                                                                                                                        space = self.MRIObj.sj_space,
+                                                                                                                                        run = run_type, 
+                                                                                                                                        model = model_name))
+            if self.pRFModelObj.fit_hrf:
+                fig_name = fig_name.replace('.png','_withHRF.png') 
+
+            print('saving %s' %fig_name)
+            _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
+            ## GET values per ROI ##
+            ecc_pp_roi_df = plot_utils.get_estimates_roi_df(pp, eccentricity, 
+                                                ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
+                                                roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
+                                                model = model_name)
+            
+            size_pp_roi_df = plot_utils.get_estimates_roi_df(pp, size_fwhmax, 
+                                                ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
+                                                roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
+                                                model = model_name)
+
+        return ecc_pp_roi_df, size_pp_roi_df
 
 

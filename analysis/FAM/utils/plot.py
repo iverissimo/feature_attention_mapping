@@ -454,7 +454,7 @@ def plot_pRF_DM(dm_array, filename):
     os.system("ffmpeg -r 6 -start_number 0 -i %s -vcodec mpeg4 -y %s"%(img_name, filename))  
 
 
-def get_estimates_roi_df(participant, est_pp_dict, ROIs = None, roi_verts = None, est_key = 'r2', model = 'gauss'):
+def get_estimates_roi_df(participant, estimates_pp, ROIs = None, roi_verts = None, est_key = 'r2', model = 'gauss'):
 
     """
 
@@ -471,7 +471,10 @@ def get_estimates_roi_df(participant, est_pp_dict, ROIs = None, roi_verts = None
         # mask estimates
         print('masking estimates for ROI %s'%rois_ks)
         
-        roi_arr = est_pp_dict[est_key][roi_verts[rois_ks]]
+        if isinstance(estimates_pp, dict):
+            roi_arr = estimates_pp[est_key][roi_verts[rois_ks]]
+        else:
+            roi_arr = estimates_pp[roi_verts[rois_ks]]
 
         df_est = pd.concat((df_est,
                             pd.DataFrame({'sj': np.tile('sub-{sj}'.format(sj = participant), len(roi_arr)), 

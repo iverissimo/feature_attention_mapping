@@ -110,7 +110,7 @@ match task2model:
                         vertex = vertex, chunk_num = chunk_num, ROI = ROI,
                         model2fit = prf_model_name,
                         save_estimates = True,
-                        xtol = 1e-2, ftol = 1e-4, n_jobs = 16)
+                        xtol = 1e-3, ftol = 1e-4, n_jobs = 16)
 
         print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
 

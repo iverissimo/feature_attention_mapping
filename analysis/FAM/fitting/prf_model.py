@@ -19,6 +19,8 @@ import cortex
 
 import subprocess
 
+from scipy.optimize import LinearConstraint, NonlinearConstraint
+
 from FAM.utils import mri as mri_utils
 from FAM.processing import preproc_behdata
 
@@ -63,6 +65,9 @@ class pRF_model:
         
         ## type of model to fit
         self.model_type = self.MRIObj.params['mri']['fitting']['pRF']['fit_model']
+
+        ## type of optimizer to use
+        self.optimizer = self.MRIObj.params['mri']['fitting']['pRF']['optimizer']
 
         # if we are fitting HRF params
         self.fit_hrf = self.MRIObj.params['mri']['fitting']['pRF']['fit_hrf']
@@ -391,13 +396,19 @@ class pRF_model:
 
         ## set constraints
         # for now only changes minimizer used, but can also be useful to put contraints on dog and dn
-        constraints = self.get_fit_constraints(method = 'L-BFGS-B')
+        constraints = self.get_fit_constraints(method = self.optimizer, ss_larger_than_centre = True, 
+                                                positive_centre_only = False, normalize_RFs = False)
 
         ## ACTUALLY FIT 
 
         # always start with gauss of course
         grid_gauss_filename = op.join(outdir, 'grid_gauss', basefilename.replace('.npz', '_grid_gauss_estimates.npz'))
         it_gauss_filename = op.join(outdir, 'it_gauss', basefilename.replace('.npz', '_it_gauss_estimates.npz'))
+
+        # if we want to fit hrf, change output name
+        if self.fit_hrf:
+            grid_gauss_filename = grid_gauss_filename.replace('_estimates.npz', '_HRF_estimates.npz')
+            it_gauss_filename = it_gauss_filename.replace('_estimates.npz', '_HRF_estimates.npz')
 
         if model2fit != 'gauss' or not op.exists(it_gauss_filename):
 
@@ -438,6 +449,11 @@ class pRF_model:
             
             grid_model_filename = grid_gauss_filename.replace('gauss', model2fit)
             it_model_filename = it_gauss_filename.replace('gauss', model2fit)
+
+            # if we want to fit hrf, change output name
+            if self.fit_hrf:
+                grid_model_filename = grid_model_filename.replace('_estimates.npz', '_HRF_estimates.npz')
+                it_model_filename = it_model_filename.replace('_estimates.npz', '_HRF_estimates.npz')
 
             if not op.exists(it_model_filename):
 
@@ -659,7 +675,8 @@ class pRF_model:
         return fitpar_dict
 
     
-    def get_fit_constraints(self, method = 'L-BFGS-B'):
+    def get_fit_constraints(self, method = 'L-BFGS-B', ss_larger_than_centre = True, 
+                        positive_centre_only = False, normalize_RFs = False):
 
         """
         Helper function sets constraints - which depend on minimizer used -
@@ -681,11 +698,57 @@ class pRF_model:
                 constraints[key] = None
             
             elif method == 'trust-constr':
-
+                
                 constraints[key] = []
+                
+                if 'dn' in key:
+                    if ss_larger_than_centre:
+                        #enforcing surround size larger than prf size
+                        if self.fit_hrf:
+                            A_ssc_norm = np.array([[0,0,-1,0,0,0,1,0,0,0,0]])
+                        else:
+                            A_ssc_norm = np.array([[0,0,-1,0,0,0,1,0,0]])
+                            
+                        constraints[key].append(LinearConstraint(A_ssc_norm,
+                                                lb=0,
+                                                ub=np.inf))
+                        
+                    if positive_centre_only:
+                        #enforcing positive central amplitude in norm
+                        def positive_centre_prf_norm(x):
+                            if normalize_RFs:
+                                return (x[3]/(2*np.pi*x[2]**2)+x[7])/(x[5]/(2*np.pi*x[6]**2)+x[8]) - x[7]/x[8]
+                            else:
+                                return (x[3]+x[7])/(x[5]+x[8]) - x[7]/x[8]
+
+                        constraints[key].append(NonlinearConstraint(positive_centre_prf_norm,
+                                                                    lb=0,
+                                                                    ub=np.inf))
+                elif 'dog' in key:
+                    if ss_larger_than_centre:
+                        #enforcing surround size larger than prf size
+                        if self.fit_hrf:
+                             A_ssc_dog = np.array([[0,0,-1,0,0,0,1,0,0]])
+                        else:
+                            A_ssc_dog = np.array([[0,0,-1,0,0,0,1]])
+                            
+                        constraints[key].append(LinearConstraint(A_ssc_dog,
+                                                lb=0,
+                                                ub=np.inf))
+                        
+                    if positive_centre_only:
+                        #enforcing positive central amplitude in DoG
+                        def positive_centre_prf_dog(x):
+                            if normalize_RFs:
+                                return x[3]/(2*np.pi*x[2]**2)-x[5]/(2*np.pi*x[6]**2)
+                            else:
+                                return x[3] - x[5]
+
+                        constraints[key].append(NonlinearConstraint(positive_centre_prf_dog,
+                                                                    lb=0,
+                                                                    ub=np.inf))
 
         return constraints
-
 
 
     def get_data4fitting(self, file_list, run_type = 'mean',
@@ -1014,6 +1077,32 @@ class pRF_model:
                         sb = final_estimates[..., 8], 
                         r2 = final_estimates[..., 9])
 
+        elif model_type == 'dog':
+
+            if self.fit_hrf:
+                np.savez(filename,
+                        x = final_estimates[..., 0],
+                        y = final_estimates[..., 1],
+                        size = final_estimates[..., 2],
+                        betas = final_estimates[...,3],
+                        baseline = final_estimates[..., 4],
+                        sa = final_estimates[..., 5],
+                        ss = final_estimates[..., 6], 
+                        hrf_derivative = final_estimates[..., 7],
+                        hrf_dispersion = final_estimates[..., 8], 
+                        r2 = final_estimates[..., 9])
+            
+            else:
+                np.savez(filename,
+                        x = final_estimates[..., 0],
+                        y = final_estimates[..., 1],
+                        size = final_estimates[..., 2],
+                        betas = final_estimates[...,3],
+                        baseline = final_estimates[..., 4],
+                        sa = final_estimates[..., 5],
+                        ss = final_estimates[..., 6], 
+                        r2 = final_estimates[..., 7])
+
 
     def load_pRF_model_chunks(self, fit_path, fit_model = 'css', fit_hrf = False, basefilename = None, overwrite = False):
 
@@ -1037,8 +1126,12 @@ class pRF_model:
             numpy array of estimates
         
         """
-        
-        filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-000'in x]
+
+        # if we are fitting HRF, then we want to look for those files
+        if fit_hrf:
+            filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-000' in x and 'HRF' in x]
+        else:
+            filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-000' in x]
         
         ## if we defined a base filename that should be used to fish out right estimates
         if basefilename:
@@ -1052,7 +1145,11 @@ class pRF_model:
         
             for ch in np.arange(self.total_chunks):
                 
-                chunk_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-%s'%str(ch).zfill(3) in x]
+                # if we are fitting HRF, then we want to look for those files
+                if fit_hrf:
+                    chunk_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-%s'%str(ch).zfill(3) in x and 'HRF' in x]
+                else:
+                    chunk_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-%s'%str(ch).zfill(3) in x]
                 
                 ## if we defined a base filename that should be used to fish out right estimates
                 if basefilename:
@@ -1074,9 +1171,11 @@ class pRF_model:
 
                     if 'css' in fit_model: 
                         ns = chunk['ns']
-                    elif 'dn' in fit_model:
+                    elif fit_model in ['dn', 'dog']:
                         sa = chunk['sa']
                         ss = chunk['ss']
+                    
+                    if 'dn' in fit_model:
                         nb = chunk['nb']
                         sb = chunk['sb']
 
@@ -1100,9 +1199,11 @@ class pRF_model:
 
                     if 'css' in fit_model:
                         ns = np.concatenate((ns, chunk['ns']))
-                    elif 'dn' in fit_model:
+                    elif fit_model in ['dn', 'dog']:
                         sa = np.concatenate((sa, chunk['sa']))
                         ss = np.concatenate((ss, chunk['ss']))
+
+                    if 'dn' in fit_model:
                         nb = np.concatenate((nb, chunk['nb']))
                         sb = np.concatenate((sb, chunk['sb']))
 
@@ -1120,7 +1221,18 @@ class pRF_model:
             # save file
             print('saving %s'%filename)
 
-            if 'css' in fit_model:
+            if 'gauss' in fit_model:
+                np.savez(filename,
+                        x = xx,
+                        y = yy,
+                        size = size,
+                        betas = beta,
+                        baseline = baseline,
+                        hrf_derivative = hrf_derivative,
+                        hrf_dispersion = hrf_dispersion,
+                        r2 = rsq)
+
+            elif 'css' in fit_model:
                 np.savez(filename,
                         x = xx,
                         y = yy,
@@ -1146,17 +1258,20 @@ class pRF_model:
                         hrf_derivative = hrf_derivative,
                         hrf_dispersion = hrf_dispersion,
                         r2 = rsq)
-            
-            else: # assumes gauss
+
+            elif 'dog' in fit_model:
                 np.savez(filename,
                         x = xx,
                         y = yy,
                         size = size,
                         betas = beta,
                         baseline = baseline,
+                        sa = sa,
+                        ss = ss,
                         hrf_derivative = hrf_derivative,
                         hrf_dispersion = hrf_dispersion,
                         r2 = rsq)
+            
         else:
             print('file already exists, loading %s'%filename)
         

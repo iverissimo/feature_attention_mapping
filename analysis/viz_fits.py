@@ -126,5 +126,12 @@ match task:
                                         ses = ses, run_type = run_type,
                                         prf_model_name = prf_model_name, file_ext = file_ext)
 
+            case 'prf_estimates':
+                plotter.plot_prf_results(participant_list = FAM_data.sj_num,
+                                        prf_model_name = prf_model_name, 
+                                        rsq_threshold = FAM_data.params['plotting']['rsq_threshold'])
+
+
+
 
 

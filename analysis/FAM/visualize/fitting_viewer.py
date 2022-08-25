@@ -427,6 +427,10 @@ class pRFViewer:
         self.plot_ecc_size(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
                                             model_name = prf_model_name)
 
+        ### EXPONENT ###
+        if prf_model_name == 'css':
+            self.plot_exponent(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
+                                            model_name = prf_model_name)
 
 
 
@@ -518,7 +522,6 @@ class pRFViewer:
             plt.ylim(0, 1)
 
             fig.savefig(op.join(figures_pth, op.split(fig_name)[-1].replace('flatmap','violinplot').replace('sub-{sj}'.format(sj = pp),'sub-GROUP')))
-
 
     
     def compare_pRF_model_rsq(self, participant_list = [], ses = 'ses-mean', run_type = 'mean', 
@@ -882,6 +885,113 @@ class pRFViewer:
                                                                                                                                         model = model_name))
             fig2.savefig(fig_name, dpi=100,bbox_inches = 'tight')
 
+
+    def plot_exponent(self, participant_list = [], group_estimates = {}, ses = 'ses-mean',  run_type = 'mean',
+                        figures_pth = None, model_name = 'gauss'):
+        
+        ### make output folder for figures
+        if figures_pth is None:
+            figures_pth = op.join(self.outputdir, 'exponent', 'pRF_fit')
+            
+        
+        avg_df = pd.DataFrame()
+        
+        ## loop over participants in list
+        for pp in participant_list:
+
+            ## make sub specific folder
+            sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
+            
+            if not op.exists(sub_figures_pth):
+                os.makedirs(sub_figures_pth)
+                
+            ## use RSQ as alpha level for flatmaps
+            r2 = group_estimates['sub-{sj}'.format(sj = pp)]['r2']
+            alpha_level = mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
+                
+            #### plot flatmap ###
+            flatmap =  plot_utils.make_raw_vertex_image(group_estimates['sub-{sj}'.format(sj = pp)]['ns'], 
+                                                        cmap = 'plasma', 
+                                                        vmin = 0, vmax = 1, 
+                                                        data2 = alpha_level, 
+                                                        vmin2 = 0, vmax2 = 1, 
+                                                        subject = self.pysub, data2D = True)
+            
+            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_N.png'.format(sj = pp,
+                                                                                                                                        acq = self.MRIObj.acq,
+                                                                                                                                        space = self.MRIObj.sj_space,
+                                                                                                                                        run = run_type, 
+                                                                                                                                        model = model_name))
+            if self.pRFModelObj.fit_hrf:
+                fig_name = fig_name.replace('.png','_withHRF.png') 
+
+            print('saving %s' %fig_name)
+            _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
+            
+            ## GET values per ROI ##
+            ns_pp_roi_df = plot_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)]['ns'], 
+                                                ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
+                                                roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
+                                                model = model_name)
+            
+            rsq_pp_roi_df = plot_utils.get_estimates_roi_df(pp, r2, 
+                                                ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
+                                                roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
+                                                model = model_name)
+
+            # merge them into one
+            df_ns = pd.merge(ns_pp_roi_df.rename(columns={'value': 'exponent'}),
+                                rsq_pp_roi_df.rename(columns={'value': 'rsq'}))
+
+            #### plot distribution ###
+            fig, axis = plt.subplots(1, figsize=(10,5), dpi=100, facecolor='w', edgecolor='k')
+
+            v1 = sns.violinplot(data = df_ns, x = 'ROI', y = 'exponent', 
+                                cut=0, inner='box', palette = self.group_color_codes['sub-{sj}'.format(sj = pp)], linewidth=1.8, ax = axis) 
+
+            v1.set(xlabel=None)
+            v1.set(ylabel=None)
+            plt.margins(y=0.025)
+            #sns.swarmplot(x='ecc', y='cs', data=crwd_df4plot,color=".25",alpha=0.5)
+            plt.xticks(fontsize = 10)
+            plt.yticks(fontsize = 10)
+
+            plt.xlabel('ROI',fontsize = 15,labelpad=18)
+            plt.ylabel('Exponent',fontsize = 15,labelpad=18)
+            plt.ylim(0, 1)
+
+            fig.savefig(fig_name.replace('flatmap','violinplot'))
+            
+            
+            ## concatenate average per participant, to make group plot
+            avg_df = pd.concat((avg_df,
+                                    df_ns.groupby(['sj', 'ROI'])['exponent'].median().reset_index()))
+            
+            
+        if len(participant_list) > 1:
+
+            fig, axis = plt.subplots(1, figsize=(10,5), dpi=100, facecolor='w', edgecolor='k')
+
+            v1 = sns.violinplot(data = avg_df, x = 'ROI', y = 'exponent', 
+                                order = self.MRIObj.params['plotting']['ROIs']['glasser_atlas'].keys(),
+                                cut=0, inner='box', palette = self.group_color_codes['sub-{sj}'.format(sj = pp)], 
+                                linewidth=1.8, ax = axis)
+
+            v1.set(xlabel=None)
+            v1.set(ylabel=None)
+            plt.margins(y=0.025)
+            sns.stripplot(data = avg_df, x = 'ROI', y = 'exponent', 
+                            order=self.MRIObj.params['plotting']['ROIs']['glasser_atlas'].keys(),
+                            color="white", alpha=0.5)
+            plt.xticks(fontsize = 10)
+            plt.yticks(fontsize = 10)
+
+            plt.xlabel('ROI',fontsize = 15,labelpad=18)
+            plt.ylabel('Exponent',fontsize = 15,labelpad=18)
+            plt.ylim(0, 1)
+
+            fig.savefig(op.join(figures_pth, op.split(fig_name)[-1].replace('flatmap','violinplot').replace('sub-{sj}'.format(sj = pp),'sub-GROUP')))
 
 
 

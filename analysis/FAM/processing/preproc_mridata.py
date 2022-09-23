@@ -534,6 +534,11 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             # replace all key-value pairs in batch string
             for key, value in keys2replace.items():
                 batch_string = batch_string.replace(key, value)
+
+            # if using version 20, then folder structure of fmriprep output different 
+            # quick fix, could generalize better
+            if 'fmriprep.20' in self.MRIObj.params['mri']['fmriprep_sing']:
+                batch_string = batch_string.replace('/derivatives/fmriprep/', '/derivatives/')
                 
             print(batch_string)
             

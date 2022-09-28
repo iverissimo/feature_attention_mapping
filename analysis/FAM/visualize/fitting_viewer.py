@@ -26,7 +26,7 @@ from PIL import Image, ImageDraw
 
 class pRFViewer:
 
-    def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, pysub = 'hcp_999999'):
+    def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, pysub = 'hcp_999999', use_atlas_rois = True):
         
         """__init__
         constructor for class 
@@ -37,7 +37,14 @@ class pRFViewer:
             object from one of the classes defined in processing.load_exp_data
         pRFModelObj: pRF Model object
             object from one of the classes defined in prf_model.pRF_model
-            
+        outputdir: str
+            path to save plots
+        pysub: str
+            name of pycortex subject folder, where we drew all ROIs. 
+            will try to find 'hcp_999999_sub-X' by default, if doesnt exist then uses 'hcp_999999'
+        use_atlas: bool
+            if we want to use the glasser atlas ROIs instead (this is, from the keys conglomerate defined in the params yml)
+
         """
 
         # set data object to use later on
@@ -59,46 +66,33 @@ class pRFViewer:
         self.pysub = pysub
 
         ## load participant ROIs and color codes
-        self.get_group_prf_rois(use_atlas_rois = True)
+        self.group_ROIs, self.group_roi_verts, self.group_color_codes = plot_utils.get_rois4plotting(self.MRIObj.params, 
+                                                                                                    sub_id = self.MRIObj.sj_num,
+                                                                                                    pysub = self.pysub, 
+                                                                                                    use_atlas = use_atlas_rois, 
+                                                                                                    atlas_pth = op.join(self.MRIObj.derivatives_pth,
+                                                                                                                        'glasser_atlas','59k_mesh'), 
+                                                                                                    space = self.MRIObj.sj_space)
 
         ## load participant models
         # which also will load DM and mask it according to participants behavior
         self.pp_prf_models = self.pRFModelObj.set_models(participant_list = self.MRIObj.sj_num, 
                                                     mask_DM = True, combine_ses = True)
 
-    
-    def get_group_prf_rois(self, use_atlas_rois = True):
-
-        """
-
-        Helper function to get each participants ROIS,
-        vertex ind and color codes
-        (for now from Glasser atlas but should generalize to use sub specific rois when available)
-
-        """
-
-        group_ROIs = {}
-        group_roi_verts = {}
-        group_color_codes = {}
-
-        for pp in self.MRIObj.sj_num:
-
-            ## Get ROI and color codes for plotting
-            group_ROIs['sub-{sj}'.format(sj = pp)], group_roi_verts['sub-{sj}'.format(sj = pp)], group_color_codes['sub-{sj}'.format(sj = pp)] = plot_utils.get_rois4plotting(self.MRIObj.params, 
-                                                                                                                                        pysub = self.pysub,
-                                                                                                                                        use_atlas = use_atlas_rois, 
-                                                                                                                                        atlas_pth = op.join(self.MRIObj.derivatives_pth,
-                                                                                                                                                            'glasser_atlas','59k_mesh'), 
-                                                                                                                                        space = self.MRIObj.sj_space)
-        ## make it accessible later 
-        self.group_ROIs = group_ROIs
-        self.group_roi_verts = group_roi_verts
-        self.group_color_codes = group_color_codes
-        
+            
     def get_prf_estimate_keys(self, prf_model_name = 'gauss'):
 
-        # get estimate key names, which vary per model used
+        """ 
+        Helper function to get prf estimate keys
+        
+        Parameters
+        ----------
+        prf_model_name : str
+            pRF model name (defaults to gauss)
+            
+        """
 
+        # get estimate key names, which vary per model used
         keys = self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][prf_model_name]
         
         if self.pRFModelObj.fit_hrf:
@@ -116,6 +110,29 @@ class pRFViewer:
 
         Function to plot single vertex timecourse
 
+        Parameters
+        ----------
+        participant : str
+            subject ID
+        task: str
+            task identifier --> might not be needed if I make this func pRF timecourse specific
+        ses: str
+            session of input data
+        run_type : str
+            type of run of input data (ex: 1/mean)
+        vertex: int
+            vertex index 
+        ROI: str
+            roi name
+        prf_model_name: str
+            name of prf model to/that was fit
+        file_ext: str
+            file extension of the post processed data
+        fit_now: bool
+            if we want to fit the timecourse now
+        figures_pth: str
+            where to save the figures
+
         """
         
         if task == 'pRF':
@@ -124,8 +141,7 @@ class pRFViewer:
             if figures_pth is None:
                 figures_pth = op.join(self.outputdir, 'single_vertex', 'pRF_fit', 'sub-{sj}'.format(sj = participant), ses)
             
-            if not op.exists(figures_pth):
-                os.makedirs(figures_pth)
+            os.makedirs(figures_pth, exist_ok=True)
 
             # if we want to fit it now
             if fit_now:
@@ -155,8 +171,8 @@ class pRFViewer:
                 bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
                 data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, run_type = run_type, chunk_num = None, vertex = vertex)
 
-            # if we fitted hrf, need to also get that from params
-            # and set model array
+            ## if we fitted hrf, need to also get that from params
+            ## and set model array
             
             # define spm hrf
             spm_hrf = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].create_hrf(hrf_params = [1, 1, 0],
@@ -247,6 +263,131 @@ class pRFViewer:
             #plt.show()
             fig.savefig(op.join(figures_pth, fig_name))
 
+    
+    def save_estimates4drawing(self, participant, task2draw = 'pRF',
+                                    ses = 'ses-mean', run_type = 'mean', pysub = 'hcp_999999',
+                                    prf_model_name = 'gauss', file_ext = '_cropped_dc_psc.npy', rsq_threshold = .1):
+
+        """
+
+        Load estimates into pycortex sub specific overlay, to draw ROIs
+        - pRF estimates : will load polar angle (with and without alpha level) and eccentricity
+        - FA estimates : not implemented yet
+
+        Note - requires that we have (at least) pRF estimates saved 
+
+        Parameters
+        ----------
+        participant : str
+            subject ID
+        task2draw: str
+            task identifier 
+        ses: str
+            session of input data
+        run_type : str
+            type of run of input data (ex: 1/mean)
+        prf_model_name: str
+            name of prf model that was fit
+        file_ext: str
+            file extension of the post processed data
+        rsq_threshold: float
+            minimum RSQ threshold to use for figures
+        pysub: str
+            name of pycortex subject folder, to draw ROIs. 
+            will try to find 'hcp_999999_sub-X' by default, if doesnt exist then throws error
+
+        """
+
+        # check if subject pycortex folder exists
+        pysub_folder = '{ps}_sub-{pp}'.format(ps = pysub, 
+                                            pp = participant)
+
+        if op.exists(op.join(cortex.options.config.get('basic', 'filestore'), pysub_folder)):
+            print('Participant overlay %s in pycortex filestore, assumes we draw ROIs there'%pysub_folder)
+        else:
+            raise NameError('FOLDER %s DOESNT EXIST'%op.join(cortex.options.config.get('basic', 'filestore'), pysub_folder))
+
+        ## load model and prf estimates for that participant
+        pp_prf_est_dict, _ = self.pRFModelObj.load_pRF_model_estimates(participant, 
+                                                                        ses = ses, run_type = run_type, 
+                                                                        model_name = prf_model_name, iterative = True)
+
+        ## calculate pa + ecc + size
+        nan_mask = np.where((np.isnan(pp_prf_est_dict['r2'])) | (pp_prf_est_dict['r2'] < rsq_threshold))[0]
+        
+        complex_location = pp_prf_est_dict['x'] + pp_prf_est_dict['y'] * 1j # calculate eccentricity values
+
+        polar_angle = np.angle(complex_location)
+        polar_angle_norm = ((polar_angle + np.pi) / (np.pi * 2.0))
+        polar_angle_norm[nan_mask] = np.nan
+
+        eccentricity = np.abs(complex_location)
+        eccentricity[nan_mask] = np.nan
+
+        ## make alpha mask
+        alpha_level = mri_utils.normalize(np.clip(pp_prf_est_dict['r2'], rsq_threshold, .6)) # normalize 
+        alpha_level[nan_mask] = np.nan
+
+        ## set flatmaps ##
+        images = {}
+        n_bins_colors = 256
+
+        ## pRF rsq
+        images['pRF_rsq'] = plot_utils.get_flatmaps(pp_prf_est_dict['r2'], 
+                                                    vmin1 = 0, vmax1 = .8,
+                                                    pysub = pysub_folder, 
+                                                    cmap = 'Reds')
+        ## pRF Eccentricity
+
+        # make costum coor map
+        ecc_cmap = plot_utils.make_colormap(colormap = ['#dd3933','#f3eb53','#7cb956','#82cbdb','#3d549f'],
+                                            bins = n_bins_colors, cmap_name = 'ECC_mackey_costum', 
+                                            discrete = False, add_alpha = False, return_cmap = True)
+
+
+        images['ecc'] = plot_utils.make_raw_vertex_image(eccentricity, 
+                                                        cmap = ecc_cmap, 
+                                                        vmin = 0, vmax = 6, 
+                                                        data2 = alpha_level, 
+                                                        vmin2 = 0, vmax2 = 1, 
+                                                        subject = pysub_folder, data2D = True)
+
+        ## pRF Polar Angle
+       
+        # get matplotlib color map from segmented colors
+        PA_cmap = plot_utils.make_colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb',
+                                                    '#3d549f','#655099','#ad5a9b','#dd3933'], bins = n_bins_colors, 
+                                                    cmap_name = 'PA_mackey_costum',
+                                                    discrete = False, add_alpha = False, return_cmap = True)
+
+        images['PA_alpha'] = plot_utils.make_raw_vertex_image(polar_angle_norm, 
+                                                    cmap = PA_cmap, vmin = 0, vmax = 1, 
+                                                    data2 = alpha_level, 
+                                                    vmin2 = 0, vmax2 = 1, 
+                                                    subject = pysub_folder, data2D = True)
+
+        images['PA'] = plot_utils.make_raw_vertex_image(polar_angle_norm, 
+                                                    cmap = PA_cmap, vmin = 0, vmax = 1, 
+                                                    data2 = np.ones(alpha_level.shape), 
+                                                    vmin2 = 0, vmax2 = 1, 
+                                                    subject = pysub_folder, data2D = True)
+
+        ### ADD TO OVERLAY, TO DRAW BORDERS
+        cortex.utils.add_roi(images['pRF_rsq'], name = 'RSQ_sub-{sj}_task-pRF_run-{run}_model-{model}'.format(sj = participant,
+                                                                                                    run = run_type,
+                                                                                                    model = prf_model_name), open_inkscape = False)
+        cortex.utils.add_roi(images['ecc'], name = 'ECC_sub-{sj}_task-pRF_run-{run}_model-{model}'.format(sj = participant,
+                                                                                                    run = run_type,
+                                                                                                    model = prf_model_name), open_inkscape = False)
+        cortex.utils.add_roi(images['PA'], name = 'PA_sub-{sj}_task-pRF_run-{run}_model-{model}'.format(sj = participant,
+                                                                                                    run = run_type,
+                                                                                                    model = prf_model_name), open_inkscape = False)
+        cortex.utils.add_roi(images['PA_alpha'], name = 'PA_alpha_sub-{sj}_task-pRF_run-{run}_model-{model}'.format(sj = participant,
+                                                                                                    run = run_type,
+                                                                                                    model = prf_model_name), open_inkscape = True)
+
+        print('Done')
+
 
     def open_click_viewer(self, participant, task2viz = 'pRF',
                     ses = 'ses-mean', run_type = 'mean',
@@ -254,9 +395,27 @@ class pRFViewer:
 
         """
 
-        visualize pRF and FA estimates
-        with interactive figure 
-        that shows timecourse on click
+        Visualize pRF and FA estimates
+        with interactive figure that shows timecourse on click
+
+        Note - requires that we have (at least) pRF estimates saved 
+
+        Parameters
+        ----------
+        participant : str
+            subject ID
+        task2viz: str
+            task identifier 
+        ses: str
+            session of input data
+        run_type : str
+            type of run of input data (ex: 1/mean)
+        prf_model_name: str
+            name of prf model that was fit
+        file_ext: str
+            file extension of the post processed data
+        rsq_threshold: float
+            minimum RSQ threshold to use for figures
 
         """
 
@@ -448,8 +607,7 @@ class pRFViewer:
 
             sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
             
-            if not op.exists(sub_figures_pth):
-                os.makedirs(sub_figures_pth)
+            os.makedirs(sub_figures_pth, exist_ok=True)
 
             #### plot flatmap ###
             flatmap = plot_utils.get_flatmaps(group_estimates['sub-{sj}'.format(sj = pp)]['r2'], 
@@ -547,8 +705,7 @@ class pRFViewer:
             ## make sub specific fig path
             sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
             
-            if not op.exists(sub_figures_pth):
-                os.makedirs(sub_figures_pth)
+            os.makedirs(sub_figures_pth, exist_ok=True)
 
             group_estimates['sub-{sj}'.format(sj = pp)] = {}
 
@@ -709,8 +866,7 @@ class pRFViewer:
             ## make sub specific folder
             sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
             
-            if not op.exists(sub_figures_pth):
-                os.makedirs(sub_figures_pth)
+            os.makedirs(sub_figures_pth, exist_ok=True)
                 
             ## use RSQ as alpha level for flatmaps
             r2 = group_estimates['sub-{sj}'.format(sj = pp)]['r2']
@@ -902,8 +1058,7 @@ class pRFViewer:
             ## make sub specific folder
             sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
             
-            if not op.exists(sub_figures_pth):
-                os.makedirs(sub_figures_pth)
+            os.makedirs(sub_figures_pth, exist_ok=True)
                 
             ## use RSQ as alpha level for flatmaps
             r2 = group_estimates['sub-{sj}'.format(sj = pp)]['r2']

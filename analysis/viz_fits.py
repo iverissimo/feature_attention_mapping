@@ -131,6 +131,11 @@ match task:
                                         prf_model_name = prf_model_name, 
                                         rsq_threshold = FAM_data.params['plotting']['rsq_threshold'])
 
+            case 'draw_roi':
+                plotter.save_estimates4drawing(sj, task2draw = 'pRF',
+                                                ses = ses, run_type = run_type,
+                                                prf_model_name = prf_model_name, file_ext = file_ext)
+
 
 
 

@@ -1,3 +1,4 @@
+from genericpath import isdir
 import numpy as np
 import os
 from os import path as op
@@ -291,7 +292,7 @@ def get_weighted_bins(data_df, x_key = 'ecc', y_key = 'size', weight_key = 'rsq'
     return mean_x, mean_x_std, mean_y, mean_y_std
 
 
-def get_rois4plotting(params, pysub = 'hcp_999999', use_atlas = True, atlas_pth = '', space = 'fsLR_den-170k'):
+def get_rois4plotting(params, sub_id = None, pysub = 'hcp_999999', use_atlas = True, atlas_pth = '', space = 'fsLR_den-170k'):
 
     """ 
     helper function to get ROI names, vertice index and color palette
@@ -301,38 +302,80 @@ def get_rois4plotting(params, pysub = 'hcp_999999', use_atlas = True, atlas_pth 
     ----------
     params : dict
         yaml dict with task related infos  
+    sub_id: str, int or list
+        subject ID to add as identifier in outputed dictionaries
+    pysub: str
+        name of pycortex subject folder, where we drew all ROIs. 
+        will try to find 'hcp_999999_sub-X' by default, if doesnt exist then uses 'hcp_999999'
+    use_atlas: bool
+        if we want to use the glasser atlas ROIs instead (this is, from the keys conglomerate defined in the params yml)
+    atlas_pth: str
+        path to atlas file
+    space: str
+        pycortex subject space
     """ 
-    
-    roi_verts = {} #empty dictionary  
-    
+
     if use_atlas:
         # Get Glasser atlas
         atlas_df, atlas_array = create_glasser_df(atlas_pth)
+    
+    if sub_id:
+        
+        # if single id provided, put in list
+        if isinstance(sub_id, str) or isinstance(sub_id, int):
+            sub_id = [sub_id]
 
-        # ROI names
-        ROIs = list(params['plotting']['ROIs']['glasser_atlas'].keys())
-        # colors
-        color_codes = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs}
+        sub_id_list = ['sub-{sj}'.format(sj = str(pp).zfill(3)) if 'sub-' not in str(pp) else str(pp) for pp in sub_id]
 
-        # get vertices for ROI
-        for _,key in enumerate(ROIs):
-            roi_verts[key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
+        ## start empty dictionaries  
+        ROIs = {}
+        color_codes = {}
+        roi_verts = {}
 
-    else:
-        # set ROI names
-        ROIs = params['plotting']['ROIs'][space]
+        # loop over participant list
+        for pp in sub_id_list:
 
-        # dictionary with one specific color per group - similar to fig3 colors
-        ROI_pal = params['plotting']['ROI_pal']
-        color_codes = {key: ROI_pal[key] for key in ROIs}
+            print('Getting ROIs for participants %s'%pp)
 
-        # get vertices for ROI
-        for _,val in enumerate(ROIs):
-            print(val)
-            roi_verts[val] = cortex.get_roi_verts(pysub,val)[val]
+            if use_atlas:
+                # ROI names
+                ROIs[pp] = list(params['plotting']['ROIs']['glasser_atlas'].keys())
+
+                # colors
+                color_codes[pp] = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs[pp]}
+
+                # get vertices for ROI
+                roi_verts[pp] = {}
+                for _,key in enumerate(ROIs[pp]):
+                    roi_verts[pp][key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
+
+            else:
+
+                ## check if sub specific pysub exists
+                overlay_name = '{ps}_{sid}'.format(ps = pysub, sid = pp)
+
+                if op.exists(op.join(cortex.options.config.get('basic', 'filestore'), overlay_name)):
+                    print('Participant overlay %s in pycortex filestore, rois taken from there'%overlay_name)
+                else:
+                    overlay_name = pysub 
+                    print('Getting ROIs from %s'%overlay_name)
+
+                # set ROI names
+                ROIs[pp] = params['plotting']['ROIs'][space]
+
+                # dictionary with one specific color per group - similar to fig3 colors
+                color_codes[pp] = {key: params['plotting']['ROI_pal'][key] for key in ROIs[pp]}
+
+                # get vertices for ROI
+                roi_verts[pp] = {}
+                for _,val in enumerate(ROIs[pp]):
+                    print(val)
+                    roi_verts[pp][val] = cortex.get_roi_verts(overlay_name,val)[val]
             
+    else:
+        raise NameError('No subject ID provided')
+    
     return ROIs, roi_verts, color_codes
-
 
 
 def fwhmax_fwatmin(model, estimates, normalize_RFs=False, return_profiles=False):

@@ -174,27 +174,26 @@ freeview -v \
         if input_pth is None:
             input_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space)
 
-        ## get vertices for each relevant ROI
-        # from glasser atlas
-        ROIs, roi_verts, color_codes = plot_utils.get_rois4plotting(self.MRIObj.params, 
-                                                                pysub = self.MRIObj.params['plotting']['pycortex_sub'], 
-                                                                use_atlas = use_atlas_rois, 
-                                                                atlas_pth = op.join(self.MRIObj.derivatives_pth,
-                                                                                    'glasser_atlas','59k_mesh'), 
-                                                                space = self.MRIObj.sj_space)
-
         ## empty dataframe to save mean values per run
         corr_df = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'acq': [], 'ROI': [], 'mean_r': [], 'Wmean_r': []})
         tsnr_df = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'acq': [], 'ROI': [], 'mean_tsnr': []})
         ## also save full corr arrays
         surf_avg_corr = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'acq': [], 'ROI': [], 'vertex': [], 'pearson_r': []})
 
-        ## loop over participants
-
         ## if no participant list set, then run all
         if len(participant_list) == 0:
             participant_list = self.MRIObj.sj_num
-        
+
+        ## get vertices for each relevant ROI
+        # from glasser atlas
+        ROIs, roi_verts, color_codes = plot_utils.get_rois4plotting(self.MRIObj.params, 
+                                                                sub_id = participant_list,
+                                                                pysub = self.MRIObj.params['plotting']['pycortex_sub'], 
+                                                                use_atlas = use_atlas_rois, 
+                                                                atlas_pth = op.join(self.MRIObj.derivatives_pth,
+                                                                                    'glasser_atlas','59k_mesh'), 
+                                                                space = self.MRIObj.sj_space)
+        ## loop over participants
         for pp in participant_list:
 
             # and over sessions (if more than one)
@@ -235,12 +234,12 @@ freeview -v \
                             tsnr_arr.append(mri_utils.get_tsnr(np.load(r), return_mean = False))
 
                             tsnr_df = pd.concat((tsnr_df, 
-                                                pd.DataFrame({'sj': np.tile(pp, len(ROIs)), 
-                                                            'ses': np.tile(ses, len(ROIs)), 
-                                                            'task': np.tile(tsk, len(ROIs)), 
-                                                            'acq': np.tile(acq, len(ROIs)), 
-                                                            'ROI': ROIs, 
-                                                            'mean_tsnr': [np.nanmean(mri_utils.get_tsnr(np.load(r), return_mean = False)[roi_verts[roi_name]]) for roi_name in ROIs]})
+                                                pd.DataFrame({'sj': np.tile(pp, len(ROIs['sub-{sj}'.format(sj=pp)])), 
+                                                            'ses': np.tile(ses, len(ROIs['sub-{sj}'.format(sj=pp)])), 
+                                                            'task': np.tile(tsk, len(ROIs['sub-{sj}'.format(sj=pp)])), 
+                                                            'acq': np.tile(acq, len(ROIs['sub-{sj}'.format(sj=pp)])), 
+                                                            'ROI': ROIs['sub-{sj}'.format(sj=pp)], 
+                                                            'mean_tsnr': [np.nanmean(mri_utils.get_tsnr(np.load(r), return_mean = False)[roi_verts['sub-{sj}'.format(sj=pp)][roi_name]]) for roi_name in ROIs['sub-{sj}'.format(sj=pp)]]})
                                                 ))
                         # make it an array, for simplicity 
                         tsnr_arr = np.array(tsnr_arr)
@@ -257,14 +256,14 @@ freeview -v \
 
                             ## save in dataframe
                             corr_df = pd.concat((corr_df, 
-                                                pd.DataFrame({'sj': np.tile(pp, len(ROIs)), 
-                                                            'ses': np.tile(ses, len(ROIs)), 
-                                                            'task': np.tile(tsk, len(ROIs)), 
-                                                            'acq': np.tile(acq, len(ROIs)), 
-                                                            'ROI': ROIs, 
-                                                            'mean_r': [np.nanmean(correlations[roi_verts[roi_name]]) for roi_name in ROIs],
-                                                            'Wmean_r': [mri_utils.weighted_mean(correlations[roi_verts[roi_name]],
-                                                                          weights=mri_utils.normalize(np.mean(tsnr_arr, axis = 0))[roi_verts[roi_name]]) for roi_name in ROIs]})
+                                                pd.DataFrame({'sj': np.tile(pp, len(ROIs['sub-{sj}'.format(sj=pp)])), 
+                                                            'ses': np.tile(ses, len(ROIs['sub-{sj}'.format(sj=pp)])), 
+                                                            'task': np.tile(tsk, len(ROIs['sub-{sj}'.format(sj=pp)])), 
+                                                            'acq': np.tile(acq, len(ROIs['sub-{sj}'.format(sj=pp)])), 
+                                                            'ROI': ROIs['sub-{sj}'.format(sj=pp)], 
+                                                            'mean_r': [np.nanmean(correlations[roi_verts['sub-{sj}'.format(sj=pp)][roi_name]]) for roi_name in ROIs['sub-{sj}'.format(sj=pp)]],
+                                                            'Wmean_r': [mri_utils.weighted_mean(correlations[roi_verts['sub-{sj}'.format(sj=pp)][roi_name]],
+                                                                          weights=mri_utils.normalize(np.mean(tsnr_arr, axis = 0))[roi_verts['sub-{sj}'.format(sj=pp)][roi_name]]) for roi_name in ROIs['sub-{sj}'.format(sj=pp)]]})
                                                 ))
 
                         ## plot average correlation values on flatmap surface ##
@@ -282,15 +281,15 @@ freeview -v \
 
                         ## save surface correlation for relevant ROIS
                         # to make distribution plots
-                        for roi_name in ROIs:
+                        for roi_name in ROIs['sub-{sj}'.format(sj=pp)]:
                             surf_avg_corr = pd.concat((surf_avg_corr, 
-                                                    pd.DataFrame({'sj': np.tile(pp, len(roi_verts[roi_name])), 
-                                                                'ses': np.tile(ses, len(roi_verts[roi_name])), 
-                                                                'task': np.tile(tsk, len(roi_verts[roi_name])), 
-                                                                'acq': np.tile(acq, len(roi_verts[roi_name])), 
-                                                                'ROI': np.tile(roi_name, len(roi_verts[roi_name])), 
-                                                                'vertex': roi_verts[roi_name],
-                                                                'pearson_r': np.mean(corr_arr, axis=0)[roi_verts[roi_name]]})
+                                                    pd.DataFrame({'sj': np.tile(pp, len(roi_verts['sub-{sj}'.format(sj=pp)][roi_name])), 
+                                                                'ses': np.tile(ses, len(roi_verts['sub-{sj}'.format(sj=pp)][roi_name])), 
+                                                                'task': np.tile(tsk, len(roi_verts['sub-{sj}'.format(sj=pp)][roi_name])), 
+                                                                'acq': np.tile(acq, len(roi_verts['sub-{sj}'.format(sj=pp)][roi_name])), 
+                                                                'ROI': np.tile(roi_name, len(roi_verts['sub-{sj}'.format(sj=pp)][roi_name])), 
+                                                                'vertex': roi_verts['sub-{sj}'.format(sj=pp)][roi_name],
+                                                                'pearson_r': np.mean(corr_arr, axis=0)[roi_verts['sub-{sj}'.format(sj=pp)][roi_name]]})
                                                     ))
 
                 ### PLOTS ####
@@ -348,15 +347,15 @@ freeview -v \
                 fig.savefig(op.join(outdir,'tSNR_ROIS_sub-{sj}_{ses}.png'.format(sj=pp, ses=ses)), dpi=100,bbox_inches = 'tight')
 
                 ### split half correlation distribution per ROI ##
-                fig, ax1 = plt.subplots(1, len(ROIs), figsize=(50,5), dpi=100, facecolor='w', edgecolor='k')
+                fig, ax1 = plt.subplots(1, len(ROIs['sub-{sj}'.format(sj=pp)]), figsize=(50,5), dpi=100, facecolor='w', edgecolor='k')
 
-                for i in np.arange(len(ROIs)):
+                for i in np.arange(len(ROIs['sub-{sj}'.format(sj=pp)])):
                     A = surf_avg_corr[(surf_avg_corr['task']=='pRF')&\
-                            (surf_avg_corr['ROI']==ROIs[i])&\
+                            (surf_avg_corr['ROI']==ROIs['sub-{sj}'.format(sj=pp)][i])&\
                             (surf_avg_corr['acq']=='standard')].sort_values(by=['vertex'])['pearson_r'].values
 
                     B = surf_avg_corr[(surf_avg_corr['task']=='pRF')&\
-                                (surf_avg_corr['ROI']==ROIs[i])&\
+                                (surf_avg_corr['ROI']==ROIs['sub-{sj}'.format(sj=pp)][i])&\
                                 (surf_avg_corr['acq']=='nordic')].sort_values(by=['vertex'])['pearson_r'].values
 
                     sns.scatterplot(A,B, ax=ax1[i])
@@ -366,7 +365,7 @@ freeview -v \
                     ax1[i].set_ylabel('NORDIC',fontsize = 12,labelpad=18)
                     ax1[i].set_ylim(-.2,1)
                     ax1[i].set_xlim(-.2,1)
-                    ax1[i].set_title(ROIs[i]) 
+                    ax1[i].set_title(ROIs['sub-{sj}'.format(sj=pp)][i]) 
 
                 fig.savefig(op.join(outdir,'half_split_correlation_ROIS_distribution_sub-{sj}_{ses}.png'.format(sj=pp, ses=ses)), dpi=100,bbox_inches = 'tight')
 
@@ -428,15 +427,15 @@ freeview -v \
             fig.savefig(op.join(output_pth,'tSNR_ROIS_sub-GROUP.png'), dpi=100,bbox_inches = 'tight')
 
             ### split half correlation distribution per ROI ##
-            fig, ax1 = plt.subplots(1, len(ROIs), figsize=(50,5), dpi=100, facecolor='w', edgecolor='k')
+            fig, ax1 = plt.subplots(1, len(ROIs['sub-{sj}'.format(sj=pp)]), figsize=(50,5), dpi=100, facecolor='w', edgecolor='k')
 
-            for i in np.arange(len(ROIs)):
+            for i in np.arange(len(ROIs['sub-{sj}'.format(sj=pp)])):
                 A = group_surf_avg_corr[(group_surf_avg_corr['task']=='pRF')&\
-                        (group_surf_avg_corr['ROI']==ROIs[i])&\
+                        (group_surf_avg_corr['ROI']==ROIs['sub-{sj}'.format(sj=pp)][i])&\
                         (group_surf_avg_corr['acq']=='standard')].sort_values(by=['vertex'])['pearson_r'].values
 
                 B = group_surf_avg_corr[(group_surf_avg_corr['task']=='pRF')&\
-                            (group_surf_avg_corr['ROI']==ROIs[i])&\
+                            (group_surf_avg_corr['ROI']==ROIs['sub-{sj}'.format(sj=pp)][i])&\
                             (group_surf_avg_corr['acq']=='nordic')].sort_values(by=['vertex'])['pearson_r'].values
 
                 sns.scatterplot(A,B, ax=ax1[i])
@@ -446,7 +445,7 @@ freeview -v \
                 ax1[i].set_ylabel('NORDIC',fontsize = 12,labelpad=18)
                 ax1[i].set_ylim(-.2,1)
                 ax1[i].set_xlim(-.2,1)
-                ax1[i].set_title(ROIs[i]) 
+                ax1[i].set_title(ROIs['sub-{sj}'.format(sj=pp)][i]) 
 
             fig.savefig(op.join(output_pth,'half_split_correlation_ROIS_distribution_sub-GROUP.png'), dpi=100,bbox_inches = 'tight')
 
@@ -474,24 +473,25 @@ freeview -v \
         if input_pth is None:
             input_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space)
 
+        ## empty dataframe to save mean values per run
+        tsnr_df = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'ROI': [], 'mean_tsnr': []})
+        
+        ## if no participant list set, then run all
+        if len(participant_list) == 0:
+            participant_list = self.MRIObj.sj_num
+
         ## get vertices for each relevant ROI
         # from glasser atlas
         ROIs, roi_verts, color_codes = plot_utils.get_rois4plotting(self.MRIObj.params, 
+                                                                sub_id = participant_list,
                                                                 pysub = self.MRIObj.params['plotting']['pycortex_sub'], 
                                                                 use_atlas = use_atlas_rois, 
                                                                 atlas_pth = op.join(self.MRIObj.derivatives_pth,
                                                                                     'glasser_atlas','59k_mesh'), 
                                                                 space = self.MRIObj.sj_space)
-
-        ## empty dataframe to save mean values per run
-        tsnr_df = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'ROI': [], 'mean_tsnr': []})
         
         ## loop over participants
 
-        ## if no participant list set, then run all
-        if len(participant_list) == 0:
-            participant_list = self.MRIObj.sj_num
-        
         for pp in participant_list:
 
             # and over sessions (if more than one)
@@ -529,11 +529,11 @@ freeview -v \
                         tsnr_arr.append(mri_utils.get_tsnr(np.load(r), return_mean = False))
 
                         tsnr_df = pd.concat((tsnr_df, 
-                                            pd.DataFrame({'sj': np.tile(pp, len(ROIs)), 
-                                                        'ses': np.tile(ses, len(ROIs)), 
-                                                        'task': np.tile(tsk, len(ROIs)), 
-                                                        'ROI': ROIs, 
-                                                        'mean_tsnr': [np.nanmean(mri_utils.get_tsnr(np.load(r), return_mean = False)[roi_verts[roi_name]]) for roi_name in ROIs]})
+                                            pd.DataFrame({'sj': np.tile(pp, len(ROIs['sub-{sj}'.format(sj=pp)])), 
+                                                        'ses': np.tile(ses, len(ROIs['sub-{sj}'.format(sj=pp)])), 
+                                                        'task': np.tile(tsk, len(ROIs['sub-{sj}'.format(sj=pp)])), 
+                                                        'ROI': ROIs['sub-{sj}'.format(sj=pp)], 
+                                                        'mean_tsnr': [np.nanmean(mri_utils.get_tsnr(np.load(r), return_mean = False)[roi_verts['sub-{sj}'.format(sj=pp)][roi_name]]) for roi_name in ROIs['sub-{sj}'.format(sj=pp)]]})
                                             ))
                     
                     ## plot average tSNR values on flatmap surface ##
@@ -558,7 +558,7 @@ freeview -v \
                 b1.set(xlabel=None)
                 b1.set(ylabel=None)
                 ax1.set_ylabel('mean tSNR',fontsize = 20,labelpad=18)
-                ax1.set_ylim(0,130)
+                ax1.set_ylim(0,150)
                          
                 fig.savefig(op.join(outdir,'tSNR_ROIS_sub-{sj}_{ses}.png'.format(sj=pp, ses=ses)), dpi=100,bbox_inches = 'tight')
 
@@ -694,12 +694,23 @@ freeview -v \
         if input_pth is None:
             input_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space)
 
-        ## loop over participants
-
+    
         ## if no participant list set, then run all
         if len(participant_list) == 0:
             participant_list = self.MRIObj.sj_num
+
+        ## get vertices for each relevant ROI
+        # from glasser atlas
+        ROIs, roi_verts, color_codes = plot_utils.get_rois4plotting(self.MRIObj.params, 
+                                                                sub_id = participant_list,
+                                                                pysub = self.MRIObj.params['plotting']['pycortex_sub'], 
+                                                                use_atlas = use_atlas_rois, 
+                                                                atlas_pth = op.join(self.MRIObj.derivatives_pth,
+                                                                                    'glasser_atlas','59k_mesh'), 
+                                                                space = self.MRIObj.sj_space)
         
+        ## loop over participants
+
         for pp in participant_list:
 
             # and over sessions (if more than one)
@@ -743,19 +754,10 @@ freeview -v \
                 # to check if something is off (some arousal artifact or so) 
                 if (task == 'FA') and (run_type in ['mean', 'median']):
 
-                    ## get vertices for each relevant ROI
-                    # from glasser atlas
-                    ROIs, roi_verts, color_codes = plot_utils.get_rois4plotting(self.MRIObj.params, 
-                                                                            pysub = self.MRIObj.params['plotting']['pycortex_sub'], 
-                                                                            use_atlas = use_atlas_rois, 
-                                                                            atlas_pth = op.join(self.MRIObj.derivatives_pth,
-                                                                                                'glasser_atlas','59k_mesh'), 
-                                                                            space = self.MRIObj.sj_space)
-
                     avg_bold_roi = {} #empty dictionary 
 
-                    for _,val in enumerate(ROIs):    
-                        avg_bold_roi[val] = np.nanmean(data_arr[roi_verts[val]], axis=0)
+                    for _,val in enumerate(ROIs['sub-{sj}'.format(sj=pp)]):    
+                        avg_bold_roi[val] = np.nanmean(data_arr[roi_verts['sub-{sj}'.format(sj=pp)][val]], axis=0)
                         
                     # plot data with model
                     fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
@@ -764,11 +766,11 @@ freeview -v \
                     
                     plt.plot(time_sec, stim_on_screen, linewidth = 5, alpha = 1, linestyle = 'solid', color = 'gray')
 
-                    for _,key in enumerate(ROIs):
-                        plt.plot(time_sec, avg_bold_roi[key], linewidth = 1.5, label = '%s'%key, color = color_codes[key], alpha = .6)
+                    for _,key in enumerate(ROIs['sub-{sj}'.format(sj=pp)]):
+                        plt.plot(time_sec, avg_bold_roi[key], linewidth = 1.5, label = '%s'%key, color = color_codes['sub-{sj}'.format(sj=pp)][key], alpha = .6)
 
                     # also plot average of all time courses
-                    plt.plot(time_sec, np.mean(np.stack((avg_bold_roi[val] for val in ROIs), axis = 0), axis = 0),
+                    plt.plot(time_sec, np.mean(np.stack((avg_bold_roi[val] for val in ROIs['sub-{sj}'.format(sj=pp)]), axis = 0), axis = 0),
                             linewidth = 2.5, label = 'average', linestyle = 'solid', color = 'k')
 
                     axis.set_xlabel('Time (s)',fontsize=20, labelpad=20)

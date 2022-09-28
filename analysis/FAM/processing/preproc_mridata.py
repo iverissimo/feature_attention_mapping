@@ -62,8 +62,7 @@ class PreprocMRI:
         # make output folder to store copy of original, tmp and output files
         out_pth = self.MRIObj.bfc_pth
         
-        if not op.exists(out_pth):
-            os.makedirs(out_pth)
+        os.makedirs(out_pth, exist_ok = True)
         print('saving files in %s'%out_pth)
         
         # loop over files we want to bias field correct
@@ -79,8 +78,7 @@ class PreprocMRI:
 
             else:
                 # proceed
-                if not op.exists(outfolder):
-                    os.makedirs(outfolder)
+                os.makedirs(outfolder, exist_ok = True)
                 print('saving files in %s'%outfolder)
                 
                 batch_string = """#!/bin/bash
@@ -114,8 +112,7 @@ class PreprocMRI:
                 """
 
                 batch_dir = op.join(self.MRIObj.proj_root_pth,'batch')
-                if not op.exists(batch_dir):
-                        os.makedirs(batch_dir)
+                os.makedirs(batch_dir, exist_ok = True)
                         
                 keys2replace = {'$SJ_NR': str(participant).zfill(3),
                         '$ORIG': orig, 
@@ -222,8 +219,7 @@ class PreprocMRI:
                 masked_T1_pth = op.join(self.MRIObj.anat_preproc_pth, 'derivatives', 'masked_mp2rage', 
                                        'sub-{sj}'.format(sj=pp), 'ses-1', 'anat')
                 
-                if not op.exists(masked_T1_pth):
-                    os.makedirs(masked_T1_pth)
+                os.makedirs(masked_T1_pth, exist_ok = True)
                 print('saving files in %s'%masked_T1_pth)
                 
                 masked_T1_files = [op.join(masked_T1_pth, val) for val in os.listdir(masked_T1_pth) if val.endswith('_desc-masked_T1w.nii.gz')]
@@ -452,9 +448,6 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             # add memory for node
             fmriprep_cmd += '#SBATCH --mem={mem}G\n'.format(mem=batch_mem_Gib)
             
-            # make fmriprep folder if it does not exist
-            #if not op.exists(self.MRIObj.fmriprep_pth):
-            #    os.makedirs(self.MRIObj.fmriprep_pth)
                 
             if data_type == 'anat':
                 fmriprep_cmd +="""\n# call the programs
@@ -579,8 +572,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
         
         ## to save shell scripts created
         batch_dir = op.join(self.MRIObj.proj_root_pth,'batch')
-        if not op.exists(batch_dir):
-            os.makedirs(batch_dir)
+        os.makedirs(batch_dir, exist_ok = True)
         
         ## set input path where standard files are stored
         if input_pth is None:
@@ -612,8 +604,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
         
         # make post_nordic folder (for intermediate files)
         post_nordic = input_pth.replace('pre_nordic', 'post_nordic')
-        if not op.exists(post_nordic):
-            os.makedirs(post_nordic)
+        os.makedirs(post_nordic, exist_ok = True)
             
         print('saving files in %s'%post_nordic)
         
@@ -918,8 +909,8 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
         if output_pth is None:
             output_pth = op.join(self.MRIObj.proj_root_pth, 'orig_fmaps' , 'sub-{sj}'.format(sj=participant))
 
-        if not op.isdir(output_pth):
-            os.makedirs(output_pth)
+        # make path
+        os.makedirs(output_pth, exist_ok = True)
 
         # then for each file
         for file in orig_nii_files:
@@ -969,8 +960,7 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
 
             # path to store mriqc outputs, in derivatives
             out_dir = op.join(self.MRIObj.derivatives_pth, 'mriqc', 'sub-{sj}'.format(sj=pp))
-            if not op.exists(out_dir):
-                os.makedirs(out_dir)
+            os.makedirs(out_dir, exist_ok = True)
             print('saving files in %s'%out_dir)
 
             # if running in local machine
@@ -1051,8 +1041,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                 output_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 'sub-{sj}'.format(sj=pp), ses)
 
                 # if output path doesn't exist, create it
-                if not op.isdir(output_pth): 
-                    os.makedirs(output_pth)
+                os.makedirs(output_pth, exist_ok = True)
                 print('saving files in %s'%output_pth)
 
                 # get list of functional files to process, per task
@@ -1105,8 +1094,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                     # avoids mistakes later on
                     final_output_dir =  op.join(output_pth, 'processed')
                     # if output path doesn't exist, create it
-                    if not op.isdir(final_output_dir): 
-                        os.makedirs(final_output_dir)
+                    os.makedirs(final_output_dir, exist_ok = True)
                     print('saving FINAL processed files in %s'%final_output_dir)
 
                     ## average all runs for pRF task

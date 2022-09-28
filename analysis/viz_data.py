@@ -21,6 +21,7 @@ parser.add_argument("--data_type", type = str.lower, help="Type of data to proce
 parser.add_argument("--dir", type = str.lower, help="System we are making plots in (local [default] vs lisa)")
 parser.add_argument("--T2", type = int, help="Consider T2 file - only for freeview command (0 [default] vs 1)")
 parser.add_argument("--task", type = str, help="Task to look at (pRF [default] vs FA)")
+parser.add_argument("--atlas", type = int, help="Use Glasser atlas ROIs (1 [default] vs 0)")
 
 #  only relevant if subject == group/all
 parser.add_argument("--exclude_sj", nargs='+', help="List of subjects to exclude, define as --exclude_sj 0 1 ...", default=[])
@@ -38,6 +39,8 @@ task = args.task if args.task is not None else "pRF" # type of task
 system_dir = args.dir if args.dir is not None else "local" # system location
 
 T2_file = bool(args.T2) if args.T2 is not None else False # make it boolean
+
+atlas_bool = bool(args.atlas) if args.atlas is not None else True # make it boolean
 
 exclude_sj = args.exclude_sj # list of excluded subjects
 if len(exclude_sj)>0:
@@ -83,6 +86,7 @@ match data_type:
                 plotter = MRIViewer(FAM_data)
                 plotter.compare_nordic2standard(participant_list = FAM_preproc.MRIObj.sj_num, 
                                                 input_pth = None, 
+                                                use_atlas_rois = atlas_bool,
                                                 file_ext = FAM_preproc.get_mrifile_ext())
 
             case 'tsnr':
@@ -92,6 +96,7 @@ match data_type:
                 plotter = MRIViewer(FAM_data)
                 plotter.plot_tsnr(participant_list = FAM_preproc.MRIObj.sj_num, 
                                                 input_pth = None, 
+                                                use_atlas_rois = atlas_bool,
                                                 file_ext = FAM_preproc.get_mrifile_ext())
 
             case 'vasculature':
@@ -115,6 +120,7 @@ match data_type:
                                             run_type = 'mean', 
                                             task = task_name,
                                             stim_on_screen = None,
+                                            use_atlas_rois = atlas_bool,
                                             file_ext = FAM_preproc.get_mrifile_ext())
 
             case TypeError:

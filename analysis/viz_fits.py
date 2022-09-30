@@ -57,6 +57,7 @@ system_dir = args.dir if args.dir is not None else "local" # system location
 #
 # type of session and run to use
 ses = args.ses2fit if args.ses2fit is not None else 'ses-mean'
+combine_ses = True if ses == 'ses-mean' else False 
 run_type = args.run_type if args.run_type is not None else 'mean'
 #
 #
@@ -111,7 +112,7 @@ match task:
         file_ext = FAM_mri_preprocess.get_mrifile_ext()['pRF']
 
         ## load plotter class
-        plotter = pRFViewer(FAM_data, pRFModelObj = FAM_pRF)
+        plotter = pRFViewer(FAM_data, pRFModelObj = FAM_pRF, combine_ses = combine_ses)
 
         ## run specific vizualizer
         match viz:

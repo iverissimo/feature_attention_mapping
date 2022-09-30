@@ -46,6 +46,7 @@ task2model = args.task2model
 #
 # type of session and run to use
 ses = args.ses if args.ses is not None else 'ses-mean'
+combine_ses = True if ses == 'ses-mean' else False # if we want to combine sessions
 run_type = args.run_type if args.run_type is not None else 'mean'
 #
 #
@@ -94,7 +95,7 @@ match task2model:
 
         # get participant models, which also will load 
         # DM and mask it according to participants behavior
-        pp_prf_models = FAM_pRF.set_models(participant_list = [participant], mask_DM = True, combine_ses = True)
+        pp_prf_models = FAM_pRF.set_models(participant_list = [participant], mask_DM = True, combine_ses = combine_ses)
         
         ## get file extension for post fmriprep
         # processed files

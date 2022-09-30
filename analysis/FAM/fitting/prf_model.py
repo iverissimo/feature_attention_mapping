@@ -355,8 +355,6 @@ class pRF_model:
             file extension, to select appropriate files
         mask_DM: bool
             if we want to mask design matrix given behavioral performance
-        combine_ses: bool
-            if we want to combine runs from different sessions (relevant for fitting of average across runs)
         """  
 
         ## get list of files to load
@@ -858,11 +856,14 @@ class pRF_model:
             est_folder = 'it_{model_name}'.format(model_name = model_name)
         else:
             est_folder = 'grid_{model_name}'.format(model_name = model_name)
+        
+        # if not doing mean across session, then set combine ses to false
+        combine_ses = True if ses == 'ses-mean' else False 
 
         # get participant models, which also will load 
         # DM and mask it according to participants behavior
         pp_prf_models = self.set_models(participant_list = [participant], 
-                                                    mask_DM = True, combine_ses = True)
+                                                    mask_DM = True, combine_ses = combine_ses)
 
         ## load estimates to make it easier to load later
         pRFdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', 

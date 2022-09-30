@@ -26,7 +26,7 @@ from PIL import Image, ImageDraw
 
 class pRFViewer:
 
-    def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, pysub = 'hcp_999999', use_atlas_rois = True):
+    def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, pysub = 'hcp_999999', use_atlas_rois = True, combine_ses = True):
         
         """__init__
         constructor for class 
@@ -44,7 +44,8 @@ class pRFViewer:
             will try to find 'hcp_999999_sub-X' by default, if doesnt exist then uses 'hcp_999999'
         use_atlas: bool
             if we want to use the glasser atlas ROIs instead (this is, from the keys conglomerate defined in the params yml)
-
+        combine_ses: bool
+            if we want to combine runs from different sessions (relevant for fitting of average across runs)
         """
 
         # set data object to use later on
@@ -77,7 +78,7 @@ class pRFViewer:
         ## load participant models
         # which also will load DM and mask it according to participants behavior
         self.pp_prf_models = self.pRFModelObj.set_models(participant_list = self.MRIObj.sj_num, 
-                                                    mask_DM = True, combine_ses = True)
+                                                    mask_DM = True, combine_ses = combine_ses)
 
             
     def get_prf_estimate_keys(self, prf_model_name = 'gauss'):
@@ -424,6 +425,7 @@ class pRFViewer:
 
         ## load pRF data array
         bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
+        #print(bold_filelist)
         pRF_data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, run_type = run_type)
 
         max_ecc_ext = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].screen_size_degrees/2

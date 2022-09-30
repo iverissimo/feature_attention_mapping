@@ -528,3 +528,68 @@ def get_estimates_roi_df(participant, estimates_pp, ROIs = None, roi_verts = Non
                         ))
 
     return df_est
+
+
+def get_NONuniform_polar_angle(xx, yy, rsq, angle_thresh = 3*np.pi/4, rsq_thresh = 0, pysub = 'hcp_999999'):
+
+    """
+
+    Helper function to transform polar angle values into RGB values
+    guaranteeing a non-uniform representation
+
+    (this is, when we want to use half the color wheel to show the pa values)
+    (useful for better visualization of boundaries)
+
+    Parameters
+    ----------
+    xx : arr
+        array with x position values
+    yy : arr
+        array with y position values
+    rsq: arr
+        rsq values, to be used as alpha level/threshold
+    angle_thresh: float
+        value upon which to make it red for this hemifield (above angle or below 1-angle will be red in a retinotopy hsv color wheel)
+    rsq_thresh: float/int
+        minimum rsq threshold to use 
+    pysub: str
+        name of pycortex subject folder
+
+    """
+
+    hsv_angle = []
+    hsv_angle = np.ones((len(rsq), 3))
+
+    ## calculate polar angle
+    polar_angle = np.angle(xx + yy * 1j)
+
+    ## set normalized polar angle (0-1), and make nan irrelevant vertices
+    hsv_angle[:, 0] = np.nan 
+    hsv_angle[:, 0][rsq > rsq_thresh] = ((polar_angle + np.pi) / (np.pi * 2.0))[rsq > rsq_thresh]
+
+    ## normalize angle threshold for overepresentation
+    angle_thresh_norm = (angle_thresh + np.pi) / (np.pi * 2.0)
+
+    ## get mid vertex index (diving hemispheres)
+    left_index = cortex.db.get_surfinfo(pysub).left.shape[0] 
+
+    ## set angles within threh interval to 0
+    ind_thresh = np.where((hsv_angle[:left_index, 0] > angle_thresh_norm) | (hsv_angle[:left_index, 0] < 1-angle_thresh_norm))[0]
+    hsv_angle[:left_index, 0][ind_thresh] = 0
+
+    ## now take angles from RH (thus LVF) 
+    #### ATENÇÃO -> minus sign to flip angles vertically (then order of colors same for both hemispheres) ###
+    # also normalize it
+    hsv_angle[left_index:, 0] = ((np.angle(-1*xx + yy * 1j) + np.pi) / (np.pi * 2.0))[left_index:]
+
+    # set angles within threh interval to 0
+    ind_thresh = np.where((hsv_angle[left_index:, 0] > angle_thresh_norm) | (hsv_angle[left_index:, 0] < 1-angle_thresh_norm))[0]
+    hsv_angle[left_index:, 0][ind_thresh] = 0
+
+    ## make final RGB array
+    rgb_angle = np.ones((len(rsq), 3))
+    rgb_angle[:] = np.nan
+
+    rgb_angle[rsq > rsq_thresh] = colors.hsv_to_rgb(hsv_angle[rsq > rsq_thresh])
+
+    return rgb_angle

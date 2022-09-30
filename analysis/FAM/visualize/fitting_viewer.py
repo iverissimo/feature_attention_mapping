@@ -373,19 +373,36 @@ class pRFViewer:
                                                     vmin2 = 0, vmax2 = 1, 
                                                     subject = pysub_folder, data2D = True)
 
+        ## also make non uniform color wheel, which helps seeing borders
+        rgb_pa = plot_utils.get_NONuniform_polar_angle(pp_prf_est_dict['x'], pp_prf_est_dict['y'], pp_prf_est_dict['r2'], 
+                                                        angle_thresh = 3*np.pi/4, 
+                                                        rsq_thresh = 0, 
+                                                        pysub = pysub_folder)
+
+        # make ones mask, only for high rsq fits
+        ones_mask = np.ones(pp_prf_est_dict['r2'].shape)
+        ones_mask[pp_prf_est_dict['r2'] < 0.3] = np.nan
+
+        images['PA_half_hemi'] = cortex.VertexRGB(rgb_pa[:, 0], rgb_pa[:, 1], rgb_pa[:, 2],
+                                           alpha = ones_mask,
+                                           subject = pysub_folder)
+
         ### ADD TO OVERLAY, TO DRAW BORDERS
         cortex.utils.add_roi(images['pRF_rsq'], name = 'RSQ_sub-{sj}_task-pRF_run-{run}_model-{model}'.format(sj = participant,
                                                                                                     run = run_type,
-                                                                                                    model = prf_model_name), open_inkscape = False)
+                                                                                                    model = prf_model_name), open_inkscape = False, add_path = False)
         cortex.utils.add_roi(images['ecc'], name = 'ECC_sub-{sj}_task-pRF_run-{run}_model-{model}'.format(sj = participant,
                                                                                                     run = run_type,
-                                                                                                    model = prf_model_name), open_inkscape = False)
+                                                                                                    model = prf_model_name), open_inkscape = False, add_path = False)
         cortex.utils.add_roi(images['PA'], name = 'PA_sub-{sj}_task-pRF_run-{run}_model-{model}'.format(sj = participant,
                                                                                                     run = run_type,
-                                                                                                    model = prf_model_name), open_inkscape = False)
+                                                                                                    model = prf_model_name), open_inkscape = False, add_path = False)
         cortex.utils.add_roi(images['PA_alpha'], name = 'PA_alpha_sub-{sj}_task-pRF_run-{run}_model-{model}'.format(sj = participant,
                                                                                                     run = run_type,
-                                                                                                    model = prf_model_name), open_inkscape = True)
+                                                                                                    model = prf_model_name), open_inkscape = False, add_path = False)
+        cortex.utils.add_roi(images['PA_half_hemi'], name = 'PA_half_hemi_sub-{sj}_task-pRF_run-{run}_model-{model}'.format(sj = participant,
+                                                                                                    run = run_type,
+                                                                                                    model = prf_model_name), open_inkscape = False, add_path = False)
 
         print('Done')
 

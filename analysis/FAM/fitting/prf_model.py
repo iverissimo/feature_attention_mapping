@@ -412,7 +412,7 @@ class pRF_model:
         grid_model_filename = grid_gauss_filename.replace('gauss', model2fit)
         it_model_filename = it_gauss_filename.replace('gauss', model2fit)
 
-        if not op.exists(it_model_filename):
+        if not op.isfile(it_model_filename):
 
             print("Gauss model GRID fit")
             print(it_gauss_filename)
@@ -438,7 +438,7 @@ class pRF_model:
                                         ftol = ftol)
 
             # if we want to save estimates
-            if save_estimates and not op.exists(it_gauss_filename):
+            if save_estimates and not op.isfile(it_gauss_filename):
                 # for grid
                 print('saving %s'%grid_gauss_filename)
                 self.save_pRF_model_estimates(grid_gauss_filename, gauss_fitter.gridsearch_params, 

@@ -295,33 +295,33 @@ class visualize_on_click:
             self.redraw_vertex_plots(clicked_vertex.indices[0], refresh_fig)
             plt.draw()
 
-    def onkey(self, event):
+    def onkey(self, event, with_rois = True, with_sulci=True):
         
         # clear flatmap axis
         self.flatmap_ax.clear()
 
         if event.key == '1':  # pRF rsq
-            cortex.quickshow(self.images['pRF_rsq'], with_rois = False, with_curvature = True,
+            cortex.quickshow(self.images['pRF_rsq'], with_rois = with_rois, with_curvature = True, with_sulci = with_sulci, with_labels = False,
                         fig = self.flatmap_ax, with_colorbar = False)
             self.flatmap_ax.set_title('pRF rsq')
         elif (event.key == '2') & (self.task2viz in ['both', 'FA', 'feature']):  # FA rsq
-            cortex.quickshow(self.images['FA_rsq'], with_rois = False, with_curvature = True,
+            cortex.quickshow(self.images['FA_rsq'], with_rois = with_rois, with_curvature = True, with_sulci = with_sulci, with_labels = False,
                         fig = self.flatmap_ax, with_colorbar = False)
             self.flatmap_ax.set_title('FA rsq')
         elif event.key == '3':  # pRF eccentricity
-            cortex.quickshow(self.images['ecc'], with_rois = False, with_curvature = True,
+            cortex.quickshow(self.images['ecc'], with_rois = with_rois, with_curvature = True, with_sulci = with_sulci, with_labels = False,
                         fig = self.flatmap_ax, with_colorbar = False)
             self.flatmap_ax.set_title('pRF eccentricity')
         elif event.key == '4':  # pRF Size
-            cortex.quickshow(self.images['size_fwhmax'], with_rois = False, with_curvature = True,
+            cortex.quickshow(self.images['size_fwhmax'], with_rois = with_rois, with_curvature = True, with_sulci = with_sulci, with_labels = False,
                         fig = self.flatmap_ax, with_colorbar = False)
             self.flatmap_ax.set_title('pRF size (FWHMax)')
         elif event.key == '5':  # pRF PA
-            cortex.quickshow(self.images['PA'], with_rois = False, with_curvature = True,
+            cortex.quickshow(self.images['PA'], with_rois = with_rois, with_curvature = True, with_sulci = with_sulci, with_labels = False,
                         fig = self.flatmap_ax, with_colorbar = False)
             self.flatmap_ax.set_title('pRF PA')
         elif (event.key == '6') & (self.pRFmodel_name == 'css'):  # pRF exponent
-            cortex.quickshow(self.images['ns'], with_rois = False, with_curvature = True,
+            cortex.quickshow(self.images['ns'], with_rois = with_rois, with_curvature = True, with_sulci = with_sulci, with_labels = False,
                         fig = self.flatmap_ax, with_colorbar = False)
             self.flatmap_ax.set_title('pRF exponent')      
         plt.draw()

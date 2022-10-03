@@ -64,12 +64,25 @@ class pRFViewer:
         self.nr_pp = len(self.MRIObj.sj_num)
         
         ## pycortex subject to be used in plotting
-        self.pysub = pysub
+        # loop over participant list
+        self.pysub = {}
+        for pp in self.MRIObj.sj_num:
+            # check if subject pycortex folder exists
+            pysub_folder = '{ps}_sub-{pp}'.format(ps = pysub, pp = pp)
+
+            if op.exists(op.join(cortex.options.config.get('basic', 'filestore'), pysub_folder)):
+                print('Participant overlay %s in pycortex filestore, assumes we draw ROIs there'%pysub_folder)
+                self.pysub['sub-{pp}'.format(pp = pp)] = pysub_folder
+            else:
+                self.pysub['sub-{pp}'.format(pp = pp)] = pysub
+
+        ## if we want to use atlas roi or not
+        self.use_atlas_rois = use_atlas_rois
 
         ## load participant ROIs and color codes
         self.group_ROIs, self.group_roi_verts, self.group_color_codes = plot_utils.get_rois4plotting(self.MRIObj.params, 
                                                                                                     sub_id = self.MRIObj.sj_num,
-                                                                                                    pysub = self.pysub, 
+                                                                                                    pysub = pysub, 
                                                                                                     use_atlas = use_atlas_rois, 
                                                                                                     atlas_pth = op.join(self.MRIObj.derivatives_pth,
                                                                                                                         'glasser_atlas','59k_mesh'), 
@@ -451,7 +464,7 @@ class pRFViewer:
         click_plotter = click_viewer.visualize_on_click(self.MRIObj, pRFModelObj = self.pRFModelObj,
                                                         pRF_data = pRF_data_arr,
                                                         prf_dm = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].design_matrix,
-                                                        pysub = self.pysub,
+                                                        pysub = self.pysub['sub-{pp}'.format(pp = participant)],
                                                         max_ecc_ext = max_ecc_ext)
 
         ## set figure, and also load estimates and models
@@ -471,7 +484,7 @@ class pRFViewer:
                                                                     x_ecc_lim = [- max_ecc_ext, max_ecc_ext],
                                                                     y_ecc_lim = [- max_ecc_ext, max_ecc_ext],
                                                                     rsq_threshold = rsq_threshold,
-                                                                    pysub = self.pysub
+                                                                    pysub = self.pysub['sub-{pp}'.format(pp = participant)]
                                                                     )
 
         ## calculate pa + ecc + size
@@ -502,7 +515,7 @@ class pRFViewer:
         ## pRF rsq
         click_plotter.images['pRF_rsq'] = plot_utils.get_flatmaps(click_plotter.pp_prf_est_dict['r2'], 
                                                                     vmin1 = 0, vmax1 = .8,
-                                                                    pysub = self.pysub, 
+                                                                    pysub = self.pysub['sub-{pp}'.format(pp = participant)], 
                                                                     cmap = 'Reds')
         ## pRF Eccentricity
 
@@ -517,14 +530,14 @@ class pRFViewer:
                                                                             vmin = 0, vmax = 6, 
                                                                             data2 = alpha_level, 
                                                                             vmin2 = 0, vmax2 = 1, 
-                                                                            subject = self.pysub, data2D = True)
+                                                                            subject = self.pysub['sub-{pp}'.format(pp = participant)], data2D = True)
 
         ## pRF Size
         click_plotter.images['size_fwhmax'] = plot_utils.make_raw_vertex_image(size_fwhmax, 
                                                     cmap = 'hot', vmin = 0, vmax = 7, 
                                                     data2 = alpha_level, 
                                                     vmin2 = 0, vmax2 = 1, 
-                                                    subject = self.pysub, data2D = True)
+                                                    subject = self.pysub['sub-{pp}'.format(pp = participant)], data2D = True)
 
         ## pRF Polar Angle
        
@@ -538,18 +551,19 @@ class pRFViewer:
                                                     cmap = PA_cmap, vmin = 0, vmax = 1, 
                                                     data2 = alpha_level, 
                                                     vmin2 = 0, vmax2 = 1, 
-                                                    subject = self.pysub, data2D = True)
+                                                    subject = self.pysub['sub-{pp}'.format(pp = participant)], data2D = True)
 
         ## pRF Exponent 
         if prf_model_name == 'css':
             click_plotter.images['ns'] = plot_utils.get_flatmaps(click_plotter.pp_prf_est_dict['ns'], 
                                                                 vmin1 = 0, vmax1 = 1,
-                                                                pysub = self.pysub, 
+                                                                pysub = self.pysub['sub-{pp}'.format(pp = participant)], 
                                                                 cmap = 'plasma')
 
         
         cortex.quickshow(click_plotter.images['pRF_rsq'], fig = click_plotter.flatmap_ax,
-                        with_rois = False, with_curvature = True, with_colorbar=False)
+                        with_rois = False, with_curvature = True, with_colorbar=False, 
+                        with_sulci = True, with_labels = False)
 
         click_plotter.full_fig.canvas.mpl_connect('button_press_event', click_plotter.onclick)
         click_plotter.full_fig.canvas.mpl_connect('key_press_event', click_plotter.onkey)
@@ -589,7 +603,7 @@ class pRFViewer:
                                                                             x_ecc_lim = [- max_ecc_ext, max_ecc_ext],
                                                                             y_ecc_lim = [- max_ecc_ext, max_ecc_ext],
                                                                             rsq_threshold = rsq_threshold,
-                                                                            pysub = self.pysub
+                                                                            pysub = self.pysub['sub-{pp}'.format(pp = pp)]
                                                                             )
             else:
                 group_estimates['sub-{sj}'.format(sj = pp)] = estimates_dict
@@ -631,7 +645,7 @@ class pRFViewer:
             #### plot flatmap ###
             flatmap = plot_utils.get_flatmaps(group_estimates['sub-{sj}'.format(sj = pp)]['r2'], 
                                                         vmin1 = 0, vmax1 = .8,
-                                                        pysub = self.pysub, 
+                                                        pysub = self.pysub['sub-{pp}'.format(pp = pp)], 
                                                         cmap = 'Reds')
             
             fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_RSQ.png'.format(sj = pp,
@@ -756,7 +770,7 @@ class pRFViewer:
                                                                                                     x_ecc_lim = [- max_ecc_ext, max_ecc_ext],
                                                                                                     y_ecc_lim = [- max_ecc_ext, max_ecc_ext],
                                                                                                     rsq_threshold = rsq_threshold,
-                                                                                                    pysub = self.pysub
+                                                                                                    pysub = self.pysub['sub-{pp}'.format(pp = pp)]
                                                                                                     )
                     else:
                         group_estimates['sub-{sj}'.format(sj = pp)][mod_name][stage] = estimates_dict
@@ -768,7 +782,7 @@ class pRFViewer:
                     ## plot rsq value difference from grid to iterative
                     flatmap = plot_utils.get_flatmaps(group_estimates['sub-{sj}'.format(sj = pp)][mod_name]['iterative']['r2'] - group_estimates['sub-{sj}'.format(sj = pp)][mod_name]['grid']['r2'], 
                                                                 vmin1 = -.1, vmax1 = .1,
-                                                                pysub = self.pysub, 
+                                                                pysub = self.pysub['sub-{pp}'.format(pp = pp)], 
                                                                 cmap = 'BuBkRd')
                     
                     fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_grid2iterative_diff_RSQ.png'.format(sj = pp,
@@ -799,7 +813,7 @@ class pRFViewer:
                 for non_g in non_gauss_mod:
                     flatmap = plot_utils.get_flatmaps(group_estimates['sub-{sj}'.format(sj = pp)][non_g]['iterative']['r2'] - group_estimates['sub-{sj}'.format(sj = pp)]['gauss']['iterative']['r2'], 
                                                                 vmin1 = -.1, vmax1 = .1,
-                                                                pysub = self.pysub, 
+                                                                pysub = self.pysub['sub-{pp}'.format(pp = pp)], 
                                                                 cmap = 'BuBkRd')
                     
                     fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_flatmap_gauss2{model}_diff_RSQ.png'.format(sj = pp,
@@ -901,7 +915,8 @@ class pRFViewer:
                                                         vmin = 0, vmax = 6, 
                                                         data2 = alpha_level, 
                                                         vmin2 = 0, vmax2 = 1, 
-                                                        subject = self.pysub, data2D = True)
+                                                        subject = self.pysub['sub-{pp}'.format(pp = pp)], 
+                                                        data2D = True)
             
             fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_ECC.png'.format(sj = pp,
                                                                                                                                         acq = self.MRIObj.acq,
@@ -929,7 +944,8 @@ class pRFViewer:
                                                         vmin = 0, vmax = 7, 
                                                         data2 = alpha_level, 
                                                         vmin2 = 0, vmax2 = 1, 
-                                                        subject = self.pysub, data2D = True)
+                                                        subject = self.pysub['sub-{pp}'.format(pp = pp)], 
+                                                        data2D = True)
             
             fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_SIZE-fwhmax.png'.format(sj = pp,
                                                                                                                                         acq = self.MRIObj.acq,
@@ -1089,7 +1105,8 @@ class pRFViewer:
                                                         vmin = 0, vmax = 1, 
                                                         data2 = alpha_level, 
                                                         vmin2 = 0, vmax2 = 1, 
-                                                        subject = self.pysub, data2D = True)
+                                                        subject = self.pysub['sub-{pp}'.format(pp = pp)], 
+                                                        data2D = True)
             
             fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_N.png'.format(sj = pp,
                                                                                                                                         acq = self.MRIObj.acq,

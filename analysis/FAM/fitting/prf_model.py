@@ -415,6 +415,8 @@ class pRF_model:
         if not op.exists(it_model_filename):
 
             print("Gauss model GRID fit")
+            print(it_gauss_filename)
+            print(self.fit_hrf)
             gauss_fitter = Iso2DGaussianFitter(data = masked_data, 
                                                 model = pp_models['sub-{sj}'.format(sj = participant)][ses]['gauss_model'], 
                                                 n_jobs = n_jobs,

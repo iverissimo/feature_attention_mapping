@@ -37,6 +37,9 @@ parser.add_argument("--run_type", help="Type of run to fit (mean of runs [defaul
 parser.add_argument("--vertex", type = str, help="Vertex index to view, or list of indexes or None [default]")
 parser.add_argument("--ROI",type = str, help="ROI name to fit")
 
+# if we want to use atlas for ROI definition
+parser.add_argument("--atlas_bool", type = int, help="1/0 - if we want to use atlas ROI [default] or sub specific roi")
+
 # only relevant if single voxel viewer
 parser.add_argument("--fit_now", type = int, help="1/0 - if we want to fit the data now [default] or load when possible")
 
@@ -72,6 +75,7 @@ fit_now = bool(args.fit_now) if args.fit_now is not None else True
 vertex = ast.literal_eval(str(args.vertex)) if args.vertex is not None else None
 ROI = args.ROI 
 #
+atlas_bool = bool(args.atlas_bool) if args.atlas_bool is not None else True 
 
 exclude_sj = args.exclude_sj # list of excluded subjects
 if len(exclude_sj)>0:
@@ -112,7 +116,7 @@ match task:
         file_ext = FAM_mri_preprocess.get_mrifile_ext()['pRF']
 
         ## load plotter class
-        plotter = pRFViewer(FAM_data, pRFModelObj = FAM_pRF, combine_ses = combine_ses)
+        plotter = pRFViewer(FAM_data, pRFModelObj = FAM_pRF, combine_ses = combine_ses, use_atlas_rois = atlas_bool)
 
         ## run specific vizualizer
         match viz:

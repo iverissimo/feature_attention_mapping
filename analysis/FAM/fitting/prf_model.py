@@ -414,8 +414,6 @@ class pRF_model:
         if not op.isfile(it_model_filename):
 
             print("Gauss model GRID fit")
-            print(it_gauss_filename)
-            print(op.isfile(it_gauss_filename))
             gauss_fitter = Iso2DGaussianFitter(data = masked_data, 
                                                 model = pp_models['sub-{sj}'.format(sj = participant)][ses]['gauss_model'], 
                                                 n_jobs = n_jobs,
@@ -433,6 +431,7 @@ class pRF_model:
                                         verbose = True,
                                         bounds = fit_params['gauss']['bounds'],
                                         constraints = constraints['gauss'],
+                                        starting_params = None,
                                         xtol = xtol,
                                         ftol = ftol)
 
@@ -441,7 +440,7 @@ class pRF_model:
                 # for grid
                 print('saving %s'%grid_gauss_filename)
                 self.save_pRF_model_estimates(grid_gauss_filename, gauss_fitter.gridsearch_params, 
-                                                model_type = 'gauss')
+                                                model_type = 'gauss', grid = True) 
                 # for it
                 print('saving %s'%it_gauss_filename)
                 self.save_pRF_model_estimates(it_gauss_filename, gauss_fitter.iterative_search_params, 
@@ -971,7 +970,7 @@ class pRF_model:
         return bold_filelist
 
 
-    def save_pRF_model_estimates(self, filename, final_estimates, model_type = 'gauss'):
+    def save_pRF_model_estimates(self, filename, final_estimates, model_type = 'gauss', grid = False):
     
         """
         re-arrange estimates that were masked
@@ -995,7 +994,7 @@ class pRF_model:
                 
         if model_type == 'gauss':
 
-            if self.fit_hrf:
+            if self.fit_hrf and not grid:
                 np.savez(filename,
                         x = final_estimates[..., 0],
                         y = final_estimates[..., 1],

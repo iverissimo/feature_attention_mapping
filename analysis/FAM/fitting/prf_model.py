@@ -371,8 +371,7 @@ class pRF_model:
         if outdir is None:
             outdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), ses)
             
-        if not op.exists(outdir):
-            os.makedirs(outdir)
+        os.makedirs(outdir, exist_ok = True)
         print('saving files in %s'%outdir)
 
         ## set base filename that will be used for estimates
@@ -416,7 +415,7 @@ class pRF_model:
 
             print("Gauss model GRID fit")
             print(it_gauss_filename)
-            print(self.fit_hrf)
+            print(op.isfile(it_gauss_filename))
             gauss_fitter = Iso2DGaussianFitter(data = masked_data, 
                                                 model = pp_models['sub-{sj}'.format(sj = participant)][ses]['gauss_model'], 
                                                 n_jobs = n_jobs,
@@ -988,14 +987,11 @@ class pRF_model:
             2d estimates (datapoints,estimates)
         model_type: str
             model type used for fitting
-        fit_hrf: bool
-            if we fitted hrf or not
         
         """ 
 
         # make dir if it doesnt exist already
-        if not op.exists(op.split(filename)[0]):
-            os.makedirs(op.split(filename)[0])
+        os.makedirs(op.split(filename)[0], exist_ok = True)
                 
         if model_type == 'gauss':
 

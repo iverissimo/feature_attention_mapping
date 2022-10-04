@@ -572,7 +572,7 @@ class pRFViewer:
 
     
     def plot_prf_results(self, participant_list = [], 
-                                ses = 'ses-mean', run_type = 'mean', prf_model_name = 'gauss',
+                                ses = 'ses-mean', run_type = 'mean', prf_model_name = 'gauss', max_ecc_ext = 5,
                                 mask_arr = True, rsq_threshold =.1, iterative = True, figures_pth = None, use_atlas_rois = True):
 
 
@@ -581,7 +581,7 @@ class pRFViewer:
   
         for pp in participant_list:
 
-            max_ecc_ext = self.pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2
+            #max_ecc_ext = self.pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2
             
             ## load estimates
             print('Loading iterative estimates')
@@ -880,7 +880,7 @@ class pRFViewer:
 
 
     def plot_ecc_size(self, participant_list = [], group_estimates = {}, ses = 'ses-mean',  run_type = 'mean',
-                        figures_pth = None, model_name = 'gauss', n_bins_colors = 256, n_bins_dist = 5):
+                        figures_pth = None, model_name = 'gauss', n_bins_colors = 256, n_bins_dist = 5, max_ecc_ext = 5, max_size_ext = 14):
         
         ### make output folder for figures
         if figures_pth is None:
@@ -989,8 +989,8 @@ class pRFViewer:
             ax = plt.gca()
             plt.xticks(fontsize = 18)
             plt.yticks(fontsize = 18)
-            ax.axes.set_xlim(0, 6)
-            ax.axes.set_ylim(0.5,14)
+            ax.axes.set_xlim(0, max_ecc_ext)
+            ax.axes.set_ylim(0.5, max_size_ext)
             ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
             ax.set_ylabel('pRF size FWHMax [deg]', fontsize = 20, labelpad = 15)
             sns.despine(offset=15)
@@ -1030,8 +1030,8 @@ class pRFViewer:
             ax = plt.gca()
             plt.xticks(fontsize = 18)
             plt.yticks(fontsize = 18)
-            ax.axes.set_xlim(0, 6)
-            ax.axes.set_ylim(0.5,14)
+            ax.axes.set_xlim(0, max_ecc_ext)
+            ax.axes.set_ylim(0.5, max_size_ext)
             ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
             ax.set_ylabel('pRF size FWHMax [deg]', fontsize = 20, labelpad = 15)
             sns.despine(offset=15)
@@ -1060,8 +1060,8 @@ class pRFViewer:
             ax = plt.gca()
             plt.xticks(fontsize = 18)
             plt.yticks(fontsize = 18)
-            ax.axes.set_xlim(0, 6)
-            ax.axes.set_ylim(0.5,14)
+            ax.axes.set_xlim(0, max_ecc_ext)
+            ax.axes.set_ylim(0.5, max_size_ext)
             ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
             ax.set_ylabel('pRF size FWHMax [deg]', fontsize = 20, labelpad = 15)
             sns.despine(offset=15)

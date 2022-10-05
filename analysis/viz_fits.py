@@ -116,7 +116,8 @@ match task:
         file_ext = FAM_mri_preprocess.get_mrifile_ext()['pRF']
 
         ## load plotter class
-        plotter = pRFViewer(FAM_data, pRFModelObj = FAM_pRF, combine_ses = combine_ses, use_atlas_rois = atlas_bool)
+        plotter = pRFViewer(FAM_data, pRFModelObj = FAM_pRF, combine_ses = combine_ses, use_atlas_rois = atlas_bool,
+                                pysub = FAM_data.params['plotting']['pycortex_sub'], use_sub_rois = FAM_data.params['plotting']['use_sub_rois'])
 
         ## run specific vizualizer
         match viz:
@@ -140,6 +141,25 @@ match task:
                 plotter.save_estimates4drawing(sj, task2draw = 'pRF',
                                                 ses = ses, run_type = run_type,
                                                 prf_model_name = prf_model_name, file_ext = file_ext)
+
+            case 'compare_pRF_fit':
+                ## ask for user input on models to compare
+                model_list = []
+                mod_1 = ''
+                while mod_1 not in (['gauss','css', 'dog', 'dn']):
+                    mod_1 = input("First model name to compare RSQ?: ")
+                model_list.append(mod_1)
+
+                mod_2 = ''
+                while mod_2 not in (['gauss','css', 'dog', 'dn']):
+                    mod_2 = input("Second model name to compare RSQ?: ")
+                if mod_2 != mod_1:
+                    model_list.append(mod_2)
+
+                plotter.compare_pRF_model_rsq(participant_list = FAM_data.sj_num,
+                                            ses = ses, run_type = run_type,
+                                            prf_model_list = model_list,
+                                            rsq_threshold = FAM_data.params['plotting']['rsq_threshold'])
 
 
 

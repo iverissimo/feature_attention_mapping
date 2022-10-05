@@ -304,9 +304,9 @@ def get_rois4plotting(params, sub_id = None, pysub = 'hcp_999999', use_atlas = T
         yaml dict with task related infos  
     sub_id: str, int or list
         subject ID to add as identifier in outputed dictionaries
-    pysub: str
-        name of pycortex subject folder, where we drew all ROIs. 
-        will try to find 'hcp_999999_sub-X' by default, if doesnt exist then uses 'hcp_999999'
+    pysub: str/dict
+        name of pycortex subject folder, where we drew all ROIs.
+        if dict, assumes key is participant ID, and value is sub specific pycortex folder 
     use_atlas: bool
         if we want to use the glasser atlas ROIs instead (this is, from the keys conglomerate defined in the params yml)
     atlas_pth: str
@@ -338,6 +338,7 @@ def get_rois4plotting(params, sub_id = None, pysub = 'hcp_999999', use_atlas = T
             print('Getting ROIs for participants %s'%pp)
 
             if use_atlas:
+                print('Using Glasser ROIs')
                 # ROI names
                 ROIs[pp] = list(params['plotting']['ROIs']['glasser_atlas'].keys())
 
@@ -347,18 +348,15 @@ def get_rois4plotting(params, sub_id = None, pysub = 'hcp_999999', use_atlas = T
                 # get vertices for ROI
                 roi_verts[pp] = {}
                 for _,key in enumerate(ROIs[pp]):
+                    print(val)
                     roi_verts[pp][key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
 
             else:
-
-                ## check if sub specific pysub exists
-                overlay_name = '{ps}_{sid}'.format(ps = pysub, sid = pp)
-
-                if op.exists(op.join(cortex.options.config.get('basic', 'filestore'), overlay_name)):
-                    print('Participant overlay %s in pycortex filestore, rois taken from there'%overlay_name)
+                ## check if dict or str
+                if isinstance(pysub, dict):
+                    pysub_pp = pysub[pp]
                 else:
-                    overlay_name = pysub 
-                    print('Getting ROIs from %s'%overlay_name)
+                    pysub_pp = pysub
 
                 # set ROI names
                 ROIs[pp] = params['plotting']['ROIs'][space]
@@ -370,7 +368,7 @@ def get_rois4plotting(params, sub_id = None, pysub = 'hcp_999999', use_atlas = T
                 roi_verts[pp] = {}
                 for _,val in enumerate(ROIs[pp]):
                     print(val)
-                    roi_verts[pp][val] = cortex.get_roi_verts(overlay_name,val)[val]
+                    roi_verts[pp][val] = cortex.get_roi_verts(pysub_pp,val)[val]
             
     else:
         raise NameError('No subject ID provided')
@@ -513,11 +511,15 @@ def get_estimates_roi_df(participant, estimates_pp, ROIs = None, roi_verts = Non
         
         # mask estimates
         print('masking estimates for ROI %s'%rois_ks)
-        
-        if isinstance(estimates_pp, dict):
-            roi_arr = estimates_pp[est_key][roi_verts[rois_ks]]
+
+        if len(roi_verts[rois_ks]) > 0:
+            if isinstance(estimates_pp, dict):
+                roi_arr = estimates_pp[est_key][roi_verts[rois_ks]]
+            else:
+                roi_arr = estimates_pp[roi_verts[rois_ks]]
         else:
-            roi_arr = estimates_pp[roi_verts[rois_ks]]
+            print('No vertices found for ROI')
+            roi_arr = [np.nan]
 
         df_est = pd.concat((df_est,
                             pd.DataFrame({'sj': np.tile('sub-{sj}'.format(sj = participant), len(roi_arr)), 

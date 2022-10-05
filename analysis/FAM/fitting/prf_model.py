@@ -1017,7 +1017,7 @@ class pRF_model:
         
         elif model_type == 'css':
 
-            if self.fit_hrf:
+            if self.fit_hrf and not grid:
                 np.savez(filename,
                         x = final_estimates[..., 0],
                         y = final_estimates[..., 1],
@@ -1041,7 +1041,7 @@ class pRF_model:
 
         elif model_type == 'dn':
 
-            if self.fit_hrf:
+            if self.fit_hrf and not grid:
                 np.savez(filename,
                         x = final_estimates[..., 0],
                         y = final_estimates[..., 1],
@@ -1071,7 +1071,7 @@ class pRF_model:
 
         elif model_type == 'dog':
 
-            if self.fit_hrf:
+            if self.fit_hrf and not grid:
                 np.savez(filename,
                         x = final_estimates[..., 0],
                         y = final_estimates[..., 1],

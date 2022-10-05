@@ -184,7 +184,7 @@ mri: # refers to the Psychopy SyncGenerator class
       correct_baseline: True
       num_baseline_TRs: 8
 
-      grid_nr: 40 # number of grid steps
+      grid_nr: 20 #40 # number of grid steps
       min_eccen: 0.2
       max_eccen: 10
 
@@ -241,6 +241,7 @@ plotting:
 
 
   pycortex_sub: 'hcp_999999' #'fsaverage'
+  use_sub_rois: True
 
   ROI_pal: 
     V1: [0.03137255, 0.11372549, 0.34509804]
@@ -248,6 +249,7 @@ plotting:
     V3: [0.12026144, 0.50196078, 0.72156863]
     V3AB: [0.25871588, 0.71514033, 0.76807382]
     hV4: [0.59215686, 0.84052288, 0.72418301]
+    V4: [0.59215686, 0.84052288, 0.72418301]
     LO: [0.88207612, 0.9538639 , 0.69785467]
     TO: [0.99764706, 0.88235294, 0.52862745]
     MT+: [0.99764706, 0.88235294, 0.52862745]

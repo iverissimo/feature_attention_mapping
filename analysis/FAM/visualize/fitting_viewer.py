@@ -26,7 +26,7 @@ from PIL import Image, ImageDraw
 
 class pRFViewer:
 
-    def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, pysub = 'hcp_999999', use_atlas_rois = True, combine_ses = True):
+    def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, pysub = 'hcp_999999', use_sub_rois = True, use_atlas_rois = True, combine_ses = True):
         
         """__init__
         constructor for class 
@@ -40,8 +40,9 @@ class pRFViewer:
         outputdir: str
             path to save plots
         pysub: str
-            name of pycortex subject folder, where we drew all ROIs. 
-            will try to find 'hcp_999999_sub-X' by default, if doesnt exist then uses 'hcp_999999'
+            basename of pycortex subject folder, where we drew all ROIs. 
+        use_sub_rois: bool
+            if True, will try to find 'hcp_999999_sub-X' by default, if doesnt exist then uses 'hcp_999999'
         use_atlas: bool
             if we want to use the glasser atlas ROIs instead (this is, from the keys conglomerate defined in the params yml)
         combine_ses: bool
@@ -62,36 +63,65 @@ class pRFViewer:
             
         # number of participants to plot
         self.nr_pp = len(self.MRIObj.sj_num)
+
+        # get dict of pycortex subject names to use per participant
+        self.pysub = self.get_pycortex_sub_dict(participant_list = self.MRIObj.sj_num, pysub = pysub, use_sub_rois = use_sub_rois)
         
-        ## pycortex subject to be used in plotting
-        # loop over participant list
-        self.pysub = {}
-        for pp in self.MRIObj.sj_num:
-            # check if subject pycortex folder exists
-            pysub_folder = '{ps}_sub-{pp}'.format(ps = pysub, pp = pp)
-
-            if op.exists(op.join(cortex.options.config.get('basic', 'filestore'), pysub_folder)):
-                print('Participant overlay %s in pycortex filestore, assumes we draw ROIs there'%pysub_folder)
-                self.pysub['sub-{pp}'.format(pp = pp)] = pysub_folder
-            else:
-                self.pysub['sub-{pp}'.format(pp = pp)] = pysub
-
         ## if we want to use atlas roi or not
         self.use_atlas_rois = use_atlas_rois
 
         ## load participant ROIs and color codes
         self.group_ROIs, self.group_roi_verts, self.group_color_codes = plot_utils.get_rois4plotting(self.MRIObj.params, 
                                                                                                     sub_id = self.MRIObj.sj_num,
-                                                                                                    pysub = pysub, 
+                                                                                                    pysub = self.pysub, 
                                                                                                     use_atlas = use_atlas_rois, 
                                                                                                     atlas_pth = op.join(self.MRIObj.derivatives_pth,
                                                                                                                         'glasser_atlas','59k_mesh'), 
                                                                                                     space = self.MRIObj.sj_space)
+        ## set ROI key names to use in plots
+        # doing this to guarantee same order in all plots 
+        if self.use_atlas_rois:
+            self.ROI_keys = list(self.MRIObj.params['plotting']['ROIs']['glasser_atlas'].keys())
+        else:
+            self.ROI_keys = self.MRIObj.params['plotting']['ROIs'][self.MRIObj.sj_space]
 
         ## load participant models
         # which also will load DM and mask it according to participants behavior
         self.pp_prf_models = self.pRFModelObj.set_models(participant_list = self.MRIObj.sj_num, 
                                                     mask_DM = True, combine_ses = combine_ses)
+
+
+    def get_pycortex_sub_dict(self, participant_list = [], pysub = 'hcp_999999', use_sub_rois = True):
+
+        """ 
+        Helper function to get dict with
+        pycortex name per participant in participant list 
+        
+        Parameters
+        ----------
+        participant_list : list
+            list with participant IDs
+        use_sub_rois: bool
+            if True we will try to find sub specific folder, else will just use pysub
+            
+        """
+        pysub_dict = {}
+
+        for pp in participant_list:
+
+            if use_sub_rois:
+                # check if subject pycortex folder exists
+                pysub_folder = '{ps}_sub-{pp}'.format(ps = pysub, pp = pp)
+
+                if op.exists(op.join(cortex.options.config.get('basic', 'filestore'), pysub_folder)):
+                    print('Participant overlay %s in pycortex filestore, assumes we draw ROIs there'%pysub_folder)
+                    pysub_dict['sub-{pp}'.format(pp = pp)] = pysub_folder
+                else:
+                    pysub_dict['sub-{pp}'.format(pp = pp)] = pysub
+            else:
+                pysub_dict['sub-{pp}'.format(pp = pp)] = pysub
+
+        return pysub_dict
 
             
     def get_prf_estimate_keys(self, prf_model_name = 'gauss'):
@@ -284,7 +314,6 @@ class pRFViewer:
                                     prf_model_name = 'gauss', file_ext = '_cropped_dc_psc.npy', rsq_threshold = .1):
 
         """
-
         Load estimates into pycortex sub specific overlay, to draw ROIs
         - pRF estimates : will load polar angle (with and without alpha level) and eccentricity
         - FA estimates : not implemented yet
@@ -403,21 +432,31 @@ class pRFViewer:
                                            subject = pysub_folder)
 
         ### ADD TO OVERLAY, TO DRAW BORDERS
-        cortex.utils.add_roi(images['pRF_rsq'], name = 'RSQ_sub-{sj}_task-pRF_run-{run}_model-{model}'.format(sj = participant,
+        cortex.utils.add_roi(images['pRF_rsq'], name = 'RSQ_sub-{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = participant,
                                                                                                     run = run_type,
-                                                                                                    model = prf_model_name), open_inkscape = False, add_path = False)
-        cortex.utils.add_roi(images['ecc'], name = 'ECC_sub-{sj}_task-pRF_run-{run}_model-{model}'.format(sj = participant,
+                                                                                                    model = prf_model_name,
+                                                                                                    hrf_bool = str(self.pRFModelObj.fit_hrf)), 
+                                                                                                    open_inkscape = False, add_path = False)
+        cortex.utils.add_roi(images['ecc'], name = 'ECC_sub-{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = participant,
                                                                                                     run = run_type,
-                                                                                                    model = prf_model_name), open_inkscape = False, add_path = False)
-        cortex.utils.add_roi(images['PA'], name = 'PA_sub-{sj}_task-pRF_run-{run}_model-{model}'.format(sj = participant,
+                                                                                                    model = prf_model_name,
+                                                                                                    hrf_bool = str(self.pRFModelObj.fit_hrf)), 
+                                                                                                    open_inkscape = False, add_path = False)
+        cortex.utils.add_roi(images['PA'], name = 'PA_sub-{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = participant,
                                                                                                     run = run_type,
-                                                                                                    model = prf_model_name), open_inkscape = False, add_path = False)
-        cortex.utils.add_roi(images['PA_alpha'], name = 'PA_alpha_sub-{sj}_task-pRF_run-{run}_model-{model}'.format(sj = participant,
+                                                                                                    model = prf_model_name,
+                                                                                                    hrf_bool = str(self.pRFModelObj.fit_hrf)), 
+                                                                                                    open_inkscape = False, add_path = False)
+        cortex.utils.add_roi(images['PA_alpha'], name = 'PA_alpha_sub-{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = participant,
                                                                                                     run = run_type,
-                                                                                                    model = prf_model_name), open_inkscape = False, add_path = False)
-        cortex.utils.add_roi(images['PA_half_hemi'], name = 'PA_half_hemi_sub-{sj}_task-pRF_run-{run}_model-{model}'.format(sj = participant,
+                                                                                                    model = prf_model_name,
+                                                                                                    hrf_bool = str(self.pRFModelObj.fit_hrf)), 
+                                                                                                    open_inkscape = False, add_path = False)
+        cortex.utils.add_roi(images['PA_half_hemi'], name = 'PA_half_hemi_sub-{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = participant,
                                                                                                     run = run_type,
-                                                                                                    model = prf_model_name), open_inkscape = False, add_path = False)
+                                                                                                    model = prf_model_name,
+                                                                                                    hrf_bool = str(self.pRFModelObj.fit_hrf)), 
+                                                                                                    open_inkscape = False, add_path = False)
 
         print('Done')
 
@@ -575,7 +614,7 @@ class pRFViewer:
     
     def plot_prf_results(self, participant_list = [], 
                                 ses = 'ses-mean', run_type = 'mean', prf_model_name = 'gauss', max_ecc_ext = 5,
-                                mask_arr = True, rsq_threshold =.1, iterative = True, figures_pth = None, use_atlas_rois = True):
+                                mask_arr = True, rsq_threshold = .1, iterative = True, figures_pth = None):
 
 
         ## stores estimates for all participants in dict, for ease of access
@@ -616,16 +655,16 @@ class pRFViewer:
         # 
         ### RSQ ###
         self.plot_rsq(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
-                                            model_name = prf_model_name)
+                                            model_name = prf_model_name, figures_pth = figures_pth)
 
         ### ECC and SIZE ###
         self.plot_ecc_size(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
-                                            model_name = prf_model_name)
+                                            model_name = prf_model_name, figures_pth = figures_pth)
 
         ### EXPONENT ###
         if prf_model_name == 'css':
             self.plot_exponent(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
-                                            model_name = prf_model_name)
+                                            model_name = prf_model_name, figures_pth = figures_pth)
 
 
 
@@ -636,13 +675,14 @@ class pRFViewer:
         if figures_pth is None:
             figures_pth = op.join(self.outputdir, 'rsq', 'pRF_fit')
 
+        # save values per roi in dataframe
         avg_roi_df = pd.DataFrame()
         
         ## loop over participants in list
         for pp in participant_list:
-
-            sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
             
+            # make path to save sub-specific figures
+            sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
             os.makedirs(sub_figures_pth, exist_ok=True)
 
             #### plot flatmap ###
@@ -656,13 +696,14 @@ class pRFViewer:
                                                                                                                                         space = self.MRIObj.sj_space,
                                                                                                                                         run = run_type, 
                                                                                                                                         model = model_name))
+            # if we fitted hrf, then add that to fig name
             if self.pRFModelObj.fit_hrf:
                 fig_name = fig_name.replace('.png','_withHRF.png') 
 
             print('saving %s' %fig_name)
             _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
-
+            ## get estimates per ROI
             pp_roi_df = plot_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)], 
                                                 ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
                                                 roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
@@ -672,6 +713,7 @@ class pRFViewer:
             fig, axis = plt.subplots(1, figsize=(10,5), dpi=100, facecolor='w', edgecolor='k')
 
             v1 = sns.violinplot(data = pp_roi_df, x = 'ROI', y = 'value', 
+                                order = self.ROI_keys,
                                 cut=0, inner='box', palette = self.group_color_codes['sub-{sj}'.format(sj = pp)], linewidth=1.8, ax = axis) 
 
             v1.set(xlabel=None)
@@ -687,7 +729,6 @@ class pRFViewer:
 
             fig.savefig(fig_name.replace('flatmap','violinplot'))
 
-
             ## concatenate average per participant, to make group plot
             avg_roi_df = pd.concat((avg_roi_df,
                                     pp_roi_df.groupby(['sj', 'ROI'])['value'].median().reset_index()))
@@ -698,7 +739,7 @@ class pRFViewer:
             fig, axis = plt.subplots(1, figsize=(10,5), dpi=100, facecolor='w', edgecolor='k')
 
             v1 = sns.violinplot(data = avg_roi_df, x = 'ROI', y = 'value', 
-                                order = self.MRIObj.params['plotting']['ROIs']['glasser_atlas'].keys(),
+                                order = self.ROI_keys,
                                 cut=0, inner='box', palette = self.group_color_codes['sub-{sj}'.format(sj = pp)], 
                                 linewidth=1.8, ax = axis)
 
@@ -706,7 +747,7 @@ class pRFViewer:
             v1.set(ylabel=None)
             plt.margins(y=0.025)
             sns.stripplot(data = avg_roi_df, x = 'ROI', y = 'value', 
-                            order=self.MRIObj.params['plotting']['ROIs']['glasser_atlas'].keys(),
+                            order = self.ROI_keys,
                             color="white", alpha=0.5)
             plt.xticks(fontsize = 10)
             plt.yticks(fontsize = 10)
@@ -720,7 +761,7 @@ class pRFViewer:
     
     def compare_pRF_model_rsq(self, participant_list = [], ses = 'ses-mean', run_type = 'mean', 
                                 prf_model_list = ['gauss', 'css'],
-                                mask_arr = True, rsq_threshold = .1, figures_pth = None, use_atlas_rois = True):
+                                mask_arr = True, rsq_threshold = .1, figures_pth = None):
 
 
         ## stores estimates for all participants in dict, for ease of access
@@ -740,7 +781,6 @@ class pRFViewer:
 
             ## make sub specific fig path
             sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
-            
             os.makedirs(sub_figures_pth, exist_ok=True)
 
             group_estimates['sub-{sj}'.format(sj = pp)] = {}
@@ -835,6 +875,7 @@ class pRFViewer:
                 fig, axis = plt.subplots(1, figsize=(10,5), dpi=100, facecolor='w', edgecolor='k')
 
                 v1 = sns.violinplot(data = pp_model_roi_df, x = 'ROI', y = 'value', hue = 'model',
+                                    order = self.ROI_keys,
                                     cut=0, inner='box',linewidth=1.8, ax = axis) 
                 v1.set(xlabel=None)
                 v1.set(ylabel=None)
@@ -855,7 +896,7 @@ class pRFViewer:
 
             v1 = sns.violinplot(data = pp_model_roi_df.groupby(['sj', 'ROI','model'])['value'].median().reset_index(), 
                                         x = 'ROI', y = 'value',  hue = 'model',
-                                        order = self.MRIObj.params['plotting']['ROIs']['glasser_atlas'].keys(),
+                                        order = self.ROI_keys,
                                         cut=0, inner='box',
                                         linewidth=1.8, ax = axis)
 

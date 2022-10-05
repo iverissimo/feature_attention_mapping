@@ -509,7 +509,7 @@ class pRF_model:
                     # for grid
                     print('saving %s'%grid_model_filename)
                     self.save_pRF_model_estimates(grid_model_filename, fitter.gridsearch_params, 
-                                                    model_type = model2fit)
+                                                    model_type = model2fit, grid = True)
                     # for it
                     print('saving %s'%it_model_filename)
                     self.save_pRF_model_estimates(it_model_filename, fitter.iterative_search_params, 
@@ -824,7 +824,7 @@ class pRF_model:
         return data_out
 
 
-    def load_pRF_model_estimates(self, participant, ses = 'ses-mean', run_type = 'mean', model_name = None, iterative = True):
+    def load_pRF_model_estimates(self, participant, ses = 'ses-mean', run_type = 'mean', model_name = None, iterative = True, fit_hrf = False):
 
         """
         Helper function to load pRF model estimates
@@ -874,7 +874,8 @@ class pRF_model:
                                                     fit_model = model_name,
                                                     basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
                                                                                                                 acq = self.MRIObj.acq,
-                                                                                                                rt = run_type))
+                                                                                                                rt = run_type),
+                                                    fit_hrf = fit_hrf)
 
         return pp_prf_est_dict, pp_prf_models
 

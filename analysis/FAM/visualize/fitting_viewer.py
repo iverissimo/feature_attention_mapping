@@ -172,7 +172,8 @@ class pRFViewer:
                 estimates_keys_dict, _ = self.pRFModelObj.load_pRF_model_estimates(participant,
                                                                             ses = ses, run_type = run_type, 
                                                                             model_name = prf_model_name, 
-                                                                            iterative = True)
+                                                                            iterative = True,
+                                                                            fit_hrf = self.pRFModelObj.fit_hrf)
 
                 # when loading, dict has key-value pairs stored,
                 # need to convert it to make it in same format as when fitting on the spot
@@ -324,7 +325,8 @@ class pRFViewer:
         ## load model and prf estimates for that participant
         pp_prf_est_dict, _ = self.pRFModelObj.load_pRF_model_estimates(participant, 
                                                                         ses = ses, run_type = run_type, 
-                                                                        model_name = prf_model_name, iterative = True)
+                                                                        model_name = prf_model_name, iterative = True,
+                                                                        fit_hrf = self.pRFModelObj.fit_hrf)
 
         ## calculate pa + ecc + size
         nan_mask = np.where((np.isnan(pp_prf_est_dict['r2'])) | (pp_prf_est_dict['r2'] < rsq_threshold))[0]
@@ -588,7 +590,8 @@ class pRFViewer:
             estimates_dict, _ = self.pRFModelObj.load_pRF_model_estimates(pp,
                                                                         ses = ses, run_type = run_type, 
                                                                         model_name = prf_model_name, 
-                                                                        iterative = iterative)
+                                                                        iterative = iterative,
+                                                                        fit_hrf = self.pRFModelObj.fit_hrf)
 
             ## mask the estimates, if such is the case
             if mask_arr:
@@ -760,7 +763,8 @@ class pRFViewer:
                     estimates_dict, _ = self.pRFModelObj.load_pRF_model_estimates(pp,
                                                                                 ses = ses, run_type = run_type, 
                                                                                 model_name = mod_name, 
-                                                                                iterative = it_bool)
+                                                                                iterative = it_bool,
+                                                                                fit_hrf = self.pRFModelObj.fit_hrf)
 
                     ## mask the estimates, if such is the case
                     if mask_arr:

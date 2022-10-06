@@ -348,7 +348,7 @@ def get_rois4plotting(params, sub_id = None, pysub = 'hcp_999999', use_atlas = T
                 # get vertices for ROI
                 roi_verts[pp] = {}
                 for _,key in enumerate(ROIs[pp]):
-                    print(val)
+                    print(key)
                     roi_verts[pp][key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
 
             else:
@@ -595,3 +595,88 @@ def get_NONuniform_polar_angle(xx, yy, rsq, angle_thresh = 3*np.pi/4, rsq_thresh
     rgb_angle[rsq > rsq_thresh] = colors.hsv_to_rgb(hsv_angle[rsq > rsq_thresh])
 
     return rgb_angle
+
+
+def plot_pa_colorwheel(resolution=800, angle_thresh = 3*np.pi/4, cmap_name = 'hsv', continuous = True, fig_name = None):
+
+    """
+
+    Helper function to create colorwheel image
+    for polar angle plots returns 
+
+    Parameters
+    ----------
+    resolution : int
+        resolution of mesh
+    angle_thresh: float
+        value upon which to make it red for this hemifield (above angle or below 1-angle will be red in a retinotopy hsv color wheel)
+        if angle threh different than PI then assumes non uniform colorwheel
+    cmap_name: str/list
+        colormap name (if string) or list of colors to use for colormap
+    continuous: bool
+        if continuous colormap or binned
+
+    """
+
+    ## make circle
+    circle_x, circle_y = np.meshgrid(np.linspace(-1, 1, resolution), np.linspace(-1, 1, resolution))
+    circle_radius = np.sqrt(circle_x**2 + circle_y**2)
+    circle_pa = np.arctan2(circle_y, circle_x) # all polar angles calculated from our mesh
+    circle_pa[circle_radius > 1] = np.nan # then we're excluding all parts of bitmap outside of circle
+
+    if isinstance(cmap_name, str):
+
+        cmap = plt.get_cmap('hsv')
+        norm = colors.Normalize(-angle_thresh, angle_thresh) # normalize between the point where we defined our color threshold
+    
+    elif isinstance(cmap_name, list) or isinstance(cmap_name, np.ndarray):
+
+        if continuous:
+            cvals  = np.arange(len(cmap_name))
+            norm = plt.Normalize(min(cvals),max(cvals))
+            tuples = list(zip(map(norm,cvals), cmap_name))
+            
+            colormap = colors.LinearSegmentedColormap.from_list("", tuples)
+            norm = colors.Normalize(-angle_thresh, angle_thresh) 
+
+        else:
+            colormap = colors.ListedColormap(cmap_name)
+            #boundaries = np.linspace(0,1,len(cmap_name))
+            #norm = colors.BoundaryNorm(boundaries, colormap.N, clip=True)
+            norm = colors.Normalize(-angle_thresh, angle_thresh) 
+
+    # non-uniform colorwheel
+    if angle_thresh != np.pi:
+        
+        ## for LH (RVF)
+        circle_pa_left = circle_pa.copy()
+        # between thresh angle make it red
+        circle_pa_left[(circle_pa_left < -angle_thresh) | (circle_pa_left > angle_thresh)] = angle_thresh
+
+        plt.imshow(circle_pa_left, cmap=cmap, norm=norm,origin='lower') # origin lower because imshow flips it vertically, now in right order for VF
+        plt.axis('off')
+
+        plt.savefig('{fn}_colorwheel_4LH-RVF.png'.format(fn = fig_name),dpi=100)
+
+        ## for RH (LVF)
+        circle_pa_right = circle_pa.copy()
+        circle_pa_right = np.fliplr(circle_pa_right)
+        # between thresh angle make it red
+        circle_pa_right[(circle_pa_right < -angle_thresh) | (circle_pa_right > angle_thresh)] = angle_thresh
+
+        plt.imshow(circle_pa_right, cmap=cmap, norm=norm,origin='lower')
+        plt.axis('off')
+
+        plt.savefig('{fn}_colorwheel_4RH-LVF.png'.format(fn = fig_name),dpi=100)
+
+    else:
+        plt.imshow(circle_pa, cmap = colormap, norm=norm, origin='lower')
+        plt.axis('off')
+
+        if continuous:
+            plt.savefig('{fn}_colorwheel_continuous.png'.format(fn = fig_name),dpi=100)
+        else:
+            plt.savefig('{fn}_colorwheel_discrete.png'.format(fn = fig_name),dpi=100)
+
+
+

@@ -138,21 +138,29 @@ match task:
                                         rsq_threshold = FAM_data.params['plotting']['rsq_threshold'])
 
             case 'draw_roi':
-                plotter.save_estimates4drawing(sj, task2draw = 'pRF',
+
+                # in case we want to average participants
+                sub_name = FAM_data.sj_num if len(FAM_data.sj_num) > 1 else sj
+
+                plotter.save_estimates4drawing(sub_name, task2draw = 'pRF',
                                                 ses = ses, run_type = run_type,
                                                 prf_model_name = prf_model_name, file_ext = file_ext)
 
-            case 'compare_pRF_fit':
+            case 'prf_rsq':
                 ## ask for user input on models to compare
+                print('Comparing pRF model rsq...')
                 model_list = []
+                
                 mod_1 = ''
-                while mod_1 not in (['gauss','css', 'dog', 'dn']):
+                while mod_1 not in ('gauss','css','dog','dn'):
                     mod_1 = input("First model name to compare RSQ?: ")
+
                 model_list.append(mod_1)
 
                 mod_2 = ''
-                while mod_2 not in (['gauss','css', 'dog', 'dn']):
+                while mod_2 not in ('gauss','css','dog','dn'):
                     mod_2 = input("Second model name to compare RSQ?: ")
+
                 if mod_2 != mod_1:
                     model_list.append(mod_2)
 

@@ -875,7 +875,8 @@ class pRF_model:
                                                     basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
                                                                                                                 acq = self.MRIObj.acq,
                                                                                                                 rt = run_type),
-                                                    fit_hrf = fit_hrf)
+                                                    fit_hrf = fit_hrf,
+                                                    iterative = iterative)
 
         return pp_prf_est_dict, pp_prf_models
 
@@ -1096,7 +1097,7 @@ class pRF_model:
                         r2 = final_estimates[..., 7])
 
 
-    def load_pRF_model_chunks(self, fit_path, fit_model = 'css', fit_hrf = False, basefilename = None, overwrite = False):
+    def load_pRF_model_chunks(self, fit_path, fit_model = 'css', fit_hrf = False, basefilename = None, overwrite = False, iterative = True):
 
         """ 
         combine all chunks 
@@ -1173,7 +1174,7 @@ class pRF_model:
 
                     rsq = chunk['r2']
 
-                    if fit_hrf:
+                    if fit_hrf and iterative:
                         hrf_derivative = chunk['hrf_derivative']
                         hrf_dispersion = chunk['hrf_dispersion']
                     else: # assumes standard spm params
@@ -1201,7 +1202,7 @@ class pRF_model:
 
                     rsq = np.concatenate((rsq, chunk['r2']))
                     
-                    if fit_hrf:
+                    if fit_hrf and iterative:
                         hrf_derivative = np.concatenate((hrf_derivative, chunk['hrf_derivative']))
                         hrf_dispersion = np.concatenate((hrf_dispersion, chunk['hrf_dispersion']))
                     else: # assumes standard spm params

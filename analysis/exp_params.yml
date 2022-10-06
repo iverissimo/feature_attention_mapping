@@ -198,6 +198,16 @@ mri: # refers to the Psychopy SyncGenerator class
       N_PROCS: 4
 
     FA:
+      fit_model: 'gain'
+
+      optimizer: 'L-BFGS-B'
+
+      fix_bold_baseline: True
+      correct_baseline: True
+      num_baseline_TRs: 8
+
+      total_chunks: {'fsaverage': 83, 'T1w': 89, 'fsLR_den-170k': 54} # total number of chunks to split the data, depends on space of files
+
       prf_rsq_threshold: 0.2 
       condition_keys: {'ACAO': {'color': True, 'orientation': True},
                       'ACUO': {'color': True, 'orientation': False},

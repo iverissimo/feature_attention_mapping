@@ -361,7 +361,9 @@ class pRF_model:
         bold_filelist = self.get_bold_file_list(participant, input_list = None, task = 'pRF', ses = ses, file_ext = file_ext)
         
         ## Load data array
-        data = self.get_data4fitting(bold_filelist, run_type = run_type, chunk_num = chunk_num, vertex = vertex)
+        data = self.get_data4fitting(bold_filelist, run_type = run_type, chunk_num = chunk_num, vertex = vertex, 
+                                    total_chunks = self.total_chunks, shift_TRs_num = self.shift_TRs_num, 
+                                    crop_TRs_num = self.crop_TRs_num, correct_baseline = self.correct_baseline)
 
         ## Set nan voxels to 0, to avoid issues when fitting
         masked_data = data.copy()
@@ -741,9 +743,12 @@ class pRF_model:
 
         return constraints
 
-
+    
+    @classmethod
     def get_data4fitting(self, file_list, run_type = 'mean',
-                            chunk_num = None, vertex = None):
+                            chunk_num = None, vertex = None, total_chunks = 54, num_baseline_TRs = 6,
+                            MRIObj = None, shift_TRs_num = -1, crop_TRs_num = 8, correct_baseline = True,
+                            baseline_interval = 'empty_long'):
 
         """
         load data from file list
@@ -760,6 +765,11 @@ class pRF_model:
             if we want to fit specific vertex of data, or list of vertices (from an ROI for example) then will return vertex array
 
         """  
+
+        # if given, will use different MRI object
+        # allows for function to be used by different classes without inheritance of whole class
+        if not MRIObj:
+            MRIObj = self.MRIObj
 
         ## Load data array
         # average runs (or loo or get single run)
@@ -785,9 +795,9 @@ class pRF_model:
         # if we want to chunk it
         if isinstance(chunk_num, int):
             # number of vertices of chunk
-            num_vox_chunk = int(data_arr.shape[0]/self.total_chunks)
+            num_vox_chunk = int(data_arr.shape[0]/total_chunks)
             print('Slicing data into chunk {ch} of {ch_total}'.format(ch = chunk_num, 
-                                        ch_total = self.total_chunks))
+                                        ch_total = total_chunks))
     
             # chunk it
             data_out = data_arr[num_vox_chunk * int(chunk_num):num_vox_chunk * int(chunk_num + 1), :]
@@ -806,19 +816,19 @@ class pRF_model:
             data_out = data_arr
 
         ## if we want to keep baseline fix, we need to correct it!
-        if self.correct_baseline:
+        if correct_baseline:
             print('Correcting baseline to be 0 centered')
 
             ## get behavioral info 
-            mri_beh = preproc_behdata.PreprocBeh(self.MRIObj)
+            mri_beh = preproc_behdata.PreprocBeh(MRIObj)
             # do same to bar pass direction str array
             condition_per_TR = mri_utils.crop_shift_arr(mri_beh.pRF_bar_pass_all, 
-                                                        crop_nr = self.crop_TRs_num, 
-                                                        shift = self.shift_TRs_num)
+                                                        crop_nr = crop_TRs_num, 
+                                                        shift = shift_TRs_num)
 
             data_out = mri_utils.baseline_correction(data_out, condition_per_TR, 
-                                                    num_baseline_TRs = 6, 
-                                                    baseline_interval = 'empty_long', 
+                                                    num_baseline_TRs = num_baseline_TRs, 
+                                                    baseline_interval = baseline_interval, 
                                                     avg_type = 'median')
 
         return data_out
@@ -938,9 +948,9 @@ class pRF_model:
         
         return masked_dict
 
-
+    @classmethod
     def get_bold_file_list(self, participant, input_list = None, task = 'pRF', 
-                            ses = 'ses-mean', file_ext = '_cropped_dc_psc.npy'):
+                            ses = 'ses-mean', file_ext = '_cropped_dc_psc.npy', MRIObj = None):
 
         """
         Helper function to get list of bold file names
@@ -954,19 +964,23 @@ class pRF_model:
             session we are looking at
 
         """
+        # if given, will use different MRI object
+        # allows for function to be used by different classes without inheritance of whole class
+        if not MRIObj:
+            MRIObj = self.MRIObj
 
         ## get list of possible input paths
         # (sessions)
         if input_list is None:
-            input_list = glob.glob(op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 
+            input_list = glob.glob(op.join(MRIObj.derivatives_pth, 'post_fmriprep', MRIObj.sj_space, 
                                     'sub-{sj}'.format(sj = participant), 'ses-*'))
 
         # list with absolute file names to be fitted
         bold_filelist = [op.join(file_path, file) for file_path in input_list for file in os.listdir(file_path) if 'task-{tsk}'.format(tsk = task) in file and \
-                        'acq-{acq}'.format(acq = self.MRIObj.acq) in file and file.endswith(file_ext)]
+                        'acq-{acq}'.format(acq = MRIObj.acq) in file and file.endswith(file_ext)]
         
         # if we're not combining sessions
-        if ses != 'ses-mean':
+        if ses and ses != 'ses-mean':
             bold_filelist = [file for file in bold_filelist if ses in file]
         
         return bold_filelist

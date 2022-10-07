@@ -136,10 +136,13 @@ class FA_model:
                                                     ses = ses, file_ext = file_ext, MRIObj = self.MRIObj)
 
         ## Load data array
+        data = self.get_data4fitting(bold_filelist, run_type = run_type, chunk_num = chunk_num, vertex = vertex, ses = ses)
+
+        return data
 
 
 
-    def get_data4fitting(self, file_list, run_type = 'loo_r1s1', chunk_num = None, vertex = None):
+    def get_data4fitting(self, file_list, run_type = 'loo_r1s1', chunk_num = None, vertex = None, ses = 1):
 
         """
         load data from file list
@@ -155,14 +158,35 @@ class FA_model:
         vertex: int, or list of indices or None
             if we want to fit specific vertex of data, or list of vertices (from an ROI for example) then will return vertex array
         """  
+        
+        if isinstance(run_type, str) and 'loo_' in run_type:
+            _, train_file_list = mri_utils.get_loo_filename(file_list, loo_key=run_type)
+
+            data2fit = np.array([])
+
+            for file in train_file_list:
+                print('Loading %s'%file)
+                run_num, ses_num = mri_utils.get_run_ses_from_str(file)
+
+                ## Load data array for run and session
+                data = pRF_model.get_data4fitting(file_list, run_type = run_num, chunk_num = chunk_num, vertex = vertex, 
+                                            total_chunks = self.total_chunks, num_baseline_TRs = self.corr_base_TRs,
+                                            MRIObj = self.MRIObj, shift_TRs_num = self.shift_TRs_num, crop_TRs_num = self.crop_TRs_num,
+                                            correct_baseline = self.correct_baseline, baseline_interval = 'empty', ses = ses_num)[np.newaxis,...]
+
+                ## STACK
+                data2fit = np.vstack([data2fit, data]) if data2fit.size else data
+
+        else:
+            data2fit = pRF_model.get_data4fitting(file_list, run_type = run_type, chunk_num = chunk_num, vertex = vertex, 
+                                            total_chunks = self.total_chunks, num_baseline_TRs = self.corr_base_TRs,
+                                            MRIObj = self.MRIObj, shift_TRs_num = self.shift_TRs_num, crop_TRs_num = self.crop_TRs_num,
+                                            correct_baseline = self.correct_baseline, baseline_interval = 'empty', ses = ses)[np.newaxis,...]
+
+        return data2fit
 
         ## need to make list of runs to load
         # and loop or parallel stack by calling prf model get data func, that will load each run individually
         # by also performing shifting and baseline correction
         # should be careful when loading a vertex or chunk, want to be sure that loading same for all runs
         # also check loo code for leave-one-out -> there are several sessions per participant, need to take that into account if combining them
-
-        # pRF_model.get_data4fitting(file_list, run_type = 'mean',
-        #                     chunk_num = None, vertex = None, total_chunks = 54, num_baseline_TRs = 6,
-        #                     MRIObj = None, shift_TRs_num = -1, crop_TRs_num = 8, correct_baseline = True,
-        #                     baseline_interval = 'empty_long')

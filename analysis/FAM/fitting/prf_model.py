@@ -362,8 +362,10 @@ class pRF_model:
         
         ## Load data array
         data = self.get_data4fitting(bold_filelist, run_type = run_type, chunk_num = chunk_num, vertex = vertex, 
-                                    total_chunks = self.total_chunks, shift_TRs_num = self.shift_TRs_num, 
-                                    crop_TRs_num = self.crop_TRs_num, correct_baseline = self.correct_baseline)
+                                    total_chunks = self.total_chunks, num_baseline_TRs = self.corr_base_TRs,
+                                    MRIObj = self.MRIObj, shift_TRs_num = self.shift_TRs_num, 
+                                    crop_TRs_num = self.crop_TRs_num, correct_baseline = self.correct_baseline,
+                                    ses = ses)
 
         ## Set nan voxels to 0, to avoid issues when fitting
         masked_data = data.copy()
@@ -371,7 +373,10 @@ class pRF_model:
 
         ## set output dir to save estimates
         if outdir is None:
-            outdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), ses)
+            if 'loo_' in run_type:
+                outdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type)
+            else:
+                outdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), ses)
             
         os.makedirs(outdir, exist_ok = True)
         print('saving files in %s'%outdir)
@@ -748,7 +753,7 @@ class pRF_model:
     def get_data4fitting(self, file_list, run_type = 'mean',
                             chunk_num = None, vertex = None, total_chunks = 54, num_baseline_TRs = 6,
                             MRIObj = None, shift_TRs_num = -1, crop_TRs_num = 8, correct_baseline = True,
-                            baseline_interval = 'empty_long'):
+                            baseline_interval = 'empty_long', ses = 1):
 
         """
         load data from file list
@@ -773,22 +778,23 @@ class pRF_model:
 
         ## Load data array
         # average runs (or loo or get single run)
-        if run_type == 'mean':
-            print('averaging runs')
-            data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
-            data_arr = np.mean(data_arr, axis = 0)
-        elif run_type == 'median':
-            print('getting median of runs')
-            data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
-            data_arr = np.median(data_arr, axis = 0)
-        elif 'loo_' in run_type:
-            print('Leave-one out averaging runs ({r})'.format(r = run_type))
-            file_list = [file for file in file_list if 'run-{r}'.format(r = run_type.split('_')[1]) not in file]
-            data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
-            data_arr = np.mean(data_arr, axis = 0)
+        if isinstance(run_type, str):
+            if run_type == 'mean':
+                print('averaging runs')
+                data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
+                data_arr = np.mean(data_arr, axis = 0)
+            elif run_type == 'median':
+                print('getting median of runs')
+                data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
+                data_arr = np.median(data_arr, axis = 0)
+            elif 'loo_' in run_type:
+                print('Leave-one out averaging runs ({r})'.format(r = run_type))
+                _, file_list = mri_utils.get_loo_filename(file_list, loo_key=run_type)
+                data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
+                data_arr = np.mean(data_arr, axis = 0)
         elif isinstance(run_type, int):
-            print('Loading run-{r}'.format(r = run_type))
-            file_list = [file for file in file_list if 'run-{r}'.format(r = run_type) in file]
+            print('Loading run-{r} from ses-{s}'.format(r = run_type, s = ses))
+            file_list = [file for file in file_list if 'run-{r}'.format(r = run_type) in file and 'ses-{s}'.format(s = ses) in file]
             data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
             data_arr = np.mean(data_arr, axis = 0)
         
@@ -834,7 +840,7 @@ class pRF_model:
         return data_out
 
 
-    def load_pRF_model_estimates(self, participant, ses = 'ses-mean', run_type = 'mean', model_name = None, iterative = True, fit_hrf = False):
+    def load_pRF_model_estimates(self, participant, ses = 'ses-mean', run_type = 'mean', model_name = None, iterative = True, fit_hrf = True):
 
         """
         Helper function to load pRF model estimates
@@ -981,7 +987,8 @@ class pRF_model:
         
         # if we're not combining sessions
         if ses and ses != 'ses-mean':
-            bold_filelist = [file for file in bold_filelist if ses in file]
+            ses_key = 'ses-{s}'.format(s = str(ses)) if isinstance(ses, int) else ses
+            bold_filelist = [file for file in bold_filelist if ses_key in file]
         
         return bold_filelist
 

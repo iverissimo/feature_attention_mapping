@@ -2319,5 +2319,59 @@ def get_event_onsets(behav_files, TR = 1.6, crop = True, crop_TR = 8):
     return avg_onset
 
 
+def get_loo_filename(input_list, loo_key = 'loo_r1s1'):
+    
+    """ get filename for loo run, and return
+    that filename plus list with rest of files
+    
+    Parameters
+    ----------
+    input_list : list/arr
+        list of items
+    loo_key: str
+        key with info about run number and session number to leave out
+        (requires both, will through error if not provided)
+    
+    """
+    
+    if 'loo_' in loo_key:
+        
+        # find run to use
+        run_num = re.findall(r'r\d{1,3}', loo_key)[0][1:]
+        
+        # find ses number to use
+        ses_num = re.findall(r's\d{1,3}', loo_key)[0][1:]
+        
+        if len(ses_num) == 0 or len(run_num) == 0:
+            raise NameError('Run number or session number not provided')
+        else:
+            print('Leaving out run-{r} from ses-{s}'.format(r=run_num, s=ses_num))
+            test_filename = [x for x in input_list if 'run-{r}'.format(r=run_num) in x and \
+                             'ses-{s}'.format(s=ses_num) in x]
+            
+            train_filename = [x for x in input_list if x not in test_filename]
+    
+    if len(test_filename) == 0 or len(train_filename) == 0:
+            raise NameError('Could not find test/train runs with loo key')
+    else:
+        return test_filename, train_filename
 
 
+def get_run_ses_from_str(input_name):
+    
+    """ 
+    get run number and session number from string
+    
+    Parameters
+    ----------
+    input_name : str
+        name of file
+    
+    """
+    # find run number
+    run_num = int(re.findall(r'run-\d{1,3}', input_name)[0][4:])
+    
+    # find ses number
+    ses_num = int(re.findall(r'ses-\d{1,3}', input_name)[0][4:])
+    
+    return run_num, ses_num

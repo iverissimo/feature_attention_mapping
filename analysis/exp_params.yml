@@ -179,7 +179,7 @@ mri: # refers to the Psychopy SyncGenerator class
                       'dog': ['x','y','size','betas','baseline', 'sa', 'ss', 'r2'],
                       'hrf': ['hrf_derivative', 'hrf_dispersion']} # to keep track of variables throughout scripts
 
-      fit_hrf: False #True
+      fit_hrf: True #False #True
       fix_bold_baseline: True
       correct_baseline: True
       num_baseline_TRs: 8

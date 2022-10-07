@@ -213,8 +213,8 @@ class pRFViewer:
                 estimates_dict['it_{name}'.format(name = prf_model_name)] = np.stack((estimates_keys_dict[val][vertex] for val in keys))[np.newaxis,...]
 
                 ## load data array
-                bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
-                data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, run_type = run_type, chunk_num = None, vertex = vertex)
+                bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext, MRIObj = self.MRIObj)
+                data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, run_type = run_type, chunk_num = None, vertex = vertex, MRIObj = self.MRIObj)
 
             ## if we fitted hrf, need to also get that from params
             ## and set model array
@@ -522,9 +522,9 @@ class pRFViewer:
         n_bins_colors = 256
 
         ## load pRF data array
-        bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
+        bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext, MRIObj = self.MRIObj)
         #print(bold_filelist)
-        pRF_data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, run_type = run_type)
+        pRF_data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, run_type = run_type, MRIObj = self.MRIObj)
 
         max_ecc_ext = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].screen_size_degrees/2
 

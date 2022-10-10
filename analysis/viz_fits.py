@@ -108,7 +108,7 @@ match task:
         FAM_pRF = prf_model.pRF_model(FAM_data)
 
         # set specific params
-        FAM_pRF.model_type = prf_model_name
+        FAM_pRF.model_type['pRF'] = prf_model_name
         FAM_pRF.fit_hrf = fit_hrf
         
         ## get file extension for post fmriprep

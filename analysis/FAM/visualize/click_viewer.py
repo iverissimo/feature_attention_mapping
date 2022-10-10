@@ -84,7 +84,8 @@ class visualize_on_click:
         self.pRFmodel_name = pRFmodel_name
 
         ## load model and prf estimates for that participant
-        self.pp_prf_est_dict, self.pp_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant, ses = self.session, run_type = run_type, model_name = pRFmodel_name, iterative = True)
+        self.pp_prf_est_dict, self.pp_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant, ses = self.session, run_type = run_type, 
+                                                                                model_name = pRFmodel_name, iterative = True, fit_hrf = self.pRFModelObj.fit_hrf)
 
         # when loading, dict has key-value pairs stored,
         # need to convert it to make it in same format as when fitting on the spot
@@ -145,23 +146,23 @@ class visualize_on_click:
         estimates_arr = np.stack((self.pp_prf_est_dict[val][vertex] for val in self.pRF_keys))
         
         # define spm hrf
-        spm_hrf = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type)].create_hrf(hrf_params = [1, 1, 0],
+        spm_hrf = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].create_hrf(hrf_params = [1, 1, 0],
                                                                                                                     onset=self.pRFModelObj.hrf_onset)
 
         if self.pRFModelObj.fit_hrf:
-            hrf = self.pp_prf_models[ 'sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type)].create_hrf(hrf_params = [1.0,
+            hrf = self.pp_prf_models[ 'sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].create_hrf(hrf_params = [1.0,
                                                                                                                                 estimates_arr[-3],
                                                                                                                                 estimates_arr[-2]],
                                                                                                                     onset=self.pRFModelObj.hrf_onset)
         
-            self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type)].hrf = hrf
+            self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].hrf = hrf
 
-            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type)].return_prediction(*list(estimates_arr[:-3]))
+            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].return_prediction(*list(estimates_arr[:-3]))
         
         else:
-            self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type)].hrf = spm_hrf
+            self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].hrf = spm_hrf
 
-            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type)].return_prediction(*list(estimates_arr[:-1]))
+            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].return_prediction(*list(estimates_arr[:-1]))
 
             
         return model_arr[0], estimates_arr[-1]
@@ -266,7 +267,7 @@ class visualize_on_click:
         #prf_ax.set_title(f"x: {self.pp_prf_est_dict['x'][vertex]}, y: {self.pp_prf_est_dict['y'][vertex]}")
 
         # just to check if exponent values make sense
-        if self.pRFModelObj.model_type == 'css':
+        if self.pRFModelObj.model_type['pRF'] == 'css':
             print('pRF exponent = %.2f'%self.pp_prf_est_dict['ns'][vertex])
         
         

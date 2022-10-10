@@ -1,36 +1,27 @@
-from turtle import screensize
 import numpy as np
 import os
 import os.path as op
-import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sns
 import yaml
-import utils
-import glob
-
-import ptitprince as pt # raincloud plots
-import matplotlib.patches as mpatches
-from  matplotlib.ticker import FuncFormatter
 
 from PIL import Image, ImageDraw
 
 import cortex
 
-import subprocess
-
 from scipy.optimize import LinearConstraint, NonlinearConstraint
 
 from FAM.utils import mri as mri_utils
 from FAM.processing import preproc_behdata
+from FAM.fitting.model import Model
 
 from prfpy.stimulus import PRFStimulus2D
 from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel, Norm_Iso2DGaussianModel, DoG_Iso2DGaussianModel
 from prfpy.fit import Iso2DGaussianFitter, CSS_Iso2DGaussianFitter, Norm_Iso2DGaussianFitter, DoG_Iso2DGaussianFitter
 
-class pRF_model:
 
-    def __init__(self, MRIObj, outputdir = None):
+class pRF_model(Model):
+
+    def __init__(self, MRIObj, outputdir = None, tasks = ['pRF', 'FA']):
         
         """__init__
         constructor for class 
@@ -42,66 +33,18 @@ class pRF_model:
             
         """
 
-        ## set data object to use later on
-        # has relevant paths etc
-        self.MRIObj = MRIObj
+        # need to initialize parent class (Model), indicating output infos
+        super().__init__(MRIObj = MRIObj, outputdir = outputdir, tasks = tasks)
 
         # if output dir not defined, then make it in derivatives
         if outputdir is None:
             self.outputdir = op.join(self.MRIObj.derivatives_pth,'pRF_fit')
         else:
             self.outputdir = outputdir
-            
-        ### some relevant params ###
-
-        ## bar width ratio
-        self.bar_width = self.MRIObj.params['pRF']['bar_width_ratio'] 
-
-        ## screen resolution in pix
-        screen_res = self.MRIObj.params['window']['size']
-        if self.MRIObj.params['window']['display'] == 'square': # if square display
-            screen_res = np.array([screen_res[1], screen_res[1]])
-        self.screen_res = screen_res
         
-        ## type of model to fit
-        self.model_type = self.MRIObj.params['mri']['fitting']['pRF']['fit_model']
-
-        ## type of optimizer to use
-        self.optimizer = self.MRIObj.params['mri']['fitting']['pRF']['optimizer']
-
-        # if we are fitting HRF params
-        self.fit_hrf = self.MRIObj.params['mri']['fitting']['pRF']['fit_hrf']
-        
-        ## if we're shifting TRs to account for dummy scans
-        self.shift_TRs_num =  self.MRIObj.params['mri']['shift_DM_TRs']
-
-        ## if we're cropping TRs
-        self.crop_TRs = self.MRIObj.params['pRF']['crop'] 
-        self.crop_TRs_num =  self.MRIObj.params['pRF']['crop_TR']
-
-        ## if we did slicetime correction
-        self.stc = self.MRIObj.params['mri']['slicetimecorrection']
-
-        # if we did stc, then we need to hrf onset
-        if self.stc:
-            self.hrf_onset = -self.MRIObj.TR/2
-        else:
-            self.hrf_onset = 0
-
-        ## if we want to oversample when fitting
+        # reset osf value, because model assumes 10 (for FA)
         self.osf = 1
-
-        ## if we want to keep the model baseline fixed a 0
-        self.fix_bold_baseline = self.MRIObj.params['mri']['fitting']['pRF']['fix_bold_baseline'] 
-
-        ## if we want to correct bold baseline of data
-        self.correct_baseline = self.MRIObj.params['mri']['fitting']['pRF']['correct_baseline'] 
-        # number of TRs to use for correction
-        self.corr_base_TRs = self.MRIObj.params['mri']['fitting']['pRF']['num_baseline_TRs'] 
-
-        ## total number of chunks we divide data when fitting
-        self.total_chunks = self.MRIObj.params['mri']['fitting']['pRF']['total_chunks'][self.MRIObj.sj_space]
-
+            
     
     def get_DM(self, participant, ses = 'ses-mean', ses_type = 'func', mask_DM = True, filename = None, 
                                     osf = 1, res_scaling = .1):
@@ -114,9 +57,17 @@ class pRF_model:
         participant : str
             participant number
         ses : str
-            session number (default ses-1)
+            session number (default ses-mean)
         ses_type: str
             type of session (default func)
+        mask_DM:
+            if we want to mask design matrix based on behavior
+        filename: str
+            absolute path to np file where we stored design matrix, if none it will make one anew
+        osf: int
+            oversampling factor, if bigger than one it will return DM of timepoints * osf
+        res_scaling: float
+            spatial rescaling factor
 
         """ 
 
@@ -160,11 +111,11 @@ class pRF_model:
                 
             ## crop and shift if such was the case
             stim_on_screen = mri_utils.crop_shift_arr(stim_on_screen, 
-                                                        crop_nr = self.crop_TRs_num, 
+                                                        crop_nr = self.crop_TRs_num['pRF'], 
                                                         shift = self.shift_TRs_num)
             # do same to bar pass direction str array
             condition_per_TR = mri_utils.crop_shift_arr(mri_beh.pRF_bar_pass_all, 
-                                                        crop_nr = self.crop_TRs_num, 
+                                                        crop_nr = self.crop_TRs_num['pRF'], 
                                                         shift = self.shift_TRs_num)
 
             # all possible positions in pixels for for midpoint of
@@ -174,14 +125,14 @@ class pRF_model:
             hor_x = self.screen_res[0]*np.linspace(0,1, self.MRIObj.pRF_nr_TRs['L-R'])
 
             # coordenates for bar pass, for PIL Image
-            coordenates_bars = {'L-R': {'upLx': hor_x - 0.5 * self.bar_width * self.screen_res[0], 'upLy': np.repeat(self.screen_res[1], self.MRIObj.pRF_nr_TRs['L-R']),
-                                        'lowRx': hor_x + 0.5 * self.bar_width * self.screen_res[0], 'lowRy': np.repeat(0, self.MRIObj.pRF_nr_TRs['L-R'])},
-                                'R-L': {'upLx': np.array(list(reversed(hor_x - 0.5 * self.bar_width * self.screen_res[0]))), 'upLy': np.repeat(self.screen_res[1], self.MRIObj.pRF_nr_TRs['R-L']),
-                                        'lowRx': np.array(list(reversed(hor_x+ 0.5 * self.bar_width * self.screen_res[0]))), 'lowRy': np.repeat(0, self.MRIObj.pRF_nr_TRs['R-L'])},
-                                'U-D': {'upLx': np.repeat(0, self.MRIObj.pRF_nr_TRs['U-D']), 'upLy': ver_y+0.5 * self.bar_width * self.screen_res[1],
-                                        'lowRx': np.repeat(self.screen_res[0], self.MRIObj.pRF_nr_TRs['U-D']), 'lowRy': ver_y - 0.5 * self.bar_width * self.screen_res[1]},
-                                'D-U': {'upLx': np.repeat(0, self.MRIObj.pRF_nr_TRs['D-U']), 'upLy': np.array(list(reversed(ver_y + 0.5 * self.bar_width * self.screen_res[1]))),
-                                        'lowRx': np.repeat(self.screen_res[0], self.MRIObj.pRF_nr_TRs['D-U']), 'lowRy': np.array(list(reversed(ver_y - 0.5 * self.bar_width * self.screen_res[1])))}
+            coordenates_bars = {'L-R': {'upLx': hor_x - 0.5 * self.bar_width['pRF'] * self.screen_res[0], 'upLy': np.repeat(self.screen_res[1], self.MRIObj.pRF_nr_TRs['L-R']),
+                                        'lowRx': hor_x + 0.5 * self.bar_width['pRF'] * self.screen_res[0], 'lowRy': np.repeat(0, self.MRIObj.pRF_nr_TRs['L-R'])},
+                                'R-L': {'upLx': np.array(list(reversed(hor_x - 0.5 * self.bar_width['pRF'] * self.screen_res[0]))), 'upLy': np.repeat(self.screen_res[1], self.MRIObj.pRF_nr_TRs['R-L']),
+                                        'lowRx': np.array(list(reversed(hor_x+ 0.5 * self.bar_width['pRF'] * self.screen_res[0]))), 'lowRy': np.repeat(0, self.MRIObj.pRF_nr_TRs['R-L'])},
+                                'U-D': {'upLx': np.repeat(0, self.MRIObj.pRF_nr_TRs['U-D']), 'upLy': ver_y+0.5 * self.bar_width['pRF'] * self.screen_res[1],
+                                        'lowRx': np.repeat(self.screen_res[0], self.MRIObj.pRF_nr_TRs['U-D']), 'lowRy': ver_y - 0.5 * self.bar_width['pRF'] * self.screen_res[1]},
+                                'D-U': {'upLx': np.repeat(0, self.MRIObj.pRF_nr_TRs['D-U']), 'upLy': np.array(list(reversed(ver_y + 0.5 * self.bar_width['pRF'] * self.screen_res[1]))),
+                                        'lowRx': np.repeat(self.screen_res[0], self.MRIObj.pRF_nr_TRs['D-U']), 'lowRy': np.array(list(reversed(ver_y - 0.5 * self.bar_width['pRF'] * self.screen_res[1])))}
                                 }
 
             # save screen display for each TR (or if osf > 1 then for #TRs * osf)
@@ -263,7 +214,7 @@ class pRF_model:
                 pp_models['sub-{sj}'.format(sj=pp)][ses] = {}
 
                 visual_dm = self.get_DM(pp, ses = ses, ses_type = 'func', mask_DM = mask_DM, 
-                                        filename = None, osf = self.osf, res_scaling = .1)
+                                        filename = None, osf = self.osf, res_scaling = self.res_scaling)
 
                 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
                 prf_stim = PRFStimulus2D(screen_size_cm = self.MRIObj.params['monitor']['height'],
@@ -358,14 +309,11 @@ class pRF_model:
         """  
 
         ## get list of files to load
-        bold_filelist = self.get_bold_file_list(participant, input_list = None, task = 'pRF', ses = ses, file_ext = file_ext)
+        bold_filelist = self.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
         
         ## Load data array
-        data = self.get_data4fitting(bold_filelist, run_type = run_type, chunk_num = chunk_num, vertex = vertex, 
-                                    total_chunks = self.total_chunks, num_baseline_TRs = self.corr_base_TRs,
-                                    MRIObj = self.MRIObj, shift_TRs_num = self.shift_TRs_num, 
-                                    crop_TRs_num = self.crop_TRs_num, correct_baseline = self.correct_baseline,
-                                    ses = ses)
+        data = self.get_data4fitting(bold_filelist, task = 'pRF', run_type = run_type, chunk_num = chunk_num, vertex = vertex, 
+                                    baseline_interval = 'empty_long', ses = ses, return_filenames = False)
 
         ## Set nan voxels to 0, to avoid issues when fitting
         masked_data = data.copy()
@@ -400,8 +348,8 @@ class pRF_model:
 
         ## set constraints
         # for now only changes minimizer used, but can also be useful to put contraints on dog and dn
-        constraints = self.get_fit_constraints(method = self.optimizer, ss_larger_than_centre = True, 
-                                                positive_centre_only = False, normalize_RFs = False)
+        constraints = self.get_fit_constraints(method = self.optimizer['pRF'], ss_larger_than_centre = True, 
+                                                positive_centre_only = True, normalize_RFs = False)
 
         ## ACTUALLY FIT 
 
@@ -534,7 +482,6 @@ class pRF_model:
 
             return estimates, masked_data
 
-        # this func will be called from other one (that will submit batch jobs or just run functions depending on system) 
 
     def get_fit_startparams(self, max_ecc_size = 6):
 
@@ -656,7 +603,7 @@ class pRF_model:
             fitpar_dict['dog']['bounds'] += [(0,10),(0,0)]
         
         # if we want to keep the baseline fixed at 0
-        if self.fix_bold_baseline:
+        if self.fix_bold_baseline['pRF']:
             fitpar_dict['gauss']['bounds'][4] = (0,0)
             fitpar_dict['gauss']['fixed_grid_baseline'] = 0 
             
@@ -749,98 +696,7 @@ class pRF_model:
         return constraints
 
     
-    @classmethod
-    def get_data4fitting(self, file_list, run_type = 'mean',
-                            chunk_num = None, vertex = None, total_chunks = 54, num_baseline_TRs = 6,
-                            MRIObj = None, shift_TRs_num = -1, crop_TRs_num = 8, correct_baseline = True,
-                            baseline_interval = 'empty_long', ses = 1):
-
-        """
-        load data from file list
-                
-        Parameters
-        ----------
-        file_list: list
-            list with files to combine into unique data array
-        run_type: string or int
-            type of run to fit, mean (default), or if int will do single run fit
-        chunk_num: int or None
-            if we want to fit specific chunk of data, then will return chunk array
-        vertex: int, or list of indices or None
-            if we want to fit specific vertex of data, or list of vertices (from an ROI for example) then will return vertex array
-
-        """  
-
-        # if given, will use different MRI object
-        # allows for function to be used by different classes without inheritance of whole class
-        if not MRIObj:
-            MRIObj = self.MRIObj
-
-        ## Load data array
-        # average runs (or loo or get single run)
-        if isinstance(run_type, str):
-            if run_type == 'mean':
-                print('averaging runs')
-                data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
-                data_arr = np.mean(data_arr, axis = 0)
-            elif run_type == 'median':
-                print('getting median of runs')
-                data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
-                data_arr = np.median(data_arr, axis = 0)
-            elif 'loo_' in run_type:
-                print('Leave-one out averaging runs ({r})'.format(r = run_type))
-                _, file_list = mri_utils.get_loo_filename(file_list, loo_key=run_type)
-                data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
-                data_arr = np.mean(data_arr, axis = 0)
-        elif isinstance(run_type, int):
-            print('Loading run-{r} from ses-{s}'.format(r = run_type, s = ses))
-            file_list = [file for file in file_list if 'run-{r}'.format(r = run_type) in file and 'ses-{s}'.format(s = ses) in file]
-            data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (vertex, TR)
-            data_arr = np.mean(data_arr, axis = 0)
-        
-        # if we want to chunk it
-        if isinstance(chunk_num, int):
-            # number of vertices of chunk
-            num_vox_chunk = int(data_arr.shape[0]/total_chunks)
-            print('Slicing data into chunk {ch} of {ch_total}'.format(ch = chunk_num, 
-                                        ch_total = total_chunks))
-    
-            # chunk it
-            data_out = data_arr[num_vox_chunk * int(chunk_num):num_vox_chunk * int(chunk_num + 1), :]
-        
-        # if we want specific vertex
-        elif isinstance(vertex, int) or isinstance(vertex, list) or isinstance(vertex, np.ndarray):
-            print('Slicing data into vertex {ver}'.format(ver = vertex))
-            data_out = data_arr[vertex]
-            
-            if isinstance(vertex, int):
-                data_out = data_out[np.newaxis,...]
-        
-        # return whole array
-        else:
-            print('Returning whole data array')
-            data_out = data_arr
-
-        ## if we want to keep baseline fix, we need to correct it!
-        if correct_baseline:
-            print('Correcting baseline to be 0 centered')
-
-            ## get behavioral info 
-            mri_beh = preproc_behdata.PreprocBeh(MRIObj)
-            # do same to bar pass direction str array
-            condition_per_TR = mri_utils.crop_shift_arr(mri_beh.pRF_bar_pass_all, 
-                                                        crop_nr = crop_TRs_num, 
-                                                        shift = shift_TRs_num)
-
-            data_out = mri_utils.baseline_correction(data_out, condition_per_TR, 
-                                                    num_baseline_TRs = num_baseline_TRs, 
-                                                    baseline_interval = baseline_interval, 
-                                                    avg_type = 'median')
-
-        return data_out
-
-
-    def load_pRF_model_estimates(self, participant, ses = 'ses-mean', run_type = 'mean', model_name = None, iterative = True, fit_hrf = True):
+    def load_pRF_model_estimates(self, participant, ses = 'ses-mean', run_type = 'mean', model_name = None, iterative = True, fit_hrf = False):
 
         """
         Helper function to load pRF model estimates
@@ -865,7 +721,7 @@ class pRF_model:
         if model_name:
             model_name = model_name
         else:
-            model_name = self.model_type
+            model_name = self.model_type['pRF']
 
         # if we want to load iterative results, or grid (iterative = False)
         if iterative:
@@ -882,9 +738,11 @@ class pRF_model:
                                                     mask_DM = True, combine_ses = combine_ses)
 
         ## load estimates to make it easier to load later
-        pRFdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', 
-                        self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 
-                        ses, est_folder)
+        if 'loo_' in run_type:
+            pRFdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type, est_folder)
+        else:
+            pRFdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), ses, est_folder)
+
 
         pp_prf_est_dict = self.load_pRF_model_chunks(pRFdir, 
                                                     fit_model = model_name,
@@ -953,44 +811,6 @@ class pRF_model:
                 masked_dict[k] = masked_dict[k][roi_ind[ROI]]
         
         return masked_dict
-
-    @classmethod
-    def get_bold_file_list(self, participant, input_list = None, task = 'pRF', 
-                            ses = 'ses-mean', file_ext = '_cropped_dc_psc.npy', MRIObj = None):
-
-        """
-        Helper function to get list of bold file names
-        to then be loaded and used
-
-        Parameters
-        ----------
-        participant: str
-            participant ID
-        ses: str
-            session we are looking at
-
-        """
-        # if given, will use different MRI object
-        # allows for function to be used by different classes without inheritance of whole class
-        if not MRIObj:
-            MRIObj = self.MRIObj
-
-        ## get list of possible input paths
-        # (sessions)
-        if input_list is None:
-            input_list = glob.glob(op.join(MRIObj.derivatives_pth, 'post_fmriprep', MRIObj.sj_space, 
-                                    'sub-{sj}'.format(sj = participant), 'ses-*'))
-
-        # list with absolute file names to be fitted
-        bold_filelist = [op.join(file_path, file) for file_path in input_list for file in os.listdir(file_path) if 'task-{tsk}'.format(tsk = task) in file and \
-                        'acq-{acq}'.format(acq = MRIObj.acq) in file and file.endswith(file_ext)]
-        
-        # if we're not combining sessions
-        if ses and ses != 'ses-mean':
-            ses_key = 'ses-{s}'.format(s = str(ses)) if isinstance(ses, int) else ses
-            bold_filelist = [file for file in bold_filelist if ses_key in file]
-        
-        return bold_filelist
 
 
     def save_pRF_model_estimates(self, filename, final_estimates, model_type = 'gauss', grid = False):
@@ -1157,7 +977,7 @@ class pRF_model:
 
         if not op.exists(filename) or overwrite:
         
-            for ch in np.arange(self.total_chunks):
+            for ch in np.arange(self.total_chunks['pRF']):
                 
                 # if we are fitting HRF, then we want to look for those files
                 if fit_hrf:

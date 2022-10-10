@@ -213,8 +213,9 @@ class pRFViewer:
                 estimates_dict['it_{name}'.format(name = prf_model_name)] = np.stack((estimates_keys_dict[val][vertex] for val in keys))[np.newaxis,...]
 
                 ## load data array
-                bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext, MRIObj = self.MRIObj)
-                data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, run_type = run_type, chunk_num = None, vertex = vertex, MRIObj = self.MRIObj)
+                bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
+                data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, task = 'pRF', run_type = run_type, chunk_num = None, vertex = vertex, 
+                                    baseline_interval = 'empty_long', ses = ses, return_filenames = False)
 
             ## if we fitted hrf, need to also get that from params
             ## and set model array
@@ -244,7 +245,7 @@ class pRFViewer:
             mri_beh = preproc_behdata.PreprocBeh(self.MRIObj)
 
             condition_per_TR = mri_utils.crop_shift_arr(mri_beh.pRF_bar_pass_all, 
-                                            crop_nr = self.pRFModelObj.crop_TRs_num, 
+                                            crop_nr = self.pRFModelObj.crop_TRs_num['pRF'], 
                                             shift = self.pRFModelObj.shift_TRs_num)
 
             ## actually plot
@@ -522,9 +523,10 @@ class pRFViewer:
         n_bins_colors = 256
 
         ## load pRF data array
-        bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext, MRIObj = self.MRIObj)
+        bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
         #print(bold_filelist)
-        pRF_data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, run_type = run_type, MRIObj = self.MRIObj)
+        pRF_data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, task = 'pRF', run_type = run_type, 
+                                            baseline_interval = 'empty_long', ses = ses, return_filenames = False)
 
         max_ecc_ext = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].screen_size_degrees/2
 

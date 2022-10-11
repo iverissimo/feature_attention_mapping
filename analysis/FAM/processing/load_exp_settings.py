@@ -124,6 +124,9 @@ class BehData(FAMData):
         self.pRF_bar_pass = self.params['pRF']['bar_pass_direction']
         self.pRF_nr_TRs = self.params['pRF']['num_TRs'] 
 
+        ## FA bar duration
+        self.FA_bars_phase_dur = self.params['FA']['bars_phase_dur']
+
 
 class MRIData(BehData):
     

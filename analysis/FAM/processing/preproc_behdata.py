@@ -45,7 +45,7 @@ class PreprocBeh:
         self.FA_total_trials = len(self.FA_bar_pass_all)
         
     
-    def load_events(self, participant, ses = 'ses-1', ses_type = 'func'):
+    def load_events(self, participant, ses = 'ses-1', ses_type = 'func', tasks = ['pRF', 'FA']):
         
         """
         Load behavioral events files
@@ -74,7 +74,7 @@ class PreprocBeh:
             events_df = {}
             
             # loop over tasks
-            for tsk in self.MRIObj.tasks:
+            for tsk in tasks:
                 
                 events_files = [op.join(input_pth,x) for x in os.listdir(input_pth) if 'task-{tsk}'.format(tsk=tsk) in x \
                                 and x.endswith(self.MRIObj.events_ext)]
@@ -99,7 +99,7 @@ class PreprocBeh:
         return events_df
     
     
-    def load_trial_info(self, participant, ses = 'ses-1', ses_type = 'func'):
+    def load_trial_info(self, participant, ses = 'ses-1', ses_type = 'func', tasks = ['pRF', 'FA']):
         
         """
         Load Trial info files
@@ -128,7 +128,7 @@ class PreprocBeh:
             trial_info_df = {}
             
             # loop over tasks
-            for tsk in self.MRIObj.tasks:
+            for tsk in tasks:
                 
                 tf_files = [op.join(input_pth,x) for x in os.listdir(input_pth) if 'task-{tsk}'.format(tsk=tsk) in x \
                                 and x.endswith(self.MRIObj.trial_info_ext)]
@@ -151,6 +151,53 @@ class PreprocBeh:
                         trial_info_df[tsk]['run-{r}'.format(r=(r+1))] = df_run
         
         return trial_info_df
+
+
+    def load_FA_bar_position(self, participant, ses = 'ses-1', ses_type = 'func'):
+        
+        """
+        Load bar position from pickle files
+
+        Parameters
+        ----------
+        participant : str
+            participant number
+        ses : str
+            session number (default ses-1)
+        ses_type: str
+            type of session (default func)
+
+        """ 
+        
+        # input path will be in sourcedata
+        input_pth = op.join(self.MRIObj.sourcedata_pth, 'sub-{sj}'.format(sj=participant), ses, ses_type)
+        
+        # if session type doesn't exist
+        if not op.exists(input_pth) or not os.listdir(input_pth):
+            print('no files in %s'%input_pth)
+        else:
+            print('loading files from %s'%input_pth)
+                   
+            bp_files = [op.join(input_pth,x) for x in os.listdir(input_pth) if 'task-FA' in x \
+                            and x.endswith(self.MRIObj.bar_pos_ext)]
+            
+            print('{nr} bar position files found for task-FA'.format(nr=len(bp_files)))
+            
+            # save in dict
+            bar_pos_df = {}
+            
+            # for each run
+            for r in np.arange(self.MRIObj.params['mri']['nr_runs']):
+
+                run_filename = [val for val in bp_files if 'run-{r}'.format(r=(r+1)) in val]
+                if len(run_filename) == 0:
+                    print('No trial info file for run-{r}'.format(r=(r+1)))
+                else:
+                    print('Loading {f}'.format(f=op.split(run_filename[0])[-1]))
+                    df_run = pd.read_pickle(run_filename[0])
+                    bar_pos_df['run-{r}'.format(r=(r+1))] = df_run
+        
+        return bar_pos_df
     
     
     def get_pRF_behavioral_results(self, ses_type = 'func'):
@@ -171,7 +218,7 @@ class PreprocBeh:
             for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
                 
                 ## load events files for that session
-                events_df = self.load_events(pp, ses = ses, ses_type = ses_type)
+                events_df = self.load_events(pp, ses = ses, ses_type = ses_type, tasks=['pRF'])
                 
                 ## loop over runs
                 for run in events_df['pRF'].keys():
@@ -256,7 +303,7 @@ class PreprocBeh:
             for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
                 
                 ## load events files for that session
-                events_df = self.load_events(pp, ses = ses, ses_type = ses_type)
+                events_df = self.load_events(pp, ses = ses, ses_type = ses_type, tasks=['pRF'])
                 
                 ## loop over runs
                 run_bool = []
@@ -324,9 +371,9 @@ class PreprocBeh:
             for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
                 
                 ## load events files for that session
-                events_df = self.load_events(pp, ses = ses, ses_type = ses_type)
+                events_df = self.load_events(pp, ses = ses, ses_type = ses_type, tasks=['FA'])
                 ## load trial info for that session
-                trial_info_df = self.load_trial_info(pp, ses = ses, ses_type = ses_type)
+                trial_info_df = self.load_trial_info(pp, ses = ses, ses_type = ses_type, tasks=['FA'])
                 
                 ## loop over runs
                 for run in events_df['FA'].keys():

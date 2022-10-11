@@ -2375,3 +2375,26 @@ def get_run_ses_from_str(input_name):
     ses_num = int(re.findall(r'ses-\d{1,3}', input_name)[0][4:])
     
     return run_num, ses_num
+
+
+def get_bar_overlap_dm(bar_arr):
+    
+    """
+    get DM of spatial positions where bars overlap
+
+    Parameters
+    ----------
+    bar_arr: arr
+        4D array with [bars,x,y,t]
+
+    """ 
+    
+    if len(bar_arr.shape) != 4:
+        raise ValueError('Input array must be 4D')
+        
+    # sum over bars, and set locations of overlap as 1, else 0
+    overlap_dm = np.sum(bar_arr, axis = 0)
+    overlap_dm[overlap_dm <= 1] = 0
+    overlap_dm[overlap_dm > 1] = 1
+    
+    return overlap_dm

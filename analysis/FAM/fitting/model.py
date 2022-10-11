@@ -120,7 +120,7 @@ class Model:
         """  
 
         # if loading specific run, select it
-        if isinstance(run_type, int) or (isinstance(run_type, str) and len(re.findall(r'\d{1,10}', run_type))>0):
+        if isinstance(run_type, int) or (isinstance(run_type, str) and 'loo_' not in run_type and len(re.findall(r'\d{1,10}', run_type))>0):
 
             run = re.findall(r'\d{1,10}', str(run_type))[0]
             print('Loading run-{r} from ses-{s}'.format(r = run, s = ses))
@@ -194,8 +194,11 @@ class Model:
                                                         avg_type = 'median')
 
             ## STACK
-            data2fit = np.vstack([data2fit, data_out]) if data2fit.size else data_out
-        
+            if data_arr.shape[0]>1:
+                data2fit = np.vstack([data2fit, data_out[np.newaxis, ...]]) if data2fit.size else data_out[np.newaxis, ...]
+            else:
+                data2fit = data_out
+
         # return filelist if that matters for fitting (mainly for FA task)
         if return_filenames:
             return data2fit, file_list

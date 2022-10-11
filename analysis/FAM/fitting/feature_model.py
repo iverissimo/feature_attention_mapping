@@ -12,6 +12,8 @@ from FAM.utils import mri as mri_utils
 from FAM.processing import preproc_behdata
 from FAM.fitting.model import Model
 
+from lmfit import Parameters, minimize
+
 
 class FA_model(Model):
 
@@ -30,11 +32,6 @@ class FA_model(Model):
         # need to initialize parent class (Model), indicating output infos
         super().__init__(MRIObj = MRIObj, outputdir = outputdir, tasks = tasks)
 
-        # # if output dir not defined, then make it in derivatives
-        # if outputdir is None:
-        #     self.outputdir = op.join(self.MRIObj.derivatives_pth,'FA_fit')
-        # else:
-        #     self.outputdir = outputdir
 
     
     def get_bar_dm(self, run_bar_pos_df, attend_bar = True, osf = 10, res_scaling = .1, 
@@ -181,11 +178,35 @@ class FA_model(Model):
                 
         return out_dict
 
+        
+class Gain_model(FA_model):
+
+    def __init__(self, MRIObj, outputdir = None, tasks = ['pRF', 'FA']):
+        
+        """__init__
+        constructor for class 
+        
+        Parameters
+        ----------
+        MRIObj : MRIData object
+            object from one of the classes defined in processing.load_exp_data
+            
+        """
+
+        # need to initialize parent class (Model), indicating output infos
+        super().__init__(MRIObj = MRIObj, outputdir = outputdir, tasks = tasks)
+
+        # if output dir not defined, then make it in derivatives
+        if outputdir is None:
+            self.outputdir = op.join(self.MRIObj.derivatives_pth,'FA_Gain_fit')
+        else:
+            self.outputdir = outputdir
+
 
     def fit_data(self, participant, pp_models, ses = 1,
                     run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,
                     model2fit = 'gauss', file_ext = '_cropped_confound_psc.npy', 
-                    outdir = None, save_estimates = False,
+                    outdir = None, save_estimates = False, fit_overlap = True,
                     xtol = 1e-3, ftol = 1e-4, n_jobs = 16):
 
         """
@@ -208,14 +229,80 @@ class FA_model(Model):
         data, train_file_list = self.get_data4fitting(bold_filelist, task = 'FA', run_type = run_type, chunk_num = chunk_num, vertex = vertex, ses = ses,
                                             baseline_interval = 'empty', return_filenames = True)
 
-        #print('Loading %s'%file)
-        #run_num, ses_num = mri_utils.get_run_ses_from_str(file)
+        ## Set nan voxels to 0, to avoid issues when fitting
+        masked_data = data.copy()
+        masked_data[np.where(np.isnan(data[...,0]))[0]] = 0
+
+        ## set output dir to save estimates
+        if outdir is None:
+            if 'loo_' in run_type:
+                outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type)
+            else:
+                outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), ses)
+            
+        os.makedirs(outdir, exist_ok = True)
+        print('saving files in %s'%outdir)
+
+        ## set base filename that will be used for estimates
+        basefilename = 'sub-{sj}_task-FA_acq-{acq}_runtype-{rt}'.format(sj = participant,
+                                                                            acq = self.MRIObj.acq,
+                                                                            rt = run_type)
+        if chunk_num is not None:
+            basefilename += '_chunk-{ch}'.format(ch = str(chunk_num).zfill(3))
+        elif vertex is not None:
+            basefilename += '_vertex-{ver}'.format(ver = str(vertex))
+        elif ROI:
+            basefilename += '_ROI-{roi}'.format(roi = str(ROI))
+        
+        basefilename += file_ext.replace('.npy', '.npz')
+
+        ## Get visual dm for different bars, and overlap
+        # dict with visual dm per run, will be weighted and combined when actually fitting
+        visual_dm_dict = self.get_visual_DM_dict(participant, train_file_list, save_overlap = fit_overlap)
+
+        ## set model parameters 
+        # relevant for grid and iterative fitting
+        fit_params = self.get_fit_startparams(self)
+
         
         
         return data, train_file_list
 
-        
 
+    def get_fit_startparams(self, run_keys = [], gain_keys = [], pRF_keys = ['x', 'y', 'size', 'beta', 'baseline']):
+
+        """
+        Initialize fitting starting params
+                
+        Parameters
+        ----------
+        
+        """  
+
+        ##set all necessary parameters used for 
+        # gain fit - also setting which ones we fit or not
+        pars = Parameters()
+
+        ## add pRF parameters - will not vary (for now)
+        for val in pRF_keys:
+            pars.add('pRF_{v}'.format(v = val), value = 0, vary = False)
+
+        ## add gain params - will vary
+        for val in gain_keys:
+
+            # if we're providing multiple runs to fit at same time (loo), then varying params need to be set per run
+            if len(run_keys)>0:
+                for ind, r in enumerate(run_keys):
+                    pars.add('gain_{v}_{r}'.format(v = val, r = r), value = 1, vary = True, min = -np.inf, max = np.inf, brute_step = None)
+
+                    # constrain the values of gain to be the same for a same condition 
+                    if ind >0:
+                        pars['gain_{v}_{r}'.format(v = val, r = r)].expr = 'gain_{v}_{r}'.format(v = val, r = run_keys[0])
+            else:
+                pars.add('gain_{v}'.format(v = val), value = 1, vary = True, min = -np.inf, max = np.inf, brute_step = None)
+
+        return pars
+        
 
 
 

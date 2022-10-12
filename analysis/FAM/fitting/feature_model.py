@@ -16,6 +16,9 @@ from lmfit import Parameters, minimize
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
+from prfpy.stimulus import PRFStimulus2D
+from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel, Norm_Iso2DGaussianModel, DoG_Iso2DGaussianModel
+
 
 class FA_model(Model):
 
@@ -306,7 +309,8 @@ class Gain_model(FA_model):
             
             for ckey in list(visual_dm_dict[run].keys()):
                 
-                gain_keys.append('gain_{cond}_{r}'.format(cond = ckey, r = run))
+                if 'gain_{cond}'.format(cond = ckey) not in gain_keys:
+                    gain_keys.append('gain_{cond}'.format(cond = ckey))
                 
         return gain_keys
 
@@ -427,6 +431,122 @@ class Gain_model(FA_model):
         return data, train_file_list
 
 
+    def get_gain_timecourse(self, pars, visual_dm_dict, prf_model_name = 'gauss', fit_hrf = True, osf = 10, hrf_onset = -.8,
+                           bar_keys = ['att_bar', 'unatt_bar']):
+    
+        """
+        given pars for that vertex 
+        (which should include gain weights and pRF estimates)
+        use pRF model to produce a timecourse for the design matrix 
+        
+
+        Parameters
+        ----------
+        pars: lmfit Parameters object
+            lmfit Parameter object with relevant estimates
+        visual_dm_dict: dict
+            dict with visual DM for each type of regressor (attended bar, unattended bar, overlap etc) per RUN
+        prf_model_obj: prfpy model object
+            prf_model object to be used
+        """ 
+        
+        model_arr = np.array([])
+        
+        ## loop over runs
+        for run_id in visual_dm_dict.keys():
+            
+            print('making timecourse for run %s'%run_id)
+            
+            ## first weight and sum both bars
+            if 'overlap' in list(visual_dm_dict[run_id].keys()):
+                
+                run_visual_dm = mri_utils.sum_bar_dms(np.stack((visual_dm_dict[run_id][bar_keys[0]] * pars['gain_{v}'.format(v = bar_keys[0])].value,
+                                                                visual_dm_dict[run_id][bar_keys[1]] * pars['gain_{v}'.format(v = bar_keys[1])].value)), 
+                                                    overlap_dm = visual_dm_dict[run_id]['overlap'], 
+                                                    overlap_weight = pars['gain_overlap'].value)
+            else:
+                run_visual_dm = mri_utils.sum_bar_dms(np.stack((visual_dm_dict[run_id][bar_keys[0]] * pars['gain_{v}'.format(v = bar_keys[0])].value,
+                                                            visual_dm_dict[run_id][bar_keys[1]] * pars['gain_{v}'.format(v = bar_keys[1])].value)), 
+                                                    overlap_dm = None)
+            
+            
+            ## make stimulus object, which takes an input design matrix and sets up its real-world dimensions
+            fa_stim = PRFStimulus2D(screen_size_cm = self.MRIObj.params['monitor']['height'],
+                                    screen_distance_cm = self.MRIObj.params['monitor']['distance'],
+                                    design_matrix = run_visual_dm,
+                                    TR = self.MRIObj.TR)
+
+            ## set prf model to use
+            if prf_model_name == 'gauss':
+
+                model_obj = Iso2DGaussianModel(stimulus = fa_stim,
+                                                filter_predictions = True,
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
+                                                                'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
+                                                                'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
+                                                                'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
+                                                osf = osf,
+                                                hrf_onset = hrf_onset
+                                                )
+            elif prf_model_name == 'css':
+
+                model_obj = CSS_Iso2DGaussianModel(stimulus = fa_stim,
+                                                filter_predictions = True,
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
+                                                                'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
+                                                                'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
+                                                                'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
+                                                osf = osf,
+                                                hrf_onset = hrf_onset
+                                                )
+
+            elif prf_model_name == 'dog':
+
+                model_obj = DoG_Iso2DGaussianModel(stimulus = fa_stim,
+                                                filter_predictions = True,
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
+                                                                'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
+                                                                'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
+                                                                'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
+                                                osf = osf,
+                                                hrf_onset = hrf_onset
+                                                )
+
+            elif prf_model_name == 'dn':
+
+                model_obj = Norm_Iso2DGaussianModel(stimulus = fa_stim,
+                                                filter_predictions = True,
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
+                                                                'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
+                                                                'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
+                                                                'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
+                                                osf = osf,
+                                                hrf_onset = hrf_onset
+                                                )
+
+            ## define hrf
+            if fit_hrf and 'hrf_derivative' in list(pars.keys()):
+                hrf = model_obj.create_hrf(hrf_params = [1, 
+                                                            pars['hrf_derivative'].value, 
+                                                            pars['hrf_dispersion'].value], osf = osf, onset = hrf_onset)
+                
+            else:
+                hrf = model_obj.create_hrf(hrf_params = [1, 1, 0], osf = osf, onset = hrf_onset)
+            
+            # update model hrf to previous one
+            model_obj.hrf = hrf
+            
+            # get run timecourse
+            run_timecourse = model_obj.return_prediction(*list([pars[val].value for val in self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][prf_model_name][:-1]]))
+            
+            ## resample to TR and stack
+            model_arr = np.vstack([model_arr, mri_utils.resample_arr(run_timecourse, osf = osf, final_sf = self.MRIObj.TR)]) if model_arr.size else mri_utils.resample_arr(run_timecourse, osf = osf, final_sf = self.MRIObj.TR)
+
+        return model_arr
 
 
 

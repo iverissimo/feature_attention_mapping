@@ -1918,3 +1918,28 @@ def get_bar_overlap_dm(bar_arr):
     overlap_dm[overlap_dm > 1] = 1
     
     return overlap_dm
+
+
+def sum_bar_dms(stacked_dms, overlap_dm = None, overlap_weight = 1):
+
+    """
+    sum visual dms of both bars
+    and set value of overlap if given
+
+    Parameters
+    ----------
+    stacked_dms: arr
+        4D array with [bars,x,y,t]. Assumes dms we're already weighted (if such is the case)
+    overlap_dm: arr
+        if not None, excepts binary array of [x,y,t] with overlap positions in time
+    overlap_weight: int/float
+        weight to give overlap area
+
+    """ 
+
+    final_dm = np.sum(stacked_dms, axis=0) 
+    
+    if overlap_dm is not None:
+        final_dm[overlap_dm == 1] = overlap_weight
+    
+    return final_dm

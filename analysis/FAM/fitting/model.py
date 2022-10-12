@@ -237,3 +237,48 @@ class Model:
             bold_filelist = [file for file in bold_filelist if ses_key in file]
         
         return bold_filelist
+
+
+    def subselect_array(self, input_arr, task = 'pRF', chunk_num = None, vertex = None):
+        
+        """
+        Helper function to subselect array (with estimate values for example)
+        depending on task, chunk number or vertex
+
+        Parameters
+        ----------
+        input_arr: np.array
+            input array, of size of data
+        task: str
+            task name for files in list (default pRF)
+        chunk_num: int or None
+            if we want to select specific chunk of initial array, then will return chunk of array
+        vertex: int, or list of indices or None
+            if we want to select specific vertex of arr, or list of vertices (from an ROI for example) then will return vertex array
+
+        """
+
+        # if we want to chunk it
+        if isinstance(chunk_num, int):
+            # number of vertices of chunk
+            num_vox_chunk = int(input_arr.shape[0]/self.total_chunks[task])
+            print('Slicing array into chunk {ch} of {ch_total}'.format(ch = chunk_num, 
+                                        ch_total = self.total_chunks[task]))
+    
+            # chunk it
+            arr_out = input_arr[num_vox_chunk * int(chunk_num):num_vox_chunk * int(chunk_num + 1), :]
+        
+        # if we want specific vertex
+        elif isinstance(vertex, int) or isinstance(vertex, list) or isinstance(vertex, np.ndarray):
+            print('Slicing array into vertex {ver}'.format(ver = vertex))
+            arr_out = input_arr[vertex]
+            
+            if isinstance(vertex, int):
+                arr_out = arr_out[np.newaxis,...]
+        
+        # return whole array
+        else:
+            print('Returning whole data array')
+            arr_out = input_arr
+
+        return arr_out

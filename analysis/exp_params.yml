@@ -209,11 +209,6 @@ mri: # refers to the Psychopy SyncGenerator class
       total_chunks: {'fsaverage': 83, 'T1w': 89, 'fsLR_den-170k': 54} # total number of chunks to split the data, depends on space of files
 
       prf_rsq_threshold: 0.2 
-      condition_keys: {'ACAO': {'color': True, 'orientation': True},
-                      'ACUO': {'color': True, 'orientation': False},
-                      'UCAO': {'color': False, 'orientation': True},
-                      'UCUO': {'color': False, 'orientation': False}
-                      }
 
     
 eyetracking:

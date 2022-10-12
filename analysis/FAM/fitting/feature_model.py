@@ -13,6 +13,8 @@ from FAM.processing import preproc_behdata
 from FAM.fitting.model import Model
 
 from lmfit import Parameters, minimize
+from joblib import Parallel, delayed
+from tqdm import tqdm
 
 
 class FA_model(Model):
@@ -32,6 +34,9 @@ class FA_model(Model):
         # need to initialize parent class (Model), indicating output infos
         super().__init__(MRIObj = MRIObj, outputdir = outputdir, tasks = tasks)
 
+        ## set some relevant parameters
+        # prf rsq threshold, to select visual voxels
+        self.prf_rsq_threshold = self.MRIObj.params['mri']['fitting']['FA']['prf_rsq_threshold']
 
     
     def get_bar_dm(self, run_bar_pos_df, attend_bar = True, osf = 10, res_scaling = .1, 
@@ -125,7 +130,7 @@ class FA_model(Model):
         with visual DM for each type of regressor (attended bar, unattended bar, overlap etc)
         
         ex:
-        out_dict['run-1_ses-1'] = {'att_bar': [x,y,t], 'unatt_bar': [x,y,t], ...}
+        out_dict['r1s1'] = {'att_bar': [x,y,t], 'unatt_bar': [x,y,t], ...}
 
         Parameters
         ----------
@@ -148,7 +153,7 @@ class FA_model(Model):
             ## get run and ses from file
             run_num, ses_num = mri_utils.get_run_ses_from_str(file) 
             
-            out_dict['run-{r}_ses-{s}'.format(r = run_num, s = ses_num)] = {}
+            out_dict['r{r}s{s}'.format(r = run_num, s = ses_num)] = {}
             
             ## get bar position df for run
             bar_pos_df = mri_beh.load_FA_bar_position(participant, ses = 'ses-{s}'.format(s = ses_num), 
@@ -156,14 +161,14 @@ class FA_model(Model):
             run_bar_pos_df = bar_pos_df['run-{r}'.format(r = run_num)]
             
             ## GET DM FOR ATTENDED BAR
-            out_dict['run-{r}_ses-{s}'.format(r = run_num, 
+            out_dict['r{r}s{s}'.format(r = run_num, 
                                             s = ses_num)]['att_bar'] = self.get_bar_dm(run_bar_pos_df,
                                                                                         attend_bar = True,
                                                                                         osf = self.osf, res_scaling = self.res_scaling,
                                                                                         stim_dur_seconds = self.MRIObj.FA_bars_phase_dur,
                                                                                         FA_bar_pass_all = mri_beh.FA_bar_pass_all)
             ## GET DM FOR UNATTENDED BAR
-            out_dict['run-{r}_ses-{s}'.format(r = run_num, 
+            out_dict['r{r}s{s}'.format(r = run_num, 
                                             s = ses_num)]['unatt_bar'] = self.get_bar_dm(run_bar_pos_df,
                                                                                         attend_bar = False,
                                                                                         osf = self.osf, res_scaling = self.res_scaling,
@@ -172,13 +177,92 @@ class FA_model(Model):
 
             if save_overlap:
                 ## GET DM FOR OVERLAP OF BARS
-                out_dict['run-{r}_ses-{s}'.format(r = run_num, 
-                                            s = ses_num)]['overlap'] = mri_utils.get_bar_overlap_dm(np.stack((out_dict['run-{r}_ses-{s}'.format(r = run_num, s = ses_num)]['att_bar'],
-                                                                                                             out_dict['run-{r}_ses-{s}'.format(r = run_num, s = ses_num)]['unatt_bar'])))
+                out_dict['r{r}s{s}'.format(r = run_num, 
+                                            s = ses_num)]['overlap'] = mri_utils.get_bar_overlap_dm(np.stack((out_dict['r{r}s{s}'.format(r = run_num, s = ses_num)]['att_bar'],
+                                                                                                             out_dict['r{r}s{s}'.format(r = run_num, s = ses_num)]['unatt_bar'])))
                 
         return out_dict
 
         
+    def initialize_params(self, par_keys = [], value = 1, vary = True, min = -np.inf, max = np.inf, brute_step = None):
+
+        """
+        Initialize lmfit Parameters object
+                
+        Parameters
+        ----------
+        par_keys: list
+            list with string names identifying each parameter
+        """  
+
+        pars = Parameters()
+
+        for val in par_keys:
+            pars.add(val)
+
+            ## update parameter values etc
+            pars[val].value = value
+            pars[val].vary = vary
+            pars[val].min = min
+            pars[val].max = max
+            pars[val].brute_step = brute_step
+
+        return pars
+
+    
+    def update_parameters(self, pars, par_key = None, value = 0, vary = True, min = -np.inf, max = np.inf, brute_step = None,
+                                constrain_expression = None, contrain_keys = []):
+        
+        """
+        Update a specific parameter  
+                
+        Parameters
+        ----------
+        pars: lmfit Parameter object
+            lmfit Parameter object to be updated (can also be empty)
+        par_key: str
+            if str, then will update that specific parameter
+            if parameter not in Parameter object, will add it
+        value: int/float
+            parameter value
+        vary: bool
+            if we are varying the parameter or stays fixed
+        min: float
+            lower bound of fitting
+        max: float
+            upper bound of fitting
+        brute_step: float
+            if given, will be the step used for fitting (when doing grid fit)
+        constrain_expression: str
+            if given, will use this expression (parameter name - or other?) to contraint others listed in constrain keys
+        contrain_keys: list
+            list with strings which are key names of parameters that will be constrained by constrain_expression
+        
+        """ 
+
+        # if we provided parameter name
+        if par_key and isinstance(par_key, str):
+
+            ## check if parameters key in object
+            if par_key not in list(pars.keys()):
+                pars.add(par_key)
+
+            ## update parameter values etc
+            pars[par_key].value = value
+            pars[par_key].vary = vary
+            pars[par_key].min = min
+            pars[par_key].max = max
+            pars[par_key].brute_step = brute_step
+
+        # check if we want to contraint keys in pars object
+        if constrain_expression and len(contrain_keys) > 0:
+
+            for name in contrain_keys:
+                pars[name].expr = constrain_expression
+
+        return pars
+
+
 class Gain_model(FA_model):
 
     def __init__(self, MRIObj, outputdir = None, tasks = ['pRF', 'FA']):
@@ -203,11 +287,35 @@ class Gain_model(FA_model):
             self.outputdir = outputdir
 
 
-    def fit_data(self, participant, pp_models, ses = 1,
+    def get_gain_run_keys(self, visual_dm_dict):
+
+        """ Helper function to get gain parameter keys, 
+        given the design matrix keys
+        
+        Parameters
+        ----------
+        visual_dm_dict : dict
+            visual DM for each run and condition of interest 
+            ex: visual_dm_dict['r1s1'] = {'att_bar': [x,y,t], 'unatt_bar': [x,y,t], ...}
+            
+        """
+    
+        gain_keys = []
+        
+        for run in list(visual_dm_dict.keys()):
+            
+            for ckey in list(visual_dm_dict[run].keys()):
+                
+                gain_keys.append('gain_{cond}_{r}'.format(cond = ckey, r = run))
+                
+        return gain_keys
+
+
+    def fit_data(self, participant, pp_prf_estimates, pp_prf_models, ses = 1,
                     run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,
-                    model2fit = 'gauss', file_ext = '_cropped_confound_psc.npy', 
+                    prf_model_name = None, rsq_threshold = None, file_ext = '_cropped_confound_psc.npy', 
                     outdir = None, save_estimates = False, fit_overlap = True,
-                    xtol = 1e-3, ftol = 1e-4, n_jobs = 16):
+                    xtol = 1e-3, ftol = 1e-4, n_jobs = 8):
 
         """
         fit inputted FA models to each participant in participant list
@@ -260,49 +368,116 @@ class Gain_model(FA_model):
         # dict with visual dm per run, will be weighted and combined when actually fitting
         visual_dm_dict = self.get_visual_DM_dict(participant, train_file_list, save_overlap = fit_overlap)
 
+        ## set prf model name
+        if prf_model_name is None:
+            prf_model_name = self.model_type['pRF']
+
+        ## get pRF model estimate keys
+        prf_est_keys = [val for val in list(pp_prf_estimates.keys()) if val!='r2']
+        print('pRF {m} model estimates found {l}'.format(m = prf_model_name, l = str(prf_est_keys)))
+
+        ## get relevant indexes to fit
+        # set threshold
+        if rsq_threshold is None:
+            rsq_threshold = self.prf_rsq_threshold
+
+        # subselect pRF estimates similar to data
+        # to avoid index issues
+        masked_prf_estimates = {}
+        for key in pp_prf_estimates.keys():
+            masked_prf_estimates[key] = self.subselect_array(pp_prf_estimates[key], task = 'pRF', chunk_num = chunk_num, vertex = vertex)
+
+        # find indexes worth fitting
+        # this is, where pRF rsq > than predetermined threshold
+        ind2fit = np.where((masked_prf_estimates['r2'] > rsq_threshold))[0]
+
+        ## now get FA gain estimate keys
+        gain_keys = self.get_gain_run_keys(visual_dm_dict)
+
         ## set model parameters 
         # relevant for grid and iterative fitting
-        fit_params = self.get_fit_startparams(self)
 
-        
+        # first just make array with parameters object per index to fit
+        print('Initializing paramenters...')
+        pars_arr = Parallel(n_jobs = n_jobs)(delayed(self.initialize_params)(par_keys = list(np.concatenate((prf_est_keys, gain_keys))),
+                                                                                value = 1, 
+                                                                                vary = True, 
+                                                                                min = -np.inf, 
+                                                                                max = np.inf, 
+                                                                                brute_step = None) for i in tqdm(range(len(ind2fit))))
+
+        # now update pRF values for said index
+        for key in prf_est_keys:
+
+            print('Updating parameters with pRF estimate %s values'%key)
+
+            pars_arr = Parallel(n_jobs = 2)(delayed(self.update_parameters)(pars_arr[i], 
+                                                                                par_key = key, 
+                                                                                value = masked_prf_estimates[key][ind2fit[i]], 
+                                                                                vary = False, 
+                                                                                min = -np.inf, 
+                                                                                max = np.inf, 
+                                                                                brute_step = None,
+                                                    constrain_expression = None, contrain_keys = []) for i in tqdm(range(len(ind2fit))))
+    
+        self.pars_arr = np.array(pars_arr)
+
+        #self.initialize_params(par_keys = [])
         
         return data, train_file_list
 
 
-    def get_fit_startparams(self, run_keys = [], gain_keys = [], pRF_keys = ['x', 'y', 'size', 'beta', 'baseline']):
 
-        """
-        Initialize fitting starting params
+
+
+    # def initialize_params(self, run_keys = [], gain_keys = ['att_bar', 'unatt_bar', 'overlap'], pRF_keys = ['x', 'y', 'size', 'beta', 'baseline']):
+
+    #     """
+    #     Initialize lmfit Parameters object
                 
-        Parameters
-        ----------
+    #     Parameters
+    #     ----------
+    #     run_keys: list
+    #         list with string names identifying each run, when we are fitting multiple runs simultaneously
+    #     gain_keys: list
+    #         list with string names identifying each gain parameter that we are fitting (attended bar, unattended bar, overlap)
+    #     pRF_keys: list
+    #         list with pRF estimate keys
         
-        """  
+    #     """  
 
-        ##set all necessary parameters used for 
-        # gain fit - also setting which ones we fit or not
-        pars = Parameters()
+    #     ##set all necessary parameters used for 
+    #     # gain fit - also setting which ones we fit or not
+    #     pars = Parameters()
 
-        ## add pRF parameters - will not vary (for now)
-        for val in pRF_keys:
-            pars.add('pRF_{v}'.format(v = val), value = 0, vary = False)
+    #     ## add pRF parameters - will not vary (for now)
+    #     for val in pRF_keys:
+    #         pars.add('pRF_{v}'.format(v = val), value = 0, vary = False)
 
-        ## add gain params - will vary
-        for val in gain_keys:
+    #     ## add gain params - will vary
+    #     for val in gain_keys:
 
-            # if we're providing multiple runs to fit at same time (loo), then varying params need to be set per run
-            if len(run_keys)>0:
-                for ind, r in enumerate(run_keys):
-                    pars.add('gain_{v}_{r}'.format(v = val, r = r), value = 1, vary = True, min = -np.inf, max = np.inf, brute_step = None)
+    #         # if we're providing multiple runs to fit at same time (loo), then varying params need to be set per run
+    #         if len(run_keys)>0:
+    #             for ind, r in enumerate(run_keys):
+    #                 pars.add('gain_{v}_{r}'.format(v = val, r = r), value = 1, vary = True, min = -np.inf, max = np.inf, brute_step = None)
 
-                    # constrain the values of gain to be the same for a same condition 
-                    if ind >0:
-                        pars['gain_{v}_{r}'.format(v = val, r = r)].expr = 'gain_{v}_{r}'.format(v = val, r = run_keys[0])
-            else:
-                pars.add('gain_{v}'.format(v = val), value = 1, vary = True, min = -np.inf, max = np.inf, brute_step = None)
+    #                 # constrain the values of gain to be the same for a same condition 
+    #                 if ind > 0:
+    #                     pars['gain_{v}_{r}'.format(v = val, r = r)].expr = 'gain_{v}_{r}'.format(v = val, r = run_keys[0])
+    #         else:
+    #             pars.add('gain_{v}'.format(v = val), value = 1, vary = True, min = -np.inf, max = np.inf, brute_step = None)
 
-        return pars
-        
+    #     return pars
+
+
+
+
+
+
+
+
+
 
 
 

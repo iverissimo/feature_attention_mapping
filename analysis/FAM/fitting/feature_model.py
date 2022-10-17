@@ -432,7 +432,7 @@ class Gain_model(FA_model):
 
 
     def get_gain_timecourse(self, pars, visual_dm_dict, prf_model_name = 'gauss', fit_hrf = True, osf = 10, hrf_onset = -.8,
-                           bar_keys = ['att_bar', 'unatt_bar']):
+                           bar_keys = ['att_bar', 'unatt_bar'], filter_predictions = False):
     
         """
         given pars for that vertex 
@@ -480,7 +480,7 @@ class Gain_model(FA_model):
             if prf_model_name == 'gauss':
 
                 model_obj = Iso2DGaussianModel(stimulus = fa_stim,
-                                                filter_predictions = True,
+                                                filter_predictions = filter_predictions,
                                                 filter_type = self.MRIObj.params['mri']['filtering']['type'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
@@ -492,7 +492,7 @@ class Gain_model(FA_model):
             elif prf_model_name == 'css':
 
                 model_obj = CSS_Iso2DGaussianModel(stimulus = fa_stim,
-                                                filter_predictions = True,
+                                                filter_predictions = filter_predictions,
                                                 filter_type = self.MRIObj.params['mri']['filtering']['type'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
@@ -505,7 +505,7 @@ class Gain_model(FA_model):
             elif prf_model_name == 'dog':
 
                 model_obj = DoG_Iso2DGaussianModel(stimulus = fa_stim,
-                                                filter_predictions = True,
+                                                filter_predictions = filter_predictions,
                                                 filter_type = self.MRIObj.params['mri']['filtering']['type'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
@@ -518,7 +518,7 @@ class Gain_model(FA_model):
             elif prf_model_name == 'dn':
 
                 model_obj = Norm_Iso2DGaussianModel(stimulus = fa_stim,
-                                                filter_predictions = True,
+                                                filter_predictions = filter_predictions,
                                                 filter_type = self.MRIObj.params['mri']['filtering']['type'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
@@ -544,7 +544,7 @@ class Gain_model(FA_model):
             run_timecourse = model_obj.return_prediction(*list([pars[val].value for val in self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][prf_model_name][:-1]]))
             
             ## resample to TR and stack
-            model_arr = np.vstack([model_arr, mri_utils.resample_arr(run_timecourse, osf = osf, final_sf = self.MRIObj.TR)]) if model_arr.size else mri_utils.resample_arr(run_timecourse, osf = osf, final_sf = self.MRIObj.TR)
+            model_arr = np.vstack([model_arr, mri_utils.resample_arr(run_timecourse, osf = osf, final_sf = 1)]) if model_arr.size else mri_utils.resample_arr(run_timecourse, osf = osf, final_sf = 1)
 
         return model_arr
 

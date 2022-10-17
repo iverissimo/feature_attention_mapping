@@ -183,21 +183,26 @@ class Model:
 
                 ## get behavioral info 
                 mri_beh = preproc_behdata.PreprocBeh(self.MRIObj)
-                # do same to bar pass direction str array
-                condition_per_TR = mri_utils.crop_shift_arr(mri_beh.pRF_bar_pass_all, 
-                                                            crop_nr = self.crop_TRs_num[task], 
+                
+                # crop and shift if such was the case
+                bar_pass = mri_beh.FA_bar_pass_all if task == 'FA' else mri_beh.pRF_bar_pass_all
+                crop_nr = self.crop_TRs_num[task] if self.crop_TRs[task] == True else None
+                only_edges = True if task == 'FA' else False
+
+                condition_per_TR = mri_utils.crop_shift_arr(bar_pass, 
+                                                            crop_nr = crop_nr, 
                                                             shift = self.shift_TRs_num)
 
                 data_out = mri_utils.baseline_correction(data_out, condition_per_TR, 
                                                         num_baseline_TRs = self.corr_base_TRs[task], 
                                                         baseline_interval = baseline_interval, 
-                                                        avg_type = 'median')
+                                                        avg_type = 'median', only_edges = only_edges)
 
             ## STACK
             if data_arr.shape[0]>1:
                 data2fit = np.vstack([data2fit, data_out[np.newaxis, ...]]) if data2fit.size else data_out[np.newaxis, ...]
             else:
-                data2fit = data_out
+                data2fit = data_out[np.newaxis, ...]
 
         # return filelist if that matters for fitting (mainly for FA task)
         if return_filenames:

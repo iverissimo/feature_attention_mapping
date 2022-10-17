@@ -1758,7 +1758,7 @@ def get_fa_prediction_tc(dm, betas,
 
 
 def baseline_correction(data, condition_per_TR, num_baseline_TRs = 6, baseline_interval = 'empty_long', 
-                        avg_type = 'median'):
+                        avg_type = 'median', only_edges = False, TR2task = 3):
     
     """Do baseline correction to timecourse
      Useful when we want a fix baseline during fitting
@@ -1773,18 +1773,24 @@ def baseline_correction(data, condition_per_TR, num_baseline_TRs = 6, baseline_i
        name of the condition to get baseline values
     avg_type: str
         type of averaging done
+    only_edges: bool
+        if we want to only use the edges of the array to correct (this is start and end)
+    TR2task: int
+        number of TRs between end of baseline period and start of bar pass (i.e., shifts baseline period in time by X TRs) 
     """
-
 
     baseline_index = [i for i, val in enumerate(condition_per_TR) if str(val) == baseline_interval]
     interval_ind = []
     for i, ind in enumerate(baseline_index):
         if i > 0:
             if (ind - baseline_index[i-1]) > 1: ## transition point
-                interval_ind.append([baseline_index[i-1] - num_baseline_TRs, baseline_index[i-1]]) 
+                interval_ind.append([baseline_index[i-1] - TR2task - num_baseline_TRs, baseline_index[i-1] - TR2task]) 
 
-    if condition_per_TR[-1] == 'empty_long':
-        interval_ind.append([baseline_index[-1] - num_baseline_TRs, baseline_index[-1]]) 
+    if condition_per_TR[-1] == baseline_interval:
+        interval_ind.append([baseline_index[-1] - TR2task - num_baseline_TRs, baseline_index[-1] - TR2task]) 
+    
+    if only_edges:
+        interval_ind = np.array((interval_ind[0], interval_ind[-1]))
 
     # get baseline values
     baseline_arr = np.hstack([data[..., ind[0]:ind[1]] for ind in interval_ind])
@@ -1943,3 +1949,31 @@ def sum_bar_dms(stacked_dms, overlap_dm = None, overlap_weight = 1):
         final_dm[overlap_dm == 1] = overlap_weight
     
     return final_dm
+
+
+def error_resid(timecourse, prediction, mean_err = False, return_array = False):
+
+    """
+
+    Helper function to get the residual error between a timecourse and a model prediction
+
+    Parameters
+    ----------
+    timecourse : ndarray
+        The actual, measured time-series against which the model is fit
+    prediction : ndarray
+        model prediction timecourse
+    mean_err : bool
+        if True, will calculate the mean of squared residulas instead of sum
+    return_array: bool
+        if True, then function returns residual array instead of scalar
+    """
+
+    if return_array:
+        return (timecourse - prediction).flatten() # return error "timecourse", that will be used by minimize
+    else:
+        if mean_err:
+            return np.mean((timecourse - prediction) ** 2)  # calculate mean of squared residuals
+
+        else:
+            return np.sum((timecourse - prediction) ** 2) # calculate residual sum of squared errors

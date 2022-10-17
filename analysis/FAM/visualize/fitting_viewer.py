@@ -528,6 +528,9 @@ class pRFViewer:
         pRF_data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, task = 'pRF', run_type = run_type, 
                                             baseline_interval = 'empty_long', ses = ses, return_filenames = False)
 
+        # FA_data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, task = 'FA', run_type = '1', 
+        #                                     baseline_interval = 'empty', ses = ses, return_filenames = False)
+
         max_ecc_ext = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].screen_size_degrees/2
 
         ## Load click viewer plotted object

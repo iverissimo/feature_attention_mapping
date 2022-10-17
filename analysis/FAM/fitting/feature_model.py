@@ -315,7 +315,7 @@ class Gain_model(FA_model):
         return gain_keys
 
 
-    def fit_data(self, participant, pp_prf_estimates, pp_prf_models, ses = 1,
+    def fit_data(self, participant, pp_prf_estimates, ses = 1,
                     run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,
                     prf_model_name = None, rsq_threshold = None, file_ext = '_cropped_confound_psc.npy', 
                     outdir = None, save_estimates = False, fit_overlap = True,
@@ -350,7 +350,7 @@ class Gain_model(FA_model):
             if 'loo_' in run_type:
                 outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type)
             else:
-                outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), ses)
+                outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses))
             
         os.makedirs(outdir, exist_ok = True)
         print('saving files in %s'%outdir)
@@ -426,9 +426,87 @@ class Gain_model(FA_model):
     
         self.pars_arr = np.array(pars_arr)
 
-        #self.initialize_params(par_keys = [])
+        ## actually fit data
+        # call iterative fit function, giving it masked data and pars
+        # in iterative function, will have to call other function that makes time course and minimizes residual?
+        # need to think of logical way of paralellizing fits
+
+        #masked_data
+
+
+        return masked_data, train_file_list, ind2fit
+
+    
+    def iterative_fit(self, data, starting_params, prf_model_name = 'gauss', visual_dm_dict = None, 
+                                                    xtol = 1e-3, ftol = 1e-3, method = 'lbfgsb', n_jobs = 16):
+
+        """
+        perform iterative fit of params on data
+
+        Parameters
+        ----------
+        data: arr
+            3D data array of [runs, vertex, time]
+        starting_params: list/arr
+            array of data size with lmfit Parameter object with relevant estimates per vertex
+        prf_model_name: str
+            name of pRF model to use
+        visual_dm_dict: dict
+            visual DM for each run and condition of interest 
+            ex: visual_dm_dict['r1s1'] = {'att_bar': [x,y,t], 'unatt_bar': [x,y,t], ...}
+        method:
+            optimizer method to use in minimize
+        """ 
+
+        ## minimize residuals
+        if method == 'lbfgsb': 
+            
+            out = minimize(self.get_gain_residuals, starting_params, args = [data],
+                        kws={'prf_model_name': prf_model_name, 'visual_dm_dict': visual_dm_dict}, 
+                        method = method, options = dict(ftol = ftol))
+
+        elif self.method == 'trust-constr':
+            out = minimize(self.get_gain_residuals, starting_params, args = [data],
+                        kws={'prf_model_name': prf_model_name, 'visual_dm_dict': visual_dm_dict}, 
+                        method = method, tol = ftol, options = dict(xtol = xtol))
+
+        return out
+
+
+
+    def get_gain_residuals(self, tc_pars, timecourse, prf_model_name = 'gauss', visual_dm_dict = None):
+
+        """
+        given data timecourse and parameters, returns 
+        residual sum of squared errors between the prediction and data
+
+        Parameters
+        ----------
+        timecourse: arr
+            data timecourse
+        tc_pars: lmfit Parameters object
+            lmfit Parameter object with relevant estimates
+        prf_model_name: str
+            name of pRF model to use
+        visual_dm_dict: dict
+            visual DM for each run and condition of interest 
+            ex: visual_dm_dict['r1s1'] = {'att_bar': [x,y,t], 'unatt_bar': [x,y,t], ...}
         
-        return data, train_file_list
+        """ 
+
+        ## get prediction timecourse for that visual design matrix
+        # and parameters
+        model_arr = self.get_gain_timecourse(tc_pars, visual_dm_dict, 
+                                                    prf_model_name = prf_model_name, 
+                                                    fit_hrf = self.fit_hrf, osf = self.osf, hrf_onset = self.hrf_onset,
+                                                    bar_keys = ['att_bar', 'unatt_bar'], filter_predictions = False)
+
+        # return residuals
+        print(mri_utils.error_resid(timecourse, model_arr, mean_err = False))
+
+        return mri_utils.error_resid(timecourse, model_arr, mean_err = False, return_array = True)
+
+
 
 
     def get_gain_timecourse(self, pars, visual_dm_dict, prf_model_name = 'gauss', fit_hrf = True, osf = 10, hrf_onset = -.8,

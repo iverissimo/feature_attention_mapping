@@ -153,7 +153,7 @@ class PreprocBeh:
         return trial_info_df
 
 
-    def load_FA_bar_position(self, participant, ses = 'ses-1', ses_type = 'func'):
+    def load_FA_bar_position(self, participant, ses = 'ses-1', ses_type = 'func', run_num = None):
         
         """
         Load bar position from pickle files
@@ -185,17 +185,24 @@ class PreprocBeh:
             
             # save in dict
             bar_pos_df = {}
-            
-            # for each run
-            for r in np.arange(self.MRIObj.params['mri']['nr_runs']):
 
-                run_filename = [val for val in bp_files if 'run-{r}'.format(r=(r+1)) in val]
-                if len(run_filename) == 0:
-                    print('No trial info file for run-{r}'.format(r=(r+1)))
-                else:
-                    print('Loading {f}'.format(f=op.split(run_filename[0])[-1]))
-                    df_run = pd.read_pickle(run_filename[0])
-                    bar_pos_df['run-{r}'.format(r=(r+1))] = df_run
+            # if we provided a specific run number, only load that
+            if run_num:
+                run_filename = [val for val in bp_files if 'run-{r}'.format(r=run_num) in val][0]
+                print('Loading {f}'.format(f=op.split(run_filename)[-1]))
+                bar_pos_df = pd.read_pickle(run_filename)
+                
+            else:
+                # for each run
+                for r in np.arange(self.MRIObj.params['mri']['nr_runs']):
+
+                    run_filename = [val for val in bp_files if 'run-{r}'.format(r=(r+1)) in val]
+                    if len(run_filename) == 0:
+                        print('No trial info file for run-{r}'.format(r=(r+1)))
+                    else:
+                        print('Loading {f}'.format(f=op.split(run_filename[0])[-1]))
+                        df_run = pd.read_pickle(run_filename[0])
+                        bar_pos_df['run-{r}'.format(r=(r+1))] = df_run
         
         return bar_pos_df
     

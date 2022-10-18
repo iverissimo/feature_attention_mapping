@@ -88,6 +88,9 @@ class Model:
         ## total number of chunks we divide data when fitting
         self.total_chunks = {key:self.MRIObj.params['mri']['fitting'][key]['total_chunks'][self.MRIObj.sj_space] for key in tasks}
 
+        ## get behavioral info 
+        self.mri_beh = preproc_behdata.PreprocBeh(self.MRIObj)
+
 
     def get_data4fitting(self, file_list, task = 'pRF', run_type = 'mean',
                             chunk_num = None, vertex = None,
@@ -181,11 +184,8 @@ class Model:
             if self.correct_baseline[task]:
                 print('Correcting baseline to be 0 centered')
 
-                ## get behavioral info 
-                mri_beh = preproc_behdata.PreprocBeh(self.MRIObj)
-                
                 # crop and shift if such was the case
-                bar_pass = mri_beh.FA_bar_pass_all if task == 'FA' else mri_beh.pRF_bar_pass_all
+                bar_pass = self.mri_beh.FA_bar_pass_all if task == 'FA' else self.mri_beh.pRF_bar_pass_all
                 crop_nr = self.crop_TRs_num[task] if self.crop_TRs[task] == True else None
                 only_edges = True if task == 'FA' else False
 

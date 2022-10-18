@@ -1079,7 +1079,8 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                         
                         ## regress out confounds, 
                         ## and percent signal change
-                        proc_files = mri_utils.regressOUT_confounds(proc_files, confounds_list, output_pth, TR = self.MRIObj.params['mri']['TR'], plot_vert = True)
+                        proc_files = mri_utils.regressOUT_confounds(proc_files, confounds_list, output_pth, TR = self.MRIObj.params['mri']['TR'], plot_vert = False,
+                                                                    detrend = False, standardize = 'psc', standardize_confounds = True)
 
                     else: 
                         ## filter files, to remove drifts ##

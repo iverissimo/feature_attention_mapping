@@ -42,8 +42,8 @@ class FA_model(Model):
         self.prf_rsq_threshold = self.MRIObj.params['mri']['fitting']['FA']['prf_rsq_threshold']
 
     
-    def get_bar_dm(self, run_bar_pos_df, attend_bar = True, osf = 10, res_scaling = .1, 
-                stim_dur_seconds = 0.5, FA_bar_pass_all = []):
+    def get_bar_dm(self, run_bar_pos_df, attend_bar = True, osf = 10, res_scaling = .1, crop_nr = None,
+                stim_dur_seconds = 0.5, FA_bar_pass_all = [], oversample_sec = True):
         
         """
         save an array with the FA (un)attended
@@ -63,11 +63,21 @@ class FA_model(Model):
             duration of stim (bar presentation) in seconds
         FA_bar_pass_all: list
             list with condition per TR/trial
+        crop_nr: int
+            if we are cropping TRs, how many (if None, it will not crop TRs)
 
         """ 
+        # if we want to oversample in seconds, then we need to multiply #TRs by TR duration in seconds
+        if oversample_sec:
+            oversampling_time = self.MRIObj.TR * osf
+            stim_dur = stim_dur_seconds * osf
+        else:
+            oversampling_time = osf
+            stim_dur = (stim_dur_seconds / self.MRIObj.TR) * osf # then we need to transform stim dur in seconds to TR
+
         ## crop and shift if such was the case
         condition_per_TR = mri_utils.crop_shift_arr(FA_bar_pass_all,
-                                                crop_nr = self.crop_TRs_num['FA'], 
+                                                crop_nr = crop_nr, 
                                                 shift = self.shift_TRs_num)
         
         ## bar midpoint coordinates
@@ -75,8 +85,8 @@ class FA_model(Model):
         ## bar direction (vertical vs horizontal)
         direction_bar = run_bar_pos_df[run_bar_pos_df['attend_condition'] == attend_bar].bar_pass_direction_at_TR.values[0]
 
-        # save screen display for each TR (or if osf > 1 then for #TRs * osf)
-        visual_dm_array = np.zeros((len(condition_per_TR) * osf, 
+        # save screen display for time stamp (#TRs * TR * osf)
+        visual_dm_array = np.zeros((int(len(condition_per_TR) * oversampling_time), 
                                     round(self.screen_res[0] * res_scaling), 
                                     round(self.screen_res[1] * res_scaling)))
         i = 0
@@ -113,11 +123,11 @@ class FA_model(Model):
                 i = i+1
                 
                 ## save in array - takes into account stim dur in seconds
-                visual_dm_array[int(trl*osf):int(trl*osf + osf*stim_dur_seconds), ...] = np.array(img)[::round(1/res_scaling),::round(1/res_scaling),0][np.newaxis,...]
+                visual_dm_array[int(trl*oversampling_time):int(trl*oversampling_time + stim_dur), ...] = np.array(img)[::round(1/res_scaling),::round(1/res_scaling),0][np.newaxis,...]
                 
             else:
                 ## save in array
-                visual_dm_array[int(trl*osf):int(trl*osf + osf), ...] = np.array(img)[::round(1/res_scaling),::round(1/res_scaling),0][np.newaxis,...]
+                visual_dm_array[int(trl*oversampling_time):int(trl*oversampling_time + oversampling_time), ...] = np.array(img)[::round(1/res_scaling),::round(1/res_scaling),0][np.newaxis,...]
 
         # swap axis to have time in last axis [x,y,t]
         visual_dm = visual_dm_array.transpose([1,2,0])
@@ -144,10 +154,10 @@ class FA_model(Model):
 
         """ 
         
-        ## get behavioral info 
-        mri_beh = preproc_behdata.PreprocBeh(self.MRIObj)
+        # set number of TRs to crop
+        crop_nr = self.crop_TRs_num['FA'] if self.crop_TRs['FA'] == True else None
         
-        # set empty dict
+        # set empty dicts
         out_dict = {}
         
         ## loop over files
@@ -159,24 +169,27 @@ class FA_model(Model):
             out_dict['r{r}s{s}'.format(r = run_num, s = ses_num)] = {}
             
             ## get bar position df for run
-            bar_pos_df = mri_beh.load_FA_bar_position(participant, ses = 'ses-{s}'.format(s = ses_num), 
-                                                    ses_type = 'func')
-            run_bar_pos_df = bar_pos_df['run-{r}'.format(r = run_num)]
+            run_bar_pos_df = self.mri_beh.load_FA_bar_position(participant, ses = 'ses-{s}'.format(s = ses_num), 
+                                                    ses_type = 'func', run_num = run_num)
             
             ## GET DM FOR ATTENDED BAR
             out_dict['r{r}s{s}'.format(r = run_num, 
-                                            s = ses_num)]['att_bar'] = self.get_bar_dm(run_bar_pos_df,
+                                        s = ses_num)]['att_bar'] = self.get_bar_dm(run_bar_pos_df,
                                                                                         attend_bar = True,
                                                                                         osf = self.osf, res_scaling = self.res_scaling,
+                                                                                        crop_nr = crop_nr,
                                                                                         stim_dur_seconds = self.MRIObj.FA_bars_phase_dur,
-                                                                                        FA_bar_pass_all = mri_beh.FA_bar_pass_all)
+                                                                                        FA_bar_pass_all = self.mri_beh.FA_bar_pass_all,
+                                                                                        oversample_sec = True)
             ## GET DM FOR UNATTENDED BAR
             out_dict['r{r}s{s}'.format(r = run_num, 
-                                            s = ses_num)]['unatt_bar'] = self.get_bar_dm(run_bar_pos_df,
+                                        s = ses_num)]['unatt_bar'] = self.get_bar_dm(run_bar_pos_df,
                                                                                         attend_bar = False,
                                                                                         osf = self.osf, res_scaling = self.res_scaling,
+                                                                                        crop_nr = crop_nr,
                                                                                         stim_dur_seconds = self.MRIObj.FA_bars_phase_dur,
-                                                                                        FA_bar_pass_all = mri_beh.FA_bar_pass_all)
+                                                                                        FA_bar_pass_all = self.mri_beh.FA_bar_pass_all,
+                                                                                        oversample_sec = True)
 
             if save_overlap:
                 ## GET DM FOR OVERLAP OF BARS
@@ -333,6 +346,10 @@ class Gain_model(FA_model):
         file_ext: dict
             file extension, to select appropriate files
         """  
+        # if we provided session as str
+        if isinstance(ses, str):
+            ses = int(re.findall(r'\d{1,10}', ses)[0]) # make int
+
 
         ## get list of files to load
         bold_filelist = self.get_bold_file_list(participant, task = 'FA', ses = ses, file_ext = file_ext)
@@ -387,9 +404,13 @@ class Gain_model(FA_model):
 
         # subselect pRF estimates similar to data
         # to avoid index issues
-        masked_prf_estimates = {}
-        for key in pp_prf_estimates.keys():
-            masked_prf_estimates[key] = self.subselect_array(pp_prf_estimates[key], task = 'pRF', chunk_num = chunk_num, vertex = vertex)
+        if (chunk_num is not None) or (vertex is not None):
+            masked_prf_estimates = {}
+            for key in pp_prf_estimates.keys():
+                print('Masking pRF estimates, to have same # vertices of FA data')
+                masked_prf_estimates[key] = self.subselect_array(pp_prf_estimates[key], task = 'pRF', chunk_num = chunk_num, vertex = vertex)
+        else:
+            masked_prf_estimates = pp_prf_estimates
 
         # find indexes worth fitting
         # this is, where pRF rsq > than predetermined threshold
@@ -465,7 +486,7 @@ class Gain_model(FA_model):
                         kws={'prf_model_name': prf_model_name, 'visual_dm_dict': visual_dm_dict}, 
                         method = method, options = dict(ftol = ftol))
 
-        elif self.method == 'trust-constr':
+        elif method == 'trust-constr':
             out = minimize(self.get_gain_residuals, starting_params, args = [data],
                         kws={'prf_model_name': prf_model_name, 'visual_dm_dict': visual_dm_dict}, 
                         method = method, tol = ftol, options = dict(xtol = xtol))
@@ -499,7 +520,7 @@ class Gain_model(FA_model):
         model_arr = self.get_gain_timecourse(tc_pars, visual_dm_dict, 
                                                     prf_model_name = prf_model_name, 
                                                     fit_hrf = self.fit_hrf, osf = self.osf, hrf_onset = self.hrf_onset,
-                                                    bar_keys = ['att_bar', 'unatt_bar'], filter_predictions = False)
+                                                    bar_keys = ['att_bar', 'unatt_bar'], filter_prf_predictions = False, filter_type = 'dc')
 
         # return residuals
         print(mri_utils.error_resid(timecourse, model_arr, mean_err = False))
@@ -510,7 +531,7 @@ class Gain_model(FA_model):
 
 
     def get_gain_timecourse(self, pars, visual_dm_dict, prf_model_name = 'gauss', fit_hrf = True, osf = 10, hrf_onset = -.8,
-                           bar_keys = ['att_bar', 'unatt_bar'], filter_predictions = False):
+                           bar_keys = ['att_bar', 'unatt_bar'], filter_prf_predictions = False, filter_type = 'dc'):
     
         """
         given pars for that vertex 
@@ -558,7 +579,7 @@ class Gain_model(FA_model):
             if prf_model_name == 'gauss':
 
                 model_obj = Iso2DGaussianModel(stimulus = fa_stim,
-                                                filter_predictions = filter_predictions,
+                                                filter_predictions = filter_prf_predictions,
                                                 filter_type = self.MRIObj.params['mri']['filtering']['type'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
@@ -570,7 +591,7 @@ class Gain_model(FA_model):
             elif prf_model_name == 'css':
 
                 model_obj = CSS_Iso2DGaussianModel(stimulus = fa_stim,
-                                                filter_predictions = filter_predictions,
+                                                filter_predictions = filter_prf_predictions,
                                                 filter_type = self.MRIObj.params['mri']['filtering']['type'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
@@ -583,7 +604,7 @@ class Gain_model(FA_model):
             elif prf_model_name == 'dog':
 
                 model_obj = DoG_Iso2DGaussianModel(stimulus = fa_stim,
-                                                filter_predictions = filter_predictions,
+                                                filter_predictions = filter_prf_predictions,
                                                 filter_type = self.MRIObj.params['mri']['filtering']['type'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
@@ -596,7 +617,7 @@ class Gain_model(FA_model):
             elif prf_model_name == 'dn':
 
                 model_obj = Norm_Iso2DGaussianModel(stimulus = fa_stim,
-                                                filter_predictions = filter_predictions,
+                                                filter_predictions = filter_prf_predictions,
                                                 filter_type = self.MRIObj.params['mri']['filtering']['type'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
@@ -622,7 +643,11 @@ class Gain_model(FA_model):
             run_timecourse = model_obj.return_prediction(*list([pars[val].value for val in self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][prf_model_name][:-1]]))
             
             ## resample to TR and stack
-            model_arr = np.vstack([model_arr, mri_utils.resample_arr(run_timecourse, osf = osf, final_sf = 1)]) if model_arr.size else mri_utils.resample_arr(run_timecourse, osf = osf, final_sf = 1)
+            model_arr = np.vstack([model_arr, mri_utils.resample_arr(run_timecourse, osf = osf, final_sf = self.MRIObj.TR)]) if model_arr.size else mri_utils.resample_arr(run_timecourse, osf = osf, final_sf = self.MRIObj.TR)
+
+            if filter_type == 'dc':
+                ## filter with discrete cosine
+                model_arr = mri_utils.dc_data(model_arr)
 
         return model_arr
 

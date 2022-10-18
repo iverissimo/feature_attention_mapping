@@ -1373,7 +1373,8 @@ def select_confounds(file, outdir, reg_names = ['a_comp_cor','cosine','framewise
     return outfiles
 
 
-def regressOUT_confounds(file, counfounds, outdir, TR=1.6, plot_vert = False):
+def regressOUT_confounds(file, counfounds, outdir, TR=1.6, plot_vert = False, 
+                                        detrend = True, standardize = 'psc', standardize_confounds = True):
     
     """ 
     regress out confounds from data
@@ -1386,6 +1387,12 @@ def regressOUT_confounds(file, counfounds, outdir, TR=1.6, plot_vert = False):
         absolute filename of confounds tsv (or list of filenames)
     outdir : str
         path to save new file
+    detrend: bool
+        input for nilearn signal clean, Whether to detrend signals or not
+    standardize: str or False
+        input for nilearn signal clean, Strategy to standardize the signal (if False wont do it)
+    standardize_confounds: bool
+        input for nilearn signal clean, If set to True, the confounds are z-scored
     
     Outputs
     -------
@@ -1409,9 +1416,17 @@ def regressOUT_confounds(file, counfounds, outdir, TR=1.6, plot_vert = False):
         # get file extension
         file_extension = '.{b}'.format(b = input_file.rsplit('.', 2)[-1])
 
+        # if we are also standardizing, then add that to name
+        if isinstance(standardize, str):
+            stand_name = '_{s}'.format(s = standardize)
+        else:
+            stand_name = ''
+            standardize = False
+
         # set output filename
         output_file = op.join(outdir, 
-                    op.split(input_file)[-1].replace(file_extension,'_{name}{ext}'.format(name = 'confound_psc',
+                    op.split(input_file)[-1].replace(file_extension,'_{c}{s}{ext}'.format(c = 'confound',
+                                                                                           s = stand_name,
                                                                                            ext = file_extension)))
         # if file already exists, skip
         if op.exists(output_file): 
@@ -1432,8 +1447,8 @@ def regressOUT_confounds(file, counfounds, outdir, TR=1.6, plot_vert = False):
             conf_df = pd.read_csv(conf_file, sep="\t")
             
             # clean confounds from data
-            filtered_signal = clean(signals = data.T, confounds = conf_df.values, detrend = True, 
-                              standardize = 'psc', standardize_confounds = True, filter = False, t_r = TR)
+            filtered_signal = clean(signals = data.T, confounds = conf_df.values, detrend = detrend, 
+                              standardize = standardize, standardize_confounds = standardize_confounds, filter = False, t_r = TR)
             
             data_filt = filtered_signal.T
             

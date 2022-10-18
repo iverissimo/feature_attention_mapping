@@ -202,7 +202,10 @@ class Model:
             if data_arr.shape[0]>1:
                 data2fit = np.vstack([data2fit, data_out[np.newaxis, ...]]) if data2fit.size else data_out[np.newaxis, ...]
             else:
-                data2fit = data_out[np.newaxis, ...]
+                if task == 'FA':
+                    data2fit = data_out[np.newaxis, ...]
+                else:
+                    data2fit = data_out
 
         # return filelist if that matters for fitting (mainly for FA task)
         if return_filenames:

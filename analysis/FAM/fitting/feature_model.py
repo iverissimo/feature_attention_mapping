@@ -414,7 +414,7 @@ class Gain_model(FA_model):
 
         # find indexes worth fitting
         # this is, where pRF rsq > than predetermined threshold
-        ind2fit = np.where((masked_prf_estimates['r2'] > rsq_threshold))[0]
+        ind2fit = np.where(((masked_prf_estimates['r2'] > rsq_threshold) & (masked_prf_estimates['size'] < 2)))[0]
 
         ## now get FA gain estimate keys
         gain_keys = self.get_gain_run_keys(visual_dm_dict)

@@ -1992,3 +1992,13 @@ def error_resid(timecourse, prediction, mean_err = False, return_array = False):
 
         else:
             return np.sum((timecourse - prediction) ** 2) # calculate residual sum of squared errors
+
+
+
+def calc_rsq(voxel, prediction):
+
+    """"
+    Calculate rsq of fit
+    """
+
+    return 1 - (np.sum((voxel - prediction)**2)/ np.sum((voxel - np.mean(voxel))**2))  

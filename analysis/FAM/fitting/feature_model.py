@@ -99,9 +99,9 @@ class FA_model(Model):
 
                 if direction_bar[i] == 'vertical':
                     coordenates_bars = {'upLx': 0, 
-                                        'upLy': self.screen_res[1]/2+midpoint_bar[i][-1]+0.5*self.bar_width['FA']*self.screen_res[1],
+                                        'upLy': self.screen_res[1]/2-midpoint_bar[i][-1]+0.5*self.bar_width['FA']*self.screen_res[1],
                                         'lowRx': self.screen_res[0], 
-                                        'lowRy': self.screen_res[1]/2+midpoint_bar[i][-1]-0.5*self.bar_width['FA']*self.screen_res[1]}
+                                        'lowRy': self.screen_res[1]/2-midpoint_bar[i][-1]-0.5*self.bar_width['FA']*self.screen_res[1]}
 
 
                 elif direction_bar[i] == 'horizontal':
@@ -436,7 +436,7 @@ class Gain_model(FA_model):
 
             print('Updating parameters with pRF estimate %s values'%key)
 
-            pars_arr = Parallel(n_jobs = 2)(delayed(self.update_parameters)(pars_arr[i], 
+            pars_arr = Parallel(n_jobs = n_jobs)(delayed(self.update_parameters)(pars_arr[i], 
                                                                                 par_key = key, 
                                                                                 value = masked_prf_estimates[key][ind2fit[i]], 
                                                                                 vary = False, 
@@ -445,7 +445,7 @@ class Gain_model(FA_model):
                                                                                 brute_step = None,
                                                     constrain_expression = None, contrain_keys = []) for i in tqdm(range(len(ind2fit))))
     
-        self.pars_arr = np.array(pars_arr)
+        self.pars_arr = list(pars_arr) #np.array(pars_arr)
 
         ## actually fit data
         # call iterative fit function, giving it masked data and pars
@@ -459,17 +459,58 @@ class Gain_model(FA_model):
 
     
     def iterative_fit(self, data, starting_params, prf_model_name = 'gauss', visual_dm_dict = None, 
-                                                    xtol = 1e-3, ftol = 1e-3, method = 'lbfgsb', n_jobs = 16):
+                                                    xtol = 1e-3, ftol = 1e-3, method = None, n_jobs = 16):
 
         """
-        perform iterative fit of params on data
+        perform iterative fit of params on all vertices of data
 
         Parameters
         ----------
         data: arr
-            3D data array of [runs, vertex, time]
+            3D data array of [runs, vertices, time]
         starting_params: list/arr
             array of data size with lmfit Parameter object with relevant estimates per vertex
+        prf_model_name: str
+            name of pRF model to use
+        visual_dm_dict: dict
+            visual DM for each run and condition of interest 
+            ex: visual_dm_dict['r1s1'] = {'att_bar': [x,y,t], 'unatt_bar': [x,y,t], ...}
+        method:
+            optimizer method to use in minimize
+        """ 
+
+        # define optimizer method to use
+        if method is None:
+            method = self.optimizer['FA']
+
+
+        ## actually fit vertices
+        # and output relevant params + rsq of model fit in dataframe
+
+        results = np.array(Parallel(n_jobs=n_jobs)(delayed(self.iterative_search)(data[:,ind,:],
+                                                                                starting_params[ind],
+                                                                                prf_model_name = prf_model_name,
+                                                                                visual_dm_dict = visual_dm_dict,
+                                                                                xtol = xtol, ftol = ftol,
+                                                                                method = method)
+                                                                            for ind in tqdm(range(len(starting_params)))))
+
+        return results
+
+
+
+    def iterative_search(self, train_timecourse, tc_pars, prf_model_name = 'gauss', visual_dm_dict = None, 
+                                                    xtol = 1e-3, ftol = 1e-3, method = None):
+
+        """
+        iterative serach func for a single vertex 
+
+        Parameters
+        ----------
+        train_timecourse: arr
+            2D data array of [runs, time]
+        tc_pars: list/arr
+            lmfit Parameter object
         prf_model_name: str
             name of pRF model to use
         visual_dm_dict: dict
@@ -482,16 +523,34 @@ class Gain_model(FA_model):
         ## minimize residuals
         if method == 'lbfgsb': 
             
-            out = minimize(self.get_gain_residuals, starting_params, args = [data],
+            out = minimize(self.get_gain_residuals, tc_pars, args = [train_timecourse],
                         kws={'prf_model_name': prf_model_name, 'visual_dm_dict': visual_dm_dict}, 
                         method = method, options = dict(ftol = ftol))
 
         elif method == 'trust-constr':
-            out = minimize(self.get_gain_residuals, starting_params, args = [data],
+            out = minimize(self.get_gain_residuals, tc_pars, args = [train_timecourse],
                         kws={'prf_model_name': prf_model_name, 'visual_dm_dict': visual_dm_dict}, 
                         method = method, tol = ftol, options = dict(xtol = xtol))
 
-        return out
+        ## calculate rsq of best fitting params
+        # need to make prediction timecourse first
+        model_arr = self.get_gain_timecourse(out.params, visual_dm_dict, 
+                                       prf_model_name = prf_model_name, bar_keys = ['att_bar', 'unatt_bar'])
+
+        # set output params as dict
+        out_dict = out.params.valuesdict() 
+        
+        ## loop over runs
+        output_list = []
+        for ind in range(train_timecourse.shape[0]):
+
+            out_dict['r2'] = mri_utils.calc_rsq(train_timecourse[ind], model_arr[ind])
+
+            ## save results in list of dicts
+            output_list.append(out_dict.copy())
+        
+        # return best fitting params in list
+        return output_list
 
 
 
@@ -526,7 +585,6 @@ class Gain_model(FA_model):
         print(mri_utils.error_resid(timecourse, model_arr, mean_err = False))
 
         return mri_utils.error_resid(timecourse, model_arr, mean_err = False, return_array = True)
-
 
 
 

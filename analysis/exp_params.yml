@@ -200,7 +200,7 @@ mri: # refers to the Psychopy SyncGenerator class
     FA:
       fit_model: 'gain'
 
-      optimizer: 'L-BFGS-B'
+      optimizer: 'lbfgsb' #'trust-constr'
 
       fix_bold_baseline: True
       correct_baseline: True
@@ -208,7 +208,7 @@ mri: # refers to the Psychopy SyncGenerator class
 
       total_chunks: {'fsaverage': 83, 'T1w': 89, 'fsLR_den-170k': 54} # total number of chunks to split the data, depends on space of files
 
-      prf_rsq_threshold: .8 #0.2 
+      prf_rsq_threshold: 0.35 # .8 
 
     
 eyetracking:

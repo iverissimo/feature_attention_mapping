@@ -22,6 +22,9 @@ parser.add_argument("--dir", type = str, help="System we are running analysis (l
 parser.add_argument("--prf_model_name", type = str, help="Type of pRF model to fit: gauss [default], css, dn, etc...")
 parser.add_argument("--fit_hrf", type = int, help="1/0 - if we want to fit hrf on the data or not [default]")
 
+# only relevant for FA fitting
+parser.add_argument("--fa_model_name", type = str, help="Type of FA model to fit: gain [default], glm, etc...")
+
 # data arguments
 parser.add_argument("--ses2fit", type = str, help="Session to fit (if ses-mean [default] then will average both session when that's possible)")
 parser.add_argument("--run_type", help="Type of run to fit (mean of runs [default], median, 1, loo_1, ...)")
@@ -68,6 +71,11 @@ system_dir = args.dir if args.dir is not None else "lisa"
 # prf model name and options
 prf_model_name = args.prf_model_name if args.prf_model_name is not None else "gauss" 
 fit_hrf = bool(args.fit_hrf) if args.fit_hrf is not None else False 
+#
+# FA model name
+fa_model_name = args.fa_model_name if args.fa_model_name is not None else 'gain'
+
+model2fit = prf_model_name if task == 'pRF' else fa_model_name
 
 # SLURM options
 # for LISA
@@ -96,7 +104,7 @@ match system_dir:
 #SBATCH -N 1
 #SBATCH -v
 #SBATCH --cpus-per-task=16
-#SBATCH --output=$BD/slurm_pRFfit_%A.out\n""".format(rtime=run_time)
+#SBATCH --output=$BD/slurm_{task}_{model}_fit_%A.out\n""".format(rtime=run_time, task = task, model = model2fit)
                     
         if partition_name is not None:
             slurm_cmd += '#SBATCH --partition {p}\n'.format(p=partition_name)
@@ -109,6 +117,11 @@ match system_dir:
         # set fit folder name
         if task == 'pRF':
             fitfolder = 'pRF_fit'
+        elif task == 'FA':
+            if model2fit == 'gain':
+                fitfolder = 'FA_Gain_fit'
+            elif model2fit == 'glm':
+                fitfolder = 'FA_GLM_fit'
 
         # batch dir to save .sh files
         batch_dir = '/home/inesv/batch/'
@@ -127,10 +140,9 @@ match system_dir:
             for ch in ch_list:
 
                 # set fitting model command 
-
                 fit_cmd = """python {pth}/fit_model.py --participant {pp} --task2model {task} --dir {dir} \
 --ses {ses} --run_type {rt} --chunk_num {ch} \
---prf_model_name {prf_mod} --fit_hrf {fh} --wf_dir $TMPDIR\n\n""".format(pth = op.split(prf_model.__file__)[0],
+--prf_model_name {prf_mod} --fa_model_name {fa_mod} --fit_hrf {fh} --wf_dir $TMPDIR\n\n""".format(pth = op.split(prf_model.__file__)[0],
                                                         pp = pp,
                                                         task = task,
                                                         dir = system_dir,
@@ -138,11 +150,12 @@ match system_dir:
                                                         rt = run_type,
                                                         ch = ch,
                                                         prf_mod = prf_model_name,
+                                                        fa_mod = fa_model_name,
                                                         fh = int(fit_hrf))
 
-                # update slurm job script
-
-                batch_string =  slurm_cmd + """# call the programs
+                # if we are fitting FA, then also need to copy pRF estimates to scratch
+                if task == 'pRF':
+                    slurm_cmd = slurm_cmd + """# call the programs
 echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
 # make derivatives dir in node and sourcedata because we want to access behav files
@@ -166,7 +179,41 @@ fi
 
 wait
 
-$PY_CMD
+"""
+                else:
+                    slurm_cmd = slurm_cmd + """# call the programs
+echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
+
+# make derivatives dir in node and sourcedata because we want to access behav files
+mkdir -p $TMPDIR/derivatives/{post_fmriprep,$FITFOLDER,pRF_fit}/$SPACE/sub-$SJ_NR
+mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR
+
+wait
+
+cp -r $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/post_fmriprep/$SPACE
+
+wait
+
+cp -r $SOURCE_DIR/sub-$SJ_NR $TMPDIR/sourcedata/
+
+wait
+
+if [ -d "$DERIV_DIR/pRF_fit/$SPACE/sub-$SJ_NR" ] 
+then
+    cp -r $DERIV_DIR/pRF_fit/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/pRF_fit/$SPACE
+fi
+
+if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ] 
+then
+    cp -r $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/$FITFOLDER/$SPACE
+fi
+
+wait
+
+"""
+                # update slurm job script
+
+                batch_string =  slurm_cmd + """$PY_CMD
 
 wait          # wait until programs are finished
 

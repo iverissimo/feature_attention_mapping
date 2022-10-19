@@ -362,6 +362,10 @@ class Gain_model(FA_model):
         masked_data = data.copy()
         masked_data[np.where(np.isnan(data[...,0]))[0]] = 0
 
+        ## set prf model name
+        if prf_model_name is None:
+            prf_model_name = self.model_type['pRF']
+
         ## set output dir to save estimates
         if outdir is None:
             if 'loo_' in run_type:
@@ -369,6 +373,9 @@ class Gain_model(FA_model):
             else:
                 outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses))
             
+        # add model identifier to it
+        outdir = op.join(outdir, 'it_{pm}'.format(pm = prf_model_name))
+
         os.makedirs(outdir, exist_ok = True)
         print('saving files in %s'%outdir)
 
@@ -388,10 +395,6 @@ class Gain_model(FA_model):
         ## Get visual dm for different bars, and overlap
         # dict with visual dm per run, will be weighted and combined when actually fitting
         visual_dm_dict = self.get_visual_DM_dict(participant, train_file_list, save_overlap = fit_overlap)
-
-        ## set prf model name
-        if prf_model_name is None:
-            prf_model_name = self.model_type['pRF']
 
         ## get pRF model estimate keys
         prf_est_keys = [val for val in list(pp_prf_estimates.keys()) if val!='r2']
@@ -414,7 +417,7 @@ class Gain_model(FA_model):
 
         # find indexes worth fitting
         # this is, where pRF rsq > than predetermined threshold
-        ind2fit = np.where(((masked_prf_estimates['r2'] > rsq_threshold) & (masked_prf_estimates['size'] < 2)))[0]
+        ind2fit = np.where(((masked_prf_estimates['r2'] > rsq_threshold)))[0]
 
         ## now get FA gain estimate keys
         gain_keys = self.get_gain_run_keys(visual_dm_dict)
@@ -449,13 +452,30 @@ class Gain_model(FA_model):
 
         ## actually fit data
         # call iterative fit function, giving it masked data and pars
-        # in iterative function, will have to call other function that makes time course and minimizes residual?
-        # need to think of logical way of paralellizing fits
+        results = self.iterative_fit(masked_data, self.pars_arr, prf_model_name = prf_model_name, visual_dm_dict = visual_dm_dict, 
+                                                    xtol = xtol, ftol = ftol, method = None, n_jobs = n_jobs) 
 
-        #masked_data
+        ## saves results as list of dataframes, with length = #runs
+        results_list = []
+        
+        for r, name in enumerate(visual_dm_dict.keys()):
+            
+            # convert fitted params list of dicts as Dataframe
+            fitted_params_df = pd.DataFrame(d for d in results[...,r])
+            # and add vertex number for bookeeping
+            if vertex is not None:
+                fitted_params_df['vertex'] = vertex
+            else:
+                fitted_params_df['vertex'] = ind2fit
 
+            results_list.append(fitted_params_df.copy())
 
-        return masked_data, train_file_list, ind2fit
+            # if we want to save estimates, do so as csv
+            if save_estimates:
+                filename = basefilename.replace('runtype','run-{n}_runtype'.format(n = name))
+                fitted_params_df.to_csv(op.join(outdir, filename.replace('.npz', '_it_{pm}_estimates.csv'.format(pm = prf_model_name))))
+
+        return results_list
 
     
     def iterative_fit(self, data, starting_params, prf_model_name = 'gauss', visual_dm_dict = None, 
@@ -483,7 +503,6 @@ class Gain_model(FA_model):
         if method is None:
             method = self.optimizer['FA']
 
-
         ## actually fit vertices
         # and output relevant params + rsq of model fit in dataframe
 
@@ -503,7 +522,7 @@ class Gain_model(FA_model):
                                                     xtol = 1e-3, ftol = 1e-3, method = None):
 
         """
-        iterative serach func for a single vertex 
+        iterative search func for a single vertex 
 
         Parameters
         ----------

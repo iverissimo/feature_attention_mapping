@@ -210,6 +210,8 @@ mri: # refers to the Psychopy SyncGenerator class
 
       prf_rsq_threshold: 0.35 # .8 
 
+      glm_regs: ['both_bar'] #['att_bar', 'unatt_bar', 'both_bar'] # regressor names for GLM fitting
+
     
 eyetracking:
 

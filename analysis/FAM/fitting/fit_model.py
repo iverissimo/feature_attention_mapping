@@ -179,7 +179,23 @@ match task2model:
 
             case 'glm':
 
-                raise NameError('Not implemented yet')
+                ## load FA model class
+                FAM_FA = feature_model.GLM_model(FAM_data)
+
+                ## actually fit
+                print('Fitting started!')
+                # to time it
+                start_time = time.time()
+
+                _ = FAM_FA.fit_data(participant, pp_prf_estimates, 
+                                            ses = ses, run_type = run_type,
+                                            chunk_num = chunk_num, vertex = vertex, ROI = ROI,
+                                            prf_model_name = prf_model_name, rsq_threshold = None, file_ext = file_ext, 
+                                            outdir = None, save_estimates = True,
+                                            fit_overlap = False,
+                                            reg_names = FAM_FA.reg_names, n_jobs = 16) 
+
+                print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
 
 
 

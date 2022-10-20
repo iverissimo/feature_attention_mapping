@@ -753,6 +753,8 @@ class GLM_model(FA_model):
         else:
             self.outputdir = outputdir
 
+        self.reg_names = self.MRIObj.params['mri']['fitting']['FA']['glm_regs']
+
 
     def fit_data(self, participant, pp_prf_estimates, ses = 1,
                     run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,

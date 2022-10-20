@@ -25,11 +25,11 @@ parser.add_argument("--wf_dir", type = str, help="Path to workflow dir, if such 
 # data arguments
 parser.add_argument("--ses", type = str, help="Session to fit (if ses-mean [default for pRF task] then will average both session when that's possible)")
 parser.add_argument("--run_type", help="Type of run to fit (mean [default for pRF task], median, 1, loo_r1s1, ...)")
-parser.add_argument("--chunk_num", type = int, help="Chunk number to fit or None [default]")
+parser.add_argument("--chunk_num", help="Chunk number to fit or None [default]")
 
 #parser.add_argument("--vertex", nargs='+', type=int, help="Vertex index to fit, or list of indexes or None [default]", default =[])
-parser.add_argument("--vertex", type = str, help="Vertex index to fit, or list of indexes or None [default]")
-parser.add_argument("--ROI",type = str, help="ROI name to fit")
+parser.add_argument("--vertex", help="Vertex index to fit, or list of indexes or None [default]")
+parser.add_argument("--ROI", help="ROI name to fit or None [default]")
 
 # only relevant for pRF fitting
 parser.add_argument("--prf_model_name", type = str, help="Type of model to fit: gauss [default], css, dn, etc...")
@@ -64,8 +64,8 @@ elif task2model == 'FA':
 # vertex, chunk_num, ROI
 #vertex = str(args.vertex).strip('][').split(', ')
 vertex = ast.literal_eval(str(args.vertex)) if args.vertex is not None else None
-chunk_num = args.chunk_num 
-ROI = args.ROI 
+chunk_num = int(args.chunk_num) if args.chunk_num is not None else None
+ROI = str(args.ROI) if args.ROI is not None else None
 #
 #
 # system location

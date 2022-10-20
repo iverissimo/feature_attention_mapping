@@ -823,6 +823,8 @@ class GLM_model(FA_model):
         # dict with visual dm per run
         visual_dm_dict = self.get_visual_DM_dict(participant, train_file_list, save_overlap = fit_overlap)
 
+        self.visual_dm_dict = visual_dm_dict
+
         ## create a stimulus visual design matrix (with both bars combined)
         # loop over runs
         print('updating visual dm dict to sum both bars')
@@ -918,7 +920,7 @@ class GLM_model(FA_model):
 
 
 
-    def fit_fa_glm(self,  train_timecourse, tc_pars, prf_model_name = 'gauss', visual_dm_dict = None, reg_names = ['both_bar']):
+    def fit_fa_glm(self, train_timecourse, tc_pars, prf_model_name = 'gauss', visual_dm_dict = None, reg_names = ['both_bar']):
 
         """
         given pars for that vertex (pRF estimates)
@@ -1086,10 +1088,51 @@ class GLM_model(FA_model):
         return model_arr
 
 
+    def get_prediction_from_betas(self, estimates_df, reg_names = ['both_bar'], prf_model_name = 'gauss', visual_dm_dict = None, 
+                                        pp_prf_estimates = None, vertex = None):
 
+        """
+        quick function to get prediction timecourse from beta values
+        of a specific vertex
 
+        """ 
+        
+        ## get pRF model estimate keys
+        prf_est_keys = [val for val in list(pp_prf_estimates.keys()) if val!='r2']
+        print('pRF {m} model estimates found {l}'.format(m = prf_model_name, l = str(prf_est_keys)))
 
+        # make parameters object from dataframe
+        tc_pars = Parameters()
+        for key in prf_est_keys:
+            tc_pars = self.update_parameters(tc_pars, par_key = key, value = pp_prf_estimates[key][vertex], vary = False)
 
+        ## loop over regressors to make design matrix
+        for ind, reg in enumerate(reg_names):
+            stim_regressor = self.get_regressor_timecourse(tc_pars, visual_dm_dict, 
+                                            prf_model_name = prf_model_name, fit_hrf = self.fit_hrf, 
+                                            osf = self.osf, hrf_onset = self.hrf_onset,
+                                            reg_name = reg, filter_prf_predictions = False, filter_type = 'dc')
 
+            # stack them
+            if ind == 0:
+                ## always add intercept
+                fa_regressor_dm = np.stack((np.ones(np.array(stim_regressor).shape),
+                                            np.array(stim_regressor)))
+            else:
+                fa_regressor_dm = np.vstack([fa_regressor_dm, np.array(stim_regressor)[np.newaxis,...]]) # add new axis to account for new shape [reg, run, time]
+        
+        # swap axis to have [run, regressors, time]
+        fa_regressor_dm = fa_regressor_dm.transpose([1,0,2])
+
+        # all regressor names
+        all_regs = ['intercept']+reg_names
+
+        # get beta values
+        betas = [estimates_df[estimates_df.vertex == vertex][key].values[0] for key in all_regs]
+
+        # make prediction timecourse 
+        prediction = fa_regressor_dm[0].T.dot(betas)
+
+        return prediction
 
 

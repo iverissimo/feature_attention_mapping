@@ -123,7 +123,7 @@ match task:
         match viz:
 
             case 'single_vertex':
-                plotter.plot_singlevert(sj, vertex = vertex, file_ext = file_ext, 
+                plotter.plot_singlevert_pRF(sj, vertex = vertex, file_ext = file_ext, 
                                         fit_now = fit_now, prf_model_name = prf_model_name)
 
 

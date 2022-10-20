@@ -64,7 +64,10 @@ elif task2model == 'FA':
 # vertex, chunk_num, ROI
 #vertex = str(args.vertex).strip('][').split(', ')
 vertex = ast.literal_eval(str(args.vertex)) if args.vertex is not None else None
-chunk_num = int(args.chunk_num) if args.chunk_num is not None else None
+if args.chunk_num is None or str(args.chunk_num) == 'None':
+    chunk_num = None
+else:
+    chunk_num = int(args.chunk_num)
 ROI = str(args.ROI) if args.ROI is not None else None
 #
 #

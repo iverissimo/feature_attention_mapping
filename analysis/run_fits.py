@@ -124,7 +124,7 @@ match system_dir:
                 fitfolder = 'FA_GLM_fit'
 
         # batch dir to save .sh files
-        batch_dir = '/home/inesv/batch/'
+        batch_dir = '/home/inesv/batch'
 
         # loop over participants
         for pp in FAM_data.sj_num:
@@ -181,7 +181,7 @@ wait
 """
                 else:
                     # if we are fitting FA, then also need to copy pRF estimates to scratch
-                    
+
                     slurm_cmd = slurm_cmd + """# call the programs
 echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 

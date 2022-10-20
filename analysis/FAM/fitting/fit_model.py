@@ -8,7 +8,7 @@ import time
 
 import yaml
 from FAM.processing import load_exp_settings, preproc_mridata
-from FAM.fitting import prf_model
+from FAM.fitting import prf_model, feature_model
 
 # load settings from yaml
 with open('exp_params.yml', 'r') as f_in:
@@ -23,8 +23,8 @@ parser.add_argument("--dir", type = str, help="System we are running analysis (l
 parser.add_argument("--wf_dir", type = str, help="Path to workflow dir, if such if not standard root dirs(None [default] vs /scratch)")
 
 # data arguments
-parser.add_argument("--ses", type = str, help="Session to fit (if ses-mean [default] then will average both session when that's possible)")
-parser.add_argument("--run_type", help="Type of run to fit (mean [default], median, 1, loo_1, ...)")
+parser.add_argument("--ses", type = str, help="Session to fit (if ses-mean [default for pRF task] then will average both session when that's possible)")
+parser.add_argument("--run_type", help="Type of run to fit (mean [default for pRF task], median, 1, loo_r1s1, ...)")
 parser.add_argument("--chunk_num", type = int, help="Chunk number to fit or None [default]")
 
 #parser.add_argument("--vertex", nargs='+', type=int, help="Vertex index to fit, or list of indexes or None [default]", default =[])
@@ -35,6 +35,8 @@ parser.add_argument("--ROI",type = str, help="ROI name to fit")
 parser.add_argument("--prf_model_name", type = str, help="Type of model to fit: gauss [default], css, dn, etc...")
 parser.add_argument("--fit_hrf", type = int, help="1/0 - if we want tp fit hrf on the data or not [default]")
 
+# only relevant for FA fitting
+parser.add_argument("--fa_model_name", type = str, help="Type of FA model to fit: gain [default], glm, etc...")
 
 ## set variables 
 args = parser.parse_args()
@@ -44,10 +46,19 @@ participant = str(args.participant).zfill(3)
 task2model = args.task2model 
 #
 #
-# type of session and run to use
-ses = args.ses if args.ses is not None else 'ses-mean'
-combine_ses = True if ses == 'ses-mean' else False # if we want to combine sessions
-run_type = args.run_type if args.run_type is not None else 'mean'
+# type of session and run to use, depending on task
+if task2model == 'pRF':
+    ses = args.ses if args.ses is not None else 'ses-mean'
+    combine_ses = True if ses == 'ses-mean' else False # if we want to combine sessions
+    run_type = args.run_type if args.run_type is not None else 'mean'
+
+elif task2model == 'FA':
+    prf_ses = 'ses-mean'
+    combine_ses = True
+    prf_run_type = 'mean'
+    ses = args.ses if args.ses is not None else 1
+    run_type = args.run_type if args.run_type is not None else 'loo_r1s1'
+    
 #
 #
 # vertex, chunk_num, ROI
@@ -65,7 +76,9 @@ wf_dir = args.wf_dir
 # prf model name and options
 prf_model_name = args.prf_model_name if args.prf_model_name is not None else "gauss" 
 fit_hrf = bool(args.fit_hrf) if args.fit_hrf is not None else False 
-
+#
+# FA model name
+fa_model_name = args.fa_model_name if args.fa_model_name is not None else 'gain'
 
 ## Load data object
 print("Fitting data for subject {sj}!".format(sj=participant))
@@ -117,6 +130,56 @@ match task2model:
 
     case 'FA':
 
-        raise NameError('Not implemented yet')
+        print('Fitting {mn} model on the data\n'.format(mn = fa_model_name))
+        print('fit HRF params set to {op}'.format(op = fit_hrf))
+
+        ## load pRF model class
+        FAM_pRF = prf_model.pRF_model(FAM_data)
+
+        # set specific params
+        FAM_pRF.model_type['pRF'] = prf_model_name
+        FAM_pRF.fit_hrf = fit_hrf
+
+        ## load pRF estimates - implies pRF model was already fit (should change to fit pRF model on the spot if needed)
+        pp_prf_estimates, pp_prf_models = FAM_pRF.load_pRF_model_estimates(participant,
+                                                                    ses = prf_ses, run_type = prf_run_type, 
+                                                                    model_name = prf_model_name, 
+                                                                    iterative = True,
+                                                                    fit_hrf = fit_hrf)
+
+        ## get file extension for post-fmriprep
+        # processed files
+        file_ext = FAM_mri_preprocess.get_mrifile_ext()['FA']
+        
+        ## now fit appropriate feature model
+        match fa_model_name:
+
+            case 'gain':
+
+                ## load FA model class
+                FAM_FA = feature_model.Gain_model(FAM_data)
+
+                ## actually fit
+                print('Fitting started!')
+                # to time it
+                start_time = time.time()
+
+                _ = FAM_FA.fit_data(participant, pp_prf_estimates, 
+                                            ses = ses, run_type = run_type,
+                                            chunk_num = chunk_num, vertex = vertex, ROI = ROI,
+                                            prf_model_name = prf_model_name, rsq_threshold = None, file_ext = file_ext, 
+                                            outdir = None, save_estimates = True,
+                                            fit_overlap = True,
+                                            xtol = 1e-3, ftol = 1e-4, n_jobs = 16) 
+
+                print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
+
+            case 'glm':
+
+                raise NameError('Not implemented yet')
+
+
+
+        
 
 

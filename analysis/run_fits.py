@@ -153,7 +153,6 @@ match system_dir:
                                                         fa_mod = fa_model_name,
                                                         fh = int(fit_hrf))
 
-                # if we are fitting FA, then also need to copy pRF estimates to scratch
                 if task == 'pRF':
                     slurm_cmd = slurm_cmd + """# call the programs
 echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
@@ -181,6 +180,8 @@ wait
 
 """
                 else:
+                    # if we are fitting FA, then also need to copy pRF estimates to scratch
+                    
                     slurm_cmd = slurm_cmd + """# call the programs
 echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 

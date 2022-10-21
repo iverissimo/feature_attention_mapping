@@ -31,14 +31,18 @@ class FA_model(Model):
         ----------
         MRIObj : MRIData object
             object from one of the classes defined in processing.load_exp_data
+        outputdir: str or None
+            path to general output directory
+        tasks: list
+            list of strings with task names (mostly needed for Model object input)
             
         """
 
         # need to initialize parent class (Model), indicating output infos
         super().__init__(MRIObj = MRIObj, outputdir = outputdir, tasks = tasks)
 
-        ## set some relevant parameters
-        # prf rsq threshold, to select visual voxels
+        ## prf rsq threshold, to select visual voxels
+        # worth fitting
         self.prf_rsq_threshold = self.MRIObj.params['mri']['fitting']['FA']['prf_rsq_threshold']
 
     
@@ -51,20 +55,22 @@ class FA_model(Model):
 
         Parameters
         ----------
-        run_bar_pos_df : dataframe
-            bar position dataframe for the run
+        run_bar_pos_df : pandas DataFrame
+            bar position dataframe for the run, can be obtained by preproc_behdata.load_FA_bar_position()
         attend_bar : bool
             if we want position for attended bar or not
         osf: int
             oversampling factor, if we want to oversample in time
         res_scaling: float
-            spatial rescaling factor
+            spatial rescaling factor for x and y axis
         stim_dur_seconds: float
             duration of stim (bar presentation) in seconds
         FA_bar_pass_all: list
             list with condition per TR/trial
         crop_nr: int
             if we are cropping TRs, how many (if None, it will not crop TRs)
+        oversample_sec: bool
+            if we want to oversample in seconds (relevant when stim dur is fraction of seconds and not ex: 1.6s = 1TR)
 
         """ 
         # if we want to oversample in seconds, then we need to multiply #TRs by TR duration in seconds
@@ -135,12 +141,12 @@ class FA_model(Model):
         return mri_utils.normalize(visual_dm)
             
     
-    def get_visual_DM_dict(self, participant, filelist, save_overlap = True):
+    def get_visual_DM_dict(self, participant, filelist, save_overlap = True, save_full_stim = True):
     
         """
-        Given participant and filelist of runs to fit,
+        Given participant ID and filelist of runs to fit,
         will return dict for each run in list,
-        with visual DM for each type of regressor (attended bar, unattended bar, overlap etc)
+        with visual DM for each type of regressor (attended bar, unattended bar, overlap, both bars, etc)
         
         ex:
         out_dict['r1s1'] = {'att_bar': [x,y,t], 'unatt_bar': [x,y,t], ...}
@@ -150,7 +156,11 @@ class FA_model(Model):
         participant : str
             participant ID
         filelist : list
-            list with filenames to fit
+            list with absolute filenames to fit
+        save_overlap: bool
+            if we also want to save the overlap of bars (spatial region where both bars overlap)
+        save_both: bool
+            if we want to save both bars combined (full stimulus that was on screen)
 
         """ 
         
@@ -161,7 +171,7 @@ class FA_model(Model):
         out_dict = {}
         
         ## loop over files
-        for file in filelist:
+        for ind, file in enumerate(filelist):
             
             ## get run and ses from file
             run_num, ses_num = mri_utils.get_run_ses_from_str(file) 
@@ -196,8 +206,21 @@ class FA_model(Model):
                 out_dict['r{r}s{s}'.format(r = run_num, 
                                             s = ses_num)]['overlap'] = mri_utils.get_bar_overlap_dm(np.stack((out_dict['r{r}s{s}'.format(r = run_num, s = ses_num)]['att_bar'],
                                                                                                              out_dict['r{r}s{s}'.format(r = run_num, s = ses_num)]['unatt_bar'])))
+
+            if save_full_stim:
+                ## GET DM FOR BOTH BARS COMBINED (FULL STIM THAT WAS ON SCREEN)
+                stimulus_dm = np.sum(np.stack((out_dict['r{r}s{s}'.format(r = run_num, s = ses_num)]['att_bar'],
+                                                out_dict['r{r}s{s}'.format(r = run_num, s = ses_num)]['unatt_bar'])), axis = 0)
+                stimulus_dm[stimulus_dm >=1] = 1
                 
-        return out_dict
+                out_dict['r{r}s{s}'.format(r = run_num, 
+                                            s = ses_num)]['full_stim'] = stimulus_dm
+
+            if ind == 0:
+                # get keys for each condition
+                condition_dm_keys = [name for name in out_dict['r{r}s{s}'.format(r = run_num, s = ses_num)].keys()]
+                
+        return out_dict, condition_dm_keys
 
         
     def initialize_params(self, par_keys = [], value = 1, vary = True, min = -np.inf, max = np.inf, brute_step = None):
@@ -209,19 +232,31 @@ class FA_model(Model):
         ----------
         par_keys: list
             list with string names identifying each parameter
+        value: int/float
+            parameter value
+        vary: bool
+            if we are varying the parameter or stays fixed
+        min: float
+            lower bound of fitting
+        max: float
+            upper bound of fitting
+        brute_step: float
+            if given, will be the step used for fitting (when doing grid fit)
         """  
 
         pars = Parameters()
 
-        for val in par_keys:
-            pars.add(val)
+        # if we actually give parameter keys
+        if len(par_keys) > 0:
+            for val in par_keys:
+                pars.add(val)
 
-            ## update parameter values etc
-            pars[val].value = value
-            pars[val].vary = vary
-            pars[val].min = min
-            pars[val].max = max
-            pars[val].brute_step = brute_step
+                ## update parameter values etc
+                pars[val].value = value
+                pars[val].vary = vary
+                pars[val].min = min
+                pars[val].max = max
+                pars[val].brute_step = brute_step
 
         return pars
 
@@ -279,77 +314,14 @@ class FA_model(Model):
         return pars
 
 
-class Gain_model(FA_model):
-
-    def __init__(self, MRIObj, outputdir = None, tasks = ['pRF', 'FA']):
-        
-        """__init__
-        constructor for class 
-        
-        Parameters
-        ----------
-        MRIObj : MRIData object
-            object from one of the classes defined in processing.load_exp_data
-            
-        """
-
-        # need to initialize parent class (Model), indicating output infos
-        super().__init__(MRIObj = MRIObj, outputdir = outputdir, tasks = tasks)
-
-        # if output dir not defined, then make it in derivatives
-        if outputdir is None:
-            self.outputdir = op.join(self.MRIObj.derivatives_pth,'FA_Gain_fit')
-        else:
-            self.outputdir = outputdir
-
-
-    def get_gain_run_keys(self, visual_dm_dict):
-
-        """ Helper function to get gain parameter keys, 
-        given the design matrix keys
-        
-        Parameters
-        ----------
-        visual_dm_dict : dict
-            visual DM for each run and condition of interest 
-            ex: visual_dm_dict['r1s1'] = {'att_bar': [x,y,t], 'unatt_bar': [x,y,t], ...}
-            
-        """
-    
-        gain_keys = []
-        
-        for run in list(visual_dm_dict.keys()):
-            
-            for ckey in list(visual_dm_dict[run].keys()):
-                
-                if 'gain_{cond}'.format(cond = ckey) not in gain_keys:
-                    gain_keys.append('gain_{cond}'.format(cond = ckey))
-                
-        return gain_keys
-
-
-    def fit_data(self, participant, pp_prf_estimates, ses = 1,
+    def setup_fitting(self, participant, pp_prf_estimates, ses = 1,
                     run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,
                     prf_model_name = None, rsq_threshold = None, file_ext = '_cropped_confound_psc.npy', 
-                    outdir = None, save_estimates = False, fit_overlap = True,
-                    xtol = 1e-3, ftol = 1e-4, n_jobs = 8):
+                    outdir = None, fit_overlap = True, fit_full_stim = False):
 
-        """
-        fit inputted FA models to each participant in participant list
-                
-        Parameters
-        ----------
-        participant: str
-            participant ID
-        run_type: string or int
-            type of run to fit, mean (default), or if int will do single run fit
-        file_ext: dict
-            file extension, to select appropriate files
-        """  
         # if we provided session as str
-        if isinstance(ses, str):
+        if isinstance(ses, str) and len(re.findall(r'\d{1,10}', ses))>0:
             ses = int(re.findall(r'\d{1,10}', ses)[0]) # make int
-
 
         ## get list of files to load
         bold_filelist = self.get_bold_file_list(participant, task = 'FA', ses = ses, file_ext = file_ext)
@@ -364,7 +336,9 @@ class Gain_model(FA_model):
 
         ## set prf model name
         if prf_model_name is None:
-            prf_model_name = self.model_type['pRF']
+            self.prf_model_name = self.model_type['pRF']
+        else: 
+            self.prf_model_name = prf_model_name
 
         ## set output dir to save estimates
         if outdir is None:
@@ -374,7 +348,7 @@ class Gain_model(FA_model):
                 outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses))
             
         # add model identifier to it
-        outdir = op.join(outdir, 'it_{pm}'.format(pm = prf_model_name))
+        outdir = op.join(outdir, 'it_{pm}'.format(pm = self.prf_model_name))
 
         os.makedirs(outdir, exist_ok = True)
         print('saving files in %s'%outdir)
@@ -391,14 +365,15 @@ class Gain_model(FA_model):
             basefilename += '_ROI-{roi}'.format(roi = str(ROI))
         
         basefilename += file_ext.replace('.npy', '.npz')
+        self.basefilename = basefilename
 
-        ## Get visual dm for different bars, and overlap
-        # dict with visual dm per run, will be weighted and combined when actually fitting
-        visual_dm_dict = self.get_visual_DM_dict(participant, train_file_list, save_overlap = fit_overlap)
+        ## Get visual dm for different bars per run
+        # and also condition dm keys (att bar, unatt bar, overlap, full_stim etc)
+        self.visual_dm_dict, self.condition_dm_keys = self.get_visual_DM_dict(participant, train_file_list, save_overlap = fit_overlap, save_full_stim = fit_full_stim)
 
         ## get pRF model estimate keys
-        prf_est_keys = [val for val in list(pp_prf_estimates.keys()) if val!='r2']
-        print('pRF {m} model estimates found {l}'.format(m = prf_model_name, l = str(prf_est_keys)))
+        self.prf_est_keys = [val for val in list(pp_prf_estimates.keys()) if val!='r2']
+        print('pRF {m} model estimates found {l}'.format(m = self.prf_model_name, l = str(self.prf_est_keys)))
 
         ## get relevant indexes to fit
         # set threshold
@@ -417,48 +392,100 @@ class Gain_model(FA_model):
 
         # find indexes worth fitting
         # this is, where pRF rsq > than predetermined threshold
-        ind2fit = np.where(((masked_prf_estimates['r2'] > rsq_threshold)))[0]
+        self.ind2fit = np.where(((masked_prf_estimates['r2'] > rsq_threshold)))[0]
 
-        ## now get FA gain estimate keys
-        gain_keys = self.get_gain_run_keys(visual_dm_dict)
+        return masked_data, masked_prf_estimates
 
-        ## set model parameters 
-        # relevant for grid and iterative fitting
 
-        # first just make array with parameters object per index to fit
+class Amplitude_model(FA_model):
+
+    ## Model that just fits pRF beta value (amplitude)
+    # on full stimulus
+    # Goal is to check if there is already some variance explained by the 
+    # pRF estimates alone (without attentional modulation)
+
+    def __init__(self, MRIObj, outputdir = None, tasks = ['pRF', 'FA']):
+        
+        """__init__
+        constructor for class 
+        
+        Parameters
+        ----------
+        MRIObj : MRIData object
+            object from one of the classes defined in processing.load_exp_data
+        outputdir: str or None
+            path to general output directory
+        tasks: list
+            list of strings with task names (mostly needed for Model object input)
+            
+        """
+
+        # need to initialize parent class (Model), indicating output infos
+        super().__init__(MRIObj = MRIObj, outputdir = outputdir, tasks = tasks)
+
+        # if output dir not defined, then make it in derivatives
+        if outputdir is None:
+            self.outputdir = op.join(self.MRIObj.derivatives_pth,'FA_Amp_fit')
+        else:
+            self.outputdir = outputdir
+
+
+    def fit_data(self, participant, pp_prf_estimates, ses = 1,
+                    run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,
+                    prf_model_name = None, rsq_threshold = None, file_ext = '_cropped_confound_psc.npy', 
+                    outdir = None, save_estimates = False, 
+                    xtol = 1e-3, ftol = 1e-4, n_jobs = 8):
+
+        """
+                
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        run_type: string or int
+            type of run to fit, mean (default), or if int will do single run fit
+        file_ext: dict
+            file extension, to select appropriate files
+        """  
+
+        ## set up fitting by loading data and visual dm for data
+        masked_data, masked_prf_estimates = self.setup_fitting(participant, pp_prf_estimates, ses = ses,
+                                                            run_type = run_type, chunk_num = chunk_num, vertex = vertex, ROI = ROI,
+                                                            prf_model_name = prf_model_name, rsq_threshold = rsq_threshold, file_ext = file_ext, 
+                                                            outdir = outdir, fit_overlap = False, fit_full_stim = True)
+
+        ## initialize empty pars object for all vertices
         print('Initializing paramenters...')
-        pars_arr = Parallel(n_jobs = n_jobs)(delayed(self.initialize_params)(par_keys = list(np.concatenate((prf_est_keys, gain_keys))),
-                                                                                value = 1, 
-                                                                                vary = True, 
-                                                                                min = -np.inf, 
-                                                                                max = np.inf, 
-                                                                                brute_step = None) for i in tqdm(range(len(ind2fit))))
+        pars_arr = Parallel(n_jobs = n_jobs)(delayed(self.initialize_params)(par_keys = []) for i in tqdm(range(len(self.ind2fit))))
 
         # now update pRF values for said index
-        for key in prf_est_keys:
+        for key in self.prf_est_keys:
 
             print('Updating parameters with pRF estimate %s values'%key)
 
+            # we only want to vary beta parameter (for now)
+            vary_par = True if key == 'betas' else False
+
             pars_arr = Parallel(n_jobs = n_jobs)(delayed(self.update_parameters)(pars_arr[i], 
                                                                                 par_key = key, 
-                                                                                value = masked_prf_estimates[key][ind2fit[i]], 
-                                                                                vary = False, 
+                                                                                value = masked_prf_estimates[key][self.ind2fit[i]], 
+                                                                                vary = vary_par, 
                                                                                 min = -np.inf, 
                                                                                 max = np.inf, 
                                                                                 brute_step = None,
-                                                    constrain_expression = None, contrain_keys = []) for i in tqdm(range(len(ind2fit))))
+                                                    constrain_expression = None, contrain_keys = []) for i in tqdm(range(len(self.ind2fit))))
     
-        self.pars_arr = list(pars_arr) #np.array(pars_arr)
+        self.pars_arr = list(pars_arr) 
 
         ## actually fit data
         # call iterative fit function, giving it masked data and pars
-        results = self.iterative_fit(masked_data, self.pars_arr, prf_model_name = prf_model_name, visual_dm_dict = visual_dm_dict, 
+        results = self.iterative_fit(masked_data, self.pars_arr, prf_model_name = self.prf_model_name, visual_dm_dict = self.visual_dm_dict, 
                                                     xtol = xtol, ftol = ftol, method = None, n_jobs = n_jobs) 
 
         ## saves results as list of dataframes, with length = #runs
         results_list = []
         
-        for r, name in enumerate(visual_dm_dict.keys()):
+        for r, name in enumerate(self.visual_dm_dict.keys()):
             
             # convert fitted params list of dicts as Dataframe
             fitted_params_df = pd.DataFrame(d for d in results[...,r])
@@ -466,13 +493,366 @@ class Gain_model(FA_model):
             if vertex is not None:
                 fitted_params_df['vertex'] = vertex
             else:
-                fitted_params_df['vertex'] = ind2fit
+                fitted_params_df['vertex'] = self.ind2fit
 
             results_list.append(fitted_params_df.copy())
 
             # if we want to save estimates, do so as csv
             if save_estimates:
-                filename = basefilename.replace('runtype','run-{n}_runtype'.format(n = name))
+                filename = self.basefilename.replace('runtype','run-{n}_runtype'.format(n = name))
+                fitted_params_df.to_csv(op.join(outdir, filename.replace('.npz', '_it_{pm}_estimates.csv'.format(pm = prf_model_name))))
+
+        return results_list
+
+
+    def iterative_fit(self, data, starting_params, prf_model_name = 'gauss', visual_dm_dict = None, 
+                                                    xtol = 1e-3, ftol = 1e-3, method = None, n_jobs = 16):
+
+        """
+        perform iterative fit of params on all vertices of data
+
+        Parameters
+        ----------
+        data: arr
+            3D data array of [runs, vertices, time]
+        starting_params: list/arr
+            array of data size with lmfit Parameter object with relevant estimates per vertex
+        prf_model_name: str
+            name of pRF model to use
+        visual_dm_dict: dict
+            visual DM for each run and condition of interest 
+            ex: visual_dm_dict['r1s1'] = {'att_bar': [x,y,t], 'unatt_bar': [x,y,t], ...}
+        method:
+            optimizer method to use in minimize
+        """ 
+
+        # define optimizer method to use
+        if method is None:
+            method = self.optimizer['FA']
+
+        ## actually fit vertices
+        # and output relevant params + rsq of model fit in dataframe
+        results = np.array(Parallel(n_jobs=n_jobs)(delayed(self.iterative_search)(data[:,ind,:],
+                                                                                starting_params[ind],
+                                                                                prf_model_name = prf_model_name,
+                                                                                visual_dm_dict = visual_dm_dict,
+                                                                                xtol = xtol, ftol = ftol,
+                                                                                method = method)
+                                                                            for ind in tqdm(range(len(starting_params)))))
+
+        return results
+
+    def iterative_search(self, train_timecourse, tc_pars, prf_model_name = 'gauss', visual_dm_dict = None, 
+                                                    xtol = 1e-3, ftol = 1e-3, method = None):
+
+        """
+        iterative search func for a single vertex 
+
+        Parameters
+        ----------
+        train_timecourse: arr
+            2D data array of [runs, time]
+        tc_pars: list/arr
+            lmfit Parameter object
+        prf_model_name: str
+            name of pRF model to use
+        visual_dm_dict: dict
+            visual DM for each run and condition of interest 
+            ex: visual_dm_dict['r1s1'] = {'att_bar': [x,y,t], 'unatt_bar': [x,y,t], ...}
+        method:
+            optimizer method to use in minimize
+        """ 
+
+        ## minimize residuals
+        if method == 'lbfgsb': 
+            
+            out = minimize(self.get_fit_residuals, tc_pars, args = [train_timecourse],
+                        kws={'prf_model_name': prf_model_name, 'visual_dm_dict': visual_dm_dict}, 
+                        method = method, options = dict(ftol = ftol))
+
+        elif method == 'trust-constr':
+            out = minimize(self.get_fit_residuals, tc_pars, args = [train_timecourse],
+                        kws={'prf_model_name': prf_model_name, 'visual_dm_dict': visual_dm_dict}, 
+                        method = method, tol = ftol, options = dict(xtol = xtol))
+
+        ## calculate rsq of best fitting params
+        # need to make prediction timecourse first
+        model_arr = self.get_fit_timecourse(out.params, visual_dm_dict, 
+                                       prf_model_name = prf_model_name)
+
+        # set output params as dict
+        out_dict = out.params.valuesdict() 
+        
+        ## loop over runs
+        output_list = []
+        for ind in range(train_timecourse.shape[0]):
+
+            out_dict['r2'] = mri_utils.calc_rsq(train_timecourse[ind], model_arr[ind])
+
+            ## save results in list of dicts
+            output_list.append(out_dict.copy())
+        
+        # return best fitting params in list
+        return output_list
+
+
+    def get_fit_residuals(self, tc_pars, timecourse, prf_model_name = 'gauss', visual_dm_dict = None):
+
+        """
+        given data timecourse and parameters, returns 
+        residual sum of squared errors between the prediction and data
+
+        Parameters
+        ----------
+        timecourse: arr
+            data timecourse
+        tc_pars: lmfit Parameters object
+            lmfit Parameter object with relevant estimates
+        prf_model_name: str
+            name of pRF model to use
+        visual_dm_dict: dict
+            visual DM for each run and condition of interest 
+            ex: visual_dm_dict['r1s1'] = {'att_bar': [x,y,t], 'unatt_bar': [x,y,t], ...}
+        
+        """ 
+
+        ## get prediction timecourse for that visual design matrix
+        # and parameters
+        model_arr = self.get_fit_timecourse(tc_pars, visual_dm_dict, 
+                                                    prf_model_name = prf_model_name, 
+                                                    fit_hrf = self.fit_hrf, osf = self.osf, hrf_onset = self.hrf_onset,
+                                                    filter_prf_predictions = False, filter_type = 'dc')
+
+        # return residuals
+        print(mri_utils.error_resid(timecourse, model_arr, mean_err = False))
+
+        return mri_utils.error_resid(timecourse, model_arr, mean_err = False, return_array = True)
+
+
+    def get_fit_timecourse(self, pars, visual_dm_dict, prf_model_name = 'gauss', 
+                                                        fit_hrf = True, osf = 10, hrf_onset = -.8, filter_prf_predictions = False, filter_type = 'dc'):
+    
+        """
+        given pars for that vertex 
+        (which should include gain weights and pRF estimates)
+        use pRF model to produce a timecourse for the design matrix 
+        
+
+        Parameters
+        ----------
+        pars: lmfit Parameters object
+            lmfit Parameter object with relevant estimates
+        visual_dm_dict: dict
+            dict with visual DM for each type of regressor (attended bar, unattended bar, overlap etc) per RUN
+        prf_model_obj: prfpy model object
+            prf_model object to be used
+        """ 
+        
+        model_arr = np.array([])
+        
+        ## loop over runs
+        for run_id in visual_dm_dict.keys():
+            
+            print('making timecourse for run %s'%run_id)
+
+            run_visual_dm = visual_dm_dict[run_id]['full_stim']
+            
+            ## make stimulus object, which takes an input design matrix and sets up its real-world dimensions
+            fa_stim = PRFStimulus2D(screen_size_cm = self.MRIObj.params['monitor']['height'],
+                                    screen_distance_cm = self.MRIObj.params['monitor']['distance'],
+                                    design_matrix = run_visual_dm,
+                                    TR = self.MRIObj.TR)
+
+            ## set prf model to use
+            if prf_model_name == 'gauss':
+
+                model_obj = Iso2DGaussianModel(stimulus = fa_stim,
+                                                filter_predictions = filter_prf_predictions,
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
+                                                                'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
+                                                                'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
+                                                                'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
+                                                osf = osf,
+                                                hrf_onset = hrf_onset
+                                                )
+            elif prf_model_name == 'css':
+
+                model_obj = CSS_Iso2DGaussianModel(stimulus = fa_stim,
+                                                filter_predictions = filter_prf_predictions,
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
+                                                                'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
+                                                                'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
+                                                                'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
+                                                osf = osf,
+                                                hrf_onset = hrf_onset
+                                                )
+
+            elif prf_model_name == 'dog':
+
+                model_obj = DoG_Iso2DGaussianModel(stimulus = fa_stim,
+                                                filter_predictions = filter_prf_predictions,
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
+                                                                'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
+                                                                'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
+                                                                'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
+                                                osf = osf,
+                                                hrf_onset = hrf_onset
+                                                )
+
+            elif prf_model_name == 'dn':
+
+                model_obj = Norm_Iso2DGaussianModel(stimulus = fa_stim,
+                                                filter_predictions = filter_prf_predictions,
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
+                                                                'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
+                                                                'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
+                                                                'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
+                                                osf = osf,
+                                                hrf_onset = hrf_onset
+                                                )
+
+            ## define hrf
+            if fit_hrf and 'hrf_derivative' in list(pars.keys()):
+                hrf = model_obj.create_hrf(hrf_params = [1, 
+                                                            pars['hrf_derivative'].value, 
+                                                            pars['hrf_dispersion'].value], osf = osf, onset = hrf_onset)
+                
+            else:
+                hrf = model_obj.create_hrf(hrf_params = [1, 1, 0], osf = osf, onset = hrf_onset)
+            
+            # update model hrf to previous one
+            model_obj.hrf = hrf
+            
+            # get run timecourse
+            run_timecourse = model_obj.return_prediction(*list([pars[val].value for val in self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][prf_model_name][:-1]]))
+            
+            ## resample to TR and stack
+            model_arr = np.vstack([model_arr, mri_utils.resample_arr(run_timecourse, osf = osf, final_sf = self.MRIObj.TR)]) if model_arr.size else mri_utils.resample_arr(run_timecourse, osf = osf, final_sf = self.MRIObj.TR)
+
+            if filter_type == 'dc':
+                ## filter with discrete cosine
+                model_arr = mri_utils.dc_data(model_arr)
+
+        return model_arr
+
+
+    
+
+
+class Gain_model(FA_model):
+
+    def __init__(self, MRIObj, outputdir = None, tasks = ['pRF', 'FA']):
+        
+        """__init__
+        constructor for class 
+        
+        Parameters
+        ----------
+        MRIObj : MRIData object
+            object from one of the classes defined in processing.load_exp_data
+        outputdir: str or None
+            path to general output directory
+        tasks: list
+            list of strings with task names (mostly needed for Model object input)
+            
+        """
+
+        # need to initialize parent class (Model), indicating output infos
+        super().__init__(MRIObj = MRIObj, outputdir = outputdir, tasks = tasks)
+
+        # if output dir not defined, then make it in derivatives
+        if outputdir is None:
+            self.outputdir = op.join(self.MRIObj.derivatives_pth,'FA_Gain_fit')
+        else:
+            self.outputdir = outputdir
+    
+
+    def fit_data(self, participant, pp_prf_estimates, ses = 1,
+                    run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,
+                    prf_model_name = None, rsq_threshold = None, file_ext = '_cropped_confound_psc.npy', 
+                    outdir = None, save_estimates = False, fit_overlap = True, fit_full_stim = False,
+                    gain_cond = None, xtol = 1e-3, ftol = 1e-4, n_jobs = 8):
+
+        """
+        fit inputted FA models to each participant in participant list
+                
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        run_type: string or int
+            type of run to fit, mean (default), or if int will do single run fit
+        file_ext: dict
+            file extension, to select appropriate files
+        """  
+
+        ## set up fitting by loading data and visual dm for data
+        masked_data, masked_prf_estimates = self.setup_fitting(participant, pp_prf_estimates, ses = ses,
+                                                            run_type = run_type, chunk_num = chunk_num, vertex = vertex, ROI = ROI,
+                                                            prf_model_name = prf_model_name, rsq_threshold = rsq_threshold, file_ext = file_ext, 
+                                                            outdir = outdir, fit_overlap = fit_overlap, fit_full_stim = fit_full_stim)
+
+        ## now get FA gain estimate keys
+        if gain_cond is None:
+            self.gain_keys = ['gain_{cond}'.format(cond = ckey) for ckey in self.condition_dm_keys]
+        else:
+            self.gain_keys = ['gain_{cond}'.format(cond = ckey) for ckey in gain_cond]
+
+        ## set model parameters 
+        # relevant for grid and iterative fitting
+
+        # first just make array with parameters object per index to fit
+        print('Initializing paramenters...')
+        pars_arr = Parallel(n_jobs = n_jobs)(delayed(self.initialize_params)(par_keys = list(np.concatenate((self.prf_est_keys, self.gain_keys))),
+                                                                                value = 1, 
+                                                                                vary = True, 
+                                                                                min = -np.inf, 
+                                                                                max = np.inf, 
+                                                                                brute_step = None) for i in tqdm(range(len(self.ind2fit))))
+
+        # now update pRF values for said index
+        for key in self.prf_est_keys:
+
+            print('Updating parameters with pRF estimate %s values'%key)
+
+            pars_arr = Parallel(n_jobs = n_jobs)(delayed(self.update_parameters)(pars_arr[i], 
+                                                                                par_key = key, 
+                                                                                value = masked_prf_estimates[key][self.ind2fit[i]], 
+                                                                                vary = False, 
+                                                                                min = -np.inf, 
+                                                                                max = np.inf, 
+                                                                                brute_step = None,
+                                                    constrain_expression = None, contrain_keys = []) for i in tqdm(range(len(self.ind2fit))))
+    
+        self.pars_arr = list(pars_arr) 
+
+        ## actually fit data
+        # call iterative fit function, giving it masked data and pars
+        results = self.iterative_fit(masked_data, self.pars_arr, prf_model_name = self.prf_model_name, visual_dm_dict = self.visual_dm_dict, 
+                                                    xtol = xtol, ftol = ftol, method = None, n_jobs = n_jobs) 
+
+        ## saves results as list of dataframes, with length = #runs
+        results_list = []
+        
+        for r, name in enumerate(self.visual_dm_dict.keys()):
+            
+            # convert fitted params list of dicts as Dataframe
+            fitted_params_df = pd.DataFrame(d for d in results[...,r])
+            # and add vertex number for bookeeping
+            if vertex is not None:
+                fitted_params_df['vertex'] = vertex
+            else:
+                fitted_params_df['vertex'] = self.ind2fit
+
+            results_list.append(fitted_params_df.copy())
+
+            # if we want to save estimates, do so as csv
+            if save_estimates:
+                filename = self.basefilename.replace('runtype','run-{n}_runtype'.format(n = name))
                 fitted_params_df.to_csv(op.join(outdir, filename.replace('.npz', '_it_{pm}_estimates.csv'.format(pm = prf_model_name))))
 
         return results_list
@@ -759,8 +1139,8 @@ class GLM_model(FA_model):
     def fit_data(self, participant, pp_prf_estimates, ses = 1,
                     run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,
                     prf_model_name = None, rsq_threshold = None, file_ext = '_cropped_confound_psc.npy', 
-                    outdir = None, save_estimates = False, fit_overlap = False,
-                    reg_names = ['both_bar'], n_jobs = 8):
+                    outdir = None, save_estimates = False, fit_overlap = False, fit_full_stim = True,
+                    reg_names = None, n_jobs = 8):
 
         """
         fit inputted FA models to each participant in participant list
@@ -774,131 +1154,53 @@ class GLM_model(FA_model):
         file_ext: dict
             file extension, to select appropriate files
         """  
-        # if we provided session as str
-        if isinstance(ses, str):
-            ses = int(re.findall(r'\d{1,10}', ses)[0]) # make int
-
-        ## get list of files to load
-        bold_filelist = self.get_bold_file_list(participant, task = 'FA', ses = ses, file_ext = file_ext)
-
-        ## Load data array and file list names
-        data, train_file_list = self.get_data4fitting(bold_filelist, task = 'FA', run_type = run_type, chunk_num = chunk_num, vertex = vertex, ses = ses,
-                                            baseline_interval = 'empty', return_filenames = True)
-
-        ## Set nan voxels to 0, to avoid issues when fitting
-        masked_data = data.copy()
-        masked_data[np.where(np.isnan(data[...,0]))[0]] = 0
-
-        ## set prf model name
-        if prf_model_name is None:
-            prf_model_name = self.model_type['pRF']
-
-        ## set output dir to save estimates
-        if outdir is None:
-            if 'loo_' in run_type:
-                outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type)
-            else:
-                outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses))
-            
-        # add model identifier to it
-        outdir = op.join(outdir, 'it_{pm}'.format(pm = prf_model_name))
-
-        os.makedirs(outdir, exist_ok = True)
-        print('saving files in %s'%outdir)
-
-        ## set base filename that will be used for estimates
-        basefilename = 'sub-{sj}_task-FA_acq-{acq}_runtype-{rt}'.format(sj = participant,
-                                                                            acq = self.MRIObj.acq,
-                                                                            rt = run_type)
-        if chunk_num is not None:
-            basefilename += '_chunk-{ch}'.format(ch = str(chunk_num).zfill(3))
-        elif vertex is not None:
-            basefilename += '_vertex-{ver}'.format(ver = str(vertex))
-        elif ROI:
-            basefilename += '_ROI-{roi}'.format(roi = str(ROI))
         
-        basefilename += file_ext.replace('.npy', '.npz')
+        ## set up fitting by loading data and visual dm for data
+        masked_data, masked_prf_estimates = self.setup_fitting(participant, pp_prf_estimates, ses = ses,
+                                                            run_type = run_type, chunk_num = chunk_num, vertex = vertex, ROI = ROI,
+                                                            prf_model_name = prf_model_name, rsq_threshold = rsq_threshold, file_ext = file_ext, 
+                                                            outdir = outdir, fit_overlap = fit_overlap, fit_full_stim = fit_full_stim)
 
-        ## Get visual dm for different bars
-        # dict with visual dm per run
-        visual_dm_dict = self.get_visual_DM_dict(participant, train_file_list, save_overlap = fit_overlap)
 
-        self.visual_dm_dict = visual_dm_dict
-
-        ## create a stimulus visual design matrix (with both bars combined)
-        # loop over runs
-        print('updating visual dm dict to sum both bars')
-        for run_id in visual_dm_dict.keys():
-
-            stimulus_dm = np.sum(np.stack((visual_dm_dict[run_id]['att_bar'],
-                                        visual_dm_dict[run_id]['unatt_bar'])), axis = 0)
-            stimulus_dm[stimulus_dm >=1] = 1
-            
-            visual_dm_dict[run_id]['both_bar'] = stimulus_dm
-
-        ## get pRF model estimate keys
-        prf_est_keys = [val for val in list(pp_prf_estimates.keys()) if val!='r2']
-        print('pRF {m} model estimates found {l}'.format(m = prf_model_name, l = str(prf_est_keys)))
-
-        ## get relevant indexes to fit
-        # set threshold
-        if rsq_threshold is None:
-            rsq_threshold = self.prf_rsq_threshold
-
-        # subselect pRF estimates similar to data
-        # to avoid index issues
-        if (chunk_num is not None) or (vertex is not None):
-            masked_prf_estimates = {}
-            for key in pp_prf_estimates.keys():
-                print('Masking pRF estimates, to have same # vertices of FA data')
-                masked_prf_estimates[key] = self.subselect_array(pp_prf_estimates[key], task = 'pRF', chunk_num = chunk_num, vertex = vertex)
+        ## now get estimate keys
+        if reg_names is None:
+            self.reg_names = self.condition_dm_keys
         else:
-            masked_prf_estimates = pp_prf_estimates
+            self.reg_names = reg_names
 
-        # find indexes worth fitting
-        # this is, where pRF rsq > than predetermined threshold
-        ind2fit = np.where(((masked_prf_estimates['r2'] > rsq_threshold)))[0]
-
-
-        ## set prf model parameters  in object
-        #  per index to fit
+        ## initialize empty pars object for all vertices
         print('Initializing paramenters...')
-        pars_arr = Parallel(n_jobs = n_jobs)(delayed(self.initialize_params)(par_keys = prf_est_keys,
-                                                                                value = 0, 
-                                                                                vary = False, 
-                                                                                min = -np.inf, 
-                                                                                max = np.inf, 
-                                                                                brute_step = None) for i in tqdm(range(len(ind2fit))))
+        pars_arr = Parallel(n_jobs = n_jobs)(delayed(self.initialize_params)(par_keys = []) for i in tqdm(range(len(self.ind2fit))))
 
         # now update pRF values for said index
-        for key in prf_est_keys:
+        for key in self.prf_est_keys:
 
             print('Updating parameters with pRF estimate %s values'%key)
 
             pars_arr = Parallel(n_jobs = n_jobs)(delayed(self.update_parameters)(pars_arr[i], 
                                                                                 par_key = key, 
-                                                                                value = masked_prf_estimates[key][ind2fit[i]], 
+                                                                                value = masked_prf_estimates[key][self.ind2fit[i]], 
                                                                                 vary = False, 
                                                                                 min = -np.inf, 
                                                                                 max = np.inf, 
                                                                                 brute_step = None,
-                                                    constrain_expression = None, contrain_keys = []) for i in tqdm(range(len(ind2fit))))
+                                                    constrain_expression = None, contrain_keys = []) for i in tqdm(range(len(self.ind2fit))))
     
         self.pars_arr = list(pars_arr) #np.array(pars_arr)
 
         
         ## fit glm for all vertices of data
-        results = np.array(Parallel(n_jobs=n_jobs)(delayed(self.fit_fa_glm)(data[:,ind2fit[i],:],
+        results = np.array(Parallel(n_jobs=n_jobs)(delayed(self.fit_fa_glm)(masked_data[:,self.ind2fit[i],:],
                                                                                 self.pars_arr[i],
-                                                                                prf_model_name = prf_model_name,
-                                                                                visual_dm_dict = visual_dm_dict,
-                                                                                reg_names = reg_names)
-                                                                                for i in tqdm(range(len(ind2fit)))))
+                                                                                prf_model_name = self.prf_model_name,
+                                                                                visual_dm_dict = self.visual_dm_dict,
+                                                                                reg_names = self.reg_names)
+                                                                                for i in tqdm(range(len(self.ind2fit)))))
 
         ## saves results as list of dataframes, with length = #runs
         results_list = []
 
-        for r, name in enumerate(visual_dm_dict.keys()):
+        for r, name in enumerate(self.visual_dm_dict.keys()):
             
             # convert fitted params list of dicts as Dataframe
             fitted_params_df = pd.DataFrame(d for d in results[...,r])
@@ -907,13 +1209,13 @@ class GLM_model(FA_model):
             if vertex is not None:
                 fitted_params_df['vertex'] = vertex
             else:
-                fitted_params_df['vertex'] = ind2fit
+                fitted_params_df['vertex'] = self.ind2fit
 
             results_list.append(fitted_params_df.copy())
 
             # if we want to save estimates, do so as csv
             if save_estimates:
-                filename = basefilename.replace('runtype','run-{n}_runtype'.format(n = name))
+                filename = self.basefilename.replace('runtype','run-{n}_runtype'.format(n = name))
                 fitted_params_df.to_csv(op.join(outdir, filename.replace('.npz', '_nreg-{nr}_it_{pm}_estimates.csv'.format(pm = prf_model_name, nr = len(reg_names)))))
 
         return results_list

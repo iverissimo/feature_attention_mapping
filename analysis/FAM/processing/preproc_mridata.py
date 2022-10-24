@@ -1083,9 +1083,15 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                                                                     detrend = True, standardize = 'psc', standardize_confounds = True)
 
                     else: 
+                        # get baseline interval indices, for cases when we want to linearly detrend
+                        baseline_inter1 = self.MRIObj.params[tsk]['baseline_ind_inter1'] - self.MRIObj.params[tsk]['crop_TR'] if self.MRIObj.params[tsk]['crop'] == True else self.MRIObj.params[tsk]['baseline_ind_inter1']
+                        baseline_inter2 = self.MRIObj.params[tsk]['baseline_ind_inter2'] 
+
                         ## filter files, to remove drifts ##
-                        proc_files = mri_utils.filter_data(proc_files, output_pth, filter_type = self.MRIObj.params['mri']['filtering']['type'], 
-                                                first_modes_to_remove = self.MRIObj.params['mri']['filtering']['first_modes_to_remove'], plot_vert = True)
+                        proc_files = mri_utils.filter_data(proc_files, output_pth, filter_type = self.MRIObj.params['mri']['filtering']['type'][tsk], 
+                                                first_modes_to_remove = self.MRIObj.params['mri']['filtering']['first_modes_to_remove'], 
+                                                baseline_inter1 = baseline_inter1, baseline_inter2 = baseline_inter2,
+                                                plot_vert = True)
                         
                         ### percent signal change ##
                         proc_files = mri_utils.psc_epi(proc_files, output_pth)
@@ -1137,7 +1143,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             if self.MRIObj.params[tsk]['regress_confounds']:
                 file_ext[tsk] += '_{name}'.format(name='confound')
             else:
-                file_ext[tsk] += '_{name}'.format(name = self.MRIObj.params['mri']['filtering']['type'])
+                file_ext[tsk] += '_{name}'.format(name = self.MRIObj.params['mri']['filtering']['type'][tsk])
             # type of standardization 
             file_ext[tsk] += '_{name}'.format(name = self.MRIObj.params[tsk]['standardize'])
             # don't forget its a numpy array

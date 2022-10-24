@@ -36,7 +36,10 @@ FA:
   crop: True # if we want to crop the functionals further
   crop_TR: 5 # number of functionals to crop
 
-  regress_confounds: True # if we want to regress out fmriprep confounds
+  regress_confounds: False # if we want to regress out fmriprep confounds
+
+  baseline_ind_inter1: 19 # start of task baseline interval to use in detrending
+  baseline_ind_inter2: -15 # end of task baseline interval to use in detrending
 
   standardize: 'psc'
 
@@ -70,6 +73,9 @@ pRF:
   crop_TR: 5 # number of functionals to crop
 
   regress_confounds: False # if we want to regress out fmriprep confounds
+
+  baseline_ind_inter1: 19 # start of task baseline interval to use in detrending
+  baseline_ind_inter2: -15 # end of task baseline interval to use in detrending
 
   standardize: 'psc'
 
@@ -137,7 +143,9 @@ mri: # refers to the Psychopy SyncGenerator class
     BFC_T2: True
   
   filtering:
-    type: 'dc' #'HPgauss' # None
+    type: 
+      pRF: 'dc' #'HPgauss' # None
+      FA: 'LinDetrend'
     cut_off_hz: 0.01 # cut off frequency to filter
     first_modes_to_remove: 5 # Number of low-frequency eigenmodes to remove (highpass)
 

@@ -45,6 +45,7 @@ from tqdm import tqdm
 import functools
 import operator
 
+from nilearn.glm.first_level.design_matrix import _cosine_drift as discrete_cosine_transform
 
 
 
@@ -264,7 +265,7 @@ def crop_epi(file, outdir, num_TR_crop = 5):
 
 
 def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert = False,
-                first_modes_to_remove = 5, **kwargs):
+                first_modes_to_remove = 5, baseline_inter1 = None, baseline_inter2 = None, **kwargs):
     
     """ 
     Generic filtering function, implemented different types of filters
@@ -328,6 +329,10 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert = False,
             elif filter_type == 'dc': 
 
                 data_filt = dc_data(data, first_modes_to_remove = first_modes_to_remove, **kwargs) 
+
+            elif filter_type == 'LinDetrend':
+
+                data_filt = detrend_data(data, detrend_type = 'linear', baseline_inter1 = None, baseline_inter2 = None, **kwargs)
                 
             else:
                 raise NameError('filter type not implemented')
@@ -461,6 +466,77 @@ def dc_data(data, first_modes_to_remove=5, **kwargs):
     data_filt = filtered_signal + np.mean(data, axis=-1)[..., np.newaxis]
 
     return data_filt # vertex, time
+
+
+def detrend_data(data, detrend_type = 'linear', baseline_inter1 = None, baseline_inter2 = None, 
+                                                dct_set_nr = 1, TR = 1.6, **kwargs):
+    
+    """ 
+    Detrend data array
+    
+    Parameters
+    ----------
+    data : arr
+        data array 2D [vert, time]
+    detrend_type: str
+        type of detrending (default 'linear'), can also use discrete cosine transform as low-frequency drift predictors
+    dct_set_nr: int
+        Number of discrete cosine transform to use
+    baseline_inter1: int/list arr
+        list with indices of intervals to use as 1st baseline period [start:end] or int with indice for end of baseline period
+    baseline_inter2: int/list arr
+        list with indices of intervals to use as last baseline period [start:end] or int with indice for start of baseline period
+
+    Outputs
+    -------
+    data_filt: arr
+        filtered array
+    """ 
+
+    ## if we want to do a linear detrend
+    if detrend_type == 'linear':
+        
+        # if indices for baseline interval given, use those values for regression line
+        if baseline_inter1 is not None and baseline_inter2 is not None:
+            
+            # get median baseline value for initial baseline period
+            if isinstance(baseline_inter1, int):
+                start_base = np.median(data[...,:baseline_inter1], axis = -1)
+            elif isinstance(baseline_inter1, list) or isinstance(baseline_inter1, np.ndarray):
+                start_base = np.median(data[...,baseline_inter1[0]:baseline_inter1[1]], axis = -1)
+
+            # get median baseline value for end baseline period
+            if isinstance(baseline_inter2, int):
+                end_base = np.median(data[...,baseline_inter2:], axis = -1)
+            elif isinstance(baseline_inter2, list) or isinstance(baseline_inter2, np.ndarray):
+                end_base = np.median(data[...,baseline_inter2[0]:baseline_inter2[1]], axis = -1)
+        
+        # just make line across time series
+        else:
+            start_base = np.zeros(data.shape[0])
+            end_base = np.zeros(data.shape[0]); end_base[:] = data.shape[-1]
+
+        ## make trend line for all vertices
+        trend_line = [np.linspace(start_base[ind], end_base[ind], data.shape[-1]) for ind, _ in enumerate(data)]
+
+        ## least squares regression (fit GLM)
+        prediction, _, _, _ = zip(*Parallel(n_jobs=2)(delayed(fit_glm)(vert, np.stack((np.ones(vert.shape[-1]),
+                                                                                            trend_line[ind])).T) for ind,vert in enumerate(tqdm(data))))
+        
+        # add mean image back to avoid distribution around 0
+        data_detr = data - prediction + np.mean(data, axis=-1)[..., np.newaxis]
+
+    ## if we want remove basis set
+    elif detrend_type == 'dct':
+
+        frame_times = np.linspace(0, data.shape[-1]*TR, data.shape[-1], endpoint=False)
+        dc_set = discrete_cosine_transform(high_pass=0.01, frame_times=frame_times)
+
+        raise NameError('Not implemented yet')
+
+
+    return data_detr # vertex, time
+
 
 
 def psc_epi(file, outdir):

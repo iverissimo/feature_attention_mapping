@@ -267,8 +267,10 @@ class pRFViewer:
             ## also plot hrf shapes for comparison
             fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
 
-            axis.plot(spm_hrf[0],'grey',label='spm hrf')
-            axis.plot(hrf[0],'red',label='fitted hrf')
+            time_sec = np.linspace(0,len(hrf[0]) * self.MRIObj.TR, num = len(hrf[0])) # array in seconds
+
+            axis.plot(time_sec, spm_hrf[0],'grey',label='spm hrf')
+            axis.plot(time_sec, hrf[0],'red',label='fitted hrf')
             axis.set_xlim(self.pRFModelObj.hrf_onset, 25)
             axis.legend(loc='upper right',fontsize=10) 
             axis.set_xlabel('Time (s)',fontsize=10, labelpad=10)

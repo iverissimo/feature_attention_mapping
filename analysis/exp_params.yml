@@ -208,7 +208,7 @@ mri: # refers to the Psychopy SyncGenerator class
     FA:
       fit_model: 'gain'
 
-      optimizer: 'lbfgsb' #'trust-constr'
+      optimizer: 'L-BFGS-B' #'lbfgsb' #'trust-constr'
 
       fix_bold_baseline: True
       correct_baseline: True

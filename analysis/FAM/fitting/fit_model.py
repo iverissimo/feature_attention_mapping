@@ -150,6 +150,10 @@ match task2model:
                                                                     iterative = True,
                                                                     fit_hrf = fit_hrf)
 
+        ## get bounds used for prf estimates of specific model
+        pp_prf_stim = pp_prf_models['sub-{sj}'.format(sj = participant)][prf_ses]['prf_stim']
+        prf_bounds = FAM_pRF.get_fit_startparams(max_ecc_size = pp_prf_stim.screen_size_degrees/2.0)[FAM_pRF.model_type['pRF']]['bounds']
+
         ## get file extension for post-fmriprep
         # processed files
         file_ext = FAM_mri_preprocess.get_mrifile_ext()['FA']
@@ -203,7 +207,10 @@ match task2model:
                 ## load FA model class
                 FAM_FA = feature_model.FullStim_model(FAM_data)
 
+                # if we want to fit hrf
                 FAM_FA.fit_hrf = FAM_pRF.fit_hrf
+                # set prf bounds
+                FAM_FA.prf_bounds = prf_bounds
 
                 if FAM_FA.fit_hrf:
                     pars2vary = ['betas', 'hrf_derivative']
@@ -221,7 +228,7 @@ match task2model:
                                             prf_model_name = prf_model_name, rsq_threshold = None, file_ext = file_ext, 
                                             outdir = None, save_estimates = True,
                                             pars2vary = pars2vary, reg_name = 'full_stim', bar_keys = ['att_bar', 'unatt_bar'],
-                                            xtol = 1e-3, ftol = 1e-4, n_jobs = 16) 
+                                            xtol = 1e-3, ftol = 1e-4, n_jobs = 16, prf_bounds = None) 
 
                 print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
 

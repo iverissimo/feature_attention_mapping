@@ -12,7 +12,9 @@ from FAM.utils import mri as mri_utils
 from FAM.processing import preproc_behdata
 from FAM.fitting.model import Model
 
-from lmfit import Parameters, minimize
+#from lmfit import Parameters, minimize
+from scipy.optimize import minimize
+
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
@@ -44,6 +46,9 @@ class FA_model(Model):
         ## prf rsq threshold, to select visual voxels
         # worth fitting
         self.prf_rsq_threshold = self.MRIObj.params['mri']['fitting']['FA']['prf_rsq_threshold']
+
+        # prf estimate bounds
+        self.prf_bounds = None
 
     
     def get_bar_dm(self, run_bar_pos_df, attend_bar = True, osf = 10, res_scaling = .1, crop_nr = None,
@@ -317,7 +322,7 @@ class FA_model(Model):
     def setup_fitting(self, participant, pp_prf_estimates, ses = 1,
                     run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,
                     prf_model_name = None, rsq_threshold = None, file_ext = '_cropped_confound_psc.npy', 
-                    outdir = None, fit_overlap = True, fit_full_stim = False, n_jobs = 8, pars2vary = []):
+                    outdir = None, fit_overlap = True, fit_full_stim = False, n_jobs = 8, pars2vary = [], prf_bounds = None):
 
         """
         set up variables necessary for fitting
@@ -435,45 +440,36 @@ class FA_model(Model):
 
         ## set up parameters object for all vertices to be fitted
         # with pRF estimates values
+        print('Initializing FA parameters with pRF estimates...')
+        self.pars_arr = np.array([{key: masked_prf_estimates[key][ind] for key in self.prf_est_keys} for ind in self.ind2fit])
 
-        ## initialize empty pars object for all vertices
-        print('Initializing paramenters...')
-        pars_arr = Parallel(n_jobs = n_jobs)(delayed(self.initialize_params)(par_keys = []) for i,_ in enumerate(tqdm(self.ind2fit)))
+        ## set up prf bounds 
+        print('Setting FA parameter bounds...')
+        pars_bounds_arr = np.array([{key: (masked_prf_estimates[key][ind],masked_prf_estimates[key][ind]) for key in self.prf_est_keys} for ind in self.ind2fit])
 
-        # now update pRF values for said index
-        for key in self.prf_est_keys:
+        if len(pars2vary) > 0:
+            print('fitting %i pRF parameters - %s'%(len(pars2vary), str(pars2vary)))
 
-            if 'hrf' in key: # set bounds for hrf parameters, to avoid weird outputs
-                min_bound = 0
-                max_bound = 10
-            else:
-                min_bound = -np.inf
-                max_bound = np.inf
+            if prf_bounds is None:
+                if self.prf_bounds is None:
+                    print('No prf bounds defined, will let all varying variables fit from -inf to +inf')
+                    prf_bounds = [(-np.inf,+np.inf) for ind in range(len(self.prf_est_keys))]
+                else:
+                    prf_bounds = self.prf_bounds
 
-            if len(pars2vary) > 0 and key in pars2vary:
-                vary_par = True
-            else:
-                vary_par = False
+            for key in pars2vary:
+                # depending on which parameters we want to vary, set bounds accordingly
+                pars_bounds_arr = [{**d, **{key: (prf_bounds[self.prf_est_keys.index(key)][0],
+                                                prf_bounds[self.prf_est_keys.index(key)][-1])}} for d in pars_bounds_arr]
 
-            print('Updating parameters with pRF estimate %s values'%key)
-
-            pars_arr = Parallel(n_jobs = n_jobs)(delayed(self.update_parameters)(pars_arr[i], 
-                                                                                par_key = key, 
-                                                                                value = masked_prf_estimates[key][vert], 
-                                                                                vary = vary_par, 
-                                                                                min = min_bound, 
-                                                                                max = max_bound, 
-                                                                                brute_step = None,
-                                                    constrain_expression = None, contrain_keys = []) for i,vert in enumerate(tqdm(self.ind2fit)))
-    
-        self.pars_arr = list(pars_arr) 
+        self.pars_bounds_arr = pars_bounds_arr
 
         return masked_data, masked_prf_estimates
 
 
     def iterative_fit(self, data, starting_params = None, model_function = None,
-                                    ind2fit = None, method = None, kws = {'prf_model_name': 'gauss', 'visual_dm_dict': None},
-                                    xtol = 1e-3, ftol = 1e-3, n_jobs = 16):
+                                    ind2fit = None, method = None, kws_dict = {'prf_model_name': 'gauss', 'visual_dm_dict': None},
+                                    xtol = 1e-3, ftol = 1e-3, n_jobs = 16, params_bounds = None):
 
         """
         perform iterative fit of params on all vertices of data
@@ -501,6 +497,10 @@ class FA_model(Model):
         if starting_params is None:
             starting_params = self.pars_arr
         
+        # bounds for parameters
+        if params_bounds is None:
+            params_bounds = self.pars_bounds_arr
+        
         # list of indices to fit
         if ind2fit is None:
             ind2fit = self.ind2fit
@@ -510,16 +510,17 @@ class FA_model(Model):
         results = np.array(Parallel(n_jobs=n_jobs)(delayed(self.iterative_search)(data[:,vert,:],
                                                                                 starting_params[ind],
                                                                                 model_function,
-                                                                                kws = kws,
+                                                                                kws_dict = kws_dict,
                                                                                 xtol = xtol, ftol = ftol,
-                                                                                method = method)
+                                                                                method = method,
+                                                                                bounds_dict = params_bounds[ind])
                                                                             for ind, vert in enumerate(tqdm(ind2fit))))
 
         return results
 
 
-    def iterative_search(self, train_timecourse, tc_pars, model_function, kws={'prf_model_name': 'gauss', 'visual_dm_dict': None}, 
-                                                    xtol = 1e-3, ftol = 1e-3, method = None):
+    def iterative_search(self, train_timecourse, tc_dict, model_function, kws_dict={'prf_model_name': 'gauss', 'visual_dm_dict': None}, 
+                                                    xtol = 1e-3, ftol = 1e-3, method = None, bounds_dict = {}):
 
         """
         iterative search func for a single vertex 
@@ -542,37 +543,39 @@ class FA_model(Model):
             produces a model time-series.
         """ 
 
+        ## turn parameters and bounds into arrays because of scipy minimize
+        # but save dict keys to guarantee order is correct
+        parameters_keys = list(tc_dict.keys())
+
+        # update kws
+        kws_dict['parameters_keys'] = parameters_keys
+
+        tc_pars = [tc_dict[key] for key in parameters_keys]
+        bounds = [bounds_dict[key] for key in parameters_keys]
+
         ## minimize residuals
-        if method == 'lbfgsb': 
+        if method in ['lbfgsb', 'L-BFGS-B']: 
             
-            out = minimize(self.get_fit_residuals, tc_pars, args = [train_timecourse, model_function],
-                        kws = kws, method = method, options = dict(ftol = ftol))
+            out = minimize(self.get_fit_residuals, tc_pars, bounds=bounds, args = (train_timecourse, model_function, kws_dict),
+                        method = method, options = dict(ftol = ftol))
 
         elif method == 'trust-constr':
-            out = minimize(self.get_fit_residuals, tc_pars, args = [train_timecourse, model_function],
-                        kws = kws, method = method, tol = ftol, options = dict(xtol = xtol))
+            out = minimize(self.get_fit_residuals, tc_pars, bounds=bounds, args = (train_timecourse, model_function, kws_dict),
+                        method = method, tol = ftol, options = dict(xtol = xtol))
 
-        ## calculate rsq of best fitting params
-        # need to make prediction timecourse first
-        model_arr = model_function(out.params, **kws)
+        # ## calculate rsq of best fitting params
+        # # need to make prediction timecourse first
+        # model_arr = model_function(out['x'], **kws_dict)
 
         # set output params as dict
-        out_dict = out.params.valuesdict() 
+        out_dict = {key: out['x'][ind] for ind, key in enumerate(parameters_keys)}
+        # add rsq value
+        out_dict['r2'] = 1 - out['fun']/(train_timecourse.ravel().shape[0] * train_timecourse.ravel().var())
         
-        ## loop over runs
-        output_list = []
-        for ind in range(train_timecourse.shape[0]):
-
-            out_dict['r2'] = mri_utils.calc_rsq(train_timecourse[ind], model_arr[ind])
-
-            ## save results in list of dicts
-            output_list.append(out_dict.copy())
-        
-        # return best fitting params in list
-        return output_list
+        return out_dict
 
     
-    def get_fit_residuals(self, tc_pars, timecourse, model_function, **kwargs):
+    def get_fit_residuals(self, tc_pars, timecourse, model_function, kws_dict):
 
         """
         given data timecourse and parameters, returns 
@@ -591,15 +594,15 @@ class FA_model(Model):
 
         ## get prediction timecourse for that visual design matrix
         # and parameters
-        model_arr = model_function(tc_pars, **kwargs)
+        model_arr = model_function(tc_pars, **kws_dict)
 
         # return residuals
         print(mri_utils.error_resid(timecourse, model_arr, mean_err = False))
 
-        return mri_utils.error_resid(timecourse, model_arr, mean_err = False, return_array = True)
+        return mri_utils.error_resid(timecourse, model_arr, mean_err = False, return_array = False)
 
     
-    def get_fit_timecourse(self, pars, reg_name = 'full_stim', bar_keys = ['att_bar', 'unatt_bar']):
+    def get_fit_timecourse(self, pars, reg_name = 'full_stim', bar_keys = ['att_bar', 'unatt_bar'], parameters_keys = []):
     
         """
         given parameters for that vertex 
@@ -607,12 +610,15 @@ class FA_model(Model):
 
         Parameters
         ----------
-        pars: lmfit Parameters object
-            lmfit Parameter object with relevant estimates
-        visual_dm_dict: dict
-            dict with visual DM for each type of regressor (attended bar, unattended bar, overlap etc) per RUN
-        prf_model_obj: prfpy model object
-            prf_model object to be used
+        pars: array/list
+            array with relevant estimates
+        reg_name: str
+            "regressor" name of visual dm dict
+        bar_keys: list
+            list with bar names
+        parameters_keys: list
+            list with parameter names, in same order of pars, for bookeeping
+        
         """ 
         
         model_arr = np.array([])
@@ -630,13 +636,13 @@ class FA_model(Model):
                 # will weight and sum bars
                 if 'overlap' in list(self.visual_dm_dict[run_id].keys()):
                     
-                    run_visual_dm = mri_utils.sum_bar_dms(np.stack((self.visual_dm_dict[run_id][bar_keys[0]] * pars['gain_{v}'.format(v = bar_keys[0])].value,
-                                                                    self.visual_dm_dict[run_id][bar_keys[1]] * pars['gain_{v}'.format(v = bar_keys[1])].value)), 
+                    run_visual_dm = mri_utils.sum_bar_dms(np.stack((self.visual_dm_dict[run_id][bar_keys[0]] * pars[parameters_keys.index('gain_{v}'.format(v = bar_keys[0]))],
+                                                                    self.visual_dm_dict[run_id][bar_keys[1]] * pars[parameters_keys.index('gain_{v}'.format(v = bar_keys[1]))])), 
                                                         overlap_dm = self.visual_dm_dict[run_id]['overlap'], 
-                                                        overlap_weight = pars['gain_overlap'].value)
+                                                        overlap_weight = pars[parameters_keys.index('gain_overlap')])
                 else:
-                    run_visual_dm = mri_utils.sum_bar_dms(np.stack((self.visual_dm_dict[run_id][bar_keys[0]] * pars['gain_{v}'.format(v = bar_keys[0])].value,
-                                                                self.visual_dm_dict[run_id][bar_keys[1]] * pars['gain_{v}'.format(v = bar_keys[1])].value)), 
+                    run_visual_dm = mri_utils.sum_bar_dms(np.stack((self.visual_dm_dict[run_id][bar_keys[0]] * pars[parameters_keys.index('gain_{v}'.format(v = bar_keys[0]))],
+                                                                self.visual_dm_dict[run_id][bar_keys[1]] * pars[parameters_keys.index('gain_{v}'.format(v = bar_keys[1]))])), 
                                                                 overlap_dm = None)
             
             
@@ -647,8 +653,8 @@ class FA_model(Model):
                                     TR = self.MRIObj.TR)
 
             # set hrf params
-            if self.fit_hrf and 'hrf_derivative' in list(pars.keys()):
-                hrf_params = [1, pars['hrf_derivative'].value, pars['hrf_dispersion'].value]
+            if self.fit_hrf and 'hrf_derivative' in parameters_keys:
+                hrf_params = [1, pars[parameters_keys.index('hrf_derivative')], pars[parameters_keys.index('hrf_dispersion')]]
             else:
                 hrf_params = [1, 1, 0]
 
@@ -713,7 +719,7 @@ class FA_model(Model):
                                                 )
             
             # get run timecourse
-            run_timecourse = model_obj.return_prediction(*list([pars[val].value for val in self.prf_est_keys]))
+            run_timecourse = model_obj.return_prediction(*list([pars[parameters_keys.index(name)] for name in parameters_keys if 'hrf' not in name]))
             
             ## resample to TR and stack
             model_arr = np.vstack([model_arr, mri_utils.resample_arr(run_timecourse, osf = self.osf, final_sf = self.MRIObj.TR)]) if model_arr.size else mri_utils.resample_arr(run_timecourse, osf = self.osf, final_sf = self.MRIObj.TR)
@@ -762,7 +768,7 @@ class FullStim_model(FA_model):
     def fit_data(self, participant, pp_prf_estimates, ses = 1,
                     run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,
                     prf_model_name = None, rsq_threshold = None, file_ext = '_cropped_LinDetrend_psc.npy', 
-                    outdir = None, save_estimates = False, 
+                    outdir = None, save_estimates = False, prf_bounds = None,
                     xtol = 1e-3, ftol = 1e-4, n_jobs = 8, pars2vary = ['betas'], reg_name = 'full_stim', bar_keys = ['att_bar', 'unatt_bar']):
 
         """
@@ -783,9 +789,10 @@ class FullStim_model(FA_model):
                                                             prf_model_name = prf_model_name, rsq_threshold = rsq_threshold, file_ext = file_ext, 
                                                             outdir = outdir, fit_overlap = False, fit_full_stim = True, pars2vary = pars2vary)
 
+
         ## actually fit data
         # call iterative fit function, giving it masked data and pars
-        results = self.iterative_fit(masked_data, self.pars_arr, self.get_fit_timecourse, kws = {'reg_name': reg_name, 'bar_keys': bar_keys}, 
+        results = self.iterative_fit(masked_data, self.pars_arr, self.get_fit_timecourse, kws_dict = {'reg_name': reg_name, 'bar_keys': bar_keys}, 
                                                     xtol = xtol, ftol = ftol, method = None, n_jobs = n_jobs) 
 
         ## saves results as list of dataframes, with length = #runs
@@ -794,7 +801,7 @@ class FullStim_model(FA_model):
         for r, name in enumerate(self.visual_dm_dict.keys()):
             
             # convert fitted params list of dicts as Dataframe
-            fitted_params_df = pd.DataFrame(d for d in results[...,r])
+            fitted_params_df = pd.DataFrame(d for d in results)
             # and add vertex number for bookeeping
             if vertex is not None:
                 fitted_params_df['vertex'] = vertex
@@ -818,7 +825,6 @@ class FullStim_model(FA_model):
 
 
     
-
 class Gain_model(FA_model):
 
     def __init__(self, MRIObj, outputdir = None, tasks = ['pRF', 'FA']):

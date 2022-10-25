@@ -122,6 +122,8 @@ match system_dir:
                 fitfolder = 'FA_Gain_fit'
             elif model2fit == 'glm':
                 fitfolder = 'FA_GLM_fit'
+            elif model2fit == 'full_stim':
+                fitfolder = 'FA_FullStim_fit'
 
         # batch dir to save .sh files
         batch_dir = '/home/inesv/batch'
@@ -236,9 +238,10 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                 print(working_string)
 
                 # run it
-                js_name = op.join(batch_dir, '{fname}_sub-{sj}_chunk-{ch}_FAM.sh'.format(fname=fitfolder,
+                js_name = op.join(batch_dir, '{fname}_sub-{sj}_chunk-{ch}_run-{r}_FAM.sh'.format(fname=fitfolder,
                                                                                         ch=ch,
-                                                                                        sj=pp))
+                                                                                        sj=pp,
+                                                                                        r=run_type))
                 of = open(js_name, 'w')
                 of.write(working_string)
                 of.close()

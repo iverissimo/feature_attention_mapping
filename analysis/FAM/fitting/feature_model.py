@@ -387,10 +387,10 @@ class FA_model(Model):
                 outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses))
             
         # add model identifier to it
-        outdir = op.join(outdir, 'it_{pm}'.format(pm = self.prf_model_name))
+        self.outdir = op.join(outdir, 'it_{pm}'.format(pm = self.prf_model_name))
 
-        os.makedirs(outdir, exist_ok = True)
-        print('saving files in %s'%outdir)
+        os.makedirs(self.outdir, exist_ok = True)
+        print('saving files in %s'%self.outdir)
 
         ## set base filename that will be used for estimates
         basefilename = 'sub-{sj}_task-FA_acq-{acq}_runtype-{rt}'.format(sj = participant,
@@ -443,6 +443,13 @@ class FA_model(Model):
         # now update pRF values for said index
         for key in self.prf_est_keys:
 
+            if 'hrf' in key: # set bounds for hrf parameters, to avoid weird outputs
+                min_bound = 0
+                max_bound = 10
+            else:
+                min_bound = -np.inf
+                max_bound = np.inf
+
             if len(pars2vary) > 0 and key in pars2vary:
                 vary_par = True
             else:
@@ -454,8 +461,8 @@ class FA_model(Model):
                                                                                 par_key = key, 
                                                                                 value = masked_prf_estimates[key][vert], 
                                                                                 vary = vary_par, 
-                                                                                min = -np.inf, 
-                                                                                max = np.inf, 
+                                                                                min = min_bound, 
+                                                                                max = max_bound, 
                                                                                 brute_step = None,
                                                     constrain_expression = None, contrain_keys = []) for i,vert in enumerate(tqdm(self.ind2fit)))
     
@@ -704,18 +711,6 @@ class FA_model(Model):
                                                 hrf = hrf_params,
                                                 pad_length = int(20 * self.osf * self.MRIObj.TR)
                                                 )
-
-            # ## define hrf
-            # if self.fit_hrf and 'hrf_derivative' in list(pars.keys()):
-            #     hrf = model_obj.create_hrf(hrf_params = [1, 
-            #                                                 pars['hrf_derivative'].value, 
-            #                                                 pars['hrf_dispersion'].value], osf = self.osf, onset = self.hrf_onset)
-                
-            # else:
-            #     hrf = model_obj.create_hrf(hrf_params = [1, 1, 0], osf = self.osf, onset = self.hrf_onset)
-            
-            # # update model hrf to previous one
-            # model_obj.hrf = hrf
             
             # get run timecourse
             run_timecourse = model_obj.return_prediction(*list([pars[val].value for val in self.prf_est_keys]))
@@ -731,10 +726,10 @@ class FA_model(Model):
 
 
 
-class Amplitude_model(FA_model):
+class FullStim_model(FA_model):
 
-    ## Model that just fits pRF beta value (amplitude)
-    # on full stimulus
+    ## Model that fits model on full stimulus
+    # 
     # Goal is to check if there is already some variance explained by the 
     # pRF estimates alone (without attentional modulation)
 
@@ -759,14 +754,14 @@ class Amplitude_model(FA_model):
 
         # if output dir not defined, then make it in derivatives
         if outputdir is None:
-            self.outputdir = op.join(self.MRIObj.derivatives_pth,'FA_Amp_fit')
+            self.outputdir = op.join(self.MRIObj.derivatives_pth,'FA_FullStim_fit')
         else:
             self.outputdir = outputdir
 
 
     def fit_data(self, participant, pp_prf_estimates, ses = 1,
                     run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,
-                    prf_model_name = None, rsq_threshold = None, file_ext = '_cropped_confound_psc.npy', 
+                    prf_model_name = None, rsq_threshold = None, file_ext = '_cropped_LinDetrend_psc.npy', 
                     outdir = None, save_estimates = False, 
                     xtol = 1e-3, ftol = 1e-4, n_jobs = 8, pars2vary = ['betas'], reg_name = 'full_stim', bar_keys = ['att_bar', 'unatt_bar']):
 
@@ -811,19 +806,18 @@ class Amplitude_model(FA_model):
             # if we want to save estimates, do so as csv
             if save_estimates:
                 filename = self.basefilename.replace('runtype','run-{n}_runtype'.format(n = name))
-                fitted_params_df.to_csv(op.join(outdir, filename.replace('.npz', '_it_{pm}_estimates.csv'.format(pm = prf_model_name))))
+                filename = filename.replace('.npz', '_it_{pm}_estimates.csv'.format(pm = prf_model_name))
 
+                # if we are fitting hrf, include that in name
+                if self.fit_hrf:
+                    filename = filename.replace('estimates.csv', 'HRF_estimates.csv')
+
+                fitted_params_df.to_csv(op.join(self.outdir, filename))
+                
         return results_list
 
 
     
-
-
-
-
-
-    
-
 
 class Gain_model(FA_model):
 

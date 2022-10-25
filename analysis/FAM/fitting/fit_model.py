@@ -197,6 +197,34 @@ match task2model:
 
                 print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
 
+            
+            case 'full_stim':
+
+                ## load FA model class
+                FAM_FA = feature_model.FullStim_model(FAM_data)
+
+                FAM_FA.fit_hrf = FAM_pRF.fit_hrf
+
+                if FAM_FA.fit_hrf:
+                    pars2vary = ['betas', 'hrf_derivative']
+                else:
+                    pars2vary = ['betas']
+
+                ## actually fit
+                print('Fitting started!')
+                # to time it
+                start_time = time.time()
+
+                _ = FAM_FA.fit_data(participant, pp_prf_estimates, 
+                                            ses = ses, run_type = run_type,
+                                            chunk_num = chunk_num, vertex = vertex, ROI = ROI,
+                                            prf_model_name = prf_model_name, rsq_threshold = None, file_ext = file_ext, 
+                                            outdir = None, save_estimates = True,
+                                            pars2vary = pars2vary, reg_name = 'full_stim', bar_keys = ['att_bar', 'unatt_bar'],
+                                            xtol = 1e-3, ftol = 1e-4, n_jobs = 16) 
+
+                print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
+
 
 
         

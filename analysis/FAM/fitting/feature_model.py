@@ -472,11 +472,11 @@ class FA_model(Model):
         if method in ['lbfgsb', 'L-BFGS-B']: 
             
             out = minimize(self.get_fit_residuals, tc_pars, bounds=bounds, args = (train_timecourse, model_function, kws_dict),
-                        method = method, options = dict(ftol = ftol))
+                        method = method, options = dict(ftol = ftol, maxls = 40, disp = True))
 
         elif method == 'trust-constr':
             out = minimize(self.get_fit_residuals, tc_pars, bounds=bounds, args = (train_timecourse, model_function, kws_dict),
-                        method = method, tol = ftol, options = dict(xtol = xtol))
+                        method = method, tol = ftol, options = dict(xtol = xtol, disp = True))
 
         # set output params as dict
         out_dict = {key: out['x'][ind] for ind, key in enumerate(parameters_keys)}

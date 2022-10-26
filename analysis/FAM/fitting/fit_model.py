@@ -213,9 +213,9 @@ match task2model:
                 FAM_FA.prf_bounds = prf_bounds
 
                 if FAM_FA.fit_hrf:
-                    pars2vary = ['betas', 'hrf_derivative']
+                    prf_pars2vary = ['betas', 'hrf_derivative']
                 else:
-                    pars2vary = ['betas']
+                    prf_pars2vary = ['betas']
 
                 ## actually fit
                 print('Fitting started!')
@@ -227,7 +227,7 @@ match task2model:
                                             chunk_num = chunk_num, vertex = vertex, ROI = ROI,
                                             prf_model_name = prf_model_name, rsq_threshold = None, file_ext = file_ext, 
                                             outdir = None, save_estimates = True,
-                                            pars2vary = pars2vary, reg_name = 'full_stim', bar_keys = ['att_bar', 'unatt_bar'],
+                                            prf_pars2vary = prf_pars2vary, reg_name = 'full_stim', bar_keys = ['att_bar', 'unatt_bar'],
                                             xtol = 1e-3, ftol = 1e-4, n_jobs = 16, prf_bounds = None) 
 
                 print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))

@@ -164,7 +164,7 @@ class FA_model(Model):
             list with absolute filenames to fit
         save_overlap: bool
             if we also want to save the overlap of bars (spatial region where both bars overlap)
-        save_both: bool
+        save_full_stim: bool
             if we want to save both bars combined (full stimulus that was on screen)
 
         """ 
@@ -227,102 +227,11 @@ class FA_model(Model):
                 
         return out_dict, condition_dm_keys
 
-        
-    def initialize_params(self, par_keys = [], value = 1, vary = True, min = -np.inf, max = np.inf, brute_step = None):
-
-        """
-        Initialize lmfit Parameters object
-                
-        Parameters
-        ----------
-        par_keys: list
-            list with string names identifying each parameter
-        value: int/float
-            parameter value
-        vary: bool
-            if we are varying the parameter or stays fixed
-        min: float
-            lower bound of fitting
-        max: float
-            upper bound of fitting
-        brute_step: float
-            if given, will be the step used for fitting (when doing grid fit)
-        """  
-
-        pars = Parameters()
-
-        # if we actually give parameter keys
-        if len(par_keys) > 0:
-            for val in par_keys:
-                pars.add(val)
-
-                ## update parameter values etc
-                pars[val].value = value
-                pars[val].vary = vary
-                pars[val].min = min
-                pars[val].max = max
-                pars[val].brute_step = brute_step
-
-        return pars
-
-    
-    def update_parameters(self, pars, par_key = None, value = 0, vary = True, min = -np.inf, max = np.inf, brute_step = None,
-                                constrain_expression = None, contrain_keys = []):
-        
-        """
-        Update a specific parameter  
-                
-        Parameters
-        ----------
-        pars: lmfit Parameter object
-            lmfit Parameter object to be updated (can also be empty)
-        par_key: str
-            if str, then will update that specific parameter
-            if parameter not in Parameter object, will add it
-        value: int/float
-            parameter value
-        vary: bool
-            if we are varying the parameter or stays fixed
-        min: float
-            lower bound of fitting
-        max: float
-            upper bound of fitting
-        brute_step: float
-            if given, will be the step used for fitting (when doing grid fit)
-        constrain_expression: str
-            if given, will use this expression (parameter name - or other?) to contraint others listed in constrain keys
-        contrain_keys: list
-            list with strings which are key names of parameters that will be constrained by constrain_expression
-        
-        """ 
-
-        # if we provided parameter name
-        if par_key and isinstance(par_key, str):
-
-            ## check if parameters key in object
-            if par_key not in list(pars.keys()):
-                pars.add(par_key)
-
-            ## update parameter values etc
-            pars[par_key].value = value
-            pars[par_key].vary = vary
-            pars[par_key].min = min
-            pars[par_key].max = max
-            pars[par_key].brute_step = brute_step
-
-        # check if we want to contraint keys in pars object
-        if constrain_expression and len(contrain_keys) > 0:
-
-            for name in contrain_keys:
-                pars[name].expr = constrain_expression
-
-        return pars
-
 
     def setup_fitting(self, participant, pp_prf_estimates, ses = 1,
                     run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,
                     prf_model_name = None, rsq_threshold = None, file_ext = '_cropped_confound_psc.npy', 
-                    outdir = None, fit_overlap = True, fit_full_stim = False, n_jobs = 8, pars2vary = [], prf_bounds = None):
+                    outdir = None, fit_overlap = True, fit_full_stim = False, prf_pars2vary = [], prf_bounds = None):
 
         """
         set up variables necessary for fitting
@@ -358,8 +267,10 @@ class FA_model(Model):
             if we want to fit overlap area as a separate regressor
         fit_full_stim: bool
             if we want to fit the full stimulus (both bars combined) or not
-        pars2vary: list
+        prf_pars2vary: list
             list with name of prf estimates to vary during fitting
+        prf_bounds: list
+            list with tuples of prf estimate bounds for fitting
         """ 
 
         # if we provided session as str
@@ -375,8 +286,7 @@ class FA_model(Model):
         print('Fitting files %s'%str(train_file_list))
 
         ## Set nan voxels to 0, to avoid issues when fitting
-        masked_data = data.copy()
-        masked_data[np.where(np.isnan(data[...,0]))[0]] = 0
+        masked_data = np.nan_to_num(data)
 
         ## set prf model name
         if prf_model_name is None:
@@ -447,8 +357,8 @@ class FA_model(Model):
         print('Setting FA parameter bounds...')
         pars_bounds_arr = np.array([{key: (masked_prf_estimates[key][ind],masked_prf_estimates[key][ind]) for key in self.prf_est_keys} for ind in self.ind2fit])
 
-        if len(pars2vary) > 0:
-            print('fitting %i pRF parameters - %s'%(len(pars2vary), str(pars2vary)))
+        if len(prf_pars2vary) > 0:
+            print('fitting %i pRF parameters - %s'%(len(prf_pars2vary), str(prf_pars2vary)))
 
             if prf_bounds is None:
                 if self.prf_bounds is None:
@@ -457,8 +367,8 @@ class FA_model(Model):
                 else:
                     prf_bounds = self.prf_bounds
 
-            for key in pars2vary:
-                # depending on which parameters we want to vary, set bounds accordingly
+            for key in prf_pars2vary:
+                # depending on which parameters we want to vary, set bounds accordingly for all vertices
                 pars_bounds_arr = [{**d, **{key: (prf_bounds[self.prf_est_keys.index(key)][0],
                                                 prf_bounds[self.prf_est_keys.index(key)][-1])}} for d in pars_bounds_arr]
 
@@ -468,7 +378,7 @@ class FA_model(Model):
 
 
     def iterative_fit(self, data, starting_params = None, model_function = None,
-                                    ind2fit = None, method = None, kws_dict = {'prf_model_name': 'gauss', 'visual_dm_dict': None},
+                                    ind2fit = None, method = None, kws_dict = {},
                                     xtol = 1e-3, ftol = 1e-3, n_jobs = 16, params_bounds = None):
 
         """
@@ -479,14 +389,18 @@ class FA_model(Model):
         data: arr
             3D data array of [runs, vertices, time]
         starting_params: list/arr
-            array of data size with lmfit Parameter object with relevant estimates per vertex
-        prf_model_name: str
-            name of pRF model to use
-        visual_dm_dict: dict
-            visual DM for each run and condition of interest 
-            ex: visual_dm_dict['r1s1'] = {'att_bar': [x,y,t], 'unatt_bar': [x,y,t], ...}
+            array with parameters dict of relevant estimates per vertex
+        model_function: callable
+            The objective function that takes `parameters` and `args` and
+            produces a model time-series.
+        ind2fit: list/arr
+            array with indices of vertices of data array to fit
         method:
             optimizer method to use in minimize
+        kws_dict: dict
+            dictionary with extra inputs parameters (var name: val) that will be used by model function
+        params_bounds: arr/list
+            array with paramter bounds for each vertex of data to fit
         """ 
 
         # define optimizer method to use
@@ -519,7 +433,7 @@ class FA_model(Model):
         return results
 
 
-    def iterative_search(self, train_timecourse, tc_dict, model_function, kws_dict={'prf_model_name': 'gauss', 'visual_dm_dict': None}, 
+    def iterative_search(self, train_timecourse, tc_dict, model_function, kws_dict={}, 
                                                     xtol = 1e-3, ftol = 1e-3, method = None, bounds_dict = {}):
 
         """
@@ -529,18 +443,18 @@ class FA_model(Model):
         ----------
         train_timecourse: arr
             2D data array of [runs, time]
-        tc_pars: list/arr
-            lmfit Parameter object
-        prf_model_name: str
-            name of pRF model to use
-        visual_dm_dict: dict
-            visual DM for each run and condition of interest 
-            ex: visual_dm_dict['r1s1'] = {'att_bar': [x,y,t], 'unatt_bar': [x,y,t], ...}
-        method:
-            optimizer method to use in minimize
+        tc_dict: dict
+            parameters dict of relevant estimates for vertex
         model_function: callable
             The objective function that takes `parameters` and `args` and
             produces a model time-series.
+        kws_dict: dict
+            dictionary with extra inputs parameters (var name: val) that will be used by model function
+        method:
+            optimizer method to use in minimize
+        bounds_dict: dict
+            dict with paramter bounds for vertex
+        
         """ 
 
         ## turn parameters and bounds into arrays because of scipy minimize
@@ -550,6 +464,7 @@ class FA_model(Model):
         # update kws
         kws_dict['parameters_keys'] = parameters_keys
 
+        # set parameters and bounds into list, to conform to scipy minimze format
         tc_pars = [tc_dict[key] for key in parameters_keys]
         bounds = [bounds_dict[key] for key in parameters_keys]
 
@@ -562,10 +477,6 @@ class FA_model(Model):
         elif method == 'trust-constr':
             out = minimize(self.get_fit_residuals, tc_pars, bounds=bounds, args = (train_timecourse, model_function, kws_dict),
                         method = method, tol = ftol, options = dict(xtol = xtol))
-
-        # ## calculate rsq of best fitting params
-        # # need to make prediction timecourse first
-        # model_arr = model_function(out['x'], **kws_dict)
 
         # set output params as dict
         out_dict = {key: out['x'][ind] for ind, key in enumerate(parameters_keys)}
@@ -583,21 +494,20 @@ class FA_model(Model):
 
         Parameters
         ----------
-        tc_pars: lmfit Parameters object
-            lmfit Parameter object with relevant estimates
+        tc_pars: arr/list
+            list with parameter values for vertex
         timecourse: arr
-            data timecourse
+            2D data array of [runs, time]
         model_function: callable
             The objective function that takes `parameters` and `args` and
             produces a model time-series.
+        kws_dict: dict
+            dictionary with extra inputs parameters (var name: val) that will be used by model function
         """ 
 
         ## get prediction timecourse for that visual design matrix
         # and parameters
         model_arr = model_function(tc_pars, **kws_dict)
-
-        # return residuals
-        print(mri_utils.error_resid(timecourse, model_arr, mean_err = False))
 
         return mri_utils.error_resid(timecourse, model_arr, mean_err = False, return_array = False)
 
@@ -608,12 +518,14 @@ class FA_model(Model):
         given parameters for that vertex 
         use pRF model to produce a timecourse for the design matrix 
 
+        Note: will return 2D model array [runs, time]
+
         Parameters
         ----------
         pars: array/list
             array with relevant estimates
         reg_name: str
-            "regressor" name of visual dm dict
+            "regressor" name as described in visual dm dict. if None will assume we want to weight each bar and stack them
         bar_keys: list
             list with bar names
         parameters_keys: list
@@ -626,7 +538,7 @@ class FA_model(Model):
         ## loop over runs
         for run_id in self.visual_dm_dict.keys():
             
-            print('making timecourse for run %s'%run_id)
+            #print('making timecourse for run %s'%run_id)
 
             ## if we want a specifc regressor (example full stim, att bar)
             if reg_name is not None:
@@ -769,7 +681,7 @@ class FullStim_model(FA_model):
                     run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,
                     prf_model_name = None, rsq_threshold = None, file_ext = '_cropped_LinDetrend_psc.npy', 
                     outdir = None, save_estimates = False, prf_bounds = None,
-                    xtol = 1e-3, ftol = 1e-4, n_jobs = 8, pars2vary = ['betas'], reg_name = 'full_stim', bar_keys = ['att_bar', 'unatt_bar']):
+                    xtol = 1e-3, ftol = 1e-4, n_jobs = 16, prf_pars2vary = ['betas'], reg_name = 'full_stim', bar_keys = ['att_bar', 'unatt_bar']):
 
         """
                 
@@ -787,7 +699,7 @@ class FullStim_model(FA_model):
         masked_data, masked_prf_estimates = self.setup_fitting(participant, pp_prf_estimates, ses = ses,
                                                             run_type = run_type, chunk_num = chunk_num, vertex = vertex, ROI = ROI,
                                                             prf_model_name = prf_model_name, rsq_threshold = rsq_threshold, file_ext = file_ext, 
-                                                            outdir = outdir, fit_overlap = False, fit_full_stim = True, pars2vary = pars2vary)
+                                                            outdir = outdir, fit_overlap = False, fit_full_stim = True, prf_pars2vary = prf_pars2vary, prf_bounds = prf_bounds)
 
 
         ## actually fit data

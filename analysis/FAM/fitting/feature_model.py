@@ -12,7 +12,6 @@ from FAM.utils import mri as mri_utils
 from FAM.processing import preproc_behdata
 from FAM.fitting.model import Model
 
-#from lmfit import Parameters, minimize
 from scipy.optimize import minimize
 
 from joblib import Parallel, delayed
@@ -575,7 +574,7 @@ class FA_model(Model):
 
                 model_obj = Iso2DGaussianModel(stimulus = fa_stim,
                                                 filter_predictions = False,
-                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                 'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -589,7 +588,7 @@ class FA_model(Model):
 
                 model_obj = CSS_Iso2DGaussianModel(stimulus = fa_stim,
                                                 filter_predictions = False,
-                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                 'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -604,7 +603,7 @@ class FA_model(Model):
 
                 model_obj = DoG_Iso2DGaussianModel(stimulus = fa_stim,
                                                 filter_predictions = False,
-                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                 'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -619,7 +618,7 @@ class FA_model(Model):
 
                 model_obj = Norm_Iso2DGaussianModel(stimulus = fa_stim,
                                                 filter_predictions = False,
-                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                 'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -641,6 +640,76 @@ class FA_model(Model):
         self.run_timecourse = run_timecourse
 
         return model_arr
+
+
+    def load_FA_model_estimates(self, participant, ses = 1, run = 'r1s1', run_type = 'loo_r1s1', model_name = None, 
+                            prf_model_name = 'gauss', fit_hrf = False, outdir = None):
+
+        """
+        Helper function to load FA model estimates
+        when they already where fitted and save in out folder
+
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        ses: int/str
+            session number of data we are fitting
+        run_type: string or int
+            type of run to fit - 1, loo_rXsY (leaving out specific run and session) 
+            or if int/'run-X' will do single run fit
+        model_name: str or None
+            model name to be loaded (if None defaults to class model)
+        iterative: bool
+            if we want to load iterative fitting results [default] or grid results
+
+        """
+        
+        if outdir is not None:
+            # if model name to load not given, use the one set in the class
+            if model_name:
+                model_name = model_name
+            else:
+                model_name = self.model_type['FA']
+
+            # set folder name
+            if model_name == 'full_stim':
+                model_folder = 'FA_FullStim_fit'
+            elif model_name == 'glm':
+                model_folder = 'FA_GLM_fit'
+            elif model_name == 'gain':
+                model_folder = 'FA_Gain_fit'
+
+            # path to fa estimates 
+            if 'loo_' in run_type:
+                FAdir = op.join(self.MRIObj.derivatives_pth, model_folder, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type)
+            else:
+                FAdir = op.join(self.MRIObj.derivatives_pth, model_folder, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses))
+
+            outdir = op.join(FAdir, 'it_{mn}'.format(mn = prf_model_name))            
+        
+        
+        # basefilename
+        basefilename = 'sub-{sj}_task-FA_acq-{acq}_run-{r}_runtype-{rt}'.format(sj = participant,
+                                                                            acq = self.MRIObj.acq,
+                                                                            r = run,
+                                                                            rt = run_type)
+        
+        ## now actually load 
+        filelist = glob.glob(op.join(outdir, '*'))
+
+        if fit_hrf:
+            filename = [file for file in filelist if basefilename in file and 'HRF' in file and file.endswith('.csv')]
+        else:
+            filename = [file for file in filelist if basefilename in file and 'HRF' not in file and file.endswith('.csv')]
+        
+        if len(filename)>1:
+            print('%s'%str(filename))
+            raise ValueError('Too many files found, conflict')
+        elif len(filename) == 0:
+            raise ValueError('No file found')
+        
+        return pd.read_csv(filename[0],index_col=[0])
 
 
 
@@ -1037,7 +1106,7 @@ class Gain_model(FA_model):
 
                 model_obj = Iso2DGaussianModel(stimulus = fa_stim,
                                                 filter_predictions = filter_prf_predictions,
-                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                 'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -1050,7 +1119,7 @@ class Gain_model(FA_model):
 
                 model_obj = CSS_Iso2DGaussianModel(stimulus = fa_stim,
                                                 filter_predictions = filter_prf_predictions,
-                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                 'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -1064,7 +1133,7 @@ class Gain_model(FA_model):
 
                 model_obj = DoG_Iso2DGaussianModel(stimulus = fa_stim,
                                                 filter_predictions = filter_prf_predictions,
-                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                 'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -1078,7 +1147,7 @@ class Gain_model(FA_model):
 
                 model_obj = Norm_Iso2DGaussianModel(stimulus = fa_stim,
                                                 filter_predictions = filter_prf_predictions,
-                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                 'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -1322,7 +1391,7 @@ class GLM_model(FA_model):
 
                 model_obj = Iso2DGaussianModel(stimulus = fa_stim,
                                                 filter_predictions = filter_prf_predictions,
-                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                 'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -1334,7 +1403,7 @@ class GLM_model(FA_model):
 
                 model_obj = CSS_Iso2DGaussianModel(stimulus = fa_stim,
                                                 filter_predictions = filter_prf_predictions,
-                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                 'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -1347,7 +1416,7 @@ class GLM_model(FA_model):
 
                 model_obj = DoG_Iso2DGaussianModel(stimulus = fa_stim,
                                                 filter_predictions = filter_prf_predictions,
-                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                 'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -1360,7 +1429,7 @@ class GLM_model(FA_model):
 
                 model_obj = Norm_Iso2DGaussianModel(stimulus = fa_stim,
                                                 filter_predictions = filter_prf_predictions,
-                                                filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                 filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                 'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                 'window_length': self.MRIObj.params['mri']['filtering']['window_length'],

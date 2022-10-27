@@ -148,7 +148,7 @@ class pRFViewer:
     def plot_singlevert_pRF(self, participant, 
                     ses = 'ses-mean', run_type = 'mean', vertex = None, ROI = None,
                     prf_model_name = 'gauss', file_ext = '_cropped_dc_psc.npy', 
-                    fit_now = False, figures_pth = None, fa_model_name = 'glm'):
+                    fit_now = False, figures_pth = None):
 
         """
 
@@ -273,7 +273,7 @@ class pRFViewer:
             axis.plot(time_sec, hrf[0],'red',label='fitted hrf')
             axis.set_xlim(self.pRFModelObj.hrf_onset, 25)
             axis.legend(loc='upper right',fontsize=10) 
-            axis.set_xlabel('Time (s)',fontsize=10, labelpad=10)
+            axis.set_xlabel('Time (TR)',fontsize=10, labelpad=10)
             #plt.show()
             fig.savefig(op.join(figures_pth, 'HRF_model-{model}_roi-{roi}_vertex-{vert}.png'.format(model = prf_model_name,
                                                                                                     roi = str(ROI), 
@@ -1477,21 +1477,26 @@ class FAViewer(pRFViewer):
 
     def plot_singlevert_FA(self, participant, 
                                 ses = 1, run_type = '1', vertex = None, ROI = None,
-                                prf_model_name = 'gauss', file_ext = '_cropped_confound_psc.npy', 
-                                fit_now = False, figures_pth = None, fa_model_name = 'glm'):
+                                prf_model_name = 'gauss', prf_ses = 'ses-mean', prf_run_type = 'run-mean', 
+                                file_ext = '_cropped_confound_psc.npy', 
+                                fit_now = False, figures_pth = None, fa_model_name = 'full_stim'):
 
-        # make output folder for figures
+        ## make output folder for figures
         if figures_pth is None:
-            if fa_model_name == 'glm':
-                figures_pth = op.join(self.outputdir, 'single_vertex', 'FA_Gain_fit', 'sub-{sj}'.format(sj = participant), ses)
+            if fa_model_name == 'full_stim':
+                figures_pth = op.join(self.outputdir, 'single_vertex', 'FA_FullStim_fit', 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses))
+
             elif fa_model_name == 'gain':
-                figures_pth = op.join(self.outputdir, 'single_vertex', 'FA_GLM_fit', 'sub-{sj}'.format(sj = participant), ses)
+                figures_pth = op.join(self.outputdir, 'single_vertex', 'FA_Gain_fit', 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses))
+
+            elif fa_model_name == 'glm':
+                figures_pth = op.join(self.outputdir, 'single_vertex', 'FA_GLM_fit', 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses))
         
         os.makedirs(figures_pth, exist_ok=True)
 
         print('Loading pRF estimates')
-        pp_prf_estimates, _ = self.pRFModelObj.load_pRF_model_estimates(participant,
-                                                                    ses = 'ses-mean', run_type = 'run-mean', 
+        pp_prf_estimates, pp_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant,
+                                                                    ses = prf_ses, run_type = prf_run_type,
                                                                     model_name = prf_model_name, 
                                                                     iterative = True,
                                                                     fit_hrf = self.pRFModelObj.fit_hrf)
@@ -1499,60 +1504,140 @@ class FAViewer(pRFViewer):
         ## load FA data array
         bold_filelist = self.FAModelObj.get_bold_file_list(participant, task = 'FA', ses = ses, file_ext = file_ext)
         data_arr, train_file_list = self.FAModelObj.get_data4fitting(bold_filelist, task = 'FA', run_type = run_type, chunk_num = None, vertex = vertex, 
-                            baseline_interval = 'empty', ses = ses, return_filenames = False)                                              
+                            baseline_interval = 'empty', ses = ses, return_filenames = True)   
 
+        ## get run and ses from file
+        run_num, ses_num = mri_utils.get_run_ses_from_str(train_file_list[0])                                            
         
-        if fa_model_name == 'glm':
+        ## select timecourse of single vertex
+        data_arr = data_arr[0,0,...]
+        
+        ## Load/fit estimates for model
+        # to make model timecourse
+
+        if fa_model_name == 'full_stim':
+
+            ## get bounds used for prf estimates of specific model
+            pp_prf_stim = pp_prf_models['sub-{sj}'.format(sj = participant)][prf_ses]['prf_stim']
+            prf_bounds = self.pRFModelObj.get_fit_startparams(max_ecc_size = pp_prf_stim.screen_size_degrees/2.0)[self.pRFModelObj.model_type['pRF']]['bounds']
+
+            if self.pRFModelObj.fit_hrf:
+                self.FAModelObj.fit_hrf = self.pRFModelObj.fit_hrf
+                prf_pars2vary = ['betas', 'hrf_derivative']
+            else:
+                prf_pars2vary = ['betas']
 
             # if we want to fit it now
             if fit_now:
                 print('Fitting estimates')
 
+                ## fit data 
                 results_list = self.FAModelObj.fit_data(participant, pp_prf_estimates, 
                                             ses = ses, run_type = run_type,
                                             chunk_num = None, vertex = vertex, ROI = ROI,
-                                            prf_model_name = prf_model_name, rsq_threshold = None, file_ext = file_ext, 
-                                            outdir = None, save_estimates = False,
-                                            fit_overlap = False,
-                                            reg_names = self.FAModelObj.reg_names, n_jobs = 16)
+                                            prf_model_name = prf_model_name, file_ext = file_ext, 
+                                            save_estimates = False,
+                                            prf_pars2vary = prf_pars2vary, reg_name = 'full_stim', bar_keys = ['att_bar', 'unatt_bar'],
+                                            xtol = 1e-3, ftol = 1e-4, n_jobs = 16, prf_bounds = prf_bounds) 
 
+                ## get estimates dataframe
+                estimates_df = results_list[0]
 
-                model_arr = self.FAModelObj.get_prediction_from_betas(results_list[0], reg_names = self.FAModelObj.reg_names, prf_model_name = prf_model_name, 
-                                                            visual_dm_dict = self.FAModelObj.visual_dm_dict, 
-                                                            pp_prf_estimates = pp_prf_estimates, vertex = vertex)
+            else:
+                ## setup fitting to get relevant variables
+                _, _ = self.FAModelObj.setup_fitting(participant, pp_prf_estimates, ses = ses,
+                                                            run_type = run_type, chunk_num = None, vertex = vertex, ROI = ROI,
+                                                            prf_model_name = prf_model_name, file_ext = file_ext, 
+                                                            fit_overlap = False, fit_full_stim = True, prf_pars2vary = prf_pars2vary, prf_bounds = prf_bounds)
 
-        elif fa_model_name == 'gain':
+                ## load estimates 
+                print('Loading estimates')
+                estimates_df = self.FAModelObj.load_FA_model_estimates(participant, ses = ses, run = 'r{r}s{s}'.format(r = run_num, s = ses_num), 
+                                                                        run_type = run_type, 
+                                                                        model_name = fa_model_name, prf_model_name = prf_model_name, 
+                                                                        fit_hrf = self.FAModelObj.fit_hrf, outdir = self.FAModelObj.outdir)
 
-            results_list = self.FAModelObj.fit_data(participant, pp_prf_estimates, 
-                                        ses = ses, run_type = run_type,
-                                        chunk_num = None, vertex = vertex, ROI = ROI,
-                                        prf_model_name = prf_model_name, rsq_threshold = None, file_ext = file_ext, 
-                                        outdir = None, save_estimates = False,
-                                        fit_overlap = True,
-                                        xtol = 1e-3, ftol = 1e-4, n_jobs = 16) 
+            ## transform estimates dataframe into dictionary
+            tc_dict = estimates_df[estimates_df.vertex == vertex][np.array(self.FAModelObj.prf_est_keys)].to_dict('r')[0]
 
-            ## Get visual dm for different bars, and overlap
-            # dict with visual dm per run, will be weighted and combined when actually fitting
-            visual_dm_dict = self.get_visual_DM_dict(participant, train_file_list, save_overlap = True)
+            # get rsq val for plotting
+            r2 = estimates_df[estimates_df.vertex == vertex]['r2'].values[0]
 
+            ## turn parameters and bounds into arrays because of scipy minimize
+            # but save dict keys to guarantee order is correct
+            parameters_keys = list(tc_dict.keys())
 
-            # ## get prediction timecourse for that visual design matrix
-            # # and parameters
-            # model_arr = self.FAModelObj.get_gain_timecourse(tc_pars, visual_dm_dict, 
-            #                                             prf_model_name = prf_model_name, 
-            #                                             fit_hrf = self.fit_hrf, osf = self.osf, hrf_onset = self.hrf_onset,
-            #                                             bar_keys = ['att_bar', 'unatt_bar'], filter_prf_predictions = False, filter_type = 'dc')
+            # set parameters and bounds into list, to conform to scipy minimze format
+            tc_pars = np.array([tc_dict[key] for key in parameters_keys])
+            
+            ## get prediction array
+            model_arr = self.FAModelObj.get_fit_timecourse(tc_pars, reg_name = 'full_stim', 
+                                                            bar_keys = ['att_bar', 'unatt_bar'], parameters_keys = parameters_keys)
 
+            model_arr = model_arr[0]
 
         ## actually plot
 
         # set figure name
-        # fig_name = 'sub-{sj}_task-FA_acq-{acq}_space-{space}_run-{run}_model-{model}_roi-{roi}_vertex-{vert}.png'.format(sj = participant,
-        #                                                                                         acq = self.MRIObj.acq,
-        #                                                                                         space = self.MRIObj.sj_space,
-        #                                                                                         run = run_type,
-        #                                                                                         model = prf_model_name,
-        #                                                                                         roi = str(ROI),
-        #                                                                                         vert = str(vertex))
-        # if not fit_now:
-        #     fig_name = fig_name.replace('.png', '_loaded.png')
+        fig_name = 'sub-{sj}_task-FA_acq-{acq}_space-{space}_run-{run}_model-{model}_pRFmodel-{pmodel}_roi-{roi}_vertex-{vert}.png'.format(sj = participant,
+                                                                                                acq = self.MRIObj.acq,
+                                                                                                space = self.MRIObj.sj_space,
+                                                                                                run = run_type,
+                                                                                                model = fa_model_name,
+                                                                                                pmodel = prf_model_name,
+                                                                                                roi = str(ROI),
+                                                                                                vert = str(vertex))
+        if not fit_now:
+            fig_name = fig_name.replace('.png', '_loaded.png')
+
+        if self.FAModelObj.fit_hrf:
+
+            fig_name = fig_name.replace('.png','_withHRF.png') 
+
+            ## make both hrfs 
+            hrf = pp_prf_models['sub-{sj}'.format(sj = participant)][prf_ses]['%s_model'%prf_model_name].create_hrf(hrf_params = [1, estimates_df[estimates_df.vertex == vertex]['hrf_derivative'].values[0],
+                                                                                                                            estimates_df[estimates_df.vertex == vertex]['hrf_dispersion'].values[0]], 
+                                                                                                                            osf = self.FAModelObj.osf * self.FAModelObj.MRIObj.TR, 
+                                                                                                                            onset = self.FAModelObj.hrf_onset)
+            
+            spm_hrf = pp_prf_models['sub-{sj}'.format(sj = participant)][prf_ses]['%s_model'%prf_model_name].create_hrf(hrf_params = [1, 1, 0], 
+                                                                                                            osf = self.FAModelObj.osf * self.FAModelObj.MRIObj.TR, 
+                                                                                                            onset = self.FAModelObj.hrf_onset)
+
+            ## also plot hrf shapes for comparison
+            fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
+
+            time_sec = np.linspace(0,len(hrf[0]) * self.MRIObj.TR, num = len(hrf[0])) # array in seconds
+
+            axis.plot(time_sec, spm_hrf[0],'grey',label='spm hrf')
+            axis.plot(time_sec, hrf[0],'blue',label='fitted hrf')
+            #axis.set_xlim(self.FAModelObj.hrf_onset, 25)
+            axis.legend(loc='upper right',fontsize=10) 
+            axis.set_xlabel('Time (s)',fontsize=10, labelpad=10)
+            #plt.show()
+            fig.savefig(op.join(figures_pth, 'HRF_model-{model}_pRFmodel-{pmodel}_run-{run}_roi-{roi}_vertex-{vert}.png'.format(model = fa_model_name,
+                                                                                                                    pmodel = prf_model_name,
+                                                                                                                    run = run_type,
+                                                                                                                    roi = str(ROI), 
+                                                                                                                    vert = str(vertex)))) 
+        
+        # plot data with model
+        fig, axis = plt.subplots(1, figsize=(12,5), dpi=100)
+
+        # plot data with model
+        time_sec = np.linspace(0, len(model_arr) * self.MRIObj.TR, num = len(model_arr)) # array in seconds
+            
+        axis.plot(time_sec, model_arr, c = 'blue', lw = 3, 
+                                            label = 'model R$^2$ = %.2f'%r2, 
+                                            zorder = 1)
+        #axis.scatter(time_sec, data_reshape[ind_max_rsq,:], marker='v',s=15,c='k',label='data')
+        axis.plot(time_sec, data_arr, 'k--', label='data')
+        
+        axis.set_xlabel('Time (s)',fontsize = 20, labelpad = 5)
+        axis.set_ylabel('BOLD signal change (%)',fontsize = 20, labelpad = 5)
+        axis.set_xlim(0, len(model_arr) * self.MRIObj.TR)
+        
+        axis.legend(loc='upper left',fontsize = 10) 
+
+        fig.savefig(op.join(figures_pth, fig_name))
+        

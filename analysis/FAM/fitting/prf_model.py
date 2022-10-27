@@ -228,7 +228,7 @@ class pRF_model(Model):
                 # GAUSS
                 gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
                                                     filter_predictions = True,
-                                                    filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                    filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                     filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                     'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                     'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -242,7 +242,7 @@ class pRF_model(Model):
                 # CSS
                 css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
                                                     filter_predictions = True,
-                                                    filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                    filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                     filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                     'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                     'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -256,7 +256,7 @@ class pRF_model(Model):
                 # DN 
                 dn_model =  Norm_Iso2DGaussianModel(stimulus = prf_stim,
                                                     filter_predictions = True,
-                                                    filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                    filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                     filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                     'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                     'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -270,7 +270,7 @@ class pRF_model(Model):
                 # DOG
                 dog_model = DoG_Iso2DGaussianModel(stimulus = prf_stim,
                                                     filter_predictions = True,
-                                                    filter_type = self.MRIObj.params['mri']['filtering']['type'],
+                                                    filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
                                                     filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
                                                                     'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
                                                                     'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
@@ -382,11 +382,16 @@ class pRF_model(Model):
 
             # iterative fit
             print("Gauss model ITERATIVE fit")
+
+            # if self.fit_hrf:
+            #     # set hrf here, for now - grid gauss doesnt fit hrf params (need to raise issue in prfpy)
+            #     pp_models['sub-{sj}'.format(sj = participant)][ses]['gauss_model'].hrf = np.array([1,1,0])
+
             gauss_fitter.iterative_fit(rsq_threshold = 0.05, 
                                         verbose = True,
                                         bounds = fit_params['gauss']['bounds'],
                                         constraints = constraints['gauss'],
-                                        starting_params = None,
+                                        #starting_params = gauss_fitter.gridsearch_params,
                                         xtol = xtol,
                                         ftol = ftol)
 
@@ -452,10 +457,12 @@ class pRF_model(Model):
 
                 # iterative fit
                 print("{key} model ITERATIVE fit".format(key = model2fit))
+
                 fitter.iterative_fit(rsq_threshold = 0.05, 
                                     verbose = True,
                                     bounds = fit_params[model2fit]['bounds'],
                                     constraints = constraints[model2fit],
+                                    #starting_params = fitter.gridsearch_params, 
                                     xtol = xtol,
                                     ftol = ftol)
 

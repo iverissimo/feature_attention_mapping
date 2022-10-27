@@ -265,7 +265,7 @@ def crop_epi(file, outdir, num_TR_crop = 5):
 
 
 def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert = False,
-                first_modes_to_remove = 5, baseline_inter1 = None, baseline_inter2 = None, **kwargs):
+                first_modes_to_remove = 5, baseline_inter1 = None, baseline_inter2 = None, TR = 1.6, **kwargs):
     
     """ 
     Generic filtering function, implemented different types of filters
@@ -332,7 +332,7 @@ def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert = False,
 
             elif filter_type == 'LinDetrend':
 
-                data_filt = detrend_data(data, detrend_type = 'linear', baseline_inter1 = None, baseline_inter2 = None, **kwargs)
+                data_filt = detrend_data(data, detrend_type = 'linear', TR = TR, baseline_inter1 = baseline_inter1, baseline_inter2 = baseline_inter2, **kwargs)
                 
             else:
                 raise NameError('filter type not implemented')
@@ -498,12 +498,16 @@ def detrend_data(data, detrend_type = 'linear', baseline_inter1 = None, baseline
         
         # if indices for baseline interval given, use those values for regression line
         if baseline_inter1 is not None and baseline_inter2 is not None:
+
+            print('Taking TR indices of %s to get average start baseline'%str(baseline_inter1))
             
             # get median baseline value for initial baseline period
             if isinstance(baseline_inter1, int):
                 start_base = np.median(data[...,:baseline_inter1], axis = -1)
             elif isinstance(baseline_inter1, list) or isinstance(baseline_inter1, np.ndarray):
                 start_base = np.median(data[...,baseline_inter1[0]:baseline_inter1[1]], axis = -1)
+
+            print('Taking TR indices of %s to get average end baseline'%str(baseline_inter2))
 
             # get median baseline value for end baseline period
             if isinstance(baseline_inter2, int):
@@ -513,8 +517,8 @@ def detrend_data(data, detrend_type = 'linear', baseline_inter1 = None, baseline
         
         # just make line across time series
         else:
-            start_base = np.zeros(data.shape[0])
-            end_base = np.zeros(data.shape[0]); end_base[:] = data.shape[-1]
+            start_base = np.zeros((data.shape[0], 1))
+            end_base = np.zeros((data.shape[0], 1)); end_base[:] = data.shape[-1]
 
         ## make trend line for all vertices
         trend_line = [np.linspace(start_base[ind], end_base[ind], data.shape[-1]) for ind, _ in enumerate(data)]

@@ -247,7 +247,7 @@ class FA_model(Model):
             session number of data we are fitting
         run_type: string or int
             type of run to fit - mean (default), median, loo_rXsY (leaving out specific run and session) 
-            or if int/'run-X' will do single run fit
+            or if int/'run-X'/'rXsY' will do single run fit
         chunk_num: int or None
             if we want to fit specific chunk of data, then will return chunk array
         vertex: int, or list of indices or None
@@ -673,12 +673,7 @@ class FA_model(Model):
                 model_name = self.model_type['FA']
 
             # set folder name
-            if model_name == 'full_stim':
-                model_folder = 'FA_FullStim_fit'
-            elif model_name == 'glm':
-                model_folder = 'FA_GLM_fit'
-            elif model_name == 'gain':
-                model_folder = 'FA_Gain_fit'
+            model_folder = self.MRIObj.params['mri']['fitting']['FA']['fit_folder'][model_name]
 
             # path to fa estimates 
             if 'loo_' in run_type:
@@ -741,7 +736,7 @@ class FullStim_model(FA_model):
 
         # if output dir not defined, then make it in derivatives
         if outputdir is None:
-            self.outputdir = op.join(self.MRIObj.derivatives_pth,'FA_FullStim_fit')
+            self.outputdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['FA']['fit_folder']['full_stim'])
         else:
             self.outputdir = outputdir
 
@@ -829,7 +824,7 @@ class Gain_model(FA_model):
 
         # if output dir not defined, then make it in derivatives
         if outputdir is None:
-            self.outputdir = op.join(self.MRIObj.derivatives_pth,'FA_Gain_fit')
+            self.outputdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['FA']['fit_folder']['gain'])
         else:
             self.outputdir = outputdir
     
@@ -1182,7 +1177,6 @@ class Gain_model(FA_model):
         return model_arr
 
 
-
 class GLM_model(FA_model):
 
     def __init__(self, MRIObj, outputdir = None, tasks = ['pRF', 'FA']):
@@ -1202,7 +1196,7 @@ class GLM_model(FA_model):
 
         # if output dir not defined, then make it in derivatives
         if outputdir is None:
-            self.outputdir = op.join(self.MRIObj.derivatives_pth,'FA_GLM_fit')
+            self.outputdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['FA']['fit_folder']['glm'])
         else:
             self.outputdir = outputdir
 

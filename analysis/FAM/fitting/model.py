@@ -151,6 +151,8 @@ class Model:
 
         # loop over runs
         data2fit = np.array([])
+        self.run_num_arr = [] 
+        self.ses_num_arr = []
 
         for r in range(data_arr.shape[0]):
             
@@ -206,6 +208,13 @@ class Model:
                     data2fit = data_out[np.newaxis, ...]
                 else:
                     data2fit = data_out
+
+            ## append run number, and ses number in list of ints
+            # useful for when fitting several runs at same time
+            file_rn, file_sn = mri_utils.get_run_ses_from_str(file_list[r])
+            self.run_num_arr.append(file_rn)
+            self.ses_num_arr.append(file_sn)
+            
 
         # return filelist if that matters for fitting (mainly for FA task)
         if return_filenames:

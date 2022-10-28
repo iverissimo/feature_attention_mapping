@@ -38,7 +38,7 @@ class pRF_model(Model):
 
         # if output dir not defined, then make it in derivatives
         if outputdir is None:
-            self.outputdir = op.join(self.MRIObj.derivatives_pth,'pRF_fit')
+            self.outputdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'])
         else:
             self.outputdir = outputdir
         
@@ -322,9 +322,9 @@ class pRF_model(Model):
         ## set output dir to save estimates
         if outdir is None:
             if 'loo_' in run_type:
-                outdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type)
+                outdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'], self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type)
             else:
-                outdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), ses)
+                outdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'], self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), ses)
             
         os.makedirs(outdir, exist_ok = True)
         print('saving files in %s'%outdir)
@@ -385,7 +385,7 @@ class pRF_model(Model):
 
             # if self.fit_hrf:
             #     # set hrf here, for now - grid gauss doesnt fit hrf params (need to raise issue in prfpy)
-            #     pp_models['sub-{sj}'.format(sj = participant)][ses]['gauss_model'].hrf = np.array([1,1,0])
+            #     gauss_fitter.model.hrf_params = [1,1,0]
 
             gauss_fitter.iterative_fit(rsq_threshold = 0.05, 
                                         verbose = True,
@@ -746,9 +746,9 @@ class pRF_model(Model):
 
         ## load estimates to make it easier to load later
         if 'loo_' in run_type:
-            pRFdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type, est_folder)
+            pRFdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'], self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type, est_folder)
         else:
-            pRFdir = op.join(self.MRIObj.derivatives_pth, 'pRF_fit', self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), ses, est_folder)
+            pRFdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'], self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), ses, est_folder)
 
 
         pp_prf_est_dict = self.load_pRF_model_chunks(pRFdir, 

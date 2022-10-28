@@ -181,7 +181,7 @@ class pRFViewer:
             
         # make output folder for figures
         if figures_pth is None:
-            figures_pth = op.join(self.outputdir, 'single_vertex', 'pRF_fit', 'sub-{sj}'.format(sj = participant), ses)
+            figures_pth = op.join(self.outputdir, 'single_vertex', self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'], 'sub-{sj}'.format(sj = participant), ses)
         
         os.makedirs(figures_pth, exist_ok=True)
 
@@ -308,8 +308,6 @@ class pRFViewer:
                 
         #plt.show()
         fig.savefig(op.join(figures_pth, fig_name))
-
-    
 
     
     def save_estimates4drawing(self, participant, task2draw = 'pRF',
@@ -706,13 +704,12 @@ class pRFViewer:
                                         n_bins_colors = 256, max_x_lim = max_ecc_ext, angle_thresh = 3*np.pi/4)
 
 
-
     def plot_rsq(self, participant_list = [], group_estimates = {}, ses = 'ses-mean',  run_type = 'mean',
                         figures_pth = None, model_name = 'gauss'):
         
         # make output folder for figures
         if figures_pth is None:
-            figures_pth = op.join(self.outputdir, 'rsq', 'pRF_fit')
+            figures_pth = op.join(self.outputdir, 'rsq', self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'])
 
         # save values per roi in dataframe
         avg_roi_df = pd.DataFrame()
@@ -812,7 +809,7 @@ class pRFViewer:
 
         # make general output folder for figures
         if figures_pth is None:
-            figures_pth = op.join(self.outputdir, 'rsq', 'pRF_fit')
+            figures_pth = op.join(self.outputdir, 'rsq', self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'])
 
         for pp in participant_list:
 
@@ -969,7 +966,7 @@ class pRFViewer:
         
         ### make output folder for figures
         if figures_pth is None:
-            figures_pth = op.join(self.outputdir, 'ecc_size', 'pRF_fit')
+            figures_pth = op.join(self.outputdir, 'ecc_size', self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'])
             
         ## make costum ECC color map
         ecc_cmap = plot_utils.make_colormap(colormap = ['#dd3933','#f3eb53','#7cb956','#82cbdb','#3d549f'],
@@ -1183,7 +1180,7 @@ class pRFViewer:
         
         ### make output folder for figures
         if figures_pth is None:
-            figures_pth = op.join(self.outputdir, 'exponent', 'pRF_fit')
+            figures_pth = op.join(self.outputdir, 'exponent', self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'])
             
         
         avg_df = pd.DataFrame()
@@ -1293,7 +1290,7 @@ class pRFViewer:
         
         # make output folder for figures
         if figures_pth is None:
-            figures_pth = op.join(self.outputdir, 'polar_angle', 'pRF_fit')
+            figures_pth = op.join(self.outputdir, 'polar_angle', self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'])
 
         ## loop over participants in list
         for pp in participant_list:
@@ -1523,7 +1520,7 @@ class FAViewer(pRFViewer):
 
             if self.pRFModelObj.fit_hrf:
                 self.FAModelObj.fit_hrf = self.pRFModelObj.fit_hrf
-                prf_pars2vary = ['betas', 'hrf_derivative']
+                prf_pars2vary = ['betas']#, 'hrf_derivative']
             else:
                 prf_pars2vary = ['betas']
 

@@ -116,14 +116,9 @@ match system_dir:
 
         # set fit folder name
         if task == 'pRF':
-            fitfolder = 'pRF_fit'
+            fitfolder = params['mri']['fitting']['pRF']['fit_folder'] 
         elif task == 'FA':
-            if model2fit == 'gain':
-                fitfolder = 'FA_Gain_fit'
-            elif model2fit == 'glm':
-                fitfolder = 'FA_GLM_fit'
-            elif model2fit == 'full_stim':
-                fitfolder = 'FA_FullStim_fit'
+            fitfolder = params['mri']['fitting']['FA']['fit_folder'][model2fit]
 
         # batch dir to save .sh files
         batch_dir = '/home/inesv/batch'
@@ -188,7 +183,7 @@ wait
 echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
 # make derivatives dir in node and sourcedata because we want to access behav files
-mkdir -p $TMPDIR/derivatives/{post_fmriprep,$FITFOLDER,pRF_fit}/$SPACE/sub-$SJ_NR
+mkdir -p $TMPDIR/derivatives/{post_fmriprep,$FITFOLDER,$PRFFITFOLDER}/$SPACE/sub-$SJ_NR
 mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR
 
 wait
@@ -201,9 +196,9 @@ cp -r $SOURCE_DIR/sub-$SJ_NR $TMPDIR/sourcedata/
 
 wait
 
-if [ -d "$DERIV_DIR/pRF_fit/$SPACE/sub-$SJ_NR" ] 
+if [ -d "$DERIV_DIR/$PRFFITFOLDER/$SPACE/sub-$SJ_NR" ] 
 then
-    cp -r $DERIV_DIR/pRF_fit/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/pRF_fit/$SPACE
+    cp -r $DERIV_DIR/$PRFFITFOLDER/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/$PRFFITFOLDER/$SPACE
 fi
 
 if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ] 
@@ -213,7 +208,8 @@ fi
 
 wait
 
-"""
+""".replace('$PRFFITFOLDER', params['mri']['fitting']['pRF']['fit_folder'])
+
                 # update slurm job script
 
                 batch_string =  slurm_cmd + """$PY_CMD

@@ -84,7 +84,7 @@ node_name = args.node_name # node name to submit slurm job (or None)
 partition_name = args.partition_name # partition name to submit slurm job (or None)
 batch_mem_Gib = args.batch_mem_Gib if args.batch_mem_Gib is not None else 90
 run_time = '24:00:00' # should make input too
-send_email = bool(args.send_email) if args.send_email is not None else False
+send_email = bool(args.email) if args.email is not None else False
 
 ## Load data object
 print("Fitting data for subject {sj}!".format(sj=sj))

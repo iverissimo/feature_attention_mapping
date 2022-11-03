@@ -39,6 +39,7 @@ parser.add_argument("--exclude_sj", nargs='+', help="List of subjects to exclude
 parser.add_argument("--node_name", type = str, help="Node name, to send job to [default None]")
 parser.add_argument("--partition_name", type = str, help="Partition name, to send job to [default None]")
 parser.add_argument("--batch_mem_Gib", type = int, help="Node memory limit [default 90]")
+parser.add_argument("--email", type = int, help="Send job email 1/0 [default 0]")
 
 ## set variables 
 args = parser.parse_args()
@@ -83,6 +84,7 @@ node_name = args.node_name # node name to submit slurm job (or None)
 partition_name = args.partition_name # partition name to submit slurm job (or None)
 batch_mem_Gib = args.batch_mem_Gib if args.batch_mem_Gib is not None else 90
 run_time = '24:00:00' # should make input too
+send_email = bool(args.send_email) if args.send_email is not None else False
 
 ## Load data object
 print("Fitting data for subject {sj}!".format(sj=sj))
@@ -152,7 +154,7 @@ match system_dir:
 
                 if task == 'pRF':
                     slurm_cmd = slurm_cmd + """# call the programs
-echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
+$START_EMAIL
 
 # make derivatives dir in node and sourcedata because we want to access behav files
 mkdir -p $TMPDIR/derivatives/{post_fmriprep,$FITFOLDER}/$SPACE/sub-$SJ_NR
@@ -180,7 +182,7 @@ wait
                     # if we are fitting FA, then also need to copy pRF estimates to scratch
 
                     slurm_cmd = slurm_cmd + """# call the programs
-echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
+$START_EMAIL
 
 # make derivatives dir in node and sourcedata because we want to access behav files
 mkdir -p $TMPDIR/derivatives/{post_fmriprep,$FITFOLDER,$PRFFITFOLDER}/$SPACE/sub-$SJ_NR
@@ -210,7 +212,7 @@ wait
 
 """.replace('$PRFFITFOLDER', params['mri']['fitting']['pRF']['fit_folder'])
 
-                # update slurm job script
+                ### update slurm job script
 
                 batch_string =  slurm_cmd + """$PY_CMD
 
@@ -220,8 +222,15 @@ rsync -chavzP $TMPDIR/derivatives/ $DERIV_DIR
 
 wait          # wait until programs are finished
 
-echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
+$END_EMAIL
 """
+
+                ### if we want to send email
+                if send_email == True:
+                    batch_string = batch_string.replace('$START_EMAIL', 'echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"')
+                    batch_string = batch_string.replace('$END_EMAIL', 'echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"')
+                
+                ## replace other variables
 
                 working_string = batch_string.replace('$SJ_NR', str(pp).zfill(3))
                 working_string = working_string.replace('$SPACE', FAM_data.sj_space)

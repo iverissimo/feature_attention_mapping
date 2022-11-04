@@ -14,7 +14,8 @@ import nibabel as nib
 from scipy.ndimage import gaussian_filter
 from scipy.signal import savgol_filter, fftconvolve
 from scipy import fft, interpolate
-from scipy.stats import t, norm
+from scipy.stats import t, norm, linregress
+from scipy.interpolate import interp1d
 
 from nilearn import surface
 from nilearn.signal import clean
@@ -482,10 +483,10 @@ def detrend_data(data, detrend_type = 'linear', baseline_inter1 = None, baseline
         type of detrending (default 'linear'), can also use discrete cosine transform as low-frequency drift predictors
     dct_set_nr: int
         Number of discrete cosine transform to use
-    baseline_inter1: int/list arr
-        list with indices of intervals to use as 1st baseline period [start:end] or int with indice for end of baseline period
-    baseline_inter2: int/list arr
-        list with indices of intervals to use as last baseline period [start:end] or int with indice for start of baseline period
+    baseline_inter1: int
+        int with indice for end of baseline period
+    baseline_inter2: int
+        int with indice for start of baseline period
 
     Outputs
     -------
@@ -501,58 +502,39 @@ def detrend_data(data, detrend_type = 'linear', baseline_inter1 = None, baseline
 
             ## start baseline interval
             print('Taking TR indices of %s to get trend of start baseline'%str(baseline_inter1))
-
-            start_reg = np.zeros(data.shape[-1])
-            start_intercept = np.zeros(data.shape[-1])
             
             # make regressor + intercept for initial baseline period
             if isinstance(baseline_inter1, int):
-                start_reg[:baseline_inter1] = np.arange(baseline_inter1)
-                start_intercept[:baseline_inter1] = 1
-
-            elif isinstance(baseline_inter1, list) or isinstance(baseline_inter1, np.ndarray):
-                start_reg[baseline_inter1[0]:baseline_inter1[1]] = np.arange(int(baseline_inter1[1] - baseline_inter1[0]))
-                start_intercept[baseline_inter1[0]:baseline_inter1[1]] = 1
+                start_trend_func = [linregress(np.arange(baseline_inter1), vert[:baseline_inter1]) for _,vert in enumerate(tqdm(data))]
+                start_trend = np.stack((start_trend_func[ind].intercept + start_trend_func[ind].slope * np.arange(baseline_inter1) for ind,_ in enumerate(tqdm(data))))
+            else:
+                raise ValueError('index not provided as int')
 
             ## end baseline interval
             print('Taking TR indices of %s to get trend of end baseline'%str(baseline_inter2))
 
-            end_reg = np.zeros(data.shape[-1])
-            end_intercept = np.zeros(data.shape[-1])
-
             # make regressor + intercept for end baseline period
             if isinstance(baseline_inter2, int):
-                end_reg[baseline_inter2:] = np.arange(np.abs(baseline_inter2))
-                end_intercept[baseline_inter2:] = 1
+                end_trend_func = [linregress(np.arange(np.abs(baseline_inter2)), vert[baseline_inter2:]) for _,vert in enumerate(tqdm(data))]
+                end_trend = np.stack((end_trend_func[ind].intercept + end_trend_func[ind].slope * np.arange(np.abs(baseline_inter2)) for ind,_ in enumerate(tqdm(data))))
+            else:
+                raise ValueError('index not provided as int')  
 
-            elif isinstance(baseline_inter2, list) or isinstance(baseline_inter2, np.ndarray):
-                end_reg[baseline_inter2[0]:baseline_inter2[1]] = np.arange(int(baseline_inter2[1] - baseline_inter2[0]))
-                end_intercept[baseline_inter2[0]:baseline_inter2[1]] = 1
+            ## now interpolate slope for task period
+            baseline_timepoints = np.concatenate((np.arange(data.shape[-1])[:baseline_inter1, ...],
+                                                np.arange(data.shape[-1])[baseline_inter2:, ...]))
 
-            ## make task regressor + intercept, to also fit task related linear trend
-            task_intercept = np.ones(data.shape[-1])
-            task_intercept[start_intercept == 1] = 0
-            task_intercept[end_intercept == 1] = 0
+            trend_func = [interp1d(baseline_timepoints, np.concatenate((start_trend[ind], end_trend[ind])), kind='linear') for ind,_ in enumerate(tqdm(data))]
 
-            task_reg = np.zeros(data.shape[-1])
-            task_reg[task_intercept == 1] = np.arange(sum(task_intercept))
+            # and save trend line
+            trend_line = np.stack((trend_func[ind](np.arange(data.shape[-1])) for ind,_ in enumerate(tqdm(data))))
 
-            ## make dm for trend
-            dm_trend = np.array((start_reg, start_intercept, 
-                                end_reg, end_intercept, 
-                                task_reg, task_intercept, 
-                                np.ones(data.shape[-1])))
-        
         # just make line across time series
         else:
-            dm_trend = np.array((np.arange(data.shape[-1]), 
-                                np.ones(data.shape[-1])))
-
-        ## least squares regression (fit GLM)
-        prediction, _, _, _ = zip(*Parallel(n_jobs=2)(delayed(fit_glm)(vert, dm_trend.T) for _,vert in enumerate(tqdm(data))))
+            raise ValueError('index not provided')  
         
         # add mean image back to avoid distribution around 0
-        data_detr = data - prediction + np.mean(data, axis=-1)[..., np.newaxis]
+        data_detr = data - trend_line + np.mean(data, axis=-1)[..., np.newaxis]
 
     ## if we want remove basis set
     elif detrend_type == 'dct':

@@ -630,7 +630,7 @@ class FA_model(Model):
                                                 )
             
             # get run timecourse
-            run_timecourse = model_obj.return_prediction(*list([pars[parameters_keys.index(name)] for name in parameters_keys if 'hrf' not in name]))
+            run_timecourse = model_obj.return_prediction(*list([pars[parameters_keys.index(name)] for name in self.prf_est_keys if 'hrf' not in name]))
             
             ## resample to TR and stack
             model_arr = np.vstack([model_arr, mri_utils.resample_arr(run_timecourse, osf = self.osf, final_sf = self.MRIObj.TR)]) if model_arr.size else mri_utils.resample_arr(run_timecourse, osf = self.osf, final_sf = self.MRIObj.TR)

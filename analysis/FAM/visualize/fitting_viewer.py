@@ -1518,11 +1518,9 @@ class FAViewer(pRFViewer):
             pp_prf_stim = pp_prf_models['sub-{sj}'.format(sj = participant)][prf_ses]['prf_stim']
             prf_bounds = self.pRFModelObj.get_fit_startparams(max_ecc_size = pp_prf_stim.screen_size_degrees/2.0)[self.pRFModelObj.model_type['pRF']]['bounds']
 
-            if self.pRFModelObj.fit_hrf:
-                self.FAModelObj.fit_hrf = self.pRFModelObj.fit_hrf
-                prf_pars2vary = ['betas']#, 'hrf_derivative']
-            else:
-                prf_pars2vary = ['betas']
+            self.FAModelObj.fit_hrf = self.pRFModelObj.fit_hrf
+            
+            prf_pars2vary = ['betas']
 
             # if we want to fit it now
             if fit_now:
@@ -1555,7 +1553,7 @@ class FAViewer(pRFViewer):
                                                                         fit_hrf = self.FAModelObj.fit_hrf, outdir = self.FAModelObj.outdir)
 
             ## transform estimates dataframe into dictionary
-            tc_dict = estimates_df[estimates_df.vertex == vertex][np.array(self.FAModelObj.prf_est_keys)].to_dict('r')[0]
+            tc_dict = estimates_df[estimates_df.vertex == vertex].to_dict('r')[0]
 
             # get rsq val for plotting
             r2 = estimates_df[estimates_df.vertex == vertex]['r2'].values[0]

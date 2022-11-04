@@ -212,10 +212,8 @@ match task2model:
                 # set prf bounds
                 FAM_FA.prf_bounds = prf_bounds
 
-                if FAM_FA.fit_hrf:
-                    prf_pars2vary = ['betas', 'hrf_derivative']
-                else:
-                    prf_pars2vary = ['betas']
+                # we're only scalling betas, keeping other pRF params the same
+                prf_pars2vary = ['betas']
 
                 ## actually fit
                 print('Fitting started!')

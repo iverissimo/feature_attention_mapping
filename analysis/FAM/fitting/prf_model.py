@@ -972,7 +972,7 @@ class pRF_model(Model):
         if fit_hrf:
             filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-000' in x and 'HRF' in x]
         else:
-            filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-000' in x]
+            filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-000' in x and 'HRF' not in x]
         
         ## if we defined a base filename that should be used to fish out right estimates
         if basefilename:
@@ -990,7 +990,7 @@ class pRF_model(Model):
                 if fit_hrf:
                     chunk_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-%s'%str(ch).zfill(3) in x and 'HRF' in x]
                 else:
-                    chunk_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-%s'%str(ch).zfill(3) in x]
+                    chunk_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-%s'%str(ch).zfill(3) in x and 'HRF' not in x]
                 
                 ## if we defined a base filename that should be used to fish out right estimates
                 if basefilename:

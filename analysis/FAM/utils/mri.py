@@ -499,33 +499,57 @@ def detrend_data(data, detrend_type = 'linear', baseline_inter1 = None, baseline
         # if indices for baseline interval given, use those values for regression line
         if baseline_inter1 is not None and baseline_inter2 is not None:
 
-            print('Taking TR indices of %s to get average start baseline'%str(baseline_inter1))
+            ## start baseline interval
+            print('Taking TR indices of %s to get trend of start baseline'%str(baseline_inter1))
+
+            start_reg = np.zeros(data.shape[-1])
+            start_intercept = np.zeros(data.shape[-1])
             
-            # get median baseline value for initial baseline period
+            # make regressor + intercept for initial baseline period
             if isinstance(baseline_inter1, int):
-                start_base = np.median(data[...,:baseline_inter1], axis = -1)
+                start_reg[:baseline_inter1] = np.arange(baseline_inter1)
+                start_intercept[:baseline_inter1] = 1
+
             elif isinstance(baseline_inter1, list) or isinstance(baseline_inter1, np.ndarray):
-                start_base = np.median(data[...,baseline_inter1[0]:baseline_inter1[1]], axis = -1)
+                start_reg[baseline_inter1[0]:baseline_inter1[1]] = np.arange(int(baseline_inter1[1] - baseline_inter1[0]))
+                start_intercept[baseline_inter1[0]:baseline_inter1[1]] = 1
 
-            print('Taking TR indices of %s to get average end baseline'%str(baseline_inter2))
+            ## end baseline interval
+            print('Taking TR indices of %s to get trend of end baseline'%str(baseline_inter2))
 
-            # get median baseline value for end baseline period
+            end_reg = np.zeros(data.shape[-1])
+            end_intercept = np.zeros(data.shape[-1])
+
+            # make regressor + intercept for end baseline period
             if isinstance(baseline_inter2, int):
-                end_base = np.median(data[...,baseline_inter2:], axis = -1)
+                end_reg[baseline_inter2:] = np.arange(np.abs(baseline_inter2))
+                end_intercept[baseline_inter2:] = 1
+
             elif isinstance(baseline_inter2, list) or isinstance(baseline_inter2, np.ndarray):
-                end_base = np.median(data[...,baseline_inter2[0]:baseline_inter2[1]], axis = -1)
+                end_reg[baseline_inter2[0]:baseline_inter2[1]] = np.arange(int(baseline_inter2[1] - baseline_inter2[0]))
+                end_intercept[baseline_inter2[0]:baseline_inter2[1]] = 1
+
+            ## make task regressor + intercept, to also fit task related linear trend
+            task_intercept = np.ones(data.shape[-1])
+            task_intercept[start_intercept == 1] = 0
+            task_intercept[end_intercept == 1] = 0
+
+            task_reg = np.zeros(data.shape[-1])
+            task_reg[task_intercept == 1] = np.arange(sum(task_intercept))
+
+            ## make dm for trend
+            dm_trend = np.array((start_reg, start_intercept, 
+                                end_reg, end_intercept, 
+                                task_reg, task_intercept, 
+                                np.ones(data.shape[-1])))
         
         # just make line across time series
         else:
-            start_base = np.zeros((data.shape[0], 1))
-            end_base = np.zeros((data.shape[0], 1)); end_base[:] = data.shape[-1]
-
-        ## make trend line for all vertices
-        trend_line = [np.linspace(start_base[ind], end_base[ind], data.shape[-1]) for ind, _ in enumerate(data)]
+            dm_trend = np.array((np.arange(data.shape[-1]), 
+                                np.ones(data.shape[-1])))
 
         ## least squares regression (fit GLM)
-        prediction, _, _, _ = zip(*Parallel(n_jobs=2)(delayed(fit_glm)(vert, np.stack((np.ones(vert.shape[-1]),
-                                                                                            trend_line[ind])).T) for ind,vert in enumerate(tqdm(data))))
+        prediction, _, _, _ = zip(*Parallel(n_jobs=2)(delayed(fit_glm)(vert, dm_trend.T) for _,vert in enumerate(tqdm(data))))
         
         # add mean image back to avoid distribution around 0
         data_detr = data - prediction + np.mean(data, axis=-1)[..., np.newaxis]

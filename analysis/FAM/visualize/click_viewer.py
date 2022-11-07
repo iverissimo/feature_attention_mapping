@@ -240,7 +240,8 @@ class visualize_on_click:
         axis.plot(time_sec, timecourse,'k--', label = 'data')
         
         if plot_model:
-            prediction, r2 = self.get_vertex_fa_model_tc(self.vertex)
+            prediction, _ = self.get_vertex_fa_model_tc(self.vertex)
+            r2 = mri_utils.calc_rsq(timecourse, prediction)
             axis.plot(time_sec, prediction, c = 'blue',lw=3,label='model R$^2$ = %.2f'%r2,zorder=1)
             print('FA model R$^2$ = %.2f'%r2)
             

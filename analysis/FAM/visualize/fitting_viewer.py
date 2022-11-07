@@ -1555,9 +1555,6 @@ class FAViewer(pRFViewer):
             ## transform estimates dataframe into dictionary
             tc_dict = estimates_df[estimates_df.vertex == vertex].to_dict('r')[0]
 
-            # get rsq val for plotting
-            r2 = estimates_df[estimates_df.vertex == vertex]['r2'].values[0]
-
             ## turn parameters and bounds into arrays because of scipy minimize
             # but save dict keys to guarantee order is correct
             parameters_keys = list(tc_dict.keys())
@@ -1570,6 +1567,10 @@ class FAViewer(pRFViewer):
                                                             bar_keys = ['att_bar', 'unatt_bar'], parameters_keys = parameters_keys)
 
             model_arr = model_arr[0]
+
+            # get rsq val for plotting
+            #r2 = estimates_df[estimates_df.vertex == vertex]['r2'].values[0]
+            r2 = mri_utils.calc_rsq(data_arr, model_arr)
 
         ## actually plot
 

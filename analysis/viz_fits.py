@@ -195,11 +195,17 @@ match task:
         file_ext = FAM_mri_preprocess.get_mrifile_ext()['FA']
 
         ## load FA model class
-        FAM_FA = feature_model.FullStim_model(FAM_data)
+        match fa_model_name:
+
+            case 'full_stim':   
+                FAM_FA = feature_model.FullStim_model(FAM_data)
+            case 'gain':
+                FAM_FA = feature_model.Gain_model(FAM_data)
+            case 'glm':
+                FAM_FA = feature_model.GLM_model(FAM_data)
 
         # if we want to fit hrf
         FAM_FA.fit_hrf = FAM_pRF.fit_hrf
-
 
         ## load plotter class
         plotter = FAViewer(FAM_data, pRFModelObj = FAM_pRF, FAModelObj = FAM_FA,
@@ -213,6 +219,13 @@ match task:
                 plotter.plot_singlevert_FA(sj, vertex = vertex, file_ext = file_ext, 
                                         ses = ses, run_type = run_type, prf_ses = prf_ses, prf_run_type = prf_run_type,
                                         fit_now = fit_now, prf_model_name = prf_model_name, fa_model_name = fa_model_name)
+
+            case 'click':
+                plotter.open_click_viewer(sj, task2viz = 'FA',
+                                        prf_ses = prf_ses, prf_run_type = prf_run_type, 
+                                        fa_ses = ses, fa_run_type = run_type,
+                                        prf_model_name = prf_model_name, fa_model_name = fa_model_name,
+                                        fa_file_ext = file_ext, prf_file_ext = FAM_mri_preprocess.get_mrifile_ext()['pRF'])
 
 
 

@@ -62,7 +62,8 @@ class visualize_on_click:
                                          np.linspace(1, -1, prf_dm.shape[0]) * max_ecc_ext))
 
     def set_figure(self, participant, 
-                    task2viz = 'both', ses = 'ses-mean', run_type = 'mean', pRFmodel_name = None):
+                    task2viz = 'both', prf_ses = 'ses-mean', prf_run_type = 'mean', fa_ses = 1, fa_run_type = '1',
+                    pRFmodel_name = None, FAmodel_name = None, fa_file_ext = '_cropped_LinDetrend_psc.npy'):
 
         """
         Set base figure with placeholders 
@@ -80,11 +81,16 @@ class visualize_on_click:
 
         ## set participant ID
         self.participant = participant
-        self.session = ses
+
+        ## set run and session to load
+        self.session = {'pRF': prf_ses, 'FA': fa_ses}
+        self.run_type = {'pRF': prf_run_type, 'FA': fa_run_type}
+
         self.pRFmodel_name = pRFmodel_name
+        self.FAmodel_name = FAmodel_name
 
         ## load model and prf estimates for that participant
-        self.pp_prf_est_dict, self.pp_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant, ses = self.session, run_type = run_type, 
+        self.pp_prf_est_dict, self.pp_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant, ses = self.session['pRF'], run_type = self.run_type['pRF'], 
                                                                                 model_name = pRFmodel_name, iterative = True, fit_hrf = self.pRFModelObj.fit_hrf)
 
         # when loading, dict has key-value pairs stored,
@@ -93,6 +99,22 @@ class visualize_on_click:
         
         if self.pRFModelObj.fit_hrf:
             self.pRF_keys = self.pRF_keys[:-1]+self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys']['hrf']+['r2']
+
+        if self.FAModelObj is not None:
+            ## load FA model estimates
+            # setup fitting to get relevant variables
+            _, _ = self.FAModelObj.setup_vars4fitting(participant, self.pp_prf_est_dict, ses = self.session['FA'],
+                                                        run_type = self.run_type['FA'], file_ext = fa_file_ext,
+                                                        prf_model_name = self.pRFmodel_name,
+                                                        fit_overlap = False, fit_full_stim = True)
+
+            ## load estimates 
+            print('Loading FA estimates')
+            self.pp_fa_est_df = self.FAModelObj.load_FA_model_estimates(participant, ses = self.session['FA'], 
+                                                                    run = 'r{r}s{s}'.format(r = self.run_type['FA'], s = self.session['FA']), 
+                                                                    run_type = self.run_type['FA'], 
+                                                                    model_name = self.FAmodel_name, prf_model_name = self.pRFmodel_name, 
+                                                                    fit_hrf = self.FAModelObj.fit_hrf, outdir = self.FAModelObj.outdir)
 
         ## set figure grid 
         self.full_fig = plt.figure(constrained_layout = True, figsize = self.full_figsize)
@@ -128,7 +150,7 @@ class visualize_on_click:
             self.prf_ax.set_title('prf')
 
 
-    def get_vertex_model_tc(self, vertex):
+    def get_vertex_prf_model_tc(self, vertex):
 
         """
         Get model estimates for that vertex
@@ -146,29 +168,29 @@ class visualize_on_click:
         estimates_arr = np.stack((self.pp_prf_est_dict[val][vertex] for val in self.pRF_keys))
         
         # define spm hrf
-        spm_hrf = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].create_hrf(hrf_params = [1, 1, 0],
+        spm_hrf = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session['pRF']]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].create_hrf(hrf_params = [1, 1, 0],
                                                                                                                     onset=self.pRFModelObj.hrf_onset)
 
         if self.pRFModelObj.fit_hrf:
-            hrf = self.pp_prf_models[ 'sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].create_hrf(hrf_params = [1.0,
+            hrf = self.pp_prf_models[ 'sub-{sj}'.format(sj = self.participant)][self.session['pRF']]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].create_hrf(hrf_params = [1.0,
                                                                                                                                 estimates_arr[-3],
                                                                                                                                 estimates_arr[-2]],
                                                                                                                     onset=self.pRFModelObj.hrf_onset)
         
-            self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].hrf = hrf
+            self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session['pRF']]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].hrf = hrf
 
-            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].return_prediction(*list(estimates_arr[:-3]))
+            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session['pRF']]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].return_prediction(*list(estimates_arr[:-3]))
         
         else:
-            self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].hrf = spm_hrf
+            self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session['pRF']]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].hrf = spm_hrf
 
-            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].return_prediction(*list(estimates_arr[:-1]))
+            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = self.participant)][self.session['pRF']]['{name}_model'.format(name = self.pRFModelObj.model_type['pRF'])].return_prediction(*list(estimates_arr[:-1]))
 
             
         return model_arr[0], estimates_arr[-1]
 
 
-
+    
     def plot_prf_tc(self, axis, timecourse = None, plot_model = True):
 
         """
@@ -188,7 +210,7 @@ class visualize_on_click:
         axis.plot(time_sec, timecourse,'k--', label = 'data')
         
         if plot_model:
-            prediction, r2 = self.get_vertex_model_tc(self.vertex)
+            prediction, r2 = self.get_vertex_prf_model_tc(self.vertex)
             axis.plot(time_sec, prediction, c = 'red',lw=3,label='model R$^2$ = %.2f'%r2,zorder=1)
             print('pRF model R$^2$ = %.2f'%r2)
             
@@ -218,8 +240,9 @@ class visualize_on_click:
         axis.plot(time_sec, timecourse,'k--', label = 'data')
         
         if plot_model:
-            axis.plot(time_sec, self.FA_model[self.vertex], c = 'blue',lw=3)
-            #print('FA model R$^2$ = %.2f'%r2)
+            prediction, r2 = self.get_vertex_fa_model_tc(self.vertex)
+            axis.plot(time_sec, prediction, c = 'blue',lw=3,label='model R$^2$ = %.2f'%r2,zorder=1)
+            print('FA model R$^2$ = %.2f'%r2)
             
 
         axis.set_xlabel('Time (s)')#,fontsize=20, labelpad=20)
@@ -228,6 +251,39 @@ class visualize_on_click:
         #axis.legend(loc='upper left',fontsize=10)  # doing this to guarantee that legend is how I want it
         
         return axis
+
+    
+    def get_vertex_fa_model_tc(self, vertex):
+
+        """
+        Get model estimates for that vertex
+
+        Parameters
+        ----------
+        vertex : int
+            vertex index
+            
+        """
+
+        ## transform estimates dataframe into dictionary
+        tc_dict = self.pp_fa_est_df[self.pp_fa_est_df.vertex == vertex].to_dict('r')[0]
+
+        # get rsq val for plotting
+        r2 = self.pp_fa_est_df[self.pp_fa_est_df.vertex == vertex]['r2'].values[0]
+
+        ## turn parameters and bounds into arrays because of scipy minimize
+        # but save dict keys to guarantee order is correct
+        parameters_keys = list(tc_dict.keys())
+
+        # set parameters and bounds into list, to conform to scipy minimze format
+        tc_pars = np.array([tc_dict[key] for key in parameters_keys])
+        
+        ## get prediction array
+        model_arr = self.FAModelObj.get_fit_timecourse(tc_pars, reg_name = 'full_stim', 
+                                                        bar_keys = ['att_bar', 'unatt_bar'], parameters_keys = parameters_keys)
+
+        return model_arr[0], r2
+
         
     
     def redraw_vertex_plots(self, vertex, refresh):

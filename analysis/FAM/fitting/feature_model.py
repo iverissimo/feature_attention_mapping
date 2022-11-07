@@ -227,10 +227,10 @@ class FA_model(Model):
         return out_dict, condition_dm_keys
 
 
-    def setup_fitting(self, participant, pp_prf_estimates, ses = 1,
+    def setup_vars4fitting(self, participant, pp_prf_estimates, ses = 1,
                     run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,
-                    prf_model_name = None, rsq_threshold = None, file_ext = '_cropped_confound_psc.npy', 
-                    outdir = None, fit_overlap = True, fit_full_stim = False, prf_pars2vary = [], prf_bounds = None):
+                    prf_model_name = None, file_ext = '_cropped_confound_psc.npy', 
+                    outdir = None, fit_overlap = True, fit_full_stim = False):
 
         """
         set up variables necessary for fitting
@@ -256,8 +256,6 @@ class FA_model(Model):
             roi name 
         prf_model_name: str
             prf model name from which estimates were derived
-        rsq_threshold: float or None
-            fit vertices where prf fit above certain rsq threshold 
         file_ext: str 
             ending of bold file, to know which one to load
         outdir: str
@@ -266,10 +264,6 @@ class FA_model(Model):
             if we want to fit overlap area as a separate regressor
         fit_full_stim: bool
             if we want to fit the full stimulus (both bars combined) or not
-        prf_pars2vary: list
-            list with name of prf estimates to vary during fitting
-        prf_bounds: list
-            list with tuples of prf estimate bounds for fitting
         """ 
 
         # if we provided session as str
@@ -328,11 +322,6 @@ class FA_model(Model):
         self.prf_est_keys = [val for val in list(pp_prf_estimates.keys()) if val!='r2']
         print('pRF {m} model estimates found {l}'.format(m = self.prf_model_name, l = str(self.prf_est_keys)))
 
-        ## get relevant indexes to fit
-        # set threshold
-        if rsq_threshold is None:
-            rsq_threshold = self.prf_rsq_threshold
-
         # subselect pRF estimates similar to data
         # to avoid index issues
         if (chunk_num is not None) or (vertex is not None):
@@ -343,18 +332,45 @@ class FA_model(Model):
         else:
             masked_prf_estimates = pp_prf_estimates
 
+        return masked_data, masked_prf_estimates
+
+
+    def initialize_parameters(self, prf_estimates, prf_pars2vary = [], prf_bounds = None, rsq_threshold = None):
+
+        """
+        initialize parameters for fitting
+        for specified participant
+
+        Parameters
+        ----------
+        prf_estimates : dict
+            dict with participant prf estimates
+        rsq_threshold: float or None
+            fit vertices where prf fit above certain rsq threshold 
+        prf_pars2vary: list
+            list with name of prf estimates to vary during fitting
+        prf_bounds: list
+            list with tuples of prf estimate bounds for fitting
+        """ 
+
+
+        ## get relevant indexes to fit
+        # set threshold
+        if rsq_threshold is None:
+            rsq_threshold = self.prf_rsq_threshold
+
         # find indexes worth fitting
         # this is, where pRF rsq > than predetermined threshold
-        self.ind2fit = np.where(((masked_prf_estimates['r2'] > rsq_threshold)))[0]
+        self.ind2fit = np.where(((prf_estimates['r2'] > rsq_threshold)))[0]
 
         ## set up parameters object for all vertices to be fitted
         # with pRF estimates values
         print('Initializing FA parameters with pRF estimates...')
-        self.pars_arr = np.array([{key: masked_prf_estimates[key][ind] for key in self.prf_est_keys} for ind in self.ind2fit])
+        self.pars_arr = np.array([{key: prf_estimates[key][ind] for key in self.prf_est_keys} for ind in self.ind2fit])
 
         ## set up prf bounds 
         print('Setting FA parameter bounds...')
-        pars_bounds_arr = np.array([{key: (masked_prf_estimates[key][ind],masked_prf_estimates[key][ind]) for key in self.prf_est_keys} for ind in self.ind2fit])
+        pars_bounds_arr = np.array([{key: (prf_estimates[key][ind],prf_estimates[key][ind]) for key in self.prf_est_keys} for ind in self.ind2fit])
 
         if len(prf_pars2vary) > 0:
             print('fitting %i pRF parameters - %s'%(len(prf_pars2vary), str(prf_pars2vary)))
@@ -372,8 +388,6 @@ class FA_model(Model):
                                                 prf_bounds[self.prf_est_keys.index(key)][-1])}} for d in pars_bounds_arr]
 
         self.pars_bounds_arr = pars_bounds_arr
-
-        return masked_data, masked_prf_estimates
 
 
     def iterative_fit(self, data, starting_params = None, model_function = None,
@@ -761,10 +775,13 @@ class FullStim_model(FA_model):
 
         ## set up fitting by loading data and visual dm for data
         # also loads prf parameters
-        masked_data, masked_prf_estimates = self.setup_fitting(participant, pp_prf_estimates, ses = ses,
+        masked_data, masked_prf_estimates = self.setup_vars4fitting(participant, pp_prf_estimates, ses = ses,
                                                             run_type = run_type, chunk_num = chunk_num, vertex = vertex, ROI = ROI,
-                                                            prf_model_name = prf_model_name, rsq_threshold = rsq_threshold, file_ext = file_ext, 
-                                                            outdir = outdir, fit_overlap = False, fit_full_stim = True, prf_pars2vary = prf_pars2vary, prf_bounds = prf_bounds)
+                                                            prf_model_name = prf_model_name, file_ext = file_ext, 
+                                                            outdir = outdir, fit_overlap = False, fit_full_stim = True)
+
+        ## initialize params for fitting
+        self.initialize_parameters(masked_prf_estimates, prf_pars2vary = prf_pars2vary, prf_bounds = prf_bounds, rsq_threshold = rsq_threshold)
 
         ## actually fit data
         # call iterative fit function, giving it masked data and pars
@@ -851,11 +868,13 @@ class Gain_model(FA_model):
 
         ## set up fitting by loading data and visual dm for data
         # also loads prf parameters
-        masked_data, masked_prf_estimates = self.setup_fitting(participant, pp_prf_estimates, ses = ses,
+        masked_data, masked_prf_estimates = self.setup_vars4fitting(participant, pp_prf_estimates, ses = ses,
                                                             run_type = run_type, chunk_num = chunk_num, vertex = vertex, ROI = ROI,
-                                                            prf_model_name = prf_model_name, rsq_threshold = rsq_threshold, file_ext = file_ext, 
-                                                            outdir = outdir, fit_overlap = fit_overlap, fit_full_stim = fit_full_stim,
-                                                            prf_pars2vary = prf_pars2vary, prf_bounds = prf_bounds)
+                                                            prf_model_name = prf_model_name, file_ext = file_ext, 
+                                                            outdir = outdir, fit_overlap = fit_overlap, fit_full_stim = fit_full_stim)
+
+        ## initialize params for fitting
+        self.initialize_parameters(masked_prf_estimates, prf_pars2vary = prf_pars2vary, prf_bounds = prf_bounds, rsq_threshold = rsq_threshold)
 
         ## now get FA gain estimate keys
         if gain_cond is None:
@@ -949,10 +968,13 @@ class GLM_model(FA_model):
         """  
         
         ## set up fitting by loading data and visual dm for data
-        masked_data, masked_prf_estimates = self.setup_fitting(participant, pp_prf_estimates, ses = ses,
+        masked_data, masked_prf_estimates = self.setup_vars4fitting(participant, pp_prf_estimates, ses = ses,
                                                             run_type = run_type, chunk_num = chunk_num, vertex = vertex, ROI = ROI,
-                                                            prf_model_name = prf_model_name, rsq_threshold = rsq_threshold, file_ext = file_ext, 
+                                                            prf_model_name = prf_model_name, file_ext = file_ext, 
                                                             outdir = outdir, fit_overlap = fit_overlap, fit_full_stim = fit_full_stim)
+
+        ## initialize params for fitting
+        #self.initialize_parameters(masked_prf_estimates, prf_pars2vary = prf_pars2vary, prf_bounds = prf_bounds, rsq_threshold = rsq_threshold)
 
 
         

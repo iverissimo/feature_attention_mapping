@@ -542,7 +542,7 @@ class pRFViewer:
 
         ## set figure, and also load estimates and models
         click_plotter.set_figure(participant,
-                                        ses = ses, run_type = run_type, pRFmodel_name = prf_model_name,
+                                        prf_ses = ses, prf_run_type = run_type, pRFmodel_name = prf_model_name,
                                         task2viz = task2viz)
 
         ## mask the estimates
@@ -1540,10 +1540,10 @@ class FAViewer(pRFViewer):
 
             else:
                 ## setup fitting to get relevant variables
-                _, _ = self.FAModelObj.setup_fitting(participant, pp_prf_estimates, ses = ses,
+                _, _ = self.FAModelObj.setup_vars4fitting(participant, pp_prf_estimates, ses = ses,
                                                             run_type = run_type, chunk_num = None, vertex = vertex, ROI = ROI,
                                                             prf_model_name = prf_model_name, file_ext = file_ext, 
-                                                            fit_overlap = False, fit_full_stim = True, prf_pars2vary = prf_pars2vary, prf_bounds = prf_bounds)
+                                                            fit_overlap = False, fit_full_stim = True)
 
                 ## load estimates 
                 print('Loading estimates')
@@ -1635,4 +1635,167 @@ class FAViewer(pRFViewer):
         axis.legend(loc='upper left',fontsize = 10) 
 
         fig.savefig(op.join(figures_pth, fig_name))
+
+
+    def open_click_viewer(self, participant, task2viz = 'both',
+                    prf_ses = 'ses-mean', prf_run_type = 'mean', 
+                    fa_ses = 1, fa_run_type = '1',
+                    prf_model_name = 'gauss', fa_model_name = 'full_stim',
+                    prf_file_ext = '_cropped_dc_psc.npy', fa_file_ext = '_cropped_LinDetrend_psc.npy', rsq_threshold = .1):
+
+        """
+
+        Visualize pRF and FA estimates
+        with interactive figure that shows timecourse on click
+
+        Note - requires that we have (at least) pRF estimates saved 
+
+        Parameters
+        ----------
+        participant : str
+            subject ID
+        task2viz: str
+            task identifier 
+        ses: str
+            session of input data
+        run_type : str
+            type of run of input data (ex: 1/mean)
+        prf_model_name: str
+            name of prf model that was fit
+        file_ext: str
+            file extension of the post processed data
+        rsq_threshold: float
+            minimum RSQ threshold to use for figures
+
+        """
+
+        # general 
+        n_bins_colors = 256
+
+        ## load pRF data array
+        bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = prf_ses, file_ext = prf_file_ext)
+        #print(bold_filelist)
+        pRF_data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, task = 'pRF', run_type = prf_run_type, 
+                                            baseline_interval = 'empty_long', ses = prf_ses, return_filenames = False)
+
+        ## load FA data array
+        bold_filelist = self.FAModelObj.get_bold_file_list(participant, task = 'FA', ses = fa_ses, file_ext = fa_file_ext)
+
+        FA_data_arr = self.FAModelObj.get_data4fitting(bold_filelist, task = 'FA', run_type = fa_run_type,  
+                                                    baseline_interval = 'empty', ses = fa_ses, return_filenames = False) 
+        FA_data_arr = FA_data_arr[0] # fa data loaded in [runs, vertex, time]
+
+
+        max_ecc_ext = self.pp_prf_models['sub-{sj}'.format(sj = participant)][prf_ses]['prf_stim'].screen_size_degrees/2
+
+        ## Load click viewer plotted object
+        click_plotter = click_viewer.visualize_on_click(self.MRIObj, pRFModelObj = self.pRFModelObj, FAModelObj = self.FAModelObj,
+                                                        pRF_data = pRF_data_arr, FA_data = FA_data_arr,
+                                                        prf_dm = self.pp_prf_models['sub-{sj}'.format(sj = participant)][prf_ses]['prf_stim'].design_matrix,
+                                                        pysub = self.pysub['sub-{pp}'.format(pp = participant)],
+                                                        max_ecc_ext = max_ecc_ext)
+
+        ## set figure, and also load estimates and models -- continue from here !!!!!!!!
+        click_plotter.set_figure(participant,
+                                        prf_ses = prf_ses, prf_run_type = prf_run_type, pRFmodel_name = prf_model_name,
+                                        fa_ses = fa_ses, fa_run_type = fa_run_type, FAmodel_name = fa_model_name,
+                                        task2viz = task2viz, fa_file_ext = fa_file_ext)
+
+        ## mask the estimates
+        print('masking estimates')
+
+        # get estimate keys
+        keys = self.get_prf_estimate_keys(prf_model_name = prf_model_name)
+
+        click_plotter.pp_prf_est_dict = self.pRFModelObj.mask_pRF_model_estimates(click_plotter.pp_prf_est_dict, 
+                                                                    ROI = None,
+                                                                    estimate_keys = keys,
+                                                                    x_ecc_lim = [- max_ecc_ext, max_ecc_ext],
+                                                                    y_ecc_lim = [- max_ecc_ext, max_ecc_ext],
+                                                                    rsq_threshold = rsq_threshold,
+                                                                    pysub = self.pysub['sub-{pp}'.format(pp = participant)]
+                                                                    )
+
+        ## calculate pa + ecc + size
+        nan_mask = np.where((np.isnan(click_plotter.pp_prf_est_dict['r2'])) | (click_plotter.pp_prf_est_dict['r2'] < rsq_threshold))[0]
+        
+        complex_location = click_plotter.pp_prf_est_dict['x'] + click_plotter.pp_prf_est_dict['y'] * 1j # calculate eccentricity values
+
+        polar_angle = np.angle(complex_location)
+        polar_angle_norm = ((polar_angle + np.pi) / (np.pi * 2.0))
+        polar_angle_norm[nan_mask] = np.nan
+
+        eccentricity = np.abs(complex_location)
+        eccentricity[nan_mask] = np.nan
+
+        if prf_model_name in ['dn', 'dog']:
+            size_fwhmax, fwatmin = plot_utils.fwhmax_fwatmin(prf_model_name, click_plotter.pp_prf_est_dict)
+        else: 
+            size_fwhmax = plot_utils.fwhmax_fwatmin(prf_model_name, click_plotter.pp_prf_est_dict)
+
+        size_fwhmax[nan_mask] = np.nan
+
+        ## make alpha mask
+        alpha_level = mri_utils.normalize(np.clip(click_plotter.pp_prf_est_dict['r2'], rsq_threshold, .6)) # normalize 
+        alpha_level[nan_mask] = np.nan
+
+        ## set flatmaps ##
+
+        ## pRF rsq
+        click_plotter.images['pRF_rsq'] = plot_utils.get_flatmaps(click_plotter.pp_prf_est_dict['r2'], 
+                                                                    vmin1 = 0, vmax1 = .8,
+                                                                    pysub = self.pysub['sub-{pp}'.format(pp = participant)], 
+                                                                    cmap = 'Reds')
+        ## pRF Eccentricity
+
+        # make costum coor map
+        ecc_cmap = plot_utils.make_colormap(colormap = ['#dd3933','#f3eb53','#7cb956','#82cbdb','#3d549f'],
+                                            bins = n_bins_colors, cmap_name = 'ECC_mackey_costum', 
+                                            discrete = False, add_alpha = False, return_cmap = True)
+
+
+        click_plotter.images['ecc'] = plot_utils.make_raw_vertex_image(eccentricity, 
+                                                                            cmap = ecc_cmap, 
+                                                                            vmin = 0, vmax = 6, 
+                                                                            data2 = alpha_level, 
+                                                                            vmin2 = 0, vmax2 = 1, 
+                                                                            subject = self.pysub['sub-{pp}'.format(pp = participant)], data2D = True)
+
+        ## pRF Size
+        click_plotter.images['size_fwhmax'] = plot_utils.make_raw_vertex_image(size_fwhmax, 
+                                                    cmap = 'hot', vmin = 0, vmax = 14, #7, 
+                                                    data2 = alpha_level, 
+                                                    vmin2 = 0, vmax2 = 1, 
+                                                    subject = self.pysub['sub-{pp}'.format(pp = participant)], data2D = True)
+
+        ## pRF Polar Angle
+       
+        # get matplotlib color map from segmented colors
+        PA_cmap = plot_utils.make_colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb',
+                                                    '#3d549f','#655099','#ad5a9b','#dd3933'], bins = n_bins_colors, 
+                                                    cmap_name = 'PA_mackey_costum',
+                                                    discrete = False, add_alpha = False, return_cmap = True)
+
+        click_plotter.images['PA'] = plot_utils.make_raw_vertex_image(polar_angle_norm, 
+                                                    cmap = PA_cmap, vmin = 0, vmax = 1, 
+                                                    data2 = alpha_level, 
+                                                    vmin2 = 0, vmax2 = 1, 
+                                                    subject = self.pysub['sub-{pp}'.format(pp = participant)], data2D = True)
+
+        ## pRF Exponent 
+        if prf_model_name == 'css':
+            click_plotter.images['ns'] = plot_utils.get_flatmaps(click_plotter.pp_prf_est_dict['ns'], 
+                                                                vmin1 = 0, vmax1 = 1,
+                                                                pysub = self.pysub['sub-{pp}'.format(pp = participant)], 
+                                                                cmap = 'plasma')
+
+        
+        cortex.quickshow(click_plotter.images['pRF_rsq'], fig = click_plotter.flatmap_ax,
+                        with_rois = False, with_curvature = True, with_colorbar=False, 
+                        with_sulci = True, with_labels = False)
+
+        click_plotter.full_fig.canvas.mpl_connect('button_press_event', click_plotter.onclick)
+        click_plotter.full_fig.canvas.mpl_connect('key_press_event', click_plotter.onkey)
+
+        plt.show()
         

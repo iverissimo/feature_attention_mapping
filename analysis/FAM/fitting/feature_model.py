@@ -277,6 +277,7 @@ class FA_model(Model):
         data, train_file_list = self.get_data4fitting(bold_filelist, task = 'FA', run_type = run_type, chunk_num = chunk_num, vertex = vertex, ses = ses,
                                             baseline_interval = 'empty', return_filenames = True)
         print('Fitting files %s'%str(train_file_list))
+        self.train_file_list = train_file_list # save to access later
 
         ## Set nan voxels to 0, to avoid issues when fitting
         masked_data = np.nan_to_num(data)
@@ -945,14 +946,18 @@ class GLM_model(FA_model):
         else:
             self.outputdir = outputdir
 
-        self.reg_names = self.MRIObj.params['mri']['fitting']['FA']['glm_regs']
+        # task regressors of interest to be used
+        self.task_reg_names = self.MRIObj.params['mri']['fitting']['FA']['glm_task_regs']
+
+        # if provided, nuisance regressor names (if empty, then NO nuisance regressors will be used)
+        self.nuisances2add = self.MRIObj.params['mri']['fitting']['FA']['glm_nuisance_regs']
+        self.nuisance_reg_names = None
 
 
     def fit_data(self, participant, pp_prf_estimates, ses = 1,
                     run_type = 'loo_r1s1', chunk_num = None, vertex = None, ROI = None,
                     prf_model_name = None, rsq_threshold = None, file_ext = '_cropped_confound_psc.npy', 
-                    outdir = None, save_estimates = False, fit_overlap = False, fit_full_stim = True,
-                    reg_names = None, n_jobs = 8):
+                    outdir = None, save_estimates = False, fit_overlap = False, fit_full_stim = True, n_jobs = 8):
 
         """
         fit inputted FA models to each participant in participant list
@@ -973,8 +978,125 @@ class GLM_model(FA_model):
                                                             prf_model_name = prf_model_name, file_ext = file_ext, 
                                                             outdir = outdir, fit_overlap = fit_overlap, fit_full_stim = fit_full_stim)
 
-        ## initialize params for fitting
-        #self.initialize_parameters(masked_prf_estimates, prf_pars2vary = prf_pars2vary, prf_bounds = prf_bounds, rsq_threshold = rsq_threshold)
+        ## initialize prf params for fitting
+        self.initialize_parameters(masked_prf_estimates, prf_pars2vary = [], prf_bounds = None, rsq_threshold = rsq_threshold)
+
+        ## if provided, get nuisance regressors
+        if len(self.nuisances2add) > 0:
+
+            # get ses and run number 
+            run_num, ses_num = mri_utils.get_run_ses_from_str(self.train_file_list[0]) ## assumes we are fitting one run, will need to change later if such is the case
+
+            ## first select confounds for run
+            conf_path = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 
+                                    'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses_num))
+
+            confound_files = [op.join(conf_path, file) for file in os.listdir(conf_path) if 'acq-{a}'.format(a=self.MRIObj.acq) in file \
+                        and 'task-FA' in file and file.endswith(self.MRIObj.confound_ext) and 'run-{r}'.format(r = run_num) in file]
+
+            print('Loading counfound file %s'%confound_files[0])
+
+            ## need to subselect confounds of interest,
+            # and crop unecessary timepoints
+            crop_TR = self.MRIObj.params['mri']['dummy_TR'] + self.MRIObj.params['FA']['crop_TR'] if self.MRIObj.params['FA']['crop'] == True else self.MRIObj.params['mri']['dummy_TR'] 
+
+            confounds_list = mri_utils.select_confounds(confound_files, self.outdir, reg_names = self.nuisances2add,
+                                                                    CumulativeVarianceExplained = self.MRIObj.params['mri']['confounds']['CumulativeVarianceExplained'],
+                                                                    select =  'num', num_components = 5, num_TR_crop = crop_TR)
+
+            ## load confound DataFrame
+            confounds_df = pd.read_csv(confounds_list[0], sep="\t") # again, assumes only one run dangerous
+            
+            # name of nuisance regressors
+            self.nuisance_reg_names = list(confounds_df.keys())  
+        else:
+            confounds_df = []
 
 
+        ## actually fit vertices
+        # and output relevant params + rsq of model fit in dataframe
+        results = np.array(Parallel(n_jobs=n_jobs)(delayed(self.fit_glm)(masked_data[0,vert,:], ## hardcoded to use first run (which is only one), should change later
+                                                                                self.pars_arr[ind],
+                                                                                nuisances_df = confounds_df,
+                                                                                bar_keys = ['att_bar', 'unatt_bar'])
+                                                                            for ind, vert in enumerate(tqdm(self.ind2fit))))
+
+        ## saves results as list of dataframes, with length = #runs
+        results_list = []
         
+        for r, name in enumerate(self.visual_dm_dict.keys()):
+            
+            # convert fitted params list of dicts as Dataframe
+            fitted_params_df = pd.DataFrame(d for d in results)
+            # and add vertex number for bookeeping
+            if vertex is not None:
+                fitted_params_df['vertex'] = vertex
+            else:
+                fitted_params_df['vertex'] = self.ind2fit
+
+            results_list.append(fitted_params_df.copy())
+
+            # if we want to save estimates, do so as csv
+            if save_estimates:
+                filename = self.basefilename.replace('runtype','run-{n}_runtype'.format(n = name))
+                filename = filename.replace('.npz', '_it_{pm}_estimates.csv'.format(pm = prf_model_name))
+
+                # if we are fitting hrf, include that in name
+                if self.fit_hrf:
+                    filename = filename.replace('estimates.csv', 'HRF_estimates.csv')
+
+                fitted_params_df.to_csv(op.join(self.outdir, filename))
+                
+        return results_list
+
+
+    
+    def fit_glm(self, train_timecourse, tc_dict, nuisances_df = [], bar_keys = ['att_bar', 'unatt_bar'], return_model_tc = False):
+
+        ## turn parameters into arrays 
+        # but save dict keys to guarantee order is correct
+        parameters_keys = list(tc_dict.keys())
+
+        # set parameters and bounds into list, to conform to scipy minimze format
+        tc_pars = [tc_dict[key] for key in parameters_keys]
+
+        ## Make DM        
+        design_matrix = []
+        all_regressor_names = []
+
+        ## get task related regressor timecourse
+        for reg in self.task_reg_names:
+
+            design_matrix.append(self.get_fit_timecourse(tc_pars, reg_name = reg, bar_keys = bar_keys, parameters_keys = parameters_keys)[0])
+            all_regressor_names.append(reg)
+
+        ## add confounds if they exist
+        if self.nuisance_reg_names is not None:
+
+            for reg in self.nuisance_reg_names:
+
+                design_matrix.append(nuisances_df[reg].values)
+                all_regressor_names.append(reg)
+
+        ## finally add intercept
+        design_matrix.append(np.ones(train_timecourse.shape[-1]))
+        all_regressor_names.append('intercept')
+
+        ## Fit the GLM
+        prediction, betas, r2, _ = mri_utils.fit_glm(train_timecourse, np.array(design_matrix).T, error='mse')
+
+        # set output params as dict
+        out_dict = tc_dict.copy()
+        for ind, key in enumerate(all_regressor_names):
+            out_dict[key] = betas[ind]
+
+        # add rsq value
+        out_dict['r2'] = r2
+
+        if return_model_tc:
+            return out_dict, prediction
+        else:
+            return out_dict
+        #return np.array(design_matrix)
+
+

@@ -1099,6 +1099,8 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                         ## copy confound files to post_fmriprep dir anyway, in case we want to use 
                         # nuisances regressors in fits
                         [os.system('cp {og_file} {new_dir}'.format(og_file = conf_file, new_dir = output_pth)) for conf_file in confound_files]
+                        # and jason files with relevant info
+                        [os.system('cp {og_file} {new_dir}'.format(og_file = conf_file.replace('.tsv','.json'), new_dir = output_pth)) for conf_file in confound_files]
 
                     ## make new outdir, to save final files that will be used for further analysis
                     # avoids mistakes later on

@@ -19,6 +19,8 @@ from FAM.utils import mri as mri_utils
 from FAM.utils import plot as plot_utils
 from FAM.processing import preproc_behdata
 
+from matplotlib.backend_bases import MouseButton
+
 
 class MRIViewer:
 
@@ -827,3 +829,208 @@ freeview -v \
                     print('movie already exists as %s'%movie_name)
                     
                 #########
+
+
+    def check_click_bold(self, participant, run, ses, task = 'FA', input_pth = None, file_ext = '_cropped_LinDetrend_psc.npy',
+                                flatmap_height = 2048, full_figsize = (12, 8), pysub = 'hcp_999999'):
+
+        """
+        Check BOLD timecourse on flatmap, by clicking around
+        will show raw (cropped) tc, filtered, and PSC to compare
+        
+        NOTE - needs to be run in local system!!
+        NOTE2 - requires post_fmriprep to have been run already
+        
+        Parameters
+        ----------
+        participant: str
+            participant ID to look at
+        run: str/int
+            run number
+        ses: str/int
+            session number
+        task: str
+            task identifier ('FA' vs 'pRF')
+        input_pth: str
+            path to look for files, if None then will get them from derivatives/freesurfer/sub-X folder
+        
+        """ 
+
+        ## set input path where processed files are
+        if input_pth is None:
+            input_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 'sub-{sj}'.format(sj=participant), 'ses-{s}'.format(s=ses))
+
+        print('post_fmriprep files in %s'%input_pth)
+
+        ## get bold data that is PSC
+        psc_bold_list = [op.join(input_pth, file) for file in os.listdir(input_pth) if 'run-{r}'.format(r=run) in file \
+                        and 'acq-{a}'.format(a=self.MRIObj.acq) in file and 'task-{t}'.format(t=task) in file and file.endswith(file_ext)]
+        if len(psc_bold_list) > 1:
+            raise ValueError('Too many runs found, dont know which to choose %s'%str(psc_bold_list))
+        else:
+            print('Loading PSC data %s'%psc_bold_list[0])
+            psc_bold_arr = np.load(psc_bold_list[0])
+
+        ## get bold data that is filtered
+        filt_ext = file_ext.replace('_psc.npy', '.npy') ## should be careful with this, might raise issues if I change file format in the future
+
+        filt_bold_list = [op.join(input_pth, file) for file in os.listdir(input_pth) if 'run-{r}'.format(r=run) in file \
+                        and 'acq-{a}'.format(a=self.MRIObj.acq) in file and 'task-{t}'.format(t=task) in file and file.endswith(filt_ext)]
+        if len(filt_bold_list) > 1:
+            raise ValueError('Too many runs found, dont know which to choose %s'%str(filt_bold_list))
+        else:
+            print('Loading Filtered data %s'%filt_bold_list[0])
+            filt_bold_arr = np.load(filt_bold_list[0])
+
+        ## get raw data (usually cropped)
+        raw_ext = '_cropped.npy' if self.MRIObj.params[task]['crop'] == True else self.MRIObj.file_ext.replace('.','_').replace('_nii', '.npy')
+
+        raw_bold_list = [op.join(input_pth, file) for file in os.listdir(input_pth) if 'run-{r}'.format(r=run) in file \
+                        and 'acq-{a}'.format(a=self.MRIObj.acq) in file and 'task-{t}'.format(t=task) in file and file.endswith(raw_ext)]
+        if len(raw_bold_list) > 1:
+            raise ValueError('Too many runs found, dont know which to choose %s'%str(raw_bold_list))
+        else:
+            print('Loading Raw data %s'%raw_bold_list[0])
+            raw_bold_arr = np.load(raw_bold_list[0])
+
+        ## save data in variable (to access later)
+        self.bold_data = {'psc': psc_bold_arr, 'filt': filt_bold_arr, 'raw': raw_bold_arr}
+
+        ## calculate tSNR 
+        # from raw bold data
+        tsnr_arr = mri_utils.get_tsnr(raw_bold_arr, return_mean=False, affine=[], hdr=[], filename=None)
+
+        ### now set click viewer
+        
+        ## figure settings
+        self.flatmap_height = flatmap_height
+        self.full_figsize = full_figsize
+        self.images = {}
+
+        ## create pycortex vars
+        self.mask, extents = cortex.quickflat.utils.get_flatmask(pysub, height = self.flatmap_height)
+        self.vc = cortex.quickflat.utils._make_vertex_cache(pysub, height = self.flatmap_height)
+
+        self.mask_index = np.zeros(self.mask.shape)
+        self.mask_index[self.mask] = np.arange(self.mask.sum())
+
+        ## set figure grid 
+        self.full_fig = plt.figure(constrained_layout = True, figsize = self.full_figsize)
+
+        gs = self.full_fig.add_gridspec(5, 3)
+
+        self.flatmap_ax = self.full_fig.add_subplot(gs[:2, :])
+
+        self.raw_timecourse_ax = self.full_fig.add_subplot(gs[2, :])
+        self.filt_timecourse_ax = self.full_fig.add_subplot(gs[3, :])
+        self.psc_timecourse_ax = self.full_fig.add_subplot(gs[4, :])
+
+        self.flatmap_ax.set_title('flatmap')
+        self.raw_timecourse_ax.set_title('Raw timecourse')
+        self.filt_timecourse_ax.set_title('Filtered timecourse')
+        self.psc_timecourse_ax.set_title('PSC timecourse')
+
+        ## set tSNR flatmap to show
+        self.images['tSNR'] = plot_utils.get_flatmaps(tsnr_arr, 
+                                                        vmin1 = 0, vmax1 = 150,
+                                                        pysub = pysub, 
+                                                        cmap = 'hot')
+
+        cortex.quickshow(self.images['tSNR'], fig = self.flatmap_ax,
+                        with_rois = False, with_curvature = True, with_colorbar=False, 
+                        with_sulci = True, with_labels = False)
+
+        ## set clicker func and show
+        self.full_fig.canvas.mpl_connect('button_press_event', self.onclick)
+
+        plt.show()
+
+
+    def onclick(self, event):
+
+        """
+        Helper function for click plotting
+        """
+
+        print('you pressed', event.button, event.xdata, event.ydata)
+
+        if  event.button is MouseButton.RIGHT:
+            refresh_fig = True
+        else:
+            refresh_fig = False
+        
+        if event.inaxes == self.flatmap_ax:
+            xmin, xmax = self.flatmap_ax.get_xbound()
+            ax_xrange = xmax-xmin
+            ymin, ymax = self.flatmap_ax.get_ybound()
+            ax_yrange = ymax-ymin
+
+            rel_x = int(self.mask.shape[0] * (event.xdata-xmin)/ax_xrange)
+            rel_y = int(self.mask.shape[1] * (event.ydata-ymin)/ax_yrange)
+            clicked_pixel = (rel_x, rel_y)
+
+            clicked_vertex = self.vc[int(
+                self.mask_index[clicked_pixel[0], clicked_pixel[1]])]
+
+            print(clicked_vertex)
+            self.redraw_vertex_plots(clicked_vertex.indices[0], refresh_fig)
+            plt.draw()
+
+    
+    def redraw_vertex_plots(self, vertex, refresh):
+
+        """
+        Helper function for click redrawing of vertex
+            
+        """
+        
+        self.vertex = vertex
+
+        print(refresh)
+
+        if refresh: # if we want to clean up timecourses
+            self.raw_timecourse_ax.clear()
+            self.filt_timecourse_ax.clear()
+            self.psc_timecourse_ax.clear()
+
+        # plot data
+        self.raw_timecourse_ax = self.plot_bold_tc(self.raw_timecourse_ax, timecourse = self.bold_data['raw'][vertex])
+        
+        self.filt_timecourse_ax = self.plot_bold_tc(self.filt_timecourse_ax, timecourse = self.bold_data['filt'][vertex],
+                                                            timecourse2 = self.bold_data['raw'][vertex])
+        
+        self.psc_timecourse_ax = self.plot_bold_tc(self.psc_timecourse_ax, timecourse = self.bold_data['psc'][vertex], units = 'psc')
+
+    
+    def plot_bold_tc(self, axis, timecourse = None, timecourse2 = None, units = '', start_task_ind = 14, end_task_ind = 279):
+
+        """
+        Helper function that actually plots timecourse
+            
+        """
+
+        if timecourse2 is not None:
+            axis.plot(timecourse, 'k-', alpha = .8, label='data')
+            axis.plot(timecourse2, 'k-', alpha = .25, label='data2')
+        else:
+            axis.plot(timecourse, 'k-', alpha = .8, label='data')
+
+        axis.set_xlabel('Time (TR)',fontsize = 15, labelpad = 10)
+        if units == 'psc':
+            axis.set_ylabel('BOLD (% sig change)',fontsize = 15, labelpad = 10)
+        else:
+            axis.set_ylabel('BOLD (a.u.)',fontsize = 15, labelpad = 10)
+
+        axis.vlines(start_task_ind, np.min(timecourse),np.max(timecourse), color='red', alpha = .5)
+        axis.vlines(end_task_ind, np.min(timecourse),np.max(timecourse), color='red', alpha = .5)
+
+        axis.set_xlim(0, len(timecourse))
+        
+        return axis
+
+
+
+
+
+
+        

@@ -65,9 +65,12 @@ match data_type:
     case 'mri':
 
         FAM_preproc = preproc_mridata.PreprocMRI(FAM_data)
+        
+        plotter = MRIViewer(FAM_data)
 
         ## run specific vizualizer
         match viz:
+
             case 'freeview':
 
                 print('Opening Freeview...')
@@ -76,14 +79,12 @@ match data_type:
                 while freeview_cmd not in ('movie','view'):
                     freeview_cmd = input("View segmentations (view) or make movie (movie)?: ")
 
-                plotter = MRIViewer(FAM_data)
                 plotter.check_fs_seg(check_type = freeview_cmd, use_T2 = T2_file, participant_list = FAM_preproc.MRIObj.sj_num)
 
             case 'nordic':
 
                 print('Comparing NORDIC to standard runs')
 
-                plotter = MRIViewer(FAM_data)
                 plotter.compare_nordic2standard(participant_list = FAM_preproc.MRIObj.sj_num, 
                                                 input_pth = None, 
                                                 use_atlas_rois = atlas_bool,
@@ -93,7 +94,6 @@ match data_type:
 
                 print('Plotting tSNR')
 
-                plotter = MRIViewer(FAM_data)
                 plotter.plot_tsnr(participant_list = FAM_preproc.MRIObj.sj_num, 
                                                 input_pth = None, 
                                                 use_atlas_rois = atlas_bool,
@@ -103,7 +103,6 @@ match data_type:
 
                 print('Plotting vasculature proxy for pRF task')
 
-                plotter = MRIViewer(FAM_data)
                 plotter.plot_vasculature(participant_list = FAM_preproc.MRIObj.sj_num, 
                                                 input_pth = None, 
                                                 file_ext = FAM_preproc.get_mrifile_ext())
@@ -114,7 +113,6 @@ match data_type:
 
                 task_name = 'pRF' if task.lower == 'prf' else 'FA' 
 
-                plotter = MRIViewer(FAM_data)
                 plotter.plot_bold_on_surface(participant_list = FAM_preproc.MRIObj.sj_num, 
                                             input_pth = None, 
                                             run_type = 'mean', 
@@ -122,6 +120,27 @@ match data_type:
                                             stim_on_screen = None,
                                             use_atlas_rois = atlas_bool,
                                             file_ext = FAM_preproc.get_mrifile_ext())
+
+            case 'click':
+                
+                print('Opening click viewer with raw, filtered and PSC data')
+
+                task_name = 'pRF' if task.lower == 'prf' else 'FA' 
+
+                run = ''
+                while isinstance(run, int) == False:
+                    run = int(input("Which run number to choose? (Ex 1, 2, ..): "))
+                
+                ses = ''
+                while isinstance(ses, int) == False:
+                    ses = int(input("Which session number to choose? (Ex 1, 2): "))
+
+                plotter.check_click_bold(FAM_preproc.MRIObj.sj_num[0], 
+                                        run, ses, 
+                                        task = task_name, input_pth = None,
+                                        file_ext = FAM_preproc.get_mrifile_ext()[task_name])
+
+
 
             case TypeError:
                 print('viz option NOT VALID')

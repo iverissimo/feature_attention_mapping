@@ -21,6 +21,8 @@ from FAM.processing import preproc_behdata
 
 from matplotlib.backend_bases import MouseButton
 
+from scipy.signal import periodogram
+
 
 class MRIViewer:
 
@@ -921,14 +923,20 @@ freeview -v \
 
         self.flatmap_ax = self.full_fig.add_subplot(gs[:2, :])
 
-        self.raw_timecourse_ax = self.full_fig.add_subplot(gs[2, :])
-        self.filt_timecourse_ax = self.full_fig.add_subplot(gs[3, :])
+        self.raw_timecourse_ax = self.full_fig.add_subplot(gs[2, :2])
+        self.filt_timecourse_ax = self.full_fig.add_subplot(gs[3, :2])
         self.psc_timecourse_ax = self.full_fig.add_subplot(gs[4, :])
+
+        self.raw_freq_ax = self.full_fig.add_subplot(gs[2, 2:])
+        self.filt_freq_ax = self.full_fig.add_subplot(gs[3, 2:])
 
         self.flatmap_ax.set_title('flatmap')
         self.raw_timecourse_ax.set_title('Raw timecourse')
         self.filt_timecourse_ax.set_title('Filtered timecourse')
         self.psc_timecourse_ax.set_title('PSC timecourse')
+
+        self.raw_freq_ax.set_title('Raw frequency-domain')
+        self.filt_freq_ax.set_title('Filtered frequency-domain')
 
         ## set tSNR flatmap to show
         self.images['tSNR'] = plot_utils.get_flatmaps(tsnr_arr, 
@@ -992,14 +1000,20 @@ freeview -v \
             self.raw_timecourse_ax.clear()
             self.filt_timecourse_ax.clear()
             self.psc_timecourse_ax.clear()
+            self.raw_freq_ax.clear()
+            self.filt_freq_ax.clear()
 
-        # plot data
+        # plot timecourse data
         self.raw_timecourse_ax = self.plot_bold_tc(self.raw_timecourse_ax, timecourse = self.bold_data['raw'][vertex])
         
         self.filt_timecourse_ax = self.plot_bold_tc(self.filt_timecourse_ax, timecourse = self.bold_data['filt'][vertex],
                                                             timecourse2 = self.bold_data['raw'][vertex])
         
         self.psc_timecourse_ax = self.plot_bold_tc(self.psc_timecourse_ax, timecourse = self.bold_data['psc'][vertex], units = 'psc')
+
+        # plot frequency power plots
+        self.raw_freq_ax = self.plot_periodogram(self.raw_freq_ax, timecourse = self.bold_data['raw'][vertex], TR = self.MRIObj.TR)
+        self.filt_freq_ax = self.plot_periodogram(self.filt_freq_ax, timecourse = self.bold_data['filt'][vertex], TR = self.MRIObj.TR)
 
     
     def plot_bold_tc(self, axis, timecourse = None, timecourse2 = None, units = '', start_task_ind = 14, end_task_ind = 279):
@@ -1025,6 +1039,26 @@ freeview -v \
         axis.vlines(end_task_ind, np.min(timecourse),np.max(timecourse), color='red', alpha = .5)
 
         axis.set_xlim(0, len(timecourse))
+        
+        return axis
+
+    
+    def plot_periodogram(self, axis, timecourse = None, TR = 1.6):
+
+        """
+        Helper function that actually plots power spectral density
+            
+        """
+
+        sampling_frequency = 1 / TR  
+        freq, power = periodogram(timecourse, fs = sampling_frequency)#, detrend = False)
+        
+        axis.plot(freq, power, 'g-', alpha = .8, label='data')
+
+        axis.set_xlabel('Frequency (Hz)',fontsize = 15, labelpad = 10)
+        axis.set_ylabel('Power (dB)',fontsize = 15, labelpad = 10)
+
+        axis.axvline(x=0.01,color='r',ls='dashed', lw=2)
         
         return axis
 

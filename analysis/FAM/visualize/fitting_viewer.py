@@ -1480,14 +1480,8 @@ class FAViewer(pRFViewer):
 
         ## make output folder for figures
         if figures_pth is None:
-            if fa_model_name == 'full_stim':
-                figures_pth = op.join(self.outputdir, 'single_vertex', 'FA_FullStim_fit', 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses))
-
-            elif fa_model_name == 'gain':
-                figures_pth = op.join(self.outputdir, 'single_vertex', 'FA_Gain_fit', 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses))
-
-            elif fa_model_name == 'glm':
-                figures_pth = op.join(self.outputdir, 'single_vertex', 'FA_GLM_fit', 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses))
+            figures_pth = op.join(self.outputdir, 'single_vertex', self.MRIObj.params['mri']['fitting']['FA']['fit_folder'][fa_model_name], 
+                                                                'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses))
         
         os.makedirs(figures_pth, exist_ok=True)
 
@@ -1512,14 +1506,14 @@ class FAViewer(pRFViewer):
         ## Load/fit estimates for model
         # to make model timecourse
 
+        self.FAModelObj.fit_hrf = self.pRFModelObj.fit_hrf
+
         if fa_model_name == 'full_stim':
 
             ## get bounds used for prf estimates of specific model
             pp_prf_stim = pp_prf_models['sub-{sj}'.format(sj = participant)][prf_ses]['prf_stim']
             prf_bounds = self.pRFModelObj.get_fit_startparams(max_ecc_size = pp_prf_stim.screen_size_degrees/2.0)[self.pRFModelObj.model_type['pRF']]['bounds']
 
-            self.FAModelObj.fit_hrf = self.pRFModelObj.fit_hrf
-            
             prf_pars2vary = ['betas']
 
             # if we want to fit it now
@@ -1568,9 +1562,42 @@ class FAViewer(pRFViewer):
 
             model_arr = model_arr[0]
 
-            # get rsq val for plotting
-            #r2 = estimates_df[estimates_df.vertex == vertex]['r2'].values[0]
-            r2 = mri_utils.calc_rsq(data_arr, model_arr)
+        elif fa_model_name == 'glm':
+
+            # if we want to fit it now
+            if fit_now:
+                print('Fitting estimates')
+
+                ## fit data 
+                results_list = self.FAModelObj.fit_data(participant, pp_prf_estimates, 
+                                            ses = ses, run_type = run_type,
+                                            chunk_num = None, vertex = vertex, ROI = ROI,
+                                            prf_model_name = prf_model_name, file_ext = file_ext, 
+                                            save_estimates = False,
+                                            fit_overlap = False, fit_full_stim = True) 
+
+                ## get estimates dataframe
+                estimates_df = results_list[0]
+
+            else:
+                ## setup fitting to get relevant variables
+                _, _ = self.FAModelObj.setup_vars4fitting(participant, pp_prf_estimates, ses = ses,
+                                                            run_type = run_type, chunk_num = None, vertex = vertex, ROI = ROI,
+                                                            prf_model_name = prf_model_name, file_ext = file_ext, 
+                                                            fit_overlap = False, fit_full_stim = True)
+
+                ## load estimates 
+                print('Loading estimates')
+                estimates_df = self.FAModelObj.load_FA_model_estimates(participant, ses = ses, run = 'r{r}s{s}'.format(r = run_num, s = ses_num), 
+                                                                        run_type = run_type, 
+                                                                        model_name = fa_model_name, prf_model_name = prf_model_name, 
+                                                                        fit_hrf = self.FAModelObj.fit_hrf, outdir = self.FAModelObj.outdir)
+
+
+
+        # get rsq val for plotting
+        #r2 = estimates_df[estimates_df.vertex == vertex]['r2'].values[0]
+        r2 = mri_utils.calc_rsq(data_arr, model_arr)
 
         ## actually plot
 

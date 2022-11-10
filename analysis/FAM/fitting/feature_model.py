@@ -987,28 +987,7 @@ class GLM_model(FA_model):
             # get ses and run number 
             run_num, ses_num = mri_utils.get_run_ses_from_str(self.train_file_list[0]) ## assumes we are fitting one run, will need to change later if such is the case
 
-            ## first select confounds for run
-            # path to post fmriprep files
-            conf_path = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 
-                                    'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses_num))
-
-            # get post fmriprep confound ext (will alway have select_cropped in name)
-            confound_ext = self.MRIObj.confound_ext.replace('.{ext}'.format(ext=self.MRIObj.confound_ext.split('.')[-1]), 
-                                                            '_select_cropped.{ext}'.format(ext=self.MRIObj.confound_ext.split('.')[-1]))
-
-            confound_files = [op.join(conf_path, file) for file in os.listdir(conf_path) if 'acq-{a}'.format(a=self.MRIObj.acq) in file \
-                        and 'task-FA' in file and file.endswith(confound_ext) and 'run-{r}'.format(r = run_num) in file]
-
-            print('Loading counfound file %s'%confound_files[0])
-
-            ## load confound DataFrame
-            if len(confound_files)>1:
-                raise ValueError('More than 1 confound file found, conflict %s'%str(confound_files)) # again, assumes only one run dangerous
-            else:
-                confounds_df = pd.read_csv(confound_files[0], sep="\t") 
-            
-            # name of nuisance regressors
-            self.nuisance_reg_names = list(confounds_df.keys())  
+            confounds_df = self.load_nuisance_df(participant, run_num = run_num, ses_num = ses_num)
         else:
             confounds_df = []
 
@@ -1050,9 +1029,36 @@ class GLM_model(FA_model):
                 
         return results_list
 
+    
+    def load_nuisance_df(self, participant, run_num = 1, ses_num = 1):
+
+        ## first select confounds for run
+        # path to post fmriprep files
+        conf_path = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 
+                                'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses_num))
+
+        # get post fmriprep confound ext (will alway have select_cropped in name)
+        confound_ext = self.MRIObj.confound_ext.replace('.{ext}'.format(ext=self.MRIObj.confound_ext.split('.')[-1]), 
+                                                        '_select_cropped.{ext}'.format(ext=self.MRIObj.confound_ext.split('.')[-1]))
+
+        confound_files = [op.join(conf_path, file) for file in os.listdir(conf_path) if 'acq-{a}'.format(a=self.MRIObj.acq) in file \
+                    and 'task-FA' in file and file.endswith(confound_ext) and 'run-{r}'.format(r = run_num) in file]
+
+        print('Loading counfound file %s'%confound_files[0])
+
+        ## load confound DataFrame
+        if len(confound_files)>1:
+            raise ValueError('More than 1 confound file found, conflict %s'%str(confound_files)) # again, assumes only one run dangerous
+        else:
+            confounds_df = pd.read_csv(confound_files[0], sep="\t") 
+        
+        # name of nuisance regressors
+        self.nuisance_reg_names = list(confounds_df.keys())
+
+        return confounds_df
 
     
-    def fit_glm(self, train_timecourse, tc_dict, nuisances_df = [], bar_keys = ['att_bar', 'unatt_bar'], return_model_tc = False):
+    def get_fa_glm_dm(self, tc_dict, nuisances_df = [], bar_keys = ['att_bar', 'unatt_bar']):
 
         ## turn parameters into arrays 
         # but save dict keys to guarantee order is correct
@@ -1080,11 +1086,18 @@ class GLM_model(FA_model):
                 all_regressor_names.append(reg)
 
         ## finally add intercept
-        design_matrix.append(np.ones(train_timecourse.shape[-1]))
+        design_matrix.append(np.ones(np.array(design_matrix).shape[-1]))
         all_regressor_names.append('intercept')
 
+        return np.array(design_matrix), all_regressor_names
+
+
+    def fit_glm(self, train_timecourse, tc_dict, nuisances_df = [], bar_keys = ['att_bar', 'unatt_bar'], return_model_tc = False):
+
+        design_matrix, all_regressor_names = self.get_fa_glm_dm(tc_dict, nuisances_df = nuisances_df, bar_keys = bar_keys)
+
         ## Fit the GLM
-        prediction, betas, r2, _ = mri_utils.fit_glm(train_timecourse, np.array(design_matrix).T, error='mse')
+        prediction, betas, r2, _ = mri_utils.fit_glm(train_timecourse, design_matrix.T, error='mse')
 
         # set output params as dict
         out_dict = tc_dict.copy()
@@ -1098,6 +1111,6 @@ class GLM_model(FA_model):
             return out_dict, prediction
         else:
             return out_dict
-        #return np.array(design_matrix)
+
 
 

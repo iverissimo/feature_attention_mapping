@@ -1604,12 +1604,14 @@ class FAViewer(pRFViewer):
                 confounds_df = []
                 self.nuisance_reg_names = None
 
+
+            vertex_df = estimates_df[estimates_df.vertex == vertex]
+
             ## get DM
-            design_matrix, all_regressor_names = self.FAModelObj.get_fa_glm_dm(self.FAModelObj.pars_arr[0], 
+            design_matrix, all_regressor_names = self.FAModelObj.get_fa_glm_dm({key: vertex_df[key].values[0] for key in self.FAModelObj.prf_est_keys}, 
                                                 nuisances_df = confounds_df, bar_keys = ['att_bar', 'unatt_bar'])
 
             ## dot design matrix with betas to get prediction timecourse
-            vertex_df = estimates_df[estimates_df.vertex == vertex]
             model_arr = design_matrix.T.dot(vertex_df[all_regressor_names].values[0])
 
 

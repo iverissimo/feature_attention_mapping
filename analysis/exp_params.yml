@@ -225,7 +225,7 @@ mri: # refers to the Psychopy SyncGenerator class
       prf_rsq_threshold: 0.35 # .8 
 
       glm_task_regs: ['full_stim'] #['att_bar', 'unatt_bar', 'full_stim'] # regressor names for GLM fitting
-      glm_nuisance_regs: ['a_comp_cor','cosine','framewise_displacement'] # []
+      glm_nuisance_regs: True
 
     
 eyetracking:

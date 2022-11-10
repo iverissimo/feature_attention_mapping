@@ -1068,15 +1068,16 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
                     proc_files = mri_utils.crop_epi(bold_files, output_pth, num_TR_crop = crop_TR)
 
+                    ## first sub select confounds that we are using, and store in output dir
+                    # even if we dont filter them out now, we might want to use them later in GLM
+                    confounds_list = mri_utils.select_confounds(confound_files, output_pth, reg_names = self.MRIObj.params['mri']['confounds']['regs'],
+                                                                CumulativeVarianceExplained = self.MRIObj.params['mri']['confounds']['CumulativeVarianceExplained'],
+                                                                select =  'num', num_components = 5, num_TR_crop = crop_TR)
+
                     ### filtering ###
                     # if regressing confounds
                     if self.MRIObj.params[tsk]['regress_confounds']: 
     
-                        ## first sub select confounds that we are using, and store in output dir
-                        confounds_list = mri_utils.select_confounds(confound_files, output_pth, reg_names = self.MRIObj.params['mri']['confounds']['regs'],
-                                                                    CumulativeVarianceExplained = self.MRIObj.params['mri']['confounds']['CumulativeVarianceExplained'],
-                                                                    select =  'num', num_components = 5, num_TR_crop = crop_TR)
-                        
                         ## regress out confounds, 
                         ## and percent signal change
                         proc_files = mri_utils.regressOUT_confounds(proc_files, confounds_list, output_pth, TR = self.MRIObj.params['mri']['TR'], plot_vert = False,
@@ -1095,12 +1096,6 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                         
                         ### percent signal change ##
                         proc_files = mri_utils.psc_epi(proc_files, output_pth)
-
-                        ## copy confound files to post_fmriprep dir anyway, in case we want to use 
-                        # nuisances regressors in fits
-                        [os.system('cp {og_file} {new_dir}'.format(og_file = conf_file, new_dir = output_pth)) for conf_file in confound_files]
-                        # and jason files with relevant info
-                        [os.system('cp {og_file} {new_dir}'.format(og_file = conf_file.replace('.tsv','.json'), new_dir = output_pth)) for conf_file in confound_files]
 
                     ## make new outdir, to save final files that will be used for further analysis
                     # avoids mistakes later on

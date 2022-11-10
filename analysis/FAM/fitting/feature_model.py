@@ -950,7 +950,7 @@ class GLM_model(FA_model):
         self.task_reg_names = self.MRIObj.params['mri']['fitting']['FA']['glm_task_regs']
 
         # if provided, nuisance regressor names (if empty, then NO nuisance regressors will be used)
-        self.nuisances2add = self.MRIObj.params['mri']['fitting']['FA']['glm_nuisance_regs']
+        self.add_nuisance_reg = self.MRIObj.params['mri']['fitting']['FA']['glm_nuisance_regs']
         self.nuisance_reg_names = None
 
 
@@ -982,30 +982,30 @@ class GLM_model(FA_model):
         self.initialize_parameters(masked_prf_estimates, prf_pars2vary = [], prf_bounds = None, rsq_threshold = rsq_threshold)
 
         ## if provided, get nuisance regressors
-        if len(self.nuisances2add) > 0:
+        if self.add_nuisance_reg:
 
             # get ses and run number 
             run_num, ses_num = mri_utils.get_run_ses_from_str(self.train_file_list[0]) ## assumes we are fitting one run, will need to change later if such is the case
 
             ## first select confounds for run
+            # path to post fmriprep files
             conf_path = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 
                                     'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses_num))
 
+            # get post fmriprep confound ext (will alway have select_cropped in name)
+            confound_ext = self.MRIObj.confound_ext.replace('.{ext}'.format(ext=self.MRIObj.confound_ext.split('.')[-1]), 
+                                                            '_select_cropped.{ext}'.format(ext=self.MRIObj.confound_ext.split('.')[-1]))
+
             confound_files = [op.join(conf_path, file) for file in os.listdir(conf_path) if 'acq-{a}'.format(a=self.MRIObj.acq) in file \
-                        and 'task-FA' in file and file.endswith(self.MRIObj.confound_ext) and 'run-{r}'.format(r = run_num) in file]
+                        and 'task-FA' in file and file.endswith(confound_ext) and 'run-{r}'.format(r = run_num) in file]
 
             print('Loading counfound file %s'%confound_files[0])
 
-            ## need to subselect confounds of interest,
-            # and crop unecessary timepoints
-            crop_TR = self.MRIObj.params['mri']['dummy_TR'] + self.MRIObj.params['FA']['crop_TR'] if self.MRIObj.params['FA']['crop'] == True else self.MRIObj.params['mri']['dummy_TR'] 
-
-            confounds_list = mri_utils.select_confounds(confound_files, self.outdir, reg_names = self.nuisances2add,
-                                                                    CumulativeVarianceExplained = self.MRIObj.params['mri']['confounds']['CumulativeVarianceExplained'],
-                                                                    select =  'num', num_components = 5, num_TR_crop = crop_TR)
-
             ## load confound DataFrame
-            confounds_df = pd.read_csv(confounds_list[0], sep="\t") # again, assumes only one run dangerous
+            if len(confound_files)>1:
+                raise ValueError('More than 1 confound file found, conflict %s'%str(confound_files)) # again, assumes only one run dangerous
+            else:
+                confounds_df = pd.read_csv(confound_files[0], sep="\t") 
             
             # name of nuisance regressors
             self.nuisance_reg_names = list(confounds_df.keys())  
@@ -1018,7 +1018,8 @@ class GLM_model(FA_model):
         results = np.array(Parallel(n_jobs=n_jobs)(delayed(self.fit_glm)(masked_data[0,vert,:], ## hardcoded to use first run (which is only one), should change later
                                                                                 self.pars_arr[ind],
                                                                                 nuisances_df = confounds_df,
-                                                                                bar_keys = ['att_bar', 'unatt_bar'])
+                                                                                bar_keys = ['att_bar', 'unatt_bar'],
+                                                                                return_model_tc = False)
                                                                             for ind, vert in enumerate(tqdm(self.ind2fit))))
 
         ## saves results as list of dataframes, with length = #runs

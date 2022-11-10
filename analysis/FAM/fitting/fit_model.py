@@ -186,6 +186,9 @@ match task2model:
                 ## load FA model class
                 FAM_FA = feature_model.GLM_model(FAM_data)
 
+                # if we want to fit hrf
+                FAM_FA.fit_hrf = FAM_pRF.fit_hrf
+
                 ## actually fit
                 print('Fitting started!')
                 # to time it
@@ -196,8 +199,8 @@ match task2model:
                                             chunk_num = chunk_num, vertex = vertex, ROI = ROI,
                                             prf_model_name = prf_model_name, rsq_threshold = None, file_ext = file_ext, 
                                             outdir = None, save_estimates = True,
-                                            fit_overlap = False,
-                                            reg_names = FAM_FA.reg_names, n_jobs = 16) 
+                                            fit_overlap = False, fit_full_stim = True,
+                                            n_jobs = 16) 
 
                 print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
 

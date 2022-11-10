@@ -1593,6 +1593,24 @@ class FAViewer(pRFViewer):
                                                                         model_name = fa_model_name, prf_model_name = prf_model_name, 
                                                                         fit_hrf = self.FAModelObj.fit_hrf, outdir = self.FAModelObj.outdir)
 
+            ## if provided, get nuisance regressors
+            if self.FAModelObj.add_nuisance_reg:
+
+                # get ses and run number 
+                run_num, ses_num = mri_utils.get_run_ses_from_str(self.FAModelObj.train_file_list[0]) ## assumes we are fitting one run, will need to change later if such is the case
+
+                confounds_df = self.FAModelObj.load_nuisance_df(participant, run_num = run_num, ses_num = ses_num)
+            else:
+                confounds_df = []
+                self.nuisance_reg_names = None
+
+            ## get DM
+            design_matrix, all_regressor_names = self.FAModelObj.get_fa_glm_dm(self.FAModelObj.pars_arr[0], 
+                                                nuisances_df = confounds_df, bar_keys = ['att_bar', 'unatt_bar'])
+
+            ## dot design matrix with betas to get prediction timecourse
+            vertex_df = estimates_df[estimates_df.vertex == vertex]
+            model_arr = design_matrix.T.dot(vertex_df[all_regressor_names].values[0])
 
 
         # get rsq val for plotting

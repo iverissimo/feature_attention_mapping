@@ -116,6 +116,18 @@ class visualize_on_click:
                                                                     model_name = self.FAmodel_name, prf_model_name = self.pRFmodel_name, 
                                                                     fit_hrf = self.FAModelObj.fit_hrf, outdir = self.FAModelObj.outdir)
 
+            # if doing GLM, we might be using confounds (or not), so should load files
+            if self.FAmodel_name == 'glm':
+                ## if provided, get nuisance regressors
+                if self.FAModelObj.add_nuisance_reg:
+                    # get ses and run number 
+                    run_num, ses_num = mri_utils.get_run_ses_from_str(self.FAModelObj.train_file_list[0]) ## assumes we are fitting one run, will need to change later if such is the case
+
+                    self.confounds_df = self.FAModelObj.load_nuisance_df(participant, run_num = run_num, ses_num = ses_num)
+                else:
+                    self.confounds_df = []
+                    self.nuisance_reg_names = None
+
         ## set figure grid 
         self.full_fig = plt.figure(constrained_layout = True, figsize = self.full_figsize)
 
@@ -266,24 +278,40 @@ class visualize_on_click:
             
         """
 
-        ## transform estimates dataframe into dictionary
-        tc_dict = self.pp_fa_est_df[self.pp_fa_est_df.vertex == vertex].to_dict('r')[0]
-
         # get rsq val for plotting
         r2 = self.pp_fa_est_df[self.pp_fa_est_df.vertex == vertex]['r2'].values[0]
 
-        ## turn parameters and bounds into arrays because of scipy minimize
-        # but save dict keys to guarantee order is correct
-        parameters_keys = list(tc_dict.keys())
+        if self.FAmodel_name == 'glm':
 
-        # set parameters and bounds into list, to conform to scipy minimze format
-        tc_pars = np.array([tc_dict[key] for key in parameters_keys])
-        
-        ## get prediction array
-        model_arr = self.FAModelObj.get_fit_timecourse(tc_pars, reg_name = 'full_stim', 
-                                                        bar_keys = ['att_bar', 'unatt_bar'], parameters_keys = parameters_keys)
+            vertex_df = self.pp_fa_est_df[self.pp_fa_est_df.vertex == vertex]
 
-        return model_arr[0], r2
+            ## get DM
+            design_matrix, all_regressor_names = self.FAModelObj.get_fa_glm_dm({key: vertex_df[key].values[0] for key in self.FAModelObj.prf_est_keys}, 
+                                                nuisances_df = self.confounds_df, bar_keys = ['att_bar', 'unatt_bar'])
+
+            ## dot design matrix with betas to get prediction timecourse
+            model_arr = design_matrix.T.dot(vertex_df[all_regressor_names].values[0])
+
+
+        elif self.FAmodel_name == 'full_stim':
+
+            ## transform estimates dataframe into dictionary
+            tc_dict = self.pp_fa_est_df[self.pp_fa_est_df.vertex == vertex].to_dict('r')[0]
+
+            ## turn parameters and bounds into arrays because of scipy minimize
+            # but save dict keys to guarantee order is correct
+            parameters_keys = list(tc_dict.keys())
+
+            # set parameters and bounds into list, to conform to scipy minimze format
+            tc_pars = np.array([tc_dict[key] for key in parameters_keys])
+            
+            ## get prediction array
+            model_arr = self.FAModelObj.get_fit_timecourse(tc_pars, reg_name = 'full_stim', 
+                                                            bar_keys = ['att_bar', 'unatt_bar'], parameters_keys = parameters_keys)
+            
+            model_arr = model_arr[0]
+
+        return model_arr, r2
 
         
     

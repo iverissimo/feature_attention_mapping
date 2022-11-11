@@ -1597,7 +1597,7 @@ class FAViewer(pRFViewer):
             if self.FAModelObj.add_nuisance_reg:
 
                 # get ses and run number 
-                run_num, ses_num = mri_utils.get_run_ses_from_str(self.FAModelObj.train_file_list[0]) ## assumes we are fitting one run, will need to change later if such is the case
+                #run_num, ses_num = mri_utils.get_run_ses_from_str(self.FAModelObj.train_file_list[0]) ## assumes we are fitting one run, will need to change later if such is the case
 
                 confounds_df = self.FAModelObj.load_nuisance_df(participant, run_num = run_num, ses_num = ses_num)
             else:
@@ -1837,6 +1837,23 @@ class FAViewer(pRFViewer):
                                                                 pysub = self.pysub['sub-{pp}'.format(pp = participant)], 
                                                                 cmap = 'plasma')
 
+        ## FA rsq 
+        r2_surf = np.zeros(FA_data_arr.shape[0]); r2_surf[:] = np.nan
+        r2_surf[click_plotter.pp_fa_est_df.vertex.values] = click_plotter.pp_fa_est_df.r2.values
+
+        if np.any(r2_surf<0): ## if there are negative rsqs (for non-glm fitting)
+            click_plotter.images['FA_rsq'] = plot_utils.get_flatmaps(r2_surf, 
+                                                                    vmin1 = -.5, vmax1 = .5,
+                                                                    pysub = self.pysub['sub-{pp}'.format(pp = participant)], 
+                                                                    cmap = 'BuBkRd')
+
+        else:
+            click_plotter.images['FA_rsq'] = plot_utils.get_flatmaps(r2_surf, 
+                                                                    vmin1 = 0, vmax1 = .8,
+                                                                    pysub = self.pysub['sub-{pp}'.format(pp = participant)], 
+                                                                    cmap = 'Reds')
+        
+
         
         cortex.quickshow(click_plotter.images['pRF_rsq'], fig = click_plotter.flatmap_ax,
                         with_rois = False, with_curvature = True, with_colorbar=False, 
@@ -1847,3 +1864,5 @@ class FAViewer(pRFViewer):
 
         plt.show()
         
+
+    

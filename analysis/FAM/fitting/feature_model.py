@@ -1113,4 +1113,22 @@ class GLM_model(FA_model):
             return out_dict
 
 
+    def contrast_betas(self, run_data, estimates_df, vertex = None, nuisances_df = []):
+
+        vertex_df = estimates_df[estimates_df.vertex == vertex]
+
+        ## get DM
+        design_matrix, all_regressor_names = self.get_fa_glm_dm({key: vertex_df[key].values[0] for key in self.prf_est_keys}, 
+                                            nuisances_df = nuisances_df, bar_keys = ['att_bar', 'unatt_bar'])
+
+        # contrast array for full stim vs all others
+        contrast_array = np.array([1 if reg_name == 'full_stim' else 0 for reg_name in all_regressor_names])
+
+        t_val,p_val,z_score = mri_utils.compute_stats(run_data[vertex], design_matrix.T, 
+                                                    contrast_array, vertex_df[all_regressor_names].values[0], 
+                                                    pvalue = 'oneside')
+
+        return t_val
+
+
 

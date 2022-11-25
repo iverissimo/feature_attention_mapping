@@ -9,6 +9,7 @@ import time
 import yaml
 from FAM.processing import load_exp_settings, preproc_mridata
 from FAM.fitting import prf_model, feature_model
+from FAM.fitting.glm_single_model import GLMsingle_Model
 
 # load settings from yaml
 with open('exp_params.yml', 'r') as f_in:
@@ -232,6 +233,18 @@ match task2model:
                                             xtol = 1e-3, ftol = 1e-4, n_jobs = 16, prf_bounds = None) 
 
                 print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
+
+
+            case 'glmsingle':
+
+                ## load FA model class
+                FAM_FA = GLMsingle_Model(FAM_data)
+
+                _ = FAM_FA.fit_data(participant, pp_prf_estimates, 
+                                                pp_prf_models['sub-{sj}'.format(sj = participant)][prf_ses]['{mname}_model'.format(mname = prf_model_name)],  
+                                                file_ext = '_cropped.npy') 
+
+
 
 
 

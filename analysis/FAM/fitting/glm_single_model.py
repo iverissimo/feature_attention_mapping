@@ -16,6 +16,7 @@ from FAM.processing import preproc_behdata
 from FAM.fitting.model import Model
 
 from scipy.optimize import minimize
+from scipy.ndimage import gaussian_filter
 
 from joblib import Parallel, delayed
 from tqdm import tqdm
@@ -320,9 +321,17 @@ class GLMsingle_Model(Model):
         # to give as input to glmsingle
         # excluding them from noise pool
 
+        # first make a smooth mask of rsq
+        fwhm = 2
+        voxelsize = 1.6
+        rsq_arr = pp_prf_estimates['r2'].copy()
+        smoothed_vol = gaussian_filter(rsq_arr, sigma = fwhm / (np.sqrt(8 * np.log(2)) * voxelsize))
+
         ## documentation is misleading, we want to set to 0 the ones that are not in the noise pool 
-        prf_mask = np.ones(pp_prf_estimates['r2'].shape)
-        prf_mask[np.where((pp_prf_estimates['r2'] > self.prf_rsq_threshold))[0]] = 0
+        #prf_mask = np.ones(pp_prf_estimates['r2'].shape)
+        #prf_mask[np.where((pp_prf_estimates['r2'] > self.prf_rsq_threshold))[0]] = 0
+        prf_mask = np.ones(rsq_arr.shape)
+        prf_mask[smoothed_vol > 0] = 0
 
 
         # create a directory for saving GLMsingle outputs
@@ -336,7 +345,7 @@ class GLMsingle_Model(Model):
         opt['hrftoassume'] = hrf_final
         opt['brainexclude'] = prf_mask.astype(int)
         opt['sessionindicator'] = self.ses_num_arr 
-        #opt['brainthresh'] = [99, 0] # which allows all voxels to pass the intensity threshold
+        opt['brainthresh'] = [99, 0] # which allows all voxels to pass the intensity threshold --> we use surface data
         #opt['brainR2'] = 100
         
 
@@ -410,7 +419,7 @@ class GLMsingle_Model(Model):
         flatmap = cortex.Vertex(results_glmsingle['typed']['noisepool'], 
                         'hcp_999999',
                         vmin = 0, vmax = 1, #.7,
-                        cmap='Reds')
+                        cmap='hot')
 
         fig_name = op.join(outdir, 'modeltypeD_noisepool.png')
         print('saving %s' %fig_name)
@@ -420,7 +429,7 @@ class GLMsingle_Model(Model):
         ## plot Full Model RSQ
         flatmap = cortex.Vertex(results_glmsingle['typed']['R2'], 
                   'hcp_999999',
-                   vmin = 0, vmax = 80, #.7,
+                   vmin = 0, vmax = 50, #.7,
                    cmap='hot')
         
         fig_name = op.join(outdir, 'modeltypeD_rsq.png')

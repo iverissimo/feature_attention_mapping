@@ -725,7 +725,7 @@ class pRFViewer:
             flatmap = plot_utils.get_flatmaps(group_estimates['sub-{sj}'.format(sj = pp)]['r2'], 
                                                         vmin1 = 0, vmax1 = .8,
                                                         pysub = self.pysub['sub-{pp}'.format(pp = pp)], 
-                                                        cmap = 'Reds')
+                                                        cmap = 'hot')
             
             fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_RSQ.png'.format(sj = pp,
                                                                                                                                         acq = self.MRIObj.acq,

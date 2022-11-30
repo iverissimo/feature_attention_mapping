@@ -347,6 +347,9 @@ class GLMsingle_Model(Model):
         opt['sessionindicator'] = self.ses_num_arr 
         opt['brainthresh'] = [99, 0] # which allows all voxels to pass the intensity threshold --> we use surface data
         #opt['brainR2'] = 100
+
+        # define polynomials to project out from data (we only want to use intercept and slope)
+        opt['maxpolydeg'] = [[0, 1] for _ in range(data.shape[0])]
         
 
         # for the purpose of this example we will keep the relevant outputs in memory

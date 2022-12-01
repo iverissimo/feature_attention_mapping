@@ -321,17 +321,51 @@ class GLMsingle_Model(Model):
         # to give as input to glmsingle
         # excluding them from noise pool
 
-        # first make a smooth mask of rsq
-        fwhm = 2
-        voxelsize = 1.6
-        rsq_arr = pp_prf_estimates['r2'].copy()
-        smoothed_vol = gaussian_filter(rsq_arr, sigma = fwhm / (np.sqrt(8 * np.log(2)) * voxelsize))
+        # # first make a smooth mask of rsq
+        # fwhm = 2
+        # voxelsize = 1.6
+        # rsq_arr = pp_prf_estimates['r2'].copy()
+        # smoothed_vol = gaussian_filter(rsq_arr, sigma = fwhm / (np.sqrt(8 * np.log(2)) * voxelsize))
 
-        ## documentation is misleading, we want to set to 0 the ones that are not in the noise pool 
-        #prf_mask = np.ones(pp_prf_estimates['r2'].shape)
-        #prf_mask[np.where((pp_prf_estimates['r2'] > self.prf_rsq_threshold))[0]] = 0
-        prf_mask = np.ones(rsq_arr.shape)
-        prf_mask[smoothed_vol > 0] = 0
+        # ## documentation is misleading, we want to set to 0 the ones that are not in the noise pool 
+        # #prf_mask = np.ones(pp_prf_estimates['r2'].shape)
+        # #prf_mask[np.where((pp_prf_estimates['r2'] > self.prf_rsq_threshold))[0]] = 0
+        # prf_mask = np.ones(rsq_arr.shape)
+        # prf_mask[smoothed_vol > 0] = 0
+
+        # get prf bold filenames
+        prf_bold_files = self.get_bold_file_list(participant, task = 'pRF', ses = 'ses-mean', file_ext = '_cropped_dc_psc.npy')
+
+        ## find unique session number
+        prf_ses_num = np.unique([mri_utils.get_run_ses_from_str(f)[-1] for f in prf_bold_files])
+
+        ## for each session, get split half correlation values
+        corr_arr = []
+        random_corr_arr = []
+        for sn in prf_ses_num:
+
+            ses_files = [f for f in prf_bold_files if 'ses-{s}'.format(s = sn) in f]
+
+            ## split runs in half and get unique combinations
+            run_sh_lists = mri_utils.split_half_comb(ses_files)
+
+            # get correlation value for each combination
+            for r in run_sh_lists:
+                ## correlate the two halfs
+                corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8))
+                ## correlate with randomized half
+                random_corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8, shuffle_axis = -1))
+
+        # average values 
+        avg_sh_corr = np.nanmean(corr_arr, axis = 0)
+        avg_sh_rand_corr = np.nanmean(random_corr_arr, axis = 0)
+
+        print('95 percentile at %.3f'%np.nanpercentile(avg_sh_rand_corr, 95))
+
+        ## make final mask
+        # we want to exclude vertices above threshold
+        binary_mask = np.ones(avg_sh_corr.shape)
+        binary_mask[avg_sh_corr >= np.nanpercentile(avg_sh_rand_corr, 95)] = 0
 
 
         # create a directory for saving GLMsingle outputs
@@ -343,7 +377,7 @@ class GLMsingle_Model(Model):
         opt['wantfracridge'] = 1
         opt['hrfonset'] = 0 #FAM_FA.hrf_onset
         opt['hrftoassume'] = hrf_final
-        opt['brainexclude'] = prf_mask.astype(int)
+        opt['brainexclude'] = binary_mask.astype(int)
         opt['sessionindicator'] = self.ses_num_arr 
         opt['brainthresh'] = [99, 0] # which allows all voxels to pass the intensity threshold --> we use surface data
         #opt['brainR2'] = 100
@@ -483,3 +517,14 @@ class GLMsingle_Model(Model):
         axis.legend()
 
         plt.savefig(op.join(outdir, 'hrf_avg.png'))
+
+        ## plot beta standard deviation, to see how much they vary
+        flatmap = cortex.Vertex(np.std(results_glmsingle['typed']['betasmd'], axis = -1), 
+                  'hcp_999999',
+                   vmin = 0, vmax = 2, #.7,
+                   cmap='gnuplot')
+
+        fig_name = op.join(outdir, 'modeltypeD_std_betas.png')
+        print('saving %s' %fig_name)
+        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+

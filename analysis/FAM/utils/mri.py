@@ -159,7 +159,7 @@ def weighted_mean(data1, weights=None, norm=False):
     return avg_data
     
 
-def correlate_arrs(data1, data2, n_jobs = 4, weights=[]):
+def correlate_arrs(data1, data2, n_jobs = 4, weights=[], shuffle_axis = None):
     
     """
     Compute Pearson correlation between two numpy arrays
@@ -192,7 +192,19 @@ def correlate_arrs(data1, data2, n_jobs = 4, weights=[]):
         data2_arr = np.load(data2)
     elif isinstance(data2, np.ndarray):
         data2_arr = data2
-                
+
+    # if we indicate an axis to shuffle, then do so
+    if shuffle_axis is not None:
+
+        if shuffle_axis == -1:
+            data_shuf = data1_arr.T.copy()
+            np.random.shuffle(data_shuf)
+
+            data1_arr = data_shuf.T.copy()
+
+        elif shuffle_axis == 0:
+            np.random.shuffle(data1_arr)
+        
     ## actually correlate
     correlations = np.array(Parallel(n_jobs=n_jobs)(delayed(np.corrcoef)(data1_arr[i], data2_arr[i]) for i in np.arange(data1_arr.shape[0])))[...,0,1]
             

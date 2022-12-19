@@ -273,6 +273,48 @@ class GLMsingle_Model(Model):
         return hrf_final/np.max(hrf_final)
 
 
+    def get_singletrial_avg_estimates(self, estimate_arr = [], single_trl_DM = [], return_std = True):
+
+        """
+        Helper function that takes in an estimate array from glmsingle
+        [vertex, singletrials] (note: single trial number is multiplied by nr of runs)
+        
+        and outputs an average value for each single trial type (our condition)
+        [vertex, average_estimate4trialtype]
+
+        """
+
+        # set number of TRs to crop
+        crop_nr = self.crop_TRs_num['FA'] if self.crop_TRs['FA'] == True else None
+
+        ## get conditions per TR
+        ## crop and shift if such was the case
+        condition_per_TR = mri_utils.crop_shift_arr(self.mri_beh.FA_bar_pass_all,
+                                                crop_nr = crop_nr, 
+                                                shift = self.shift_TRs_num)
+        
+        ## subselect task TRs indices
+        task_indices = np.where((condition_per_TR) == 'task')[0]
+        
+        ## now append the estimate for that vertex for the same trial type (and std if we also want that)
+        avg_all = []
+        std_all = []
+
+        for i in range(len(task_indices)):
+
+            ## indices select for task on TRs (trials)
+            cond_ind = np.where((np.hstack(single_trl_DM[:,task_indices, i])) == 1)[0]
+            
+            avg_all.append(np.mean(estimate_arr[...,cond_ind], axis = -1))
+            if return_std:
+                std_all.append(np.std(estimate_arr[...,cond_ind], axis = -1))
+            
+        if return_std:
+            return np.stack(avg_all), np.stack(std_all)
+        else:
+            return np.stack(avg_all)
+
+
     def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy'):
 
         """
@@ -360,13 +402,51 @@ class GLMsingle_Model(Model):
         avg_sh_corr = np.nanmean(corr_arr, axis = 0)
         avg_sh_rand_corr = np.nanmean(random_corr_arr, axis = 0)
 
-        print('95 percentile at %.3f'%np.nanpercentile(avg_sh_rand_corr, 95))
+        print('95 percentile for pRF runs at %.3f'%np.nanpercentile(avg_sh_rand_corr, 95))
 
         ## make final mask
         # we want to exclude vertices above threshold
-        binary_mask = np.ones(avg_sh_corr.shape)
-        binary_mask[avg_sh_corr >= np.nanpercentile(avg_sh_rand_corr, 95)] = 0
+        binary_prf_mask = np.ones(avg_sh_corr.shape)
+        binary_prf_mask[avg_sh_corr >= np.nanpercentile(avg_sh_rand_corr, 95)] = 0
 
+        ## now do the same correlation mask for the FA runs ###################
+
+        # get prf bold filenames
+        fa_bold_files = self.get_bold_file_list(participant, task = 'FA', ses = 'ses-mean', file_ext = file_ext)
+
+        ## find unique session number
+        fa_ses_num = np.unique([mri_utils.get_run_ses_from_str(f)[-1] for f in fa_bold_files])
+
+        ## for each session, get split half correlation values
+        corr_arr = []
+        random_corr_arr = []
+        for sn in fa_ses_num:
+
+            ses_files = [f for f in fa_bold_files if 'ses-{s}'.format(s = sn) in f]
+
+            ## split runs in half and get unique combinations
+            run_sh_lists = mri_utils.split_half_comb(ses_files)
+
+            # get correlation value for each combination
+            for r in run_sh_lists:
+                ## correlate the two halfs
+                corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8))
+                ## correlate with randomized half
+                random_corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8, shuffle_axis = -1))
+
+        # average values 
+        fa_avg_sh_corr = np.nanmean(corr_arr, axis = 0)
+        fa_avg_sh_rand_corr = np.nanmean(random_corr_arr, axis = 0)
+
+        print('95 percentile for FA runs at %.3f'%np.nanpercentile(fa_avg_sh_rand_corr, 95))
+
+        ## make final mask
+        # we want to exclude vertices above threshold
+        binary_fa_mask = np.ones(fa_avg_sh_corr.shape)
+        binary_fa_mask[fa_avg_sh_corr >= np.nanpercentile(fa_avg_sh_rand_corr, 95)] = 0
+
+        ### final mask is multiplication of the two
+        final_mask = binary_fa_mask * binary_prf_mask
 
         # create a directory for saving GLMsingle outputs
         opt = dict()
@@ -377,10 +457,10 @@ class GLMsingle_Model(Model):
         opt['wantfracridge'] = 1
         opt['hrfonset'] = 0 #FAM_FA.hrf_onset
         opt['hrftoassume'] = hrf_final
-        opt['brainexclude'] = binary_mask.astype(int)
+        opt['brainexclude'] = final_mask.astype(int)
         opt['sessionindicator'] = self.ses_num_arr 
         opt['brainthresh'] = [99, 0] # which allows all voxels to pass the intensity threshold --> we use surface data
-        #opt['brainR2'] = 100
+        opt['brainR2'] = 100 # not using on-off model for noise pool
 
         # define polynomials to project out from data (we only want to use intercept and slope)
         opt['maxpolydeg'] = [[0, 1] for _ in range(data.shape[0])]
@@ -518,11 +598,47 @@ class GLMsingle_Model(Model):
 
         plt.savefig(op.join(outdir, 'hrf_avg.png'))
 
+        ## plot pRF binary mask
+        flatmap = cortex.Vertex(binary_prf_mask, 
+                        'hcp_999999',
+                        vmin = 0, vmax = 1, #.7,
+                        cmap='hot')
+        cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
+
+        fig_name = op.join(outdir, 'modeltypeD_pRFmask.png')
+        print('saving %s' %fig_name)
+        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
+        ## plot FA binary mask
+        flatmap = cortex.Vertex(binary_fa_mask, 
+                        'hcp_999999',
+                        vmin = 0, vmax = 1, #.7,
+                        cmap='hot')
+        cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
+
+        fig_name = op.join(outdir, 'modeltypeD_FAmask.png')
+        print('saving %s' %fig_name)
+        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
+        ## plot binary mask used for noise pool
+        flatmap = cortex.Vertex(final_mask, 
+                        'hcp_999999',
+                        vmin = 0, vmax = 1, #.7,
+                        cmap='hot')
+        cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
+
+        fig_name = op.join(outdir, 'modeltypeD_multiplicationmask.png')
+        print('saving %s' %fig_name)
+        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+
         ## plot beta standard deviation, to see how much they vary
-        flatmap = cortex.Vertex(np.std(results_glmsingle['typed']['betasmd'], axis = -1), 
-                  'hcp_999999',
-                   vmin = 0, vmax = 2, #.7,
-                   cmap='gnuplot')
+        _, std_surf = self.get_singletrial_avg_estimates(estimate_arr = results_glmsingle['typed']['betasmd'], 
+                                                        single_trl_DM = single_trl_DM, return_std = True)
+
+        flatmap = cortex.Vertex(np.mean(std_surf, axis = 0), 
+                        'hcp_999999',
+                        vmin = 0, vmax = 2, #.7,
+                        cmap='gnuplot')
 
         fig_name = op.join(outdir, 'modeltypeD_std_betas.png')
         print('saving %s' %fig_name)

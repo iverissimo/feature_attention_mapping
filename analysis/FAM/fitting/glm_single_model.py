@@ -384,6 +384,7 @@ class GLMsingle_Model(Model):
         ## for each session, get split half correlation values
         corr_arr = []
         random_corr_arr = []
+        ind_seed = int(participant) # seed index, to vary across participants
         for sn in prf_ses_num:
 
             ses_files = [f for f in prf_bold_files if 'ses-{s}'.format(s = sn) in f]
@@ -396,7 +397,7 @@ class GLMsingle_Model(Model):
                 ## correlate the two halfs
                 corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8))
                 ## correlate with randomized half
-                random_corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8, shuffle_axis = -1))
+                random_corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8, shuffle_axis = -1, seed = int(2023 * ind_seed)))
 
         # average values 
         avg_sh_corr = np.nanmean(corr_arr, axis = 0)
@@ -420,6 +421,7 @@ class GLMsingle_Model(Model):
         ## for each session, get split half correlation values
         corr_arr = []
         random_corr_arr = []
+        ind_seed = int(participant)+93 # seed index, to vary across participants
         for sn in fa_ses_num:
 
             ses_files = [f for f in fa_bold_files if 'ses-{s}'.format(s = sn) in f]
@@ -432,7 +434,7 @@ class GLMsingle_Model(Model):
                 ## correlate the two halfs
                 corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8))
                 ## correlate with randomized half
-                random_corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8, shuffle_axis = -1))
+                random_corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8, shuffle_axis = -1, seed = int(2023 * ind_seed)))
 
         # average values 
         fa_avg_sh_corr = np.nanmean(corr_arr, axis = 0)

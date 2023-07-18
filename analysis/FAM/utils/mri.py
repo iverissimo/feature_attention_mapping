@@ -159,7 +159,7 @@ def weighted_mean(data1, weights=None, norm=False):
     return avg_data
     
 
-def correlate_arrs(data1, data2, n_jobs = 4, weights=[], shuffle_axis = None):
+def correlate_arrs(data1, data2, n_jobs = 4, weights=[], shuffle_axis = None, seed=None):
     
     """
     Compute Pearson correlation between two numpy arrays
@@ -172,8 +172,14 @@ def correlate_arrs(data1, data2, n_jobs = 4, weights=[], shuffle_axis = None):
         same as data1
     n_jobs : int
         number of jobs for parallel
+    seed: int
+        if provided, will initialize random with specific seed
     
     """ 
+
+    # if we want to use specific seed
+    if seed is not None:
+        np.random.seed(seed)
     
     data1_arr = []
     data2_arr = []

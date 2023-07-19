@@ -220,6 +220,43 @@ def correlate_arrs(data1, data2, n_jobs = 4, weights=[], shuffle_axis = None, se
             
     return correlations
 
+def smooth_surface(data, pysub = 'hcp_999999', kernel=3, nr_iter=3, normalize = False):
+
+    """
+    smooth surface data, with a given kernel size 
+    (not mm but factor, see cortex.polyutils.Surface.smooth)
+
+    Parameters
+    ----------
+    data : array
+        data array to be smoothed
+    pysub : str
+        basename of pycortex subject, to use coordinate information
+    kernel : int
+        size of "kernel" to use for smoothing (factor)
+    nr_iter: int
+        number of iterations to repeat smoothing, larger values smooths more
+    normalize: bool
+        if we want to max normalize smoothed data (default = False)
+    
+    """
+
+    ## get surface data for both hemispheres
+    lh_surf_data, rh_surf_data = cortex.db.get_surf(pysub, 'fiducial')
+    lh_surf, rh_surf = cortex.polyutils.Surface(lh_surf_data[0], lh_surf_data[1]),cortex.polyutils.Surface(rh_surf_data[0], rh_surf_data[1])
+
+    ## smooth data from each hemisphere, according to surface coordinates
+    ## first remove nans (turn to 0)
+    data[np.isnan(data)] = 0
+
+    lh_data_smooth = lh_surf.smooth(data[:lh_surf_data[0].shape[0]], factor=kernel, iterations=nr_iter)
+    rh_data_smooth = rh_surf.smooth(data[rh_surf_data[0].shape[0]:], factor=kernel, iterations=nr_iter)
+    if normalize:
+        lh_data_smooth /= lh_data_smooth.max()
+        rh_data_smooth /= rh_data_smooth.max()
+
+    return np.concatenate((lh_data_smooth,rh_data_smooth), axis=0)
+
 
 def crop_epi(file, outdir, num_TR_crop = 5):
 

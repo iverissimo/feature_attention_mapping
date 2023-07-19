@@ -242,7 +242,7 @@ match task2model:
 
                 _ = FAM_FA.fit_data(participant, pp_prf_estimates, 
                                                 pp_prf_models['sub-{sj}'.format(sj = participant)][prf_ses]['{mname}_model'.format(mname = prf_model_name)],  
-                                                file_ext = '_cropped.npy') 
+                                                file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 95) 
 
 
 

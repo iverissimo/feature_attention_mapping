@@ -315,7 +315,7 @@ class GLMsingle_Model(Model):
             return np.stack(avg_all)
 
 
-    def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy'):
+    def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 95, pysub = 'hcp_999999'):
 
         """
         fit GLM single on participant data
@@ -358,22 +358,9 @@ class GLMsingle_Model(Model):
 
         ## get average hrf
         hrf_final = self.get_average_hrf(pp_prf_estimates, prf_modelobj, rsq_threshold = self.prf_rsq_threshold)
-
+        
         ### make mask array of pRF high fitting voxels,
-        # to give as input to glmsingle
-        # excluding them from noise pool
-
-        # # first make a smooth mask of rsq
-        # fwhm = 2
-        # voxelsize = 1.6
-        # rsq_arr = pp_prf_estimates['r2'].copy()
-        # smoothed_vol = gaussian_filter(rsq_arr, sigma = fwhm / (np.sqrt(8 * np.log(2)) * voxelsize))
-
-        # ## documentation is misleading, we want to set to 0 the ones that are not in the noise pool 
-        # #prf_mask = np.ones(pp_prf_estimates['r2'].shape)
-        # #prf_mask[np.where((pp_prf_estimates['r2'] > self.prf_rsq_threshold))[0]] = 0
-        # prf_mask = np.ones(rsq_arr.shape)
-        # prf_mask[smoothed_vol > 0] = 0
+        # to give as input to glmsingle (excluding them from noise pool)
 
         # get prf bold filenames
         prf_bold_files = self.get_bold_file_list(participant, task = 'pRF', ses = 'ses-mean', file_ext = '_cropped_dc_psc.npy')
@@ -398,17 +385,21 @@ class GLMsingle_Model(Model):
                 corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8))
                 ## correlate with randomized half
                 random_corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8, shuffle_axis = -1, seed = int(2023 * ind_seed)))
+                ind_seed += 1
 
         # average values 
-        avg_sh_corr = np.nanmean(corr_arr, axis = 0)
-        avg_sh_rand_corr = np.nanmean(random_corr_arr, axis = 0)
+        prf_avg_sh_corr = np.nanmean(corr_arr, axis = 0)
+        prf_avg_sh_rand_corr = np.nanmean(random_corr_arr, axis = 0)
 
-        print('95 percentile for pRF runs at %.3f'%np.nanpercentile(avg_sh_rand_corr, 95))
+        print('95 percentile for pRF runs at %.3f'%np.nanpercentile(prf_avg_sh_rand_corr, perc_thresh_nm))
 
         ## make final mask
+        # if smoothing mask 
+        corr_prf = mri_utils.smooth_surface(prf_avg_sh_corr, pysub = pysub, kernel=3, nr_iter=3, normalize = False) if smooth_nm else prf_avg_sh_corr
+
         # we want to exclude vertices above threshold
-        binary_prf_mask = np.ones(avg_sh_corr.shape)
-        binary_prf_mask[avg_sh_corr >= np.nanpercentile(avg_sh_rand_corr, 95)] = 0
+        binary_prf_mask = np.ones(corr_prf.shape)
+        binary_prf_mask[corr_prf >= np.nanpercentile(prf_avg_sh_rand_corr, perc_thresh_nm)] = 0
 
         ## now do the same correlation mask for the FA runs ###################
 
@@ -435,17 +426,21 @@ class GLMsingle_Model(Model):
                 corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8))
                 ## correlate with randomized half
                 random_corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8, shuffle_axis = -1, seed = int(2023 * ind_seed)))
+                ind_seed += 1
 
         # average values 
         fa_avg_sh_corr = np.nanmean(corr_arr, axis = 0)
         fa_avg_sh_rand_corr = np.nanmean(random_corr_arr, axis = 0)
 
-        print('95 percentile for FA runs at %.3f'%np.nanpercentile(fa_avg_sh_rand_corr, 95))
+        print('95 percentile for FA runs at %.3f'%np.nanpercentile(fa_avg_sh_rand_corr, perc_thresh_nm))
 
         ## make final mask
+        # if smoothing mask 
+        corr_fa = mri_utils.smooth_surface(fa_avg_sh_corr, pysub = pysub, kernel=3, nr_iter=3, normalize = False) if smooth_nm else fa_avg_sh_corr
+
         # we want to exclude vertices above threshold
-        binary_fa_mask = np.ones(fa_avg_sh_corr.shape)
-        binary_fa_mask[fa_avg_sh_corr >= np.nanpercentile(fa_avg_sh_rand_corr, 95)] = 0
+        binary_fa_mask = np.ones(corr_fa.shape)
+        binary_fa_mask[corr_fa >= np.nanpercentile(fa_avg_sh_rand_corr, perc_thresh_nm)] = 0
 
         ### final mask is multiplication of the two
         final_mask = binary_fa_mask * binary_prf_mask
@@ -466,7 +461,6 @@ class GLMsingle_Model(Model):
 
         # define polynomials to project out from data (we only want to use intercept and slope)
         opt['maxpolydeg'] = [[0, 1] for _ in range(data.shape[0])]
-        
 
         # for the purpose of this example we will keep the relevant outputs in memory
         # and also save them to the disk
@@ -515,7 +509,7 @@ class GLMsingle_Model(Model):
 
         ## plot ON OFF R2
         flatmap = cortex.Vertex(results_glmsingle['typea']['onoffR2'], 
-                  'hcp_999999',
+                  pysub,
                    vmin = 0, vmax = 15, #.7,
                    cmap='hot')
 
@@ -525,7 +519,7 @@ class GLMsingle_Model(Model):
 
         ## plot ON OFF betas
         flatmap = cortex.Vertex(results_glmsingle['typea']['betasmd'][...,0], 
-                  'hcp_999999',
+                  pysub,
                    vmin = -2, vmax = 2, #.7,
                    cmap='RdBu_r')
 
@@ -536,7 +530,7 @@ class GLMsingle_Model(Model):
 
         ## plot Full Model noise pool 
         flatmap = cortex.Vertex(results_glmsingle['typed']['noisepool'], 
-                        'hcp_999999',
+                        pysub,
                         vmin = 0, vmax = 1, #.7,
                         cmap='hot')
 
@@ -547,7 +541,7 @@ class GLMsingle_Model(Model):
         
         ## plot Full Model RSQ
         flatmap = cortex.Vertex(results_glmsingle['typed']['R2'], 
-                  'hcp_999999',
+                  pysub,
                    vmin = 0, vmax = 50, #.7,
                    cmap='hot')
         
@@ -557,7 +551,7 @@ class GLMsingle_Model(Model):
 
         ## plot Full Model betas
         flatmap = cortex.Vertex(np.mean(results_glmsingle['typed']['betasmd'], axis = -1), 
-                  'hcp_999999',
+                  pysub,
                    vmin = -2, vmax = 2, #.7,
                    cmap='RdBu_r')
 
@@ -571,7 +565,7 @@ class GLMsingle_Model(Model):
         avg_betas[pp_prf_estimates['r2']< self.prf_rsq_threshold] = np.nan
 
         flatmap = cortex.Vertex(avg_betas, 
-                        'hcp_999999',
+                        pysub,
                         vmin = -2, vmax = 2, #.7,
                         cmap='RdBu_r')
 
@@ -581,9 +575,8 @@ class GLMsingle_Model(Model):
 
 
         ## plot Full Model FracRidge
-
         flatmap = cortex.Vertex(results_glmsingle['typed']['FRACvalue'], 
-                  'hcp_999999',
+                  pysub,
                    vmin = 0, vmax = 1, #.7,
                    cmap='copper')
 
@@ -602,7 +595,7 @@ class GLMsingle_Model(Model):
 
         ## plot pRF binary mask
         flatmap = cortex.Vertex(binary_prf_mask, 
-                        'hcp_999999',
+                        pysub,
                         vmin = 0, vmax = 1, #.7,
                         cmap='hot')
         cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
@@ -611,9 +604,20 @@ class GLMsingle_Model(Model):
         print('saving %s' %fig_name)
         _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
+        ## plot pRF correlation flatmap used for mask
+        flatmap = cortex.Vertex(corr_prf, 
+                        pysub,
+                        vmin = 0, vmax = 1, #.7,
+                        cmap='hot')
+        cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
+
+        fig_name = op.join(outdir, 'modeltypeD_pRFcorrelation.png')
+        print('saving %s' %fig_name)
+        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False) 
+
         ## plot FA binary mask
         flatmap = cortex.Vertex(binary_fa_mask, 
-                        'hcp_999999',
+                        pysub,
                         vmin = 0, vmax = 1, #.7,
                         cmap='hot')
         cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
@@ -622,23 +626,24 @@ class GLMsingle_Model(Model):
         print('saving %s' %fig_name)
         _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
-        ## plot binary mask used for noise pool
-        flatmap = cortex.Vertex(final_mask, 
-                        'hcp_999999',
+        ## plot FA correlation flatmap used for mask
+        flatmap = cortex.Vertex(corr_fa, 
+                        pysub,
                         vmin = 0, vmax = 1, #.7,
                         cmap='hot')
         cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
 
-        fig_name = op.join(outdir, 'modeltypeD_multiplicationmask.png')
+        fig_name = op.join(outdir, 'modeltypeD_FAcorrelation.png')
         print('saving %s' %fig_name)
-        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False) 
+
 
         ## plot beta standard deviation, to see how much they vary
         _, std_surf = self.get_singletrial_avg_estimates(estimate_arr = results_glmsingle['typed']['betasmd'], 
                                                         single_trl_DM = single_trl_DM, return_std = True)
 
         flatmap = cortex.Vertex(np.mean(std_surf, axis = 0), 
-                        'hcp_999999',
+                        pysub,
                         vmin = 0, vmax = 2, #.7,
                         cmap='gnuplot')
 

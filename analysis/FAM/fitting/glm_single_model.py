@@ -315,7 +315,8 @@ class GLMsingle_Model(Model):
             return np.stack(avg_all)
 
 
-    def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 95, pysub = 'hcp_999999'):
+    def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 95, pysub = 'hcp_999999',
+                        nm_file_extent = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_LinDetrend_psc.npy'}):
 
         """
         fit GLM single on participant data
@@ -363,7 +364,7 @@ class GLMsingle_Model(Model):
         # to give as input to glmsingle (excluding them from noise pool)
 
         # get prf bold filenames
-        prf_bold_files = self.get_bold_file_list(participant, task = 'pRF', ses = 'ses-mean', file_ext = '_cropped_dc_psc.npy')
+        prf_bold_files = self.get_bold_file_list(participant, task = 'pRF', ses = 'ses-mean', file_ext = nm_file_extent['pRF'])
 
         ## find unique session number
         prf_ses_num = np.unique([mri_utils.get_run_ses_from_str(f)[-1] for f in prf_bold_files])
@@ -391,7 +392,7 @@ class GLMsingle_Model(Model):
         prf_avg_sh_corr = np.nanmean(corr_arr, axis = 0)
         prf_avg_sh_rand_corr = np.nanmean(random_corr_arr, axis = 0)
 
-        print('95 percentile for pRF runs at %.3f'%np.nanpercentile(prf_avg_sh_rand_corr, perc_thresh_nm))
+        print('X percentile for pRF runs at %.3f'%np.nanpercentile(prf_avg_sh_rand_corr, perc_thresh_nm))
 
         ## make final mask
         # if smoothing mask 
@@ -404,7 +405,7 @@ class GLMsingle_Model(Model):
         ## now do the same correlation mask for the FA runs ###################
 
         # get prf bold filenames
-        fa_bold_files = self.get_bold_file_list(participant, task = 'FA', ses = 'ses-mean', file_ext = file_ext)
+        fa_bold_files = self.get_bold_file_list(participant, task = 'FA', ses = 'ses-mean', file_ext = nm_file_extent['FA'])
 
         ## find unique session number
         fa_ses_num = np.unique([mri_utils.get_run_ses_from_str(f)[-1] for f in fa_bold_files])
@@ -432,7 +433,7 @@ class GLMsingle_Model(Model):
         fa_avg_sh_corr = np.nanmean(corr_arr, axis = 0)
         fa_avg_sh_rand_corr = np.nanmean(random_corr_arr, axis = 0)
 
-        print('95 percentile for FA runs at %.3f'%np.nanpercentile(fa_avg_sh_rand_corr, perc_thresh_nm))
+        print('X percentile for FA runs at %.3f'%np.nanpercentile(fa_avg_sh_rand_corr, perc_thresh_nm))
 
         ## make final mask
         # if smoothing mask 

@@ -21,7 +21,7 @@ from prfpy.fit import Iso2DGaussianFitter, CSS_Iso2DGaussianFitter, Norm_Iso2DGa
 
 class pRF_model(Model):
 
-    def __init__(self, MRIObj, outputdir = None, tasks = ['pRF', 'FA']):
+    def __init__(self, MRIObj, outputdir = None, tasks = ['pRF', 'FA'], pysub = 'hcp_999999'):
         
         """__init__
         constructor for class 
@@ -44,6 +44,8 @@ class pRF_model(Model):
         
         # reset osf value, because model assumes 10 (for FA)
         self.osf = 1
+    
+        self.pysub = pysub
             
     
     def get_DM(self, participant, ses = 'ses-mean', ses_type = 'func', mask_DM = True, filename = None, 
@@ -763,7 +765,7 @@ class pRF_model(Model):
 
 
     def mask_pRF_model_estimates(self, estimates, ROI = None, x_ecc_lim = [-6,6], y_ecc_lim = [-6,6],
-                                rsq_threshold = .1, pysub = 'hcp_999999', estimate_keys = ['x','y','size','betas','baseline','r2']):
+                                rsq_threshold = .1, pysub = None, estimate_keys = ['x','y','size','betas','baseline','r2'], return_ind = False):
     
         """ 
         mask estimates, to be positive RF, within screen limits
@@ -784,6 +786,8 @@ class pRF_model(Model):
             numpy array of masked estimates
         
         """
+        if pysub is None:
+            pysub = self.pysub
         
         # make new variables that are masked 
         masked_dict = {}
@@ -817,7 +821,10 @@ class pRF_model(Model):
             for k in estimate_keys:
                 masked_dict[k] = masked_dict[k][roi_ind[ROI]]
         
-        return masked_dict
+        if return_ind:
+            return masked_dict, indices
+        else:
+            return masked_dict
 
 
     def save_pRF_model_estimates(self, filename, final_estimates, model_type = 'gauss', grid = False):
@@ -1117,3 +1124,172 @@ class pRF_model(Model):
             print('file already exists, loading %s'%filename)
         
         return np.load(filename)
+
+    def get_prf_estimate_keys(self, prf_model_name = 'gauss'):
+
+        """ 
+        Helper function to get prf estimate keys
+        
+        Parameters
+        ----------
+        prf_model_name : str
+            pRF model name (defaults to gauss)
+            
+        """
+
+        # get estimate key names, which vary per model used
+        keys = self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys'][prf_model_name]
+        
+        if self.fit_hrf:
+            keys = keys[:-1]+self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys']['hrf']+['r2']
+
+        return keys
+    
+    def get_eccentricity(self, xx = [], yy = [], rsq = []):
+
+        """
+        Helper function that calculates eccentricity and returns array 
+
+        Parameters
+        ----------
+        xx : arr
+            array with x position values
+        yy : arr
+            array with y position values
+        rsq: arr
+            rsq values, to be used as alpha level/threshold
+        """
+
+        ## calculate eccentricity
+        eccentricity = np.abs(xx + yy * 1j)
+
+        # mask nans
+        eccentricity[np.where((np.isnan(rsq)))[0]] = np.nan
+
+        return eccentricity
+    
+    def get_polar_angle(self, xx = [], yy = [], rsq = [], pa_transform = 'mirror', angle_thresh = 3*np.pi/4):
+
+        """
+        Helper function that calculates PA and returns array of
+        PA values (which can also be transformed in some way)
+
+        Parameters
+        ----------
+        xx : arr
+            array with x position values
+        yy : arr
+            array with y position values
+        rsq: arr
+            rsq values, to be used as alpha level/threshold
+        pa_transform: str
+            if None, no transform, else will be:
+            mirror - hemipsheres are mirrored, and meridians are over represented
+            norm - normalized PA between 0 and 1
+        """
+
+        ## calculate polar angle
+        polar_angle = np.angle(xx + yy * 1j)
+
+        if pa_transform is not None:
+
+            ## get mid vertex index (diving hemispheres)
+            left_index = cortex.db.get_surfinfo(self.pysub).left.shape[0] 
+
+            polar_angle_out = polar_angle.copy()
+
+            if angle_thresh is not None:
+                # mask out angles within threh interval
+                polar_angle_out[:left_index][np.where((polar_angle[:left_index] > angle_thresh) | (polar_angle[:left_index] < -angle_thresh))[0]] = np.nan
+                polar_angle_out[left_index:][np.where((polar_angle[left_index:] > (-np.pi + angle_thresh)) & (polar_angle[left_index:] < (np.pi - angle_thresh)))[0]] = np.nan
+                polar_angle = polar_angle_out.copy()
+
+            if pa_transform == 'mirror':
+                ## get pa values transformed like in figure 8 of Larsson and Heeger 2006
+                # --> Horizontal meridian = 0
+                # --> upper VF goes from 0 to pi/2
+                # --> lower VF goes from 0 to -pi/2
+
+                # angles from pi/2 to pi (upper left quadrant)
+                ind_ang = np.where((polar_angle > np.pi/2))[0]
+                polar_angle_out[ind_ang] = (polar_angle_out[ind_ang] - np.pi)* -1 # minus pi, then taking absolute (positive) value
+
+                # angles from -pi/2 to -pi (lower left quadrant)
+                ind_ang = np.where((polar_angle < -np.pi/2))[0]
+                polar_angle_out[ind_ang] = (polar_angle_out[ind_ang] + np.pi) * -1 
+
+            if pa_transform == 'flip':
+                # non-uniform representation. we flip vertically to make sure
+                # order of colors same for both hemispheres
+                ind_nan = np.where((~np.isnan(polar_angle_out[left_index:])))[0]
+                polar_angle_out[left_index:][ind_nan] = np.angle(-1*xx + yy * 1j)[left_index:][ind_nan] 
+
+            elif pa_transform == 'norm':
+                polar_angle_out = ((polar_angle + np.pi) / (np.pi * 2.0)) # normalize PA between 0 and 1
+                
+        else:
+            polar_angle_out = polar_angle
+
+        polar_angle_out[np.where((np.isnan(rsq)))[0]] = np.nan
+
+        return polar_angle_out
+    
+    def fwhmax_fwatmin(self, model, estimates, normalize_RFs=False, return_profiles=False):
+    
+        """
+        taken from marco aqil's code, all credits go to him
+        """
+        
+        model = model.lower()
+        x=np.linspace(-50,50,1000).astype('float32')
+
+        prf = estimates['betas'] * np.exp(-0.5*x[...,np.newaxis]**2 / estimates['size']**2)
+        vol_prf =  2*np.pi*estimates['size']**2
+
+        if 'dog' in model or 'dn' in model:
+            srf = estimates['sa'] * np.exp(-0.5*x[...,np.newaxis]**2 / estimates['ss']**2)
+            vol_srf = 2*np.pi*estimates['ss']*2
+
+        if normalize_RFs==True:
+
+            if model == 'gauss':
+                profile =  prf / vol_prf
+            elif model == 'css':
+                #amplitude is outside exponent in CSS
+                profile = (prf / vol_prf)**estimates['ns'] * estimates['betas']**(1 - estimates['ns'])
+            elif model =='dog':
+                profile = prf / vol_prf - \
+                        srf / vol_srf
+            elif 'dn' in model:
+                profile = (prf / vol_prf + estimates['nb']) /\
+                        (srf / vol_srf + estimates['sb']) - estimates['nb']/estimates['sb']
+        else:
+            if model == 'gauss':
+                profile = prf
+            elif model == 'css':
+                #amplitude is outside exponent in CSS
+                profile = prf**estimates['ns'] * estimates['betas']**(1 - estimates['ns'])
+            elif model =='dog':
+                profile = prf - srf
+            elif 'dn' in model:
+                profile = (prf + estimates['nb'])/(srf + estimates['sb']) - estimates['nb']/estimates['sb']
+
+
+        half_max = np.max(profile, axis=0)/2
+        fwhmax = np.abs(2*x[np.argmin(np.abs(profile-half_max), axis=0)])
+
+
+        if 'dog' in model or 'dn' in model:
+
+            min_profile = np.min(profile, axis=0)
+            fwatmin = np.abs(2*x[np.argmin(np.abs(profile-min_profile), axis=0)])
+
+            result = fwhmax, fwatmin
+        else:
+            result = fwhmax
+
+        if return_profiles:
+            return result, profile.T
+        else:
+            return result
+    

@@ -21,662 +21,725 @@ import nibabel as nib
 
 from statsmodels.stats import weightstats
 
+from FAM.utils import Utils
 
+class PlotUtils(Utils):
 
-def get_flatmaps(est_arr1, est_arr2 = None, 
-                            vmin1 = 0, vmax1 = .8, vmin2 = None, vmax2 = None,
-                            pysub = 'hcp_999999', cmap = 'BuBkRd'):
-
-    """
-    Helper function to set and return flatmap  
-
-    Parameters
-    ----------
-    est_arr1 : array
-        data array
-    cmap : str
-        string with colormap name
-    vmin: int/float
-        minimum value
-    vmax: int/float 
-        maximum value
-    subject: str
-        overlay subject name to use
-    """
-
-    # if two arrays provided, then fig is 2D
-    if est_arr2:
-        flatmap = cortex.Vertex2D(est_arr1, est_arr2,
-                                pysub,
-                                vmin = vmin1, vmax = vmax1,
-                                vmin2 = vmin2, vmax2 = vmax2,
-                                cmap = cmap)
-    else:
-        flatmap = cortex.Vertex(est_arr1, 
-                                pysub,
-                                vmin = vmin1, vmax = vmax1,
-                                cmap = cmap)
-
-    return flatmap
-
-
-def make_raw_vertex_image(data1, cmap = 'hot', vmin = 0, vmax = 1, 
-                          data2 = [], vmin2 = 0, vmax2 = 1, subject = 'fsaverage', data2D = False):  
-    
-    """ function to fix web browser bug in pycortex
-        allows masking of data with nans
-    
-    Parameters
-    ----------
-    data1 : array
-        data array
-    cmap : str
-        string with colormap name (not the alpha version)
-    vmin: int/float
-        minimum value
-    vmax: int/float 
-        maximum value
-    subject: str
-        overlay subject name to use
-    
-    Outputs
-    -------
-    vx_fin : VertexRGB
-        vertex object to call in webgl
-    
-    """
-    
-    # Get curvature
-    curv = cortex.db.get_surfinfo(subject, type = 'curvature', recache=False)#,smooth=1)
-    # Adjust curvature contrast / color. Alternately, you could work
-    # with curv.data, maybe threshold it, and apply a color map.     
-    curv.data[curv.data>0] = .1
-    curv.data[curv.data<=0] = -.1
-    #curv.data = np.sign(curv.data.data) * .25
-    
-    curv.vmin = -1
-    curv.vmax = 1
-    curv.cmap = 'gray'
-    
-    # Create display data 
-    vx = cortex.Vertex(data1, subject, cmap = cmap, vmin = vmin, vmax = vmax)
-    
-    # Pick an arbitrary region to mask out
-    # (in your case you could use np.isnan on your data in similar fashion)
-    if data2D:
-        data2[np.isnan(data2)] = vmin2
-        norm2 = colors.Normalize(vmin2, vmax2)  
-        alpha = np.clip(norm2(data2), 0, 1)
-    else:
-        alpha = ~np.isnan(data1) #(data < 0.2) | (data > 0.4)
-    alpha = alpha.astype(np.float)
-    
-    # Map to RGB
-    vx_rgb = np.vstack([vx.raw.red.data, vx.raw.green.data, vx.raw.blue.data])
-    vx_rgb[:,alpha>0] = vx_rgb[:,alpha>0] * alpha[alpha>0]
-    
-    curv_rgb = np.vstack([curv.raw.red.data, curv.raw.green.data, curv.raw.blue.data])
-    # do this to avoid artifacts where curvature gets color of 0 valur of colormap
-    curv_rgb[:,np.where((vx_rgb > 0))[-1]] = curv_rgb[:,np.where((vx_rgb > 0))[-1]] * (1-alpha)[np.where((vx_rgb > 0))[-1]]
-
-    # Alpha mask
-    display_data = curv_rgb + vx_rgb 
-
-    # Create vertex RGB object out of R, G, B channels
-    vx_fin = cortex.VertexRGB(*display_data, subject, curvature_brightness = 0.4, curvature_contrast = 0.1)
-
-    return vx_fin
-
-
-def make_colormap(colormap = 'rainbow_r', bins = 256, add_alpha = True, invert_alpha = False, cmap_name = 'costum',
-                      discrete = False, return_cmap = False):
-
-    """ make custom colormap
-    can add alpha channel to colormap,
-    and save to pycortex filestore
-    Parameters
-    ----------
-    colormap : str or List/arr
-        if string then has to be a matplolib existent colormap
-        if list/array then contains strings with color names, to create linear segmented cmap
-    bins : int
-        number of bins for colormap
-    invert_alpha : bool
-        if we want to invert direction of alpha channel
-        (y can be from 0 to 1 or 1 to 0)
-    cmap_name : str
-        new cmap filename, final one will have _alpha_#-bins added to it
-    discrete : bool
-        if we want a discrete colormap or not (then will be continuous)
-    Outputs
-    -------
-    rgb_fn : str
-        absolute path to new colormap
-    """
-    
-    if isinstance(colormap, str): # if input is string (so existent colormap)
-
-        # get colormap
-        cmap = cm.get_cmap(colormap)
-
-    else: # is list of strings
-        cvals  = np.arange(len(colormap))
-        norm = plt.Normalize(min(cvals),max(cvals))
-        tuples = list(zip(map(norm,cvals), colormap))
-        cmap = colors.LinearSegmentedColormap.from_list("", tuples)
+    def __init__(self):
         
-        if discrete == True: # if we want a discrete colormap from list
-            cmap = colors.ListedColormap(colormap)
-            bins = int(len(colormap))
-
-    # convert into array
-    cmap_array = cmap(range(bins))
-
-    # reshape array for map
-    new_map = []
-    for i in range(cmap_array.shape[-1]):
-        new_map.append(np.tile(cmap_array[...,i],(bins,1)))
-
-    new_map = np.moveaxis(np.array(new_map), 0, -1)
-    
-    if add_alpha: 
-        # make alpha array
-        if invert_alpha == True: # in case we want to invert alpha (y from 1 to 0 instead pf 0 to 1)
-            _, alpha = np.meshgrid(np.linspace(0, 1, bins, endpoint=False), 1-np.linspace(0, 1, bins))
-        else:
-            _, alpha = np.meshgrid(np.linspace(0, 1, bins, endpoint=False), np.linspace(0, 1, bins, endpoint=False))
-
-        # add alpha channel
-        new_map[...,-1] = alpha
-        cmap_ext = (0,1,0,1)
-    else:
-        new_map = new_map[:1,...].copy() 
-        cmap_ext = (0,100,0,1)
-    
-    fig = plt.figure(figsize=(1,1))
-    ax = fig.add_axes([0,0,1,1])
-    # plot 
-    plt.imshow(new_map,
-    extent = cmap_ext,
-    origin = 'lower')
-    ax.axis('off')
-
-    if add_alpha: 
-        rgb_fn = op.join(op.split(cortex.database.default_filestore)[
-                          0], 'colormaps', cmap_name+'_alpha_bins_%d.png'%bins)
-    else:
-        rgb_fn = op.join(op.split(cortex.database.default_filestore)[
-                          0], 'colormaps', cmap_name+'_bins_%d.png'%bins)
-    #misc.imsave(rgb_fn, new_map)
-    plt.savefig(rgb_fn, dpi = 200,transparent=True)
-
-    if return_cmap:
-        return cmap
-    else:
-        return rgb_fn 
-
-
-def create_glasser_df(path2file):
-
-    """ Function to create glasser dataframe
-     with ROI names, colors (RGBA) and vertex indices
-
-    Parameters
-    ----------
-    path2file : str 
-        path to the parcelation label file
-    """
-    
-    # we read in the atlas data, which consists of 180 separate regions per hemisphere. 
-    # These are labeled separately, so the labels go to 360.
-    cifti = nib.load(op.join(path2file,
-                         'Q1-Q6_RelatedParcellation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.59k_fs_LR.dlabel.nii'))
-
-    # get index data array
-    cifti_data = np.array(cifti.get_fdata(dtype=np.float32))[0]
-    # from header get label dict with key + rgba
-    cifti_hdr = cifti.header
-    label_dict = cifti_hdr.get_axis(0)[0][1]
-    
-    ## make atlas data frame
-    atlas_df = pd.DataFrame(columns = ['ROI', 'index','R','G','B','A'])
-
-    for key in label_dict.keys():
-
-        if label_dict[key][0] != '???': 
-            atlas_df = pd.concat((atlas_df,
-                                pd.DataFrame({'ROI': label_dict[key][0].replace('_ROI',''),
-                                                     'index': key,
-                                                     'R': label_dict[key][1][0],
-                                                     'G': label_dict[key][1][1],
-                                                     'B': label_dict[key][1][2],
-                                                     'A': label_dict[key][1][3]
-                                                    }, index=[0])
-                                ))
+        """__init__
+        constructor for utilities plotting class 
             
-    return atlas_df, cifti_data
+        """
 
-
-def get_weighted_bins(data_df, x_key = 'ecc', y_key = 'size', weight_key = 'rsq', n_bins = 10):
-
-    """ 
-    
-    Get weighted bins from dataframe, sorted by one of the variables
-
-    """
-    
-    # sort values by eccentricity
-    data_df = data_df.sort_values(by=[x_key])
-
-    #divide in equally sized bins
-    bin_size = int(len(data_df)/n_bins) 
-    
-    mean_x = []
-    mean_x_std = []
-    mean_y = []
-    mean_y_std = []
-    
-    # for each bin calculate rsq-weighted means and errors of binned ecc/gain 
-    for j in range(n_bins): 
+    def rose_plot(self, angles, ax = None, bins = 16, use_density = True, offset = 0, color = 'g', alpha = 0.5, **param_dict):
         
-        mean_x.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][x_key],
-                                              weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).mean)
-        mean_x_std.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][x_key],
-                                                  weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
+        """
+        Plot polar histogram of angles on a figure's axis. 
 
-        mean_y.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][y_key],
-                                              weights = data_df[bin_size * j:bin_size*(j+1)][weight_key]).mean)
-        mean_y_std.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][y_key],
-                                                  weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
+        Parameters
+        ----------
+        angles : array
+            angle to plot, are expected in radians
+        ax: figure axis
+            where to plot --> NOTE: ax must have been created using subplot_kw=dict(projection='polar')
 
-    return mean_x, mean_x_std, mean_y, mean_y_std
+        """
 
+        # Wrap angles to [-pi, pi)
+        angles = (angles + np.pi) % (2*np.pi) - np.pi
 
-def get_rois4plotting(params, sub_id = None, pysub = 'hcp_999999', use_atlas = True, atlas_pth = '', space = 'fsLR_den-170k'):
+        # Set bins symmetrically around zero
+        # To have a bin edge at zero use an even number of bins
+        if bins % 2:
+            bins += 1
+        bins = np.linspace(-np.pi, np.pi, num=bins+1)
 
-    """ 
-    helper function to get ROI names, vertice index and color palette
-   to be used in plotting scripts
-    
-    Parameters
-    ----------
-    params : dict
-        yaml dict with task related infos  
-    sub_id: str, int or list
-        subject ID to add as identifier in outputed dictionaries
-    pysub: str/dict
-        name of pycortex subject folder, where we drew all ROIs.
-        if dict, assumes key is participant ID, and value is sub specific pycortex folder 
-    use_atlas: bool
-        if we want to use the glasser atlas ROIs instead (this is, from the keys conglomerate defined in the params yml)
-    atlas_pth: str
-        path to atlas file
-    space: str
-        pycortex subject space
-    """ 
+        # Bin data and record counts
+        count, bin = np.histogram(angles, bins=bins)
 
-    if use_atlas:
-        # Get Glasser atlas
-        atlas_df, atlas_array = create_glasser_df(atlas_pth)
-    
-    if sub_id:
-        
-        # if single id provided, put in list
-        if isinstance(sub_id, str) or isinstance(sub_id, int):
-            sub_id = [sub_id]
+        # Compute width of each bin
+        widths = np.diff(bin)
 
-        sub_id_list = ['sub-{sj}'.format(sj = str(pp).zfill(3)) if 'sub-' not in str(pp) else str(pp) for pp in sub_id]
-
-        ## start empty dictionaries  
-        ROIs = {}
-        color_codes = {}
-        roi_verts = {}
-
-        # loop over participant list
-        for pp in sub_id_list:
-
-            print('Getting ROIs for participants %s'%pp)
-
-            if use_atlas:
-                print('Using Glasser ROIs')
-                # ROI names
-                ROIs[pp] = list(params['plotting']['ROIs']['glasser_atlas'].keys())
-
-                # colors
-                color_codes[pp] = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs[pp]}
-
-                # get vertices for ROI
-                roi_verts[pp] = {}
-                for _,key in enumerate(ROIs[pp]):
-                    print(key)
-                    roi_verts[pp][key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
-
-            else:
-                ## check if dict or str
-                if isinstance(pysub, dict):
-                    pysub_pp = pysub[pp]
-                else:
-                    pysub_pp = pysub
-
-                # set ROI names
-                ROIs[pp] = params['plotting']['ROIs'][space]
-
-                # dictionary with one specific color per group - similar to fig3 colors
-                color_codes[pp] = {key: params['plotting']['ROI_pal'][key] for key in ROIs[pp]}
-
-                # get vertices for ROI
-                roi_verts[pp] = {}
-                for _,val in enumerate(ROIs[pp]):
-                    print(val)
-                    roi_verts[pp][val] = cortex.get_roi_verts(pysub_pp,val)[val]
-            
-    else:
-        raise NameError('No subject ID provided')
-    
-    return ROIs, roi_verts, color_codes
-
-
-def fwhmax_fwatmin(model, estimates, normalize_RFs=False, return_profiles=False):
-    
-    """
-    taken from marco aqil's code, all credits go to him
-    """
-    
-    model = model.lower()
-    x=np.linspace(-50,50,1000).astype('float32')
-
-    prf = estimates['betas'] * np.exp(-0.5*x[...,np.newaxis]**2 / estimates['size']**2)
-    vol_prf =  2*np.pi*estimates['size']**2
-
-    if 'dog' in model or 'dn' in model:
-        srf = estimates['sa'] * np.exp(-0.5*x[...,np.newaxis]**2 / estimates['ss']**2)
-        vol_srf = 2*np.pi*estimates['ss']*2
-
-    if normalize_RFs==True:
-
-        if model == 'gauss':
-            profile =  prf / vol_prf
-        elif model == 'css':
-            #amplitude is outside exponent in CSS
-            profile = (prf / vol_prf)**estimates['ns'] * estimates['betas']**(1 - estimates['ns'])
-        elif model =='dog':
-            profile = prf / vol_prf - \
-                       srf / vol_srf
-        elif 'dn' in model:
-            profile = (prf / vol_prf + estimates['nb']) /\
-                      (srf / vol_srf + estimates['sb']) - estimates['nb']/estimates['sb']
-    else:
-        if model == 'gauss':
-            profile = prf
-        elif model == 'css':
-            #amplitude is outside exponent in CSS
-            profile = prf**estimates['ns'] * estimates['betas']**(1 - estimates['ns'])
-        elif model =='dog':
-            profile = prf - srf
-        elif 'dn' in model:
-            profile = (prf + estimates['nb'])/(srf + estimates['sb']) - estimates['nb']/estimates['sb']
-
-
-    half_max = np.max(profile, axis=0)/2
-    fwhmax = np.abs(2*x[np.argmin(np.abs(profile-half_max), axis=0)])
-
-
-    if 'dog' in model or 'dn' in model:
-
-        min_profile = np.min(profile, axis=0)
-        fwatmin = np.abs(2*x[np.argmin(np.abs(profile-min_profile), axis=0)])
-
-        result = fwhmax, fwatmin
-    else:
-        result = fwhmax
-
-    if return_profiles:
-        return result, profile.T
-    else:
-        return result
-
-
-def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=None):
-    
-    """Import a subject from fmriprep-output to pycortex
-    
-    Parameters
-    ----------
-    source_directory : string
-       Local directory that contains both fmriprep and freesurfer subfolders 
-    sj : string
-        Fmriprep subject name (without "sub-")
-    dataset : string
-       If you have multiple fmriprep outputs from different datasets, use this attribute
-       to add a prefix to every subject id ('ds01.01' rather than '01')
-    ses : string, optional
-       BIDS session that contains the anatomical data
-    acq : string, optional
-        If we intend to specific the acquisition of the T1w file (for naming purposes)
-    """
-    if dataset is not None:
-        pycortex_sub = '{ds}.{sub}'.format(ds=dataset, sub=sj)
-    else:
-        pycortex_sub = '{sub}'.format(sub=sj)
-
-    if pycortex_sub in cortex.database.db.subjects.keys():
-        print('subject %s already in filestore, will not overwrite'%pycortex_sub)
-    else:
-        
-        # import subject into pycortex database
-        cortex.fmriprep.import_subj(subject = sj, source_dir = source_directory, 
-                             session = ses, dataset = dataset, acq = acq)
-
-
-def plot_pRF_DM(dm_array, filename):
-
-    """
-    Function to plot design matrix frame by frame 
-    and save movie in folder
-
-    """
-
-    # if output path doesn't exist, create it
-
-    outfolder = op.split(filename)[0]
-
-    if not op.isdir(outfolder): 
-        os.makedirs(outfolder)
-    print('saving files in %s'%filename)
-
-    dm_array = (dm_array * 255).astype(np.uint8)
-
-    for w in range(dm_array.shape[-1]):
-        im = Image.fromarray(dm_array[...,w])
-        im.save(op.join(outfolder,"DM_TR-%s.png"%str(w).zfill(4)))  
-
-    ## save as video
-    img_name = op.join(outfolder,'DM_TR-%4d.png')
-    os.system("ffmpeg -r 6 -start_number 0 -i %s -vcodec mpeg4 -y %s"%(img_name, filename))  
-
-
-def get_estimates_roi_df(participant, estimates_pp, ROIs = None, roi_verts = None, est_key = 'r2', model = 'gauss'):
-
-    """
-
-    Helper function to get estimates dataframe values for each ROI
-    will select values based on est key param 
-
-    """
-
-    ## save rsq values in dataframe, for plotting
-    df_est = pd.DataFrame({'sj': [], 'index': [], 'ROI': [], 'value': [], 'model': []})
-
-    for idx,rois_ks in enumerate(ROIs): 
-        
-        # mask estimates
-        print('masking estimates for ROI %s'%rois_ks)
-
-        if len(roi_verts[rois_ks]) > 0:
-            if isinstance(estimates_pp, dict):
-                roi_arr = estimates_pp[est_key][roi_verts[rois_ks]]
-            else:
-                roi_arr = estimates_pp[roi_verts[rois_ks]]
+        # By default plot density (frequency potentially misleading)
+        if use_density:
+            # Area to assign each bin
+            area = count / angles.size
+            # Calculate corresponding bin radius
+            radius = (area / np.pi)**.5
         else:
-            print('No vertices found for ROI')
-            roi_arr = [np.nan]
+            radius = count
+            
+        # Plot data on ax
+        ax.bar(bin[:-1], radius, zorder=1, align='edge', width=widths, edgecolor='0.5', fill=True, linewidth=1,color=color,alpha=alpha)
 
-        df_est = pd.concat((df_est,
-                            pd.DataFrame({'sj': np.tile('sub-{sj}'.format(sj = participant), len(roi_arr)), 
-                                        'index': roi_verts[rois_ks], 
-                                        'ROI': np.tile(rois_ks, len(roi_arr)), 
-                                        'value': roi_arr,
-                                        'model': np.tile(model, len(roi_arr))})
-                        ))
+        # Set the direction of the zero angle
+        ax.set_theta_offset(offset)
 
-    return df_est
+        # Remove ylabels, they are mostly obstructive and not informative
+        ax.set_yticks([])
 
+        label = ['$0$', r'$\pi/4$', r'$\pi/2$', r'$3\pi/4$',
+                r'$\pi$', r'$5\pi/4$', r'$3\pi/2$', r'$7\pi/4$']
+        ax.set_xticklabels(label)
 
-def get_NONuniform_polar_angle(xx, yy, rsq, angle_thresh = 3*np.pi/4, rsq_thresh = 0, pysub = 'hcp_999999'):
-
-    """
-
-    Helper function to transform polar angle values into RGB values
-    guaranteeing a non-uniform representation
-
-    (this is, when we want to use half the color wheel to show the pa values)
-    (useful for better visualization of boundaries)
-
-    Parameters
-    ----------
-    xx : arr
-        array with x position values
-    yy : arr
-        array with y position values
-    rsq: arr
-        rsq values, to be used as alpha level/threshold
-    angle_thresh: float
-        value upon which to make it red for this hemifield (above angle or below 1-angle will be red in a retinotopy hsv color wheel)
-    rsq_thresh: float/int
-        minimum rsq threshold to use 
-    pysub: str
-        name of pycortex subject folder
-
-    """
-
-    hsv_angle = []
-    hsv_angle = np.ones((len(rsq), 3))
-
-    ## calculate polar angle
-    polar_angle = np.angle(xx + yy * 1j)
-
-    ## set normalized polar angle (0-1), and make nan irrelevant vertices
-    hsv_angle[:, 0] = np.nan 
-    hsv_angle[:, 0][rsq > rsq_thresh] = ((polar_angle + np.pi) / (np.pi * 2.0))[rsq > rsq_thresh]
-
-    ## normalize angle threshold for overepresentation
-    angle_thresh_norm = (angle_thresh + np.pi) / (np.pi * 2.0)
-
-    ## get mid vertex index (diving hemispheres)
-    left_index = cortex.db.get_surfinfo(pysub).left.shape[0] 
-
-    ## set angles within threh interval to 0
-    ind_thresh = np.where((hsv_angle[:left_index, 0] > angle_thresh_norm) | (hsv_angle[:left_index, 0] < 1-angle_thresh_norm))[0]
-    hsv_angle[:left_index, 0][ind_thresh] = 0
-
-    ## now take angles from RH (thus LVF) 
-    #### ATENÇÃO -> minus sign to flip angles vertically (then order of colors same for both hemispheres) ###
-    # also normalize it
-    hsv_angle[left_index:, 0] = ((np.angle(-1*xx + yy * 1j) + np.pi) / (np.pi * 2.0))[left_index:]
-
-    # set angles within threh interval to 0
-    ind_thresh = np.where((hsv_angle[left_index:, 0] > angle_thresh_norm) | (hsv_angle[left_index:, 0] < 1-angle_thresh_norm))[0]
-    hsv_angle[left_index:, 0][ind_thresh] = 0
-
-    ## make final RGB array
-    rgb_angle = np.ones((len(rsq), 3))
-    rgb_angle[:] = np.nan
-
-    rgb_angle[rsq > rsq_thresh] = colors.hsv_to_rgb(hsv_angle[rsq > rsq_thresh])
-
-    return rgb_angle
-
-
-def plot_pa_colorwheel(resolution=800, angle_thresh = 3*np.pi/4, cmap_name = 'hsv', continuous = True, fig_name = None):
-
-    """
-
-    Helper function to create colorwheel image
-    for polar angle plots returns 
-
-    Parameters
-    ----------
-    resolution : int
-        resolution of mesh
-    angle_thresh: float
-        value upon which to make it red for this hemifield (above angle or below 1-angle will be red in a retinotopy hsv color wheel)
-        if angle threh different than PI then assumes non uniform colorwheel
-    cmap_name: str/list
-        colormap name (if string) or list of colors to use for colormap
-    continuous: bool
-        if continuous colormap or binned
-
-    """
-
-    ## make circle
-    circle_x, circle_y = np.meshgrid(np.linspace(-1, 1, resolution), np.linspace(-1, 1, resolution))
-    circle_radius = np.sqrt(circle_x**2 + circle_y**2)
-    circle_pa = np.arctan2(circle_y, circle_x) # all polar angles calculated from our mesh
-    circle_pa[circle_radius > 1] = np.nan # then we're excluding all parts of bitmap outside of circle
-
-    if isinstance(cmap_name, str):
-
-        cmap = plt.get_cmap('hsv')
-        norm = colors.Normalize(-angle_thresh, angle_thresh) # normalize between the point where we defined our color threshold
+        #return ax
     
-    elif isinstance(cmap_name, list) or isinstance(cmap_name, np.ndarray):
 
-        if continuous:
-            cvals  = np.arange(len(cmap_name))
+    def get_flatmaps(est_arr1, est_arr2 = None, 
+                                vmin1 = 0, vmax1 = .8, vmin2 = None, vmax2 = None,
+                                pysub = 'hcp_999999', cmap = 'BuBkRd'):
+
+        """
+        Helper function to set and return flatmap  
+
+        Parameters
+        ----------
+        est_arr1 : array
+            data array
+        cmap : str
+            string with colormap name
+        vmin: int/float
+            minimum value
+        vmax: int/float 
+            maximum value
+        subject: str
+            overlay subject name to use
+        """
+
+        # if two arrays provided, then fig is 2D
+        if est_arr2:
+            flatmap = cortex.Vertex2D(est_arr1, est_arr2,
+                                    pysub,
+                                    vmin = vmin1, vmax = vmax1,
+                                    vmin2 = vmin2, vmax2 = vmax2,
+                                    cmap = cmap)
+        else:
+            flatmap = cortex.Vertex(est_arr1, 
+                                    pysub,
+                                    vmin = vmin1, vmax = vmax1,
+                                    cmap = cmap)
+
+        return flatmap
+
+
+    def make_raw_vertex_image(data1, cmap = 'hot', vmin = 0, vmax = 1, 
+                            data2 = [], vmin2 = 0, vmax2 = 1, subject = 'fsaverage', data2D = False):  
+        
+        """ function to fix web browser bug in pycortex
+            allows masking of data with nans
+        
+        Parameters
+        ----------
+        data1 : array
+            data array
+        cmap : str
+            string with colormap name (not the alpha version)
+        vmin: int/float
+            minimum value
+        vmax: int/float 
+            maximum value
+        subject: str
+            overlay subject name to use
+        
+        Outputs
+        -------
+        vx_fin : VertexRGB
+            vertex object to call in webgl
+        
+        """
+        
+        # Get curvature
+        curv = cortex.db.get_surfinfo(subject, type = 'curvature', recache=False)#,smooth=1)
+        # Adjust curvature contrast / color. Alternately, you could work
+        # with curv.data, maybe threshold it, and apply a color map.     
+        curv.data[curv.data>0] = .1
+        curv.data[curv.data<=0] = -.1
+        #curv.data = np.sign(curv.data.data) * .25
+        
+        curv.vmin = -1
+        curv.vmax = 1
+        curv.cmap = 'gray'
+        
+        # Create display data 
+        vx = cortex.Vertex(data1, subject, cmap = cmap, vmin = vmin, vmax = vmax)
+        
+        # Pick an arbitrary region to mask out
+        # (in your case you could use np.isnan on your data in similar fashion)
+        if data2D:
+            data2[np.isnan(data2)] = vmin2
+            norm2 = colors.Normalize(vmin2, vmax2)  
+            alpha = np.clip(norm2(data2), 0, 1)
+        else:
+            alpha = ~np.isnan(data1) #(data < 0.2) | (data > 0.4)
+        alpha = alpha.astype(np.float)
+        
+        # Map to RGB
+        vx_rgb = np.vstack([vx.raw.red.data, vx.raw.green.data, vx.raw.blue.data])
+        vx_rgb[:,alpha>0] = vx_rgb[:,alpha>0] * alpha[alpha>0]
+        
+        curv_rgb = np.vstack([curv.raw.red.data, curv.raw.green.data, curv.raw.blue.data])
+        # do this to avoid artifacts where curvature gets color of 0 valur of colormap
+        curv_rgb[:,np.where((vx_rgb > 0))[-1]] = curv_rgb[:,np.where((vx_rgb > 0))[-1]] * (1-alpha)[np.where((vx_rgb > 0))[-1]]
+
+        # Alpha mask
+        display_data = curv_rgb + vx_rgb 
+
+        # Create vertex RGB object out of R, G, B channels
+        vx_fin = cortex.VertexRGB(*display_data, subject, curvature_brightness = 0.4, curvature_contrast = 0.1)
+
+        return vx_fin
+
+
+    def make_colormap(colormap = 'rainbow_r', bins = 256, add_alpha = True, invert_alpha = False, cmap_name = 'costum',
+                        discrete = False, return_cmap = False):
+
+        """ make custom colormap
+        can add alpha channel to colormap,
+        and save to pycortex filestore
+        Parameters
+        ----------
+        colormap : str or List/arr
+            if string then has to be a matplolib existent colormap
+            if list/array then contains strings with color names, to create linear segmented cmap
+        bins : int
+            number of bins for colormap
+        invert_alpha : bool
+            if we want to invert direction of alpha channel
+            (y can be from 0 to 1 or 1 to 0)
+        cmap_name : str
+            new cmap filename, final one will have _alpha_#-bins added to it
+        discrete : bool
+            if we want a discrete colormap or not (then will be continuous)
+        Outputs
+        -------
+        rgb_fn : str
+            absolute path to new colormap
+        """
+        
+        if isinstance(colormap, str): # if input is string (so existent colormap)
+
+            # get colormap
+            cmap = cm.get_cmap(colormap)
+
+        else: # is list of strings
+            cvals  = np.arange(len(colormap))
             norm = plt.Normalize(min(cvals),max(cvals))
-            tuples = list(zip(map(norm,cvals), cmap_name))
+            tuples = list(zip(map(norm,cvals), colormap))
+            cmap = colors.LinearSegmentedColormap.from_list("", tuples)
             
-            colormap = colors.LinearSegmentedColormap.from_list("", tuples)
-            norm = colors.Normalize(-angle_thresh, angle_thresh) 
+            if discrete == True: # if we want a discrete colormap from list
+                cmap = colors.ListedColormap(colormap)
+                bins = int(len(colormap))
 
-        else:
-            colormap = colors.ListedColormap(cmap_name)
-            #boundaries = np.linspace(0,1,len(cmap_name))
-            #norm = colors.BoundaryNorm(boundaries, colormap.N, clip=True)
-            norm = colors.Normalize(-angle_thresh, angle_thresh) 
+        # convert into array
+        cmap_array = cmap(range(bins))
 
-    # non-uniform colorwheel
-    if angle_thresh != np.pi:
+        # reshape array for map
+        new_map = []
+        for i in range(cmap_array.shape[-1]):
+            new_map.append(np.tile(cmap_array[...,i],(bins,1)))
+
+        new_map = np.moveaxis(np.array(new_map), 0, -1)
         
-        ## for LH (RVF)
-        circle_pa_left = circle_pa.copy()
-        # between thresh angle make it red
-        circle_pa_left[(circle_pa_left < -angle_thresh) | (circle_pa_left > angle_thresh)] = angle_thresh
+        if add_alpha: 
+            # make alpha array
+            if invert_alpha == True: # in case we want to invert alpha (y from 1 to 0 instead pf 0 to 1)
+                _, alpha = np.meshgrid(np.linspace(0, 1, bins, endpoint=False), 1-np.linspace(0, 1, bins))
+            else:
+                _, alpha = np.meshgrid(np.linspace(0, 1, bins, endpoint=False), np.linspace(0, 1, bins, endpoint=False))
 
-        plt.imshow(circle_pa_left, cmap=cmap, norm=norm,origin='lower') # origin lower because imshow flips it vertically, now in right order for VF
-        plt.axis('off')
-
-        plt.savefig('{fn}_colorwheel_4LH-RVF.png'.format(fn = fig_name),dpi=100)
-
-        ## for RH (LVF)
-        circle_pa_right = circle_pa.copy()
-        circle_pa_right = np.fliplr(circle_pa_right)
-        # between thresh angle make it red
-        circle_pa_right[(circle_pa_right < -angle_thresh) | (circle_pa_right > angle_thresh)] = angle_thresh
-
-        plt.imshow(circle_pa_right, cmap=cmap, norm=norm,origin='lower')
-        plt.axis('off')
-
-        plt.savefig('{fn}_colorwheel_4RH-LVF.png'.format(fn = fig_name),dpi=100)
-
-    else:
-        plt.imshow(circle_pa, cmap = colormap, norm=norm, origin='lower')
-        plt.axis('off')
-
-        if continuous:
-            plt.savefig('{fn}_colorwheel_continuous.png'.format(fn = fig_name),dpi=100)
+            # add alpha channel
+            new_map[...,-1] = alpha
+            cmap_ext = (0,1,0,1)
         else:
-            plt.savefig('{fn}_colorwheel_discrete.png'.format(fn = fig_name),dpi=100)
+            new_map = new_map[:1,...].copy() 
+            cmap_ext = (0,100,0,1)
+        
+        fig = plt.figure(figsize=(1,1))
+        ax = fig.add_axes([0,0,1,1])
+        # plot 
+        plt.imshow(new_map,
+        extent = cmap_ext,
+        origin = 'lower')
+        ax.axis('off')
+
+        if add_alpha: 
+            rgb_fn = op.join(op.split(cortex.database.default_filestore)[
+                            0], 'colormaps', cmap_name+'_alpha_bins_%d.png'%bins)
+        else:
+            rgb_fn = op.join(op.split(cortex.database.default_filestore)[
+                            0], 'colormaps', cmap_name+'_bins_%d.png'%bins)
+        #misc.imsave(rgb_fn, new_map)
+        plt.savefig(rgb_fn, dpi = 200,transparent=True)
+
+        if return_cmap:
+            return cmap
+        else:
+            return rgb_fn 
+
+
+    def create_glasser_df(path2file):
+
+        """ Function to create glasser dataframe
+        with ROI names, colors (RGBA) and vertex indices
+
+        Parameters
+        ----------
+        path2file : str 
+            path to the parcelation label file
+        """
+        
+        # we read in the atlas data, which consists of 180 separate regions per hemisphere. 
+        # These are labeled separately, so the labels go to 360.
+        cifti = nib.load(op.join(path2file,
+                            'Q1-Q6_RelatedParcellation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.59k_fs_LR.dlabel.nii'))
+
+        # get index data array
+        cifti_data = np.array(cifti.get_fdata(dtype=np.float32))[0]
+        # from header get label dict with key + rgba
+        cifti_hdr = cifti.header
+        label_dict = cifti_hdr.get_axis(0)[0][1]
+        
+        ## make atlas data frame
+        atlas_df = pd.DataFrame(columns = ['ROI', 'index','R','G','B','A'])
+
+        for key in label_dict.keys():
+
+            if label_dict[key][0] != '???': 
+                atlas_df = pd.concat((atlas_df,
+                                    pd.DataFrame({'ROI': label_dict[key][0].replace('_ROI',''),
+                                                        'index': key,
+                                                        'R': label_dict[key][1][0],
+                                                        'G': label_dict[key][1][1],
+                                                        'B': label_dict[key][1][2],
+                                                        'A': label_dict[key][1][3]
+                                                        }, index=[0])
+                                    ))
+                
+        return atlas_df, cifti_data
+
+
+    def get_weighted_bins(data_df, x_key = 'ecc', y_key = 'size', weight_key = 'rsq', n_bins = 10):
+
+        """ 
+        
+        Get weighted bins from dataframe, sorted by one of the variables
+
+        """
+        
+        # sort values by eccentricity
+        data_df = data_df.sort_values(by=[x_key])
+
+        #divide in equally sized bins
+        bin_size = int(len(data_df)/n_bins) 
+        
+        mean_x = []
+        mean_x_std = []
+        mean_y = []
+        mean_y_std = []
+        
+        # for each bin calculate rsq-weighted means and errors of binned ecc/gain 
+        for j in range(n_bins): 
+            
+            mean_x.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][x_key],
+                                                weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).mean)
+            mean_x_std.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][x_key],
+                                                    weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
+
+            mean_y.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][y_key],
+                                                weights = data_df[bin_size * j:bin_size*(j+1)][weight_key]).mean)
+            mean_y_std.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][y_key],
+                                                    weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
+
+        return mean_x, mean_x_std, mean_y, mean_y_std
+
+
+    def get_rois4plotting(params, sub_id = None, pysub = 'hcp_999999', use_atlas = True, atlas_pth = '', space = 'fsLR_den-170k'):
+
+        """ 
+        helper function to get ROI names, vertice index and color palette
+    to be used in plotting scripts
+        
+        Parameters
+        ----------
+        params : dict
+            yaml dict with task related infos  
+        sub_id: str, int or list
+            subject ID to add as identifier in outputed dictionaries
+        pysub: str/dict
+            name of pycortex subject folder, where we drew all ROIs.
+            if dict, assumes key is participant ID, and value is sub specific pycortex folder 
+        use_atlas: bool
+            if we want to use the glasser atlas ROIs instead (this is, from the keys conglomerate defined in the params yml)
+        atlas_pth: str
+            path to atlas file
+        space: str
+            pycortex subject space
+        """ 
+
+        if use_atlas:
+            # Get Glasser atlas
+            atlas_df, atlas_array = create_glasser_df(atlas_pth)
+        
+        if sub_id:
+            
+            # if single id provided, put in list
+            if isinstance(sub_id, str) or isinstance(sub_id, int):
+                sub_id = [sub_id]
+
+            sub_id_list = ['sub-{sj}'.format(sj = str(pp).zfill(3)) if 'sub-' not in str(pp) else str(pp) for pp in sub_id]
+
+            ## start empty dictionaries  
+            ROIs = {}
+            color_codes = {}
+            roi_verts = {}
+
+            # loop over participant list
+            for pp in sub_id_list:
+
+                print('Getting ROIs for participants %s'%pp)
+
+                if use_atlas:
+                    print('Using Glasser ROIs')
+                    # ROI names
+                    ROIs[pp] = list(params['plotting']['ROIs']['glasser_atlas'].keys())
+
+                    # colors
+                    color_codes[pp] = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs[pp]}
+
+                    # get vertices for ROI
+                    roi_verts[pp] = {}
+                    for _,key in enumerate(ROIs[pp]):
+                        print(key)
+                        roi_verts[pp][key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
+
+                else:
+                    ## check if dict or str
+                    if isinstance(pysub, dict):
+                        pysub_pp = pysub[pp]
+                    else:
+                        pysub_pp = pysub
+
+                    # set ROI names
+                    ROIs[pp] = params['plotting']['ROIs'][space]
+
+                    # dictionary with one specific color per group - similar to fig3 colors
+                    color_codes[pp] = {key: params['plotting']['ROI_pal'][key] for key in ROIs[pp]}
+
+                    # get vertices for ROI
+                    roi_verts[pp] = {}
+                    for _,val in enumerate(ROIs[pp]):
+                        print(val)
+                        roi_verts[pp][val] = cortex.get_roi_verts(pysub_pp,val)[val]
+                
+        else:
+            raise NameError('No subject ID provided')
+        
+        return ROIs, roi_verts, color_codes
+
+
+    def fwhmax_fwatmin(model, estimates, normalize_RFs=False, return_profiles=False):
+        
+        """
+        taken from marco aqil's code, all credits go to him
+        """
+        
+        model = model.lower()
+        x=np.linspace(-50,50,1000).astype('float32')
+
+        prf = estimates['betas'] * np.exp(-0.5*x[...,np.newaxis]**2 / estimates['size']**2)
+        vol_prf =  2*np.pi*estimates['size']**2
+
+        if 'dog' in model or 'dn' in model:
+            srf = estimates['sa'] * np.exp(-0.5*x[...,np.newaxis]**2 / estimates['ss']**2)
+            vol_srf = 2*np.pi*estimates['ss']*2
+
+        if normalize_RFs==True:
+
+            if model == 'gauss':
+                profile =  prf / vol_prf
+            elif model == 'css':
+                #amplitude is outside exponent in CSS
+                profile = (prf / vol_prf)**estimates['ns'] * estimates['betas']**(1 - estimates['ns'])
+            elif model =='dog':
+                profile = prf / vol_prf - \
+                        srf / vol_srf
+            elif 'dn' in model:
+                profile = (prf / vol_prf + estimates['nb']) /\
+                        (srf / vol_srf + estimates['sb']) - estimates['nb']/estimates['sb']
+        else:
+            if model == 'gauss':
+                profile = prf
+            elif model == 'css':
+                #amplitude is outside exponent in CSS
+                profile = prf**estimates['ns'] * estimates['betas']**(1 - estimates['ns'])
+            elif model =='dog':
+                profile = prf - srf
+            elif 'dn' in model:
+                profile = (prf + estimates['nb'])/(srf + estimates['sb']) - estimates['nb']/estimates['sb']
+
+
+        half_max = np.max(profile, axis=0)/2
+        fwhmax = np.abs(2*x[np.argmin(np.abs(profile-half_max), axis=0)])
+
+
+        if 'dog' in model or 'dn' in model:
+
+            min_profile = np.min(profile, axis=0)
+            fwatmin = np.abs(2*x[np.argmin(np.abs(profile-min_profile), axis=0)])
+
+            result = fwhmax, fwatmin
+        else:
+            result = fwhmax
+
+        if return_profiles:
+            return result, profile.T
+        else:
+            return result
+
+
+    def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=None):
+        
+        """Import a subject from fmriprep-output to pycortex
+        
+        Parameters
+        ----------
+        source_directory : string
+        Local directory that contains both fmriprep and freesurfer subfolders 
+        sj : string
+            Fmriprep subject name (without "sub-")
+        dataset : string
+        If you have multiple fmriprep outputs from different datasets, use this attribute
+        to add a prefix to every subject id ('ds01.01' rather than '01')
+        ses : string, optional
+        BIDS session that contains the anatomical data
+        acq : string, optional
+            If we intend to specific the acquisition of the T1w file (for naming purposes)
+        """
+        if dataset is not None:
+            pycortex_sub = '{ds}.{sub}'.format(ds=dataset, sub=sj)
+        else:
+            pycortex_sub = '{sub}'.format(sub=sj)
+
+        if pycortex_sub in cortex.database.db.subjects.keys():
+            print('subject %s already in filestore, will not overwrite'%pycortex_sub)
+        else:
+            
+            # import subject into pycortex database
+            cortex.fmriprep.import_subj(subject = sj, source_dir = source_directory, 
+                                session = ses, dataset = dataset, acq = acq)
+
+
+    def plot_pRF_DM(dm_array, filename):
+
+        """
+        Function to plot design matrix frame by frame 
+        and save movie in folder
+
+        """
+
+        # if output path doesn't exist, create it
+
+        outfolder = op.split(filename)[0]
+
+        if not op.isdir(outfolder): 
+            os.makedirs(outfolder)
+        print('saving files in %s'%filename)
+
+        dm_array = (dm_array * 255).astype(np.uint8)
+
+        for w in range(dm_array.shape[-1]):
+            im = Image.fromarray(dm_array[...,w])
+            im.save(op.join(outfolder,"DM_TR-%s.png"%str(w).zfill(4)))  
+
+        ## save as video
+        img_name = op.join(outfolder,'DM_TR-%4d.png')
+        os.system("ffmpeg -r 6 -start_number 0 -i %s -vcodec mpeg4 -y %s"%(img_name, filename))  
+
+
+    def get_estimates_roi_df(participant, estimates_pp, ROIs = None, roi_verts = None, est_key = 'r2', model = 'gauss'):
+
+        """
+
+        Helper function to get estimates dataframe values for each ROI
+        will select values based on est key param 
+
+        """
+
+        ## save rsq values in dataframe, for plotting
+        df_est = pd.DataFrame({'sj': [], 'index': [], 'ROI': [], 'value': [], 'model': []})
+
+        for idx,rois_ks in enumerate(ROIs): 
+            
+            # mask estimates
+            print('masking estimates for ROI %s'%rois_ks)
+
+            if len(roi_verts[rois_ks]) > 0:
+                if isinstance(estimates_pp, dict):
+                    roi_arr = estimates_pp[est_key][roi_verts[rois_ks]]
+                else:
+                    roi_arr = estimates_pp[roi_verts[rois_ks]]
+            else:
+                print('No vertices found for ROI')
+                roi_arr = [np.nan]
+
+            df_est = pd.concat((df_est,
+                                pd.DataFrame({'sj': np.tile('sub-{sj}'.format(sj = participant), len(roi_arr)), 
+                                            'index': roi_verts[rois_ks], 
+                                            'ROI': np.tile(rois_ks, len(roi_arr)), 
+                                            'value': roi_arr,
+                                            'model': np.tile(model, len(roi_arr))})
+                            ))
+
+        return df_est
+
+
+    def get_NONuniform_polar_angle(xx, yy, rsq, angle_thresh = 3*np.pi/4, rsq_thresh = 0, pysub = 'hcp_999999'):
+
+        """
+
+        Helper function to transform polar angle values into RGB values
+        guaranteeing a non-uniform representation
+
+        (this is, when we want to use half the color wheel to show the pa values)
+        (useful for better visualization of boundaries)
+
+        Parameters
+        ----------
+        xx : arr
+            array with x position values
+        yy : arr
+            array with y position values
+        rsq: arr
+            rsq values, to be used as alpha level/threshold
+        angle_thresh: float
+            value upon which to make it red for this hemifield (above angle or below 1-angle will be red in a retinotopy hsv color wheel)
+        rsq_thresh: float/int
+            minimum rsq threshold to use 
+        pysub: str
+            name of pycortex subject folder
+
+        """
+
+        hsv_angle = []
+        hsv_angle = np.ones((len(rsq), 3))
+
+        ## calculate polar angle
+        polar_angle = np.angle(xx + yy * 1j)
+
+        ## set normalized polar angle (0-1), and make nan irrelevant vertices
+        hsv_angle[:, 0] = np.nan 
+        hsv_angle[:, 0][rsq > rsq_thresh] = ((polar_angle + np.pi) / (np.pi * 2.0))[rsq > rsq_thresh]
+
+        ## normalize angle threshold for overepresentation
+        angle_thresh_norm = (angle_thresh + np.pi) / (np.pi * 2.0)
+
+        ## get mid vertex index (diving hemispheres)
+        left_index = cortex.db.get_surfinfo(pysub).left.shape[0] 
+
+        ## set angles within threh interval to 0
+        ind_thresh = np.where((hsv_angle[:left_index, 0] > angle_thresh_norm) | (hsv_angle[:left_index, 0] < 1-angle_thresh_norm))[0]
+        hsv_angle[:left_index, 0][ind_thresh] = 0
+
+        ## now take angles from RH (thus LVF) 
+        #### ATENÇÃO -> minus sign to flip angles vertically (then order of colors same for both hemispheres) ###
+        # also normalize it
+        hsv_angle[left_index:, 0] = ((np.angle(-1*xx + yy * 1j) + np.pi) / (np.pi * 2.0))[left_index:]
+
+        # set angles within threh interval to 0
+        ind_thresh = np.where((hsv_angle[left_index:, 0] > angle_thresh_norm) | (hsv_angle[left_index:, 0] < 1-angle_thresh_norm))[0]
+        hsv_angle[left_index:, 0][ind_thresh] = 0
+
+        ## make final RGB array
+        rgb_angle = np.ones((len(rsq), 3))
+        rgb_angle[:] = np.nan
+
+        rgb_angle[rsq > rsq_thresh] = colors.hsv_to_rgb(hsv_angle[rsq > rsq_thresh])
+
+        return rgb_angle
+
+
+    def plot_pa_colorwheel(resolution=800, angle_thresh = 3*np.pi/4, cmap_name = 'hsv', continuous = True, fig_name = None):
+
+        """
+
+        Helper function to create colorwheel image
+        for polar angle plots returns 
+
+        Parameters
+        ----------
+        resolution : int
+            resolution of mesh
+        angle_thresh: float
+            value upon which to make it red for this hemifield (above angle or below 1-angle will be red in a retinotopy hsv color wheel)
+            if angle threh different than PI then assumes non uniform colorwheel
+        cmap_name: str/list
+            colormap name (if string) or list of colors to use for colormap
+        continuous: bool
+            if continuous colormap or binned
+
+        """
+
+        ## make circle
+        circle_x, circle_y = np.meshgrid(np.linspace(-1, 1, resolution), np.linspace(-1, 1, resolution))
+        circle_radius = np.sqrt(circle_x**2 + circle_y**2)
+        circle_pa = np.arctan2(circle_y, circle_x) # all polar angles calculated from our mesh
+        circle_pa[circle_radius > 1] = np.nan # then we're excluding all parts of bitmap outside of circle
+
+        if isinstance(cmap_name, str):
+
+            cmap = plt.get_cmap('hsv')
+            norm = colors.Normalize(-angle_thresh, angle_thresh) # normalize between the point where we defined our color threshold
+        
+        elif isinstance(cmap_name, list) or isinstance(cmap_name, np.ndarray):
+
+            if continuous:
+                cvals  = np.arange(len(cmap_name))
+                norm = plt.Normalize(min(cvals),max(cvals))
+                tuples = list(zip(map(norm,cvals), cmap_name))
+                
+                colormap = colors.LinearSegmentedColormap.from_list("", tuples)
+                norm = colors.Normalize(-angle_thresh, angle_thresh) 
+
+            else:
+                colormap = colors.ListedColormap(cmap_name)
+                #boundaries = np.linspace(0,1,len(cmap_name))
+                #norm = colors.BoundaryNorm(boundaries, colormap.N, clip=True)
+                norm = colors.Normalize(-angle_thresh, angle_thresh) 
+
+        # non-uniform colorwheel
+        if angle_thresh != np.pi:
+            
+            ## for LH (RVF)
+            circle_pa_left = circle_pa.copy()
+            # between thresh angle make it red
+            circle_pa_left[(circle_pa_left < -angle_thresh) | (circle_pa_left > angle_thresh)] = angle_thresh
+
+            plt.imshow(circle_pa_left, cmap=cmap, norm=norm,origin='lower') # origin lower because imshow flips it vertically, now in right order for VF
+            plt.axis('off')
+
+            plt.savefig('{fn}_colorwheel_4LH-RVF.png'.format(fn = fig_name),dpi=100)
+
+            ## for RH (LVF)
+            circle_pa_right = circle_pa.copy()
+            circle_pa_right = np.fliplr(circle_pa_right)
+            # between thresh angle make it red
+            circle_pa_right[(circle_pa_right < -angle_thresh) | (circle_pa_right > angle_thresh)] = angle_thresh
+
+            plt.imshow(circle_pa_right, cmap=cmap, norm=norm,origin='lower')
+            plt.axis('off')
+
+            plt.savefig('{fn}_colorwheel_4RH-LVF.png'.format(fn = fig_name),dpi=100)
+
+        else:
+            plt.imshow(circle_pa, cmap = colormap, norm=norm, origin='lower')
+            plt.axis('off')
+
+            if continuous:
+                plt.savefig('{fn}_colorwheel_continuous.png'.format(fn = fig_name),dpi=100)
+            else:
+                plt.savefig('{fn}_colorwheel_discrete.png'.format(fn = fig_name),dpi=100)
 
 
 

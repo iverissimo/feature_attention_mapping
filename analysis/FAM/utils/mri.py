@@ -880,31 +880,6 @@ def crop_shift_arr(arr, crop_nr = None, shift = 0):
     return out_arr
     
 
-def dva_per_pix(height_cm,distance_cm,vert_res_pix):
-
-    """ calculate degrees of visual angle per pixel, 
-    to use for screen boundaries when plotting/masking
-    Parameters
-    ----------
-    height_cm : int
-        screen height
-    distance_cm: float
-        screen distance (same unit as height)
-    vert_res_pix : int
-        vertical resolution of screen
-    
-    Outputs
-    -------
-    deg_per_px : float
-        degree (dva) per pixel
-    
-    """
-
-    # screen size in degrees / vertical resolution
-    deg_per_px = (2.0 * np.degrees(np.arctan(height_cm /(2.0*distance_cm))))/vert_res_pix
-
-    return deg_per_px 
-
 
 def normalize(M):
     """

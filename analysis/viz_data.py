@@ -79,14 +79,19 @@ FAM_data = load_exp_settings.MRIData(params, sj,
 
 print('Subject list to vizualize is {l}'.format(l=str(FAM_data.sj_num)))
 
+
 ## Load preprocessing class for each data type ###
+
+# get behavioral info 
+FAM_beh = preproc_behdata.PreprocBeh(FAM_data)
+# and mri info
+FAM_mri = preproc_mridata.PreprocMRI(FAM_data)
 
 match data_type:
 
     case 'mri':
-
-        FAM_preproc = preproc_mridata.PreprocMRI(FAM_data)
         
+        ## initialize plotter object
         plotter = MRIViewer(FAM_data)
 
         ## run specific vizualizer
@@ -100,33 +105,34 @@ match data_type:
                 while freeview_cmd not in ('movie','view'):
                     freeview_cmd = input("View segmentations (view) or make movie (movie)?: ")
 
-                plotter.check_fs_seg(check_type = freeview_cmd, use_T2 = T2_file, participant_list = FAM_preproc.MRIObj.sj_num)
+                plotter.check_fs_seg(check_type = freeview_cmd, use_T2 = T2_file, 
+                                     participant_list = FAM_mri.MRIObj.sj_num)
 
             case 'nordic':
 
                 print('Comparing NORDIC to standard runs')
 
-                plotter.compare_nordic2standard(participant_list = FAM_preproc.MRIObj.sj_num, 
+                plotter.compare_nordic2standard(participant_list = FAM_mri.MRIObj.sj_num, 
                                                 input_pth = None, 
                                                 use_atlas_rois = use_atlas,
-                                                file_ext = FAM_preproc.get_mrifile_ext())
+                                                file_ext = FAM_mri.get_mrifile_ext())
 
             case 'tsnr':
 
                 print('Plotting tSNR')
 
-                plotter.plot_tsnr(participant_list = FAM_preproc.MRIObj.sj_num, 
-                                                input_pth = None, 
-                                                use_atlas_rois = use_atlas,
-                                                file_ext = FAM_preproc.get_mrifile_ext())
+                plotter.plot_tsnr(participant_list = FAM_mri.MRIObj.sj_num, 
+                                input_pth = None, 
+                                use_atlas_rois = use_atlas,
+                                file_ext = FAM_mri.get_mrifile_ext())
 
             case 'vasculature':
 
                 print('Plotting vasculature proxy for pRF task')
 
-                plotter.plot_vasculature(participant_list = FAM_preproc.MRIObj.sj_num, 
+                plotter.plot_vasculature(participant_list = FAM_mri.MRIObj.sj_num, 
                                                 input_pth = None, 
-                                                file_ext = FAM_preproc.get_mrifile_ext())
+                                                file_ext = FAM_mri.get_mrifile_ext())
 
             case 'bold':
                 
@@ -134,13 +140,13 @@ match data_type:
 
                 task_name = 'pRF' if task.lower == 'prf' else 'FA' 
 
-                plotter.plot_bold_on_surface(participant_list = FAM_preproc.MRIObj.sj_num, 
+                plotter.plot_bold_on_surface(participant_list = FAM_mri.MRIObj.sj_num, 
                                             input_pth = None, 
                                             run_type = 'mean', 
                                             task = task_name,
                                             stim_on_screen = None,
                                             use_atlas_rois = use_atlas,
-                                            file_ext = FAM_preproc.get_mrifile_ext())
+                                            file_ext = FAM_mri.get_mrifile_ext())
 
             case 'click':
                 
@@ -156,32 +162,29 @@ match data_type:
                 while isinstance(ses, int) == False:
                     ses = int(input("Which session number to choose? (Ex 1, 2): "))
 
-                plotter.check_click_bold(FAM_preproc.MRIObj.sj_num[0], 
+                plotter.check_click_bold(FAM_mri.MRIObj.sj_num[0], 
                                         run, ses, 
                                         task = task_name, input_pth = None,
-                                        file_ext = FAM_preproc.get_mrifile_ext()[task_name])
-
+                                        file_ext = FAM_mri.get_mrifile_ext()[task_name])
 
 
             case TypeError:
                 print('viz option NOT VALID')
 
-
     case 'beh':
-        
-        FAM_preproc = preproc_behdata.PreprocBeh(FAM_data)
 
-        ## run specific vizualizer
+        ## initialize plotter object
+        plotter = BehViewer(FAM_data)
+        
         match py_cmd:
+
             case 'behavior':
         
                 print('Plotting behavior results for pRF and FA task') ## should do for both
-
-                plotter = BehViewer(FAM_data)
                 
                 # first get the dataframe with the mean results
-                df_pRF_beh_summary = FAM_preproc.get_pRF_behavioral_results(ses_type = 'func')
-                df_FA_beh_summary = FAM_preproc.get_FA_behavioral_results(ses_type = 'func')
+                df_pRF_beh_summary = FAM_beh.get_pRF_behavioral_results(ses_type = 'func')
+                df_FA_beh_summary = FAM_beh.get_FA_behavioral_results(ses_type = 'func')
 
                 # actually plot
                 plotter.plot_pRF_behavior(results_df = df_pRF_beh_summary, plot_group = True)

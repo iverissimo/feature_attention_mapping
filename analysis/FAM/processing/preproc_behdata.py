@@ -36,10 +36,10 @@ class PreprocBeh:
         
         ## same for FA ##
         #
-        self.FA_bar_pass_all, self.FA_bar_pass_trials = self.MRIObj.beh_utils.get_FA_run_struct(self.MRIObj.params['FA']['bar_pass_direction'], 
-                                                                                    num_bar_pos = self.MRIObj.params['FA']['num_bar_position'], 
-                                                                                    empty_TR = self.MRIObj.params['FA']['empty_TR'], 
-                                                                                    task_trial_TR = self.MRIObj.params['FA']['task_trial_TR'])
+        self.FA_bar_pass_all, self.FA_bar_pass_trials = self.MRIObj.beh_utils.get_FA_run_struct(self.MRIObj.FA_bar_pass, 
+                                                                                    num_bar_pos = self.MRIObj.FA_num_bar_position, 
+                                                                                    empty_TR = self.MRIObj.FA_nr_TRs['empty_TR'], 
+                                                                                    task_trial_TR = self.MRIObj.FA_nr_TRs['task_trial_TR'])
         ## number of trials (= total #TRs)
         self.FA_total_trials = len(self.FA_bar_pass_all)
         
@@ -47,7 +47,7 @@ class PreprocBeh:
     def load_events(self, participant, ses = 'ses-1', ses_type = 'func', tasks = ['pRF', 'FA']):
         
         """
-        Load behavioral events files
+        Load behavioral events files for participant
 
         Parameters
         ----------
@@ -57,6 +57,8 @@ class PreprocBeh:
             session number (default ses-1)
         ses_type: str
             type of session (default func)
+        tasks: list
+            list of tasks to load info from
 
         """ 
         
@@ -85,7 +87,7 @@ class PreprocBeh:
                 events_df[tsk] = {}
                 
                 # for each run
-                for r in np.arange(self.MRIObj.params['mri']['nr_runs']):
+                for r in np.arange(self.MRIObj.mri_nr_runs):
 
                     run_filename = [val for val in events_files if 'run-{r}'.format(r=(r+1)) in val]
                     if len(run_filename) == 0:
@@ -111,6 +113,8 @@ class PreprocBeh:
             session number (default ses-1)
         ses_type: str
             type of session (default func)
+        tasks: list
+            list of tasks to load info from
 
         """ 
         
@@ -139,7 +143,7 @@ class PreprocBeh:
                 trial_info_df[tsk] = {}
                 
                 # for each run
-                for r in np.arange(self.MRIObj.params['mri']['nr_runs']):
+                for r in np.arange(self.MRIObj.mri_nr_runs):
 
                     run_filename = [val for val in tf_files if 'run-{r}'.format(r=(r+1)) in val]
                     if len(run_filename) == 0:
@@ -165,6 +169,7 @@ class PreprocBeh:
             session number (default ses-1)
         ses_type: str
             type of session (default func)
+        run_num: 
 
         """ 
         
@@ -210,6 +215,11 @@ class PreprocBeh:
         
         """
         Get overview of behavioral results for pRF task
+
+        Parameters
+        ----------
+        ses_type: str
+            type of session (default func)
         
         """ 
         
@@ -247,7 +257,7 @@ class PreprocBeh:
                     # for trials where they responded
 
                     # some participants swapped the buttons, so make exceptions
-                    pp_task_keys = self.get_pp_task_keys(pp)
+                    pp_task_keys = self.MRIObj.beh_utils.get_pp_task_keys(pp)
 
                     sub_response_bool = np.array([self.MRIObj.beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'] == t], trial_bar_color = category_color[t], 
                                                                                       task = 'pRF', keys = pp_task_keys) for t in sub_response_trials])
@@ -273,7 +283,6 @@ class PreprocBeh:
 
                     ## Fill results DF for each color category 
                     # separately
-
                     for cc in self.MRIObj.color_categories_dict.keys():
 
                         acc_by_cc = (np.nansum(RUN_responses_bool[np.where(RUN_category_color == cc)[0]]))/len(np.where(RUN_category_color == cc)[0])
@@ -286,8 +295,7 @@ class PreprocBeh:
                                                             'accuracy': [acc_by_cc],
                                                             'RT': [np.nanmean(RUN_response_RT[np.where(RUN_category_color == cc)[0]])]
                                                             })))
-                                               
-                                               
+                                                                    
         return df_summary
 
 
@@ -333,7 +341,7 @@ class PreprocBeh:
                     # for trials where they responded
 
                     # some participants swapped the buttons, so make exceptions
-                    pp_task_keys = self.get_pp_task_keys(pp)
+                    pp_task_keys = self.MRIObj.beh_utils.get_pp_task_keys(pp)
 
                     sub_response_bool = np.array([self.MRIObj.beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'] == t], trial_bar_color = category_color[t], 
                                                                                       task = 'pRF', keys = pp_task_keys) for t in sub_response_trials])
@@ -363,6 +371,11 @@ class PreprocBeh:
         
         """
         Get overview of behavioral results for FA task
+
+        Parameters
+        ----------
+        ses_type: str
+            type of session (default func)
         
         """ 
         
@@ -412,7 +425,7 @@ class PreprocBeh:
                         # for trials where they responded
                         
                         # some participants swapped the buttons, so make exceptions
-                        pp_task_keys = self.get_pp_task_keys(pp)
+                        pp_task_keys = self.MRIObj.beh_utils.get_pp_task_keys(pp)
 
                         sub_response_bool = np.array([self.MRIObj.beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'].isin(t)], trial_bar_color = bar_color[cond][t[0]], 
                                                                                           task = 'FA', keys = pp_task_keys) for t in sub_response_trials])
@@ -459,31 +472,4 @@ class PreprocBeh:
         return df_summary
 
 
-    def get_pp_task_keys(self, participant):
-
-        """
-        Get participant task keys, 
-        because some participants swapped them
-
-        Parameters
-        ----------
-        participant: str
-            participant ID
-        
-        """ 
-
-        if participant == '004':
-
-            keys = {'right_index': ['right','b', 2, '2','num_2', 'y'],
-                    'left_index': ['left','e', 1, '1','num_1', 'w']}
-        
-        elif participant == '010':
-
-             keys = {'right_index': ['left','e', 1, '1','num_1'],
-                    'left_index': ['right','b', 2, '2','num_2']}
-
-        else:
-            keys = {'right_index': ['right','b', 2, '2','num_2'],
-                    'left_index': ['left','e', 1, '1','num_1']}
     
-        return keys

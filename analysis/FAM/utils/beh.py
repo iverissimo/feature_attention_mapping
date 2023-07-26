@@ -231,5 +231,35 @@ class BehUtils(Utils):
         bar_pass_trials = np.where((np.array(trial_type_all) == 'task'))[0]
         
         return np.array(trial_type_all), bar_pass_trials
+    
+    
+    def get_pp_task_keys(self, participant):
+
+        """
+        Get participant task keys, 
+        because some participants swapped them
+
+        Parameters
+        ----------
+        participant: str
+            participant ID (just the number)
+        
+        """ 
+
+        if str(participant).zfill(3) == '004':
+
+            keys = {'right_index': ['right','b', 2, '2','num_2', 'y'],
+                    'left_index': ['left','e', 1, '1','num_1', 'w']}
+        
+        elif str(participant).zfill(3) == '010':
+
+             keys = {'right_index': ['left','e', 1, '1','num_1'],
+                    'left_index': ['right','b', 2, '2','num_2']}
+
+        else:
+            keys = {'right_index': ['right','b', 2, '2','num_2'],
+                    'left_index': ['left','e', 1, '1','num_1']}
+    
+        return keys
 
 

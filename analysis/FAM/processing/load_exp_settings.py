@@ -130,6 +130,12 @@ class BehData(FAMData):
 
         ## FA bar duration
         self.FA_bars_phase_dur = self.params['FA']['bars_phase_dur']
+        ## some FA params relevant for setting task
+        self.FA_bar_pass = self.params['FA']['bar_pass_direction']
+        self.FA_nr_TRs = {'empty_TR': self.params['FA']['empty_TR'],
+                          'task_trial_TR': self.params['FA']['task_trial_TR']}
+
+        self.FA_num_bar_position = self.params['FA']['num_bar_position']
 
         # initialize utilities class
         self.beh_utils = BehUtils() 
@@ -190,6 +196,7 @@ class MRIData(BehData):
         self.sj_space = self.params['mri']['space'] # subject space
         self.file_ext = self.params['mri']['file_ext'][self.sj_space] # file extension
         self.confound_ext = self.params['mri']['confounds']['file_ext'] # file extension
+        self.mri_nr_runs = self.params['mri']['nr_runs']
 
         # initialize utilities class
         self.mri_utils = MRIUtils() 

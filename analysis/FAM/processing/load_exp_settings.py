@@ -3,6 +3,9 @@ import os.path as op
 import yaml
 import glob
 
+from FAM.utils.beh import BehUtils
+from FAM.utils.mri import MRIUtils
+#from FAM.utils.eye import EyeUtils
 
 class FAMData:
     
@@ -54,7 +57,7 @@ class FAMData:
         # project root folder
         self.proj_root_pth = self.params['mri']['paths'][self.base_dir]['root']
 
-        # in case we are computing things in a different worflow dir
+        # in case we are computing things in a different workflow dir
         # useful when fitting models in /scratch node
         if wf_dir is not None:
             self.proj_root_pth = wf_dir
@@ -128,6 +131,9 @@ class BehData(FAMData):
         ## FA bar duration
         self.FA_bars_phase_dur = self.params['FA']['bars_phase_dur']
 
+        # initialize utilities class
+        self.beh_utils = BehUtils() 
+
 
 class MRIData(BehData):
     
@@ -185,6 +191,7 @@ class MRIData(BehData):
         self.file_ext = self.params['mri']['file_ext'][self.sj_space] # file extension
         self.confound_ext = self.params['mri']['confounds']['file_ext'] # file extension
 
-        
+        # initialize utilities class
+        self.mri_utils = MRIUtils() 
         
     

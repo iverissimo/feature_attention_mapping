@@ -8,7 +8,6 @@ import pandas as pd
 
 from FAM.utils.general import Utils
 
-
 class BehUtils(Utils):
 
     def __init__(self):

@@ -70,8 +70,7 @@ task = args.task
 use_atlas = args.atlas
 T2_file = args.use_T2
 
-
-## Load data object
+## Load data object --> as relevant paths, variables and utility functions
 print("Loading {data} data for subject {sj}!".format(data=data_type, sj=sj))
 
 FAM_data = load_exp_settings.MRIData(params, sj, 

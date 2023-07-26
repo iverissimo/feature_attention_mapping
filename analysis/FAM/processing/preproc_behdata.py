@@ -3,8 +3,6 @@ import os, sys
 import os.path as op
 import pandas as pd
 
-from FAM.utils.beh import BehUtils
-from FAM.utils import mri as mri_utils
 
 class PreprocBeh:
 
@@ -20,9 +18,6 @@ class PreprocBeh:
             
         """
 
-        # initialize utilities class
-        self.beh_utils = BehUtils() 
-
         # set data object to use later on
         self.MRIObj = MRIObj
 
@@ -30,7 +25,7 @@ class PreprocBeh:
         #
         ## for pRF ##
         ## set type of bar pass per TR
-        self.pRF_bar_pass_all = self.beh_utils.get_pRF_cond_per_TR(cond_TR_dict = self.MRIObj.pRF_nr_TRs, 
+        self.pRF_bar_pass_all = self.MRIObj.beh_utils.get_pRF_cond_per_TR(cond_TR_dict = self.MRIObj.pRF_nr_TRs, 
                                                                     bar_pass_direction = self.MRIObj.pRF_bar_pass)
         ## number of trials (= total #TRs)
         self.pRF_total_trials = len(self.pRF_bar_pass_all)
@@ -41,7 +36,7 @@ class PreprocBeh:
         
         ## same for FA ##
         #
-        self.FA_bar_pass_all, self.FA_bar_pass_trials = self.beh_utils.get_FA_run_struct(self.MRIObj.params['FA']['bar_pass_direction'], 
+        self.FA_bar_pass_all, self.FA_bar_pass_trials = self.MRIObj.beh_utils.get_FA_run_struct(self.MRIObj.params['FA']['bar_pass_direction'], 
                                                                                     num_bar_pos = self.MRIObj.params['FA']['num_bar_position'], 
                                                                                     empty_TR = self.MRIObj.params['FA']['empty_TR'], 
                                                                                     task_trial_TR = self.MRIObj.params['FA']['task_trial_TR'])
@@ -242,7 +237,7 @@ class PreprocBeh:
                     
                     ## get bar color and 
                     # bar color category for all trials
-                    category_color, bar_color = self.beh_utils.get_pRF_trials_bar_color(run_ev_df)     
+                    category_color, bar_color = self.MRIObj.beh_utils.get_pRF_trials_bar_color(run_ev_df)     
         
                     ## initialize a response array filled with nans for all trials in run
                     all_responses_bool = np.zeros(self.pRF_total_trials); all_responses_bool[:] = np.nan
@@ -254,14 +249,14 @@ class PreprocBeh:
                     # some participants swapped the buttons, so make exceptions
                     pp_task_keys = self.get_pp_task_keys(pp)
 
-                    sub_response_bool = np.array([self.beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'] == t], trial_bar_color = category_color[t], 
+                    sub_response_bool = np.array([self.MRIObj.beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'] == t], trial_bar_color = category_color[t], 
                                                                                       task = 'pRF', keys = pp_task_keys) for t in sub_response_trials])
 
                     all_responses_bool[sub_response_trials] = sub_response_bool
                     
                     ## get reaction times for the same 
                     # trials
-                    sub_response_RT = np.array([self.beh_utils.get_pp_response_rt(run_ev_df[run_ev_df['trial_nr'] == t], 
+                    sub_response_RT = np.array([self.MRIObj.beh_utils.get_pp_response_rt(run_ev_df[run_ev_df['trial_nr'] == t], 
                                                                                   task = 'pRF', TR = self.MRIObj.TR) for t in sub_response_trials])
                     
                     all_responses_RT[sub_response_trials] = sub_response_RT
@@ -329,7 +324,7 @@ class PreprocBeh:
                     
                     ## get bar color and 
                     # bar color category for all trials
-                    category_color, _ = self.beh_utils.get_pRF_trials_bar_color(run_ev_df)     
+                    category_color, _ = self.MRIObj.beh_utils.get_pRF_trials_bar_color(run_ev_df)     
         
                      ## initialize a response array filled with 0 for all trials in run
                     all_responses_bool = np.zeros(self.pRF_total_trials)
@@ -340,7 +335,7 @@ class PreprocBeh:
                     # some participants swapped the buttons, so make exceptions
                     pp_task_keys = self.get_pp_task_keys(pp)
 
-                    sub_response_bool = np.array([self.beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'] == t], trial_bar_color = category_color[t], 
+                    sub_response_bool = np.array([self.MRIObj.beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'] == t], trial_bar_color = category_color[t], 
                                                                                       task = 'pRF', keys = pp_task_keys) for t in sub_response_trials])
 
                     all_responses_bool[sub_response_trials] = sub_response_bool
@@ -350,7 +345,7 @@ class PreprocBeh:
                     
                 ## sums responses across runs
                 # mask trials where wrong answer for more than 25% of runs 
-                mask_bool = mri_utils.normalize(np.sum(np.array(run_bool), axis = 0))
+                mask_bool = self.MRIObj.mri_utils.normalize(np.sum(np.array(run_bool), axis = 0))
                 mask_bool[mask_bool>=.75] = 1
                 mask_bool[mask_bool!=1] = 0
 
@@ -402,7 +397,7 @@ class PreprocBeh:
                     ## get bar color and bar color category 
                     # for attended and unattended bars
                     # for all trials
-                    category_color, bar_color = self.beh_utils.get_FA_trials_bar_color(run_trl_info_df)    
+                    category_color, bar_color = self.MRIObj.beh_utils.get_FA_trials_bar_color(run_trl_info_df)    
         
                     ## loop over attended and unattended conditions
                     # (we might want to compare)
@@ -419,14 +414,14 @@ class PreprocBeh:
                         # some participants swapped the buttons, so make exceptions
                         pp_task_keys = self.get_pp_task_keys(pp)
 
-                        sub_response_bool = np.array([self.beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'].isin(t)], trial_bar_color = bar_color[cond][t[0]], 
+                        sub_response_bool = np.array([self.MRIObj.beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'].isin(t)], trial_bar_color = bar_color[cond][t[0]], 
                                                                                           task = 'FA', keys = pp_task_keys) for t in sub_response_trials])
                         
                         all_responses_bool[np.ravel(sub_response_trials)[::2]] = sub_response_bool
                         
                         ## get reaction times for the same 
                         # trials
-                        sub_response_RT = np.array([self.beh_utils.get_pp_response_rt(run_ev_df[run_ev_df['trial_nr'].isin(t)],
+                        sub_response_RT = np.array([self.MRIObj.beh_utils.get_pp_response_rt(run_ev_df[run_ev_df['trial_nr'].isin(t)],
                                                                                       task = 'FA', TR = self.MRIObj.TR) for t in sub_response_trials])
 
                         all_responses_RT[np.ravel(sub_response_trials)[::2]] = sub_response_RT

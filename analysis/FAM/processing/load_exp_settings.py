@@ -44,8 +44,9 @@ class FAMData:
         # excluded participants
         self.exclude_sj = exclude_sj
         if len(self.exclude_sj)>0:
+            print('Excluding participants {expp}'.format(expp = exclude_sj))
             self.exclude_sj = [str(val).zfill(3) for val in exclude_sj]
-
+            
         ## set some paths
         # which machine we run the data
         self.base_dir = base_dir

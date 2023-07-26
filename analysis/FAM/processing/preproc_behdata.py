@@ -3,7 +3,7 @@ import os, sys
 import os.path as op
 import pandas as pd
 
-from FAM.utils import BehUtils
+from FAM.utils.beh import BehUtils
 from FAM.utils import mri as mri_utils
 
 class PreprocBeh:

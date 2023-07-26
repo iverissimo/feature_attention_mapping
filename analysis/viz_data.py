@@ -13,48 +13,70 @@ with open('exp_params.yml', 'r') as f_in:
 
 ## to get inputs 
 parser = argparse.ArgumentParser()
-parser.add_argument("--subject", help="Subject number (ex: 001, or 'group'/'all')", required=True)
-parser.add_argument("--viz", type = str.lower, help="Vizualization step of processed data: freeview, nordic, tsnr, bold, etc...", required=True)
 
-# optional
-parser.add_argument("--data_type", type = str.lower, help="Type of data to process (mri [default], beh or eye)")
-parser.add_argument("--dir", type = str.lower, help="System we are making plots in (local [default] vs lisa)")
-parser.add_argument("--T2", type = int, help="Consider T2 file - only for freeview command (0 [default] vs 1)")
-parser.add_argument("--task", type = str, help="Task to look at (pRF [default] vs FA)")
-parser.add_argument("--atlas", type = int, help="Use Glasser atlas ROIs (1 [default] vs 0)")
+parser.add_argument("--subject",
+                    nargs = "*", # 0 or more values expected => creates a list
+                    type = str,  # any type/callable can be used here
+                    default = [],
+                    required = True,
+                    help = 'Subject number (ex:1). If "all" will run for all participants. If list of subs, will run only those (ex: 1 2 3 4)'
+                    )
+parser.add_argument("--cmd", 
+                    type = str.lower, 
+                    required = True,
+                    help = "Vizualization step of processed data: freeview, nordic, tsnr, bold, etc..."
+                    )
+parser.add_argument("--dir", 
+                    type = str.lower, 
+                    default = 'local',
+                    help = "System we are making plots in - local [default] vs slurm (snellius)"
+                    )
+parser.add_argument("--data_type", 
+                    type = str.lower, 
+                    default = "mri",
+                    help = "Type of data to process (mri [default], beh or eye)"
+                    )
+parser.add_argument("--exclude_sj", 
+                    nargs = '*', # 0 or more values expected => creates a list
+                    default = [],
+                    type = int,
+                    help = "List of subs to exclude (ex: 1 2 3 4). Default []"
+                    )
+parser.add_argument("--task", 
+                    type = str, 
+                    default = 'pRF',
+                    help = "Task to look at (pRF [default] vs FA)"
+                    )
+parser.add_argument("--atlas", 
+                    type = str, 
+                    default = None,
+                    help = "If we want to use atlas ROIs (ex: glasser, wang) or not [default]."
+                    )
+parser.add_argument("--use_T2", 
+                    action = 'store_true',
+                    help = "if option called, will consider T2 file (only relevant for freeview command)")
 
-#  only relevant if subject == group/all
-parser.add_argument("--exclude_sj", nargs='+', help="List of subjects to exclude, define as --exclude_sj 0 1 ...", default=[])
 
-
-# set variables 
+# parse the command line
 args = parser.parse_args()
 
-sj = str(args.subject).zfill(3) # subject
-viz = args.viz # what step of pipeline we want to run
-
-data_type = args.data_type if args.data_type is not None else "mri" # type of data 
-task = args.task if args.task is not None else "pRF" # type of task 
-
-system_dir = args.dir if args.dir is not None else "local" # system location
-
-T2_file = bool(args.T2) if args.T2 is not None else False # make it boolean
-
-atlas_bool = bool(args.atlas) if args.atlas is not None else True # make it boolean
-
+# access parser options
+sj = args.subject[0] if len(args.subject) == 1 else args.subject # for situation where 1 sj vs list
+py_cmd = args.cmd # what step of pipeline we want to run
+system_dir = args.dir
+data_type = args.data_type
 exclude_sj = args.exclude_sj # list of excluded subjects
-if len(exclude_sj)>0:
-    exclude_sj = [val.zfill(3) for val in exclude_sj]
-    print('Excluding participants {expp}'.format(expp = exclude_sj))
-else:
-    exclude_sj = []
+task = args.task
+use_atlas = args.atlas
+T2_file = args.use_T2
+
 
 ## Load data object
 print("Loading {data} data for subject {sj}!".format(data=data_type, sj=sj))
 
 FAM_data = load_exp_settings.MRIData(params, sj, 
                                     repo_pth = op.split(load_exp_settings.__file__)[0], 
-                                    base_dir=system_dir, exclude_sj = exclude_sj)
+                                    base_dir = system_dir, exclude_sj = exclude_sj)
 
 print('Subject list to vizualize is {l}'.format(l=str(FAM_data.sj_num)))
 
@@ -69,7 +91,7 @@ match data_type:
         plotter = MRIViewer(FAM_data)
 
         ## run specific vizualizer
-        match viz:
+        match py_cmd:
 
             case 'freeview':
 
@@ -87,7 +109,7 @@ match data_type:
 
                 plotter.compare_nordic2standard(participant_list = FAM_preproc.MRIObj.sj_num, 
                                                 input_pth = None, 
-                                                use_atlas_rois = atlas_bool,
+                                                use_atlas_rois = use_atlas,
                                                 file_ext = FAM_preproc.get_mrifile_ext())
 
             case 'tsnr':
@@ -96,7 +118,7 @@ match data_type:
 
                 plotter.plot_tsnr(participant_list = FAM_preproc.MRIObj.sj_num, 
                                                 input_pth = None, 
-                                                use_atlas_rois = atlas_bool,
+                                                use_atlas_rois = use_atlas,
                                                 file_ext = FAM_preproc.get_mrifile_ext())
 
             case 'vasculature':
@@ -118,7 +140,7 @@ match data_type:
                                             run_type = 'mean', 
                                             task = task_name,
                                             stim_on_screen = None,
-                                            use_atlas_rois = atlas_bool,
+                                            use_atlas_rois = use_atlas,
                                             file_ext = FAM_preproc.get_mrifile_ext())
 
             case 'click':
@@ -151,7 +173,7 @@ match data_type:
         FAM_preproc = preproc_behdata.PreprocBeh(FAM_data)
 
         ## run specific vizualizer
-        match viz:
+        match py_cmd:
             case 'behavior':
         
                 print('Plotting behavior results for pRF and FA task') ## should do for both

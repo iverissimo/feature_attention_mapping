@@ -21,7 +21,7 @@ import nibabel as nib
 
 from statsmodels.stats import weightstats
 
-from FAM.utils import Utils
+from FAM.utils.general import Utils
 
 class PlotUtils(Utils):
 
@@ -355,9 +355,14 @@ class PlotUtils(Utils):
         return mean_x, mean_x_std, mean_y, mean_y_std
 
 
-    def get_rois4plotting(params, sub_id = None, pysub = 'hcp_999999', use_atlas = True, atlas_pth = '', space = 'fsLR_den-170k'):
+    def get_rois4plotting(self, params, sub_id = None, pysub = 'hcp_999999', use_atlas = None, atlas_pth = '', space = 'fsLR_den-170k'):
 
         """ 
+
+        NOT DONE YET - BEFORE USE ATLAS WAS BOOL, NOW NEED TO DEFINE NONE IF USING HAND-DRAWN ROIS,
+        OR STRING OF GLASSER VS WANG ATLAS
+
+
         helper function to get ROI names, vertice index and color palette
     to be used in plotting scripts
         

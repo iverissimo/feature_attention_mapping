@@ -5,8 +5,8 @@ import os.path as op
 import pandas as pd
 import hedfpy
 
+from FAM.utils.general import Utils
 
-from FAM.utils import Utils
 
 class EyeUtils(Utils):
 

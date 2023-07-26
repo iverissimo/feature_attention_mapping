@@ -154,7 +154,7 @@ freeview -v \
 
 
     def compare_nordic2standard(self, participant_list = [], input_pth = None, file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'},
-                                use_atlas_rois = True, acq_keys = ['standard', 'nordic'], plot_group=True):
+                                use_atlas_rois = None, acq_keys = ['standard', 'nordic'], plot_group=True):
 
         """
         Make nordic vs standard comparison plots
@@ -456,7 +456,7 @@ freeview -v \
         #return tsnr_df, corr_df, surf_avg_corr
                             
                         
-    def plot_tsnr(self, participant_list = [], input_pth = None, use_atlas_rois = True,
+    def plot_tsnr(self, participant_list = [], input_pth = None, use_atlas_rois = None,
               file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'}):
 
         """
@@ -646,7 +646,7 @@ freeview -v \
 
 
     def plot_bold_on_surface(self, participant_list = [], input_pth = None, run_type = 'mean', task = 'pRF',
-                         stim_on_screen = None, use_atlas_rois = True,
+                         stim_on_screen = None, use_atlas_rois = None,
                          file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'}):
 
         """

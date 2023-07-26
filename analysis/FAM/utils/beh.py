@@ -6,8 +6,8 @@ import os
 import os.path as op
 import pandas as pd
 
+from FAM.utils.general import Utils
 
-from FAM.utils import Utils
 
 class BehUtils(Utils):
 

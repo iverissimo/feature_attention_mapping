@@ -61,6 +61,13 @@ class Utils:
         
         return hsv_color
     
+    def normalize(self, M):
+
+        """
+        normalize data array
+        """
+        return (M-np.nanmin(M))/(np.nanmax(M)-np.nanmin(M))
+    
 
     
     

@@ -15,18 +15,20 @@ import cortex
 
 import subprocess
 
-from FAM.utils import mri as mri_utils
-from FAM.utils import plot as plot_utils
-from FAM.processing import preproc_behdata
+#from FAM.utils import mri as mri_utils
+#from FAM.utils import plot as plot_utils
+#from FAM.processing import preproc_behdata
 
 from matplotlib.backend_bases import MouseButton
 
 from scipy.signal import periodogram
 
+from FAM.visualize.viewer import Viewer
 
-class MRIViewer:
 
-    def __init__(self, MRIObj, outputdir = None):
+class MRIViewer(Viewer):
+
+    def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_99999'):
         
         """__init__
         constructor for class 
@@ -35,20 +37,17 @@ class MRIViewer:
         ----------
         MRIObj : MRIData object
             object from one of the classes defined in processing.load_exp_data
+        outputdir: str
+            path to save plots
             
         """
 
-        # set data object to use later on
-        self.MRIObj = MRIObj
+        # need to initialize parent class (Model), indicating output infos
+        super().__init__(MRIObj, pysub = pysub, outputdir = outputdir)
 
-        # if output dir not defined, then make it in derivatives
-        if outputdir is None:
-            self.outputdir = op.join(self.MRIObj.derivatives_pth,'plots')
-        else:
-            self.outputdir = outputdir
-            
-        # number of participants to plot
-        self.nr_pp = len(self.MRIObj.sj_num)
+        ## output path to save plots
+        self.figures_pth = op.join(self.outputdir)
+        os.makedirs(self.figures_pth, exist_ok=True)
 
 
     def check_fs_seg(self, participant_list=[], input_pth = None, check_type = 'view', use_T2=False):
@@ -114,10 +113,8 @@ freeview -v \
             elif check_type == 'movie':
 
                 ## set output path where we want to store movie
-                output_pth = op.join(self.MRIObj.derivatives_pth, 'check_segmentations', 'sub-{sj}'.format(sj=pp))
-
-                if not op.isdir(output_pth):
-                    os.makedirs(output_pth)
+                output_pth = op.join(self.figures_pth, 'check_segmentations', 'sub-{sj}'.format(sj=pp))
+                os.makedirs(output_pth, exist_ok=True)
 
                 batch_string = """#!/bin/bash
     conda activate i36
@@ -139,7 +136,7 @@ freeview -v \
                 working_string = working_string.replace('$DATADIR', input_pth)
 
                 # number of slices for saggital view
-                sag_slices = range(77,280) #268) #248)
+                sag_slices = range(77, 280) #268) #248)
 
                 for slice in sag_slices:
                     if not op.exists(op.join(output_pth, str(slice).zfill(3) + '.png')): # if image already in dir, skip

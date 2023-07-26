@@ -890,14 +890,6 @@ class MRIUtils(Utils):
         return out_arr
         
 
-
-    def normalize(M):
-        """
-        normalize data array
-        """
-        return (M-np.nanmin(M))/(np.nanmax(M)-np.nanmin(M))
-
-
     def surf_data_from_cifti(data, axis, surf_name, medial_struct=False):
 
         """

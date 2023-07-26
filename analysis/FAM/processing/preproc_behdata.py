@@ -198,7 +198,7 @@ class PreprocBeh:
                 
             else:
                 # for each run
-                for r in np.arange(self.MRIObj.params['mri']['nr_runs']):
+                for r in np.arange(self.MRIObj.mri_nr_runs):
 
                     run_filename = [val for val in bp_files if 'run-{r}'.format(r=(r+1)) in val]
                     if len(run_filename) == 0:
@@ -302,9 +302,13 @@ class PreprocBeh:
     def get_pRF_mask_bool(self, ses_type = 'func'):
         
         """
-        Make boolean mask 
+        Make boolean mask based on subject responses, 
         to use in design matrix for pRF task
-        based on subject responses
+
+        Parameters
+        ----------
+        ses_type: str
+            type of session (default func)
         
         """ 
         
@@ -353,7 +357,7 @@ class PreprocBeh:
                     
                 ## sums responses across runs
                 # mask trials where wrong answer for more than 25% of runs 
-                mask_bool = self.MRIObj.mri_utils.normalize(np.sum(np.array(run_bool), axis = 0))
+                mask_bool = self.MRIObj.beh_utils.normalize(np.sum(np.array(run_bool), axis = 0))
                 mask_bool[mask_bool>=.75] = 1
                 mask_bool[mask_bool!=1] = 0
 

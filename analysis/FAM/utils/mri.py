@@ -59,7 +59,7 @@ class MRIUtils(Utils):
             
         """
 
-    def create_glasser_df(self, annot_filename = ''):
+    def create_glasser_df(self, annot_filename = '', pysub = 'hcp_999999'):
 
         """ Function to create glasser dataframe
         with ROI names, colors (RGBA) and vertex indices
@@ -79,24 +79,40 @@ class MRIUtils(Utils):
         # from header get label dict with key + rgba
         cifti_hdr = cifti.header
         label_dict = cifti_hdr.get_axis(0)[0][1]
+
+        # number of vertices in one hemisphere (for bookeeping) 
+        hemi_vert_num = cortex.db.get_surfinfo('hcp_999999').left.shape[0] 
         
         ## make atlas data frame
-        atlas_df = pd.DataFrame(columns = ['ROI', 'index','R','G','B','A'])
+        atlas_df = pd.DataFrame({'ROI': [], 'hemi_vertex': [], 'merge_vertex': [], 'hemisphere': [],
+                                 'R': [],'G': [],'B': [],'A': []})
 
         for key in label_dict.keys():
 
             if label_dict[key][0] != '???': 
-                atlas_df = pd.concat((atlas_df,
-                                    pd.DataFrame({'ROI': label_dict[key][0].replace('_ROI',''),
-                                                        'index': key,
-                                                        'R': label_dict[key][1][0],
-                                                        'G': label_dict[key][1][1],
-                                                        'B': label_dict[key][1][2],
-                                                        'A': label_dict[key][1][3]
-                                                        }, index=[0])
-                                    ))
                 
-        return atlas_df, cifti_data
+                # name of atlas roi
+                roi_name = re.findall(r'_(.*?)_ROI', label_dict[key][0])[0]
+                # hemisphere
+                hemi = re.findall(r'(.*?)_', label_dict[key][0])[0]
+                # get vertex indices for whole surface or each hemisphere separately
+                merge_vert = np.where(cifti_data == key)[0] 
+                hemi_vert = np.where(cifti_data == key)[0] - hemi_vert_num  if hemi == 'R' else np.where(cifti_data == key)[0]
+                
+                # fill df
+                atlas_df = pd.concat((atlas_df,
+                                    pd.DataFrame({'ROI': np.tile(roi_name, len(merge_vert)),
+                                                'hemisphere': np.tile(hemi, len(merge_vert)),
+                                                'hemi_vertex': hemi_vert, 
+                                                'merge_vertex': merge_vert,
+                                                'R': np.tile(label_dict[key][1][0], len(merge_vert)),
+                                                'G': np.tile(label_dict[key][1][1], len(merge_vert)),
+                                                'B': np.tile(label_dict[key][1][2], len(merge_vert)),
+                                                'A': np.tile(label_dict[key][1][3], len(merge_vert))
+                                                })), ignore_index=True
+                                    )
+                
+        return atlas_df
     
 
     def get_vertex_rois(self, sub_id = None, pysub = 'hcp_999999', use_atlas = None, 
@@ -129,7 +145,7 @@ class MRIUtils(Utils):
         """ 
 
         if use_atlas == 'glasser':
-            
+
             # Get Glasser atlas
             atlas_df, atlas_array = self.create_glasser_df(annot_filename = annot_filename)
         

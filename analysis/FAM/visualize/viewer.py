@@ -17,7 +17,7 @@ import subprocess
 
 class Viewer:
 
-    def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_99999'):
+    def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_999999'):
         
         """__init__
         constructor for class 

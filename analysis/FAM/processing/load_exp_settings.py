@@ -204,6 +204,9 @@ class MRIData(BehData):
         # atlas annotation file path
         self.atlas_annot = {'glasser': op.join(self.derivatives_pth, 'glasser_atlas','59k_mesh', 
                                         self.params['plotting']['glasser_annot'])}
+        
+        # pycortex subject 
+        self.pysub = self.params['plotting']['pycortex_sub']
 
         ## number of cropped TRs
         # due to dummies TRs that were saved and extra ones as defined in params

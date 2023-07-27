@@ -202,8 +202,10 @@ class MRIData(BehData):
         self.postfmriprep_pth = op.join(self.derivatives_pth, 'post_fmriprep', self.sj_space)
 
         # atlas annotation file path
-        self.atlas_annot = {'glasser': op.join(self.derivatives_pth, 'glasser_atlas','59k_mesh', 
-                                        self.params['plotting']['glasser_annot'])}
+        self.atlas_annot = {'glasser': op.join(self.derivatives_pth, 'atlas', 'glasser','59k_mesh', 
+                                        self.params['plotting']['glasser_annot']),
+                            'wang': op.join(self.derivatives_pth, 'atlas', 'wang',
+                                        self.params['plotting']['wang_annot'])}
         
         # pycortex subject 
         self.pysub = self.params['plotting']['pycortex_sub']

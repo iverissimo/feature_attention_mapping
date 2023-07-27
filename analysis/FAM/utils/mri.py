@@ -59,7 +59,7 @@ class MRIUtils(Utils):
             
         """
 
-    def create_glasser_df(self, annot_filename = '', pysub = 'hcp_999999'):
+    def create_atlas_df(self, annot_filename = '', pysub = 'hcp_999999', atlas_name = 'glasser'):
 
         """ Function to create glasser dataframe
         with ROI names, colors (RGBA) and vertex indices
@@ -90,19 +90,33 @@ class MRIUtils(Utils):
         for key in label_dict.keys():
 
             if label_dict[key][0] != '???': 
-                
-                # name of atlas roi
-                roi_name = re.findall(r'_(.*?)_ROI', label_dict[key][0])[0]
-                # hemisphere
-                hemi = re.findall(r'(.*?)_', label_dict[key][0])[0]
+
                 # get vertex indices for whole surface or each hemisphere separately
                 merge_vert = np.where(cifti_data == key)[0] 
-                hemi_vert = np.where(cifti_data == key)[0] - hemi_vert_num  if hemi == 'R' else np.where(cifti_data == key)[0]
-                
+
+                if atlas_name == 'glasser':
+                    # name of atlas roi
+                    roi_name = re.findall(r'_(.*?)_ROI', label_dict[key][0])[0]
+                    # hemisphere
+                    hemi = re.findall(r'(.*?)_', label_dict[key][0])[0]
+                    hemi_arr = np.tile(hemi, len(merge_vert))
+                    # get vertex indices for each hemisphere separately
+                    hemi_vert = np.where(cifti_data == key)[0] - hemi_vert_num  if hemi == 'R' else np.where(cifti_data == key)[0]
+                    
+                elif atlas_name == 'wang':
+                    # name of atlas roi
+                    roi_name = label_dict[key][0]
+                    # hemisphere
+                    hemi_arr = np.tile('R', len(merge_vert))
+                    hemi_arr[np.where(merge_vert < hemi_vert_num)[0]] = 'L'
+                    # get vertex indices for each hemisphere separately
+                    hemi_vert = merge_vert.copy()
+                    hemi_vert[np.where(merge_vert >= hemi_vert_num)[0]] -= hemi_vert_num
+
                 # fill df
                 atlas_df = pd.concat((atlas_df,
                                     pd.DataFrame({'ROI': np.tile(roi_name, len(merge_vert)),
-                                                'hemisphere': np.tile(hemi, len(merge_vert)),
+                                                'hemisphere': hemi_arr,
                                                 'hemi_vertex': hemi_vert, 
                                                 'merge_vertex': merge_vert,
                                                 'R': np.tile(label_dict[key][1][0], len(merge_vert)),

@@ -267,6 +267,7 @@ plotting:
   use_sub_rois: False #True
 
   glasser_annot: 'Q1-Q6_RelatedParcellation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.59k_fs_LR.dlabel.nii'
+  wang_annot: 'wang2015.59k_fs_LR.dlabel.nii'
 
   ROI_pal: 
     V1: [0.03137255, 0.11372549, 0.34509804]

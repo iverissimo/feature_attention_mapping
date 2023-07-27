@@ -59,6 +59,136 @@ class MRIUtils(Utils):
             
         """
 
+    def create_glasser_df(self, annot_filename = ''):
+
+        """ Function to create glasser dataframe
+        with ROI names, colors (RGBA) and vertex indices
+
+        Parameters
+        ----------
+        path2file : str 
+            absolute name of the parcelation file (defined in MRIObj.atlas_annot)
+        """
+        
+        # we read in the atlas data, which consists of 180 separate regions per hemisphere. 
+        # These are labeled separately, so the labels go to 360.
+        cifti = nib.load(annot_filename)
+
+        # get index data array
+        cifti_data = np.array(cifti.get_fdata(dtype=np.float32))[0]
+        # from header get label dict with key + rgba
+        cifti_hdr = cifti.header
+        label_dict = cifti_hdr.get_axis(0)[0][1]
+        
+        ## make atlas data frame
+        atlas_df = pd.DataFrame(columns = ['ROI', 'index','R','G','B','A'])
+
+        for key in label_dict.keys():
+
+            if label_dict[key][0] != '???': 
+                atlas_df = pd.concat((atlas_df,
+                                    pd.DataFrame({'ROI': label_dict[key][0].replace('_ROI',''),
+                                                        'index': key,
+                                                        'R': label_dict[key][1][0],
+                                                        'G': label_dict[key][1][1],
+                                                        'B': label_dict[key][1][2],
+                                                        'A': label_dict[key][1][3]
+                                                        }, index=[0])
+                                    ))
+                
+        return atlas_df, cifti_data
+    
+
+    def get_vertex_rois(self, sub_id = None, pysub = 'hcp_999999', use_atlas = None, 
+                        annot_filename = ''):
+
+        """ 
+
+        NOT DONE YET - BEFORE USE ATLAS WAS BOOL, NOW NEED TO DEFINE NONE IF USING HAND-DRAWN ROIS,
+        OR STRING OF GLASSER VS WANG ATLAS
+
+
+        helper function to get ROI names, vertice index and color palette
+        to be used in plotting scripts
+        
+        Parameters
+        ----------
+        params : dict
+            yaml dict with task related infos  
+        sub_id: str, int or list
+            subject ID to add as identifier in outputed dictionaries
+        pysub: str/dict
+            name of pycortex subject folder, where we drew all ROIs.
+            if dict, assumes key is participant ID, and value is sub specific pycortex folder 
+        use_atlas: bool
+            if we want to use the glasser atlas ROIs instead (this is, from the keys conglomerate defined in the params yml)
+        atlas_pth: str
+            path to atlas file
+        space: str
+            pycortex subject space
+        """ 
+
+        if use_atlas == 'glasser':
+            
+            # Get Glasser atlas
+            atlas_df, atlas_array = self.create_glasser_df(annot_filename = annot_filename)
+        
+        if sub_id:
+            
+            # if single id provided, put in list
+            if isinstance(sub_id, str) or isinstance(sub_id, int):
+                sub_id = [sub_id]
+
+            sub_id_list = ['sub-{sj}'.format(sj = str(pp).zfill(3)) if 'sub-' not in str(pp) else str(pp) for pp in sub_id]
+
+            ## start empty dictionaries  
+            ROIs = {}
+            color_codes = {}
+            roi_verts = {}
+
+            # loop over participant list
+            for pp in sub_id_list:
+
+                print('Getting ROIs for participants %s'%pp)
+
+                if use_atlas:
+                    print('Using Glasser ROIs')
+                    # ROI names
+                    ROIs[pp] = list(params['plotting']['ROIs']['glasser_atlas'].keys())
+
+                    # colors
+                    color_codes[pp] = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs[pp]}
+
+                    # get vertices for ROI
+                    roi_verts[pp] = {}
+                    for _,key in enumerate(ROIs[pp]):
+                        print(key)
+                        roi_verts[pp][key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
+
+                else:
+                    ## check if dict or str
+                    if isinstance(pysub, dict):
+                        pysub_pp = pysub[pp]
+                    else:
+                        pysub_pp = pysub
+
+                    # set ROI names
+                    ROIs[pp] = params['plotting']['ROIs'][space]
+
+                    # dictionary with one specific color per group - similar to fig3 colors
+                    color_codes[pp] = {key: params['plotting']['ROI_pal'][key] for key in ROIs[pp]}
+
+                    # get vertices for ROI
+                    roi_verts[pp] = {}
+                    for _,val in enumerate(ROIs[pp]):
+                        print(val)
+                        roi_verts[pp][val] = cortex.get_roi_verts(pysub_pp,val)[val]
+                
+        else:
+            raise NameError('No subject ID provided')
+        
+        return ROIs, roi_verts, color_codes
+
 
     def get_tsnr(input_file, return_mean=True, affine=[], hdr=[], filename=None):
         

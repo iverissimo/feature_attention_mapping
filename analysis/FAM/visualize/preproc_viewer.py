@@ -60,12 +60,14 @@ class MRIViewer(Viewer):
         
         Parameters
         ----------
+        participant_list: list
+            list of participants to check segmentations (if empty will run for all)
         input_pth: str
             path to look for files, if None then will get them from derivatives/freesurfer/sub-X folder
-        output_pth: str
-            path to save original files, if None then will save them in derivatives/check_segmentations/sub-X folder
         check_type : str
             if viewing or making movie (view, movie) 
+        use_T2: bool
+            if we want to also open T2 image (when viewing)
         """ 
 
         ## set input path where fmaps are
@@ -150,30 +152,35 @@ freeview -v \
                 subprocess.call(convert_command, shell=True)
 
 
-    def compare_nordic2standard(self, participant_list = [], input_pth = None, file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'},
-                                use_atlas_rois = None, acq_keys = ['standard', 'nordic'], plot_group=True):
+    def compare_nordic2standard(self, participant_list = [], input_pth = None, 
+                                file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'},
+                                use_atlas_rois = None, acq_keys = ['standard', 'nordic'], plot_group = True):
 
         """
         Make nordic vs standard comparison plots
-        
+    
         NOTE - expects that we already ran postfmriprep, for both 
         
         Parameters
         ----------
+        participant_list: list
+            list of participants to check segmentations (if empty will run for all)
         input_pth: str
             path to look for files, if None then will get them from derivatives/freesurfer/sub-X folder
-        output_pth: str
-            path to save original files, if None then will save them in derivatives/check_segmentations/sub-X folder
-        check_type : str
-            if viewing or making movie (view, movie) 
+        file_ext: dict
+            file extension to use (for each task)
+        use_atlas_rois: str
+            if we want to use atlas rois (glasser, wang) or not (then will default to hand-drawn)
+        
         """ 
-
-        ## output path to save plots
-        output_pth = op.join(self.MRIObj.derivatives_pth, 'nordic_comparison')
+        
+        ## set output path where we want to save plots
+        output_pth = op.join(self.figures_pth, 'nordic_comparison')
+        os.makedirs(output_pth, exist_ok=True)
 
         ## input path, if not defined get's it from post-fmriprep dir
         if input_pth is None:
-            input_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space)
+            input_pth = self.MRIObj.postfmriprep_pth
 
         ## empty dataframe to save mean values per run
         corr_df = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'acq': [], 'ROI': [], 'mean_r': [], 'Wmean_r': []})

@@ -113,7 +113,6 @@ match data_type:
                 print('Comparing NORDIC to standard runs')
 
                 plotter.compare_nordic2standard(participant_list = FAM_mri.MRIObj.sj_num, 
-                                                input_pth = None, 
                                                 use_atlas_rois = use_atlas,
                                                 file_ext = FAM_mri.get_mrifile_ext())
 

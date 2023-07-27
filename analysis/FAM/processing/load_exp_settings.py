@@ -198,6 +198,22 @@ class MRIData(BehData):
         self.confound_ext = self.params['mri']['confounds']['file_ext'] # file extension
         self.mri_nr_runs = self.params['mri']['nr_runs']
 
+        # path to post-fmriprep files
+        self.postfmriprep_pth = op.join(self.derivatives_pth, 'post_fmriprep', self.sj_space)
+
+        # atlas annotation file path
+        self.atlas_annot = {'glasser': op.join(self.derivatives_pth, 'glasser_atlas','59k_mesh', 
+                                        self.params['plotting']['glasser_annot'])}
+
+        ## number of cropped TRs
+        # due to dummies TRs that were saved and extra ones as defined in params
+        self.mri_nr_cropTR = {'pRF': self.params['mri']['dummy_TR'],
+                              'FA': self.params['mri']['dummy_TR']}
+        if self.params['pRF']['crop'] == True: 
+            self.mri_nr_cropTR['pRF'] += self.params['pRF']['crop_TR']
+        if self.params['FA']['crop'] == True: 
+            self.mri_nr_cropTR['FA'] += self.params['FA']['crop_TR']
+
         # initialize utilities class
         self.mri_utils = MRIUtils() 
         

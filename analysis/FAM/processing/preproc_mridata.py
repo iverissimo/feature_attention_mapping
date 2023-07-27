@@ -1038,14 +1038,14 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             # and over sessions (if more than one)
             for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
                 
-                output_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 'sub-{sj}'.format(sj=pp), ses)
+                output_pth = op.join(self.MRIObj.postfmriprep_pth, 'sub-{sj}'.format(sj=pp), ses)
 
                 # if output path doesn't exist, create it
                 os.makedirs(output_pth, exist_ok = True)
                 print('saving files in %s'%output_pth)
 
                 # get list of functional files to process, per task
-                fmriprep_pth = op.join(self.MRIObj.derivatives_pth, 'fmriprep', 'sub-{sj}'.format(sj=pp), ses, 'func')
+                fmriprep_pth = op.join(self.MRIObj.fmriprep_pth, 'sub-{sj}'.format(sj=pp), ses, 'func')
 
                 for tsk in tasks:
                     print('Processign bold files from task-{t}'.format(t=tsk))
@@ -1064,7 +1064,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
                     ### crop files, due to dummies TRs that were saved ##
                     # and extra ones, if we want to
-                    crop_TR = self.MRIObj.params['mri']['dummy_TR'] + self.MRIObj.params[tsk]['crop_TR'] if self.MRIObj.params[tsk]['crop'] == True else self.MRIObj.params['mri']['dummy_TR'] 
+                    crop_TR = self.MRIObj.mri_nr_cropTR[tsk]
 
                     proc_files = mri_utils.crop_epi(bold_files, output_pth, num_TR_crop = crop_TR)
 
@@ -1080,7 +1080,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
     
                         ## regress out confounds, 
                         ## and percent signal change
-                        proc_files = mri_utils.regressOUT_confounds(proc_files, confounds_list, output_pth, TR = self.MRIObj.params['mri']['TR'], plot_vert = False,
+                        proc_files = mri_utils.regressOUT_confounds(proc_files, confounds_list, output_pth, TR = self.MRIObj.TR, plot_vert = False,
                                                                     detrend = True, standardize = 'psc', standardize_confounds = True)
 
                     else: 

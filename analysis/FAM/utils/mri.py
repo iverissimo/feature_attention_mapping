@@ -61,13 +61,17 @@ class MRIUtils(Utils):
 
     def create_atlas_df(self, annot_filename = '', pysub = 'hcp_999999', atlas_name = 'glasser'):
 
-        """ Function to create glasser dataframe
+        """ Function to create glasser/wang dataframe
         with ROI names, colors (RGBA) and vertex indices
 
         Parameters
         ----------
-        path2file : str 
+        annot_filename : str 
             absolute name of the parcelation file (defined in MRIObj.atlas_annot)
+        pysub: str
+            pycortex subject
+        atlas_name: str
+            atlas name (glasser vs wang)
         """
         
         # we read in the atlas data, which consists of 180 separate regions per hemisphere. 
@@ -81,7 +85,7 @@ class MRIUtils(Utils):
         label_dict = cifti_hdr.get_axis(0)[0][1]
 
         # number of vertices in one hemisphere (for bookeeping) 
-        hemi_vert_num = cortex.db.get_surfinfo('hcp_999999').left.shape[0] 
+        hemi_vert_num = cortex.db.get_surfinfo(pysub).left.shape[0] 
         
         ## make atlas data frame
         atlas_df = pd.DataFrame({'ROI': [], 'hemi_vertex': [], 'merge_vertex': [], 'hemisphere': [],
@@ -91,7 +95,7 @@ class MRIUtils(Utils):
 
             if label_dict[key][0] != '???': 
 
-                # get vertex indices for whole surface or each hemisphere separately
+                # get vertex indices for whole surface 
                 merge_vert = np.where(cifti_data == key)[0] 
 
                 if atlas_name == 'glasser':
@@ -128,99 +132,129 @@ class MRIUtils(Utils):
                 
         return atlas_df
     
+    def create_sjROI_df(self, sub_id = None, pysub = 'hcp_999999', 
+                        ROIs = ['V1', 'V2', 'V3', 'hV4', 'LO', 'V3AB']):
+        
+        """ Function to create pycortex subject dataframe
+        with ROI names and vertex indices
 
-    def get_vertex_rois(self, sub_id = None, pysub = 'hcp_999999', use_atlas = None, 
-                        annot_filename = ''):
+        Parameters
+        ----------
+        sub_id : str 
+            subject ID
+        pysub: str
+            pycortex subject
+        ROIs: list/array
+            relevant roi names
+        """
+        
+        # number of vertices in one hemisphere (for bookeeping) 
+        hemi_vert_num = cortex.db.get_surfinfo(pysub).left.shape[0] 
+        
+        ## make subject ROI data frame
+        sjROI_df = pd.DataFrame({'ROI': [], 'hemi_vertex': [], 'merge_vertex': [], 'hemisphere': []})
 
-        """ 
+        for roi_name in ROIs:
 
-        NOT DONE YET - BEFORE USE ATLAS WAS BOOL, NOW NEED TO DEFINE NONE IF USING HAND-DRAWN ROIS,
-        OR STRING OF GLASSER VS WANG ATLAS
+            # get vertex indices for whole surface 
+            merge_vert = cortex.get_roi_verts(pysub, roi = roi_name)[roi_name]
 
+            # hemisphere
+            hemi_arr = np.tile('R', len(merge_vert))
+            hemi_arr[np.where(merge_vert < hemi_vert_num)[0]] = 'L'
+            # get vertex indices for each hemisphere separately
+            hemi_vert = merge_vert.copy()
+            hemi_vert[np.where(merge_vert >= hemi_vert_num)[0]] -= hemi_vert_num
 
-        helper function to get ROI names, vertice index and color palette
-        to be used in plotting scripts
+            # fill df
+            sjROI_df = pd.concat((sjROI_df,
+                                pd.DataFrame({'ROI': np.tile(roi_name, len(merge_vert)),
+                                            'hemisphere': hemi_arr,
+                                            'hemi_vertex': hemi_vert, 
+                                            'merge_vertex': merge_vert
+                                            })), ignore_index=True
+                                )
+            
+        return sjROI_df
+
+    def get_roi_vert(self, allROI_df, roi_list = [], hemi = 'BH'):
+
+        """
+        get vertex indices for an ROI (or several)
+        as defined by the list of labels
+        for a specific hemisphere (or both)
         
         Parameters
         ----------
-        params : dict
-            yaml dict with task related infos  
-        sub_id: str, int or list
-            subject ID to add as identifier in outputed dictionaries
-        pysub: str/dict
-            name of pycortex subject folder, where we drew all ROIs.
-            if dict, assumes key is participant ID, and value is sub specific pycortex folder 
-        use_atlas: bool
-            if we want to use the glasser atlas ROIs instead (this is, from the keys conglomerate defined in the params yml)
-        atlas_pth: str
-            path to atlas file
-        space: str
-            pycortex subject space
+        allROI_df: df
+            dataframe with all ROIs
+        roi_list: list
+            list of strings with ROI labels to load
+        hemi: str
+            which hemisphere (LH, RH or BH - both)
+        """
+
+        roi_vert = []
+
+        for roi2plot in roi_list:
+            if hemi == 'BH':
+                roi_vert += list(allROI_df[allROI_df['ROI'] == roi2plot].merge_vertex.values.astype(int))
+            else:
+                roi_vert += list(allROI_df[(allROI_df['ROI'] == roi2plot) & \
+                                        (allROI_df['hemisphere'] == hemi[0])].merge_vertex.values.astype(int))
+
+        return np.array(roi_vert)
+
+    def get_ROIs_dict(self, sub_id = None, pysub = 'hcp_999999', use_atlas = None, 
+                            annot_filename = '', hemisphere = 'BH',
+                            ROI_labels = {'V1': ['V1v', 'V1d'], 'V2': ['V2v', 'V2d'],'V3': ['V3v', 'V3d'],
+                                          'V3AB': ['V3A', 'V3B'], 'LO': ['LO1', 'LO2'], 'hV4': ['hV4'], 
+                                          'IPS0': ['IPS0'], 'IPS1': ['IPS1'], 'IPS2': ['IPS2']}):
+
+        """ 
+        get straightforward dictionary of (ROI, vert) pairs
+
+        Parameters
+        ----------
+        sub_id : str 
+            subject ID
+        pysub: str
+            pycortex subject
+        use_atlas: str
+            atlas name (glasser vs wang)
+        annot_filename : str 
+            absolute name of the parcelation file (defined in MRIObj.atlas_annot)
+        hemisphere: str
+            which hemisphere (LH, RH or BH - both)
+        ROI_labels: list/dict/array
+            list of strings with ROI labels to load. can also be dict of list of strings
         """ 
 
-        if use_atlas == 'glasser':
-
-            # Get Glasser atlas
-            atlas_df, atlas_array = self.create_glasser_df(annot_filename = annot_filename)
-        
-        if sub_id:
-            
-            # if single id provided, put in list
-            if isinstance(sub_id, str) or isinstance(sub_id, int):
-                sub_id = [sub_id]
-
-            sub_id_list = ['sub-{sj}'.format(sj = str(pp).zfill(3)) if 'sub-' not in str(pp) else str(pp) for pp in sub_id]
-
-            ## start empty dictionaries  
-            ROIs = {}
-            color_codes = {}
-            roi_verts = {}
-
-            # loop over participant list
-            for pp in sub_id_list:
-
-                print('Getting ROIs for participants %s'%pp)
-
-                if use_atlas:
-                    print('Using Glasser ROIs')
-                    # ROI names
-                    ROIs[pp] = list(params['plotting']['ROIs']['glasser_atlas'].keys())
-
-                    # colors
-                    color_codes[pp] = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs[pp]}
-
-                    # get vertices for ROI
-                    roi_verts[pp] = {}
-                    for _,key in enumerate(ROIs[pp]):
-                        print(key)
-                        roi_verts[pp][key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
-
-                else:
-                    ## check if dict or str
-                    if isinstance(pysub, dict):
-                        pysub_pp = pysub[pp]
-                    else:
-                        pysub_pp = pysub
-
-                    # set ROI names
-                    ROIs[pp] = params['plotting']['ROIs'][space]
-
-                    # dictionary with one specific color per group - similar to fig3 colors
-                    color_codes[pp] = {key: params['plotting']['ROI_pal'][key] for key in ROIs[pp]}
-
-                    # get vertices for ROI
-                    roi_verts[pp] = {}
-                    for _,val in enumerate(ROIs[pp]):
-                        print(val)
-                        roi_verts[pp][val] = cortex.get_roi_verts(pysub_pp,val)[val]
-                
+        # if we gave a list, then make it dict, for consistency
+        if isinstance(ROI_labels, list) or isinstance(ROI_labels, np.ndarray):
+            rlabels_dict = {val: [val] for val in ROI_labels}
         else:
-            raise NameError('No subject ID provided')
-        
-        return ROIs, roi_verts, color_codes
+            rlabels_dict = ROI_labels
 
+        if use_atlas is not None:
+            # if we want to use atlas, then load it
+            allROI_df = self.create_atlas_df(annot_filename = annot_filename, 
+                                            pysub = pysub, atlas_name = use_atlas)
+        else:
+            # if not, load subject hand-drawn rois
+            tmp_arr = sorted({x for v in rlabels_dict.values() for x in v})
+            allROI_df = self.create_sjROI_df(sub_id = sub_id, pysub = pysub, ROIs = tmp_arr)
 
-    def get_tsnr(input_file, return_mean=True, affine=[], hdr=[], filename=None):
+        # iterate over rois and get vertices
+        output_dict = {}
+        for rname in rlabels_dict.keys():
+
+            output_dict[rname] = self.get_roi_vert(allROI_df, roi_list = rlabels_dict[rname], 
+                                                   hemi = hemisphere)
+            
+        return output_dict            
+
+    def get_tsnr(self, input_file, return_mean=True, affine=[], hdr=[], filename=None):
         
         """
         Compute the tSNR of NIFTI file
@@ -262,20 +296,15 @@ class MRIUtils(Utils):
             hdr = img.header
 
         # calculate tSNR
-        mean_d = np.mean(data,axis=-1)
-        std_d = np.std(data,axis=-1)
-        
-        tsnr = mean_d/std_d
+        tsnr = np.mean(data,axis=-1)/np.std(data,axis=-1)
         tsnr[np.where(np.isinf(tsnr))] = np.nan
-
-        mean_tsnr = np.nanmean(np.ravel(tsnr))
 
         # if we want to save image, need to provide an output filename
         if filename:
             tsnr_image = nib.Nifti1Image(tsnr, affine=affine, header=hdr).to_filename(filename)
 
         if return_mean:
-            return mean_tsnr
+            return np.nanmean(np.ravel(tsnr))
         else:
             return tsnr
 
@@ -304,91 +333,10 @@ class MRIUtils(Utils):
         return corr
 
 
-    def weighted_mean(data1, weights=None, norm=False):
-        
-        """
-        Compute (Weighted) mean 
-        with statsmodel
-        
-        Parameters
-        ----------
-        data1 : arr
-            numpy array 
-        weights : arr
-        
-        """ 
-
-        if norm:
-            weights = normalize(weights)
-
-        if weights is not None:
-            weights[np.where((np.isinf(weights)) | (np.isnan(weights)) | (weights == 0))] = 0.000000001
-
-        avg_data = weightstats.DescrStatsW(data1,weights=weights).mean
-
-        return avg_data
+    
         
 
-    def correlate_arrs(data1, data2, n_jobs = 4, weights=[], shuffle_axis = None, seed=None):
-        
-        """
-        Compute Pearson correlation between two numpy arrays
-        
-        Parameters
-        ----------
-        data1 : str/list/array
-            numpy array OR absolute filename of array OR list filenames
-        data2 : str/list/array
-            same as data1
-        n_jobs : int
-            number of jobs for parallel
-        seed: int
-            if provided, will initialize random with specific seed
-        
-        """ 
 
-        # if we want to use specific seed
-        if seed is not None:
-            np.random.seed(seed)
-        
-        data1_arr = []
-        data2_arr = []
-        
-        ## if list was provided, then load and average
-        if isinstance(data1, list):
-            data1_arr = np.mean(np.stack(np.load(v) for v in list(data1)), axis = 0)
-        elif isinstance(data1, str):
-            data1_arr = np.load(data1)
-        elif isinstance(data1, np.ndarray):
-            data1_arr = data1
-            
-        if isinstance(data2, list):
-            data2_arr = np.mean(np.stack(np.load(v) for v in list(data2)), axis = 0)
-        elif isinstance(data2, str):
-            data2_arr = np.load(data2)
-        elif isinstance(data2, np.ndarray):
-            data2_arr = data2
-
-        # if we indicate an axis to shuffle, then do so
-        if shuffle_axis is not None:
-
-            if shuffle_axis == -1:
-                data_shuf1 = data1_arr.T.copy()
-                np.random.shuffle(data_shuf1)
-                data1_arr = data_shuf1.T.copy()
-
-                data_shuf2 = data2_arr.T.copy()
-                np.random.shuffle(data_shuf2)
-                data2_arr = data_shuf2.T.copy()
-
-            elif shuffle_axis == 0:
-                np.random.shuffle(data1_arr)
-                np.random.shuffle(data2_arr)
-            
-        ## actually correlate
-        correlations = np.array(Parallel(n_jobs=n_jobs)(delayed(np.corrcoef)(data1_arr[i], data2_arr[i]) for i in np.arange(data1_arr.shape[0])))[...,0,1]
-                
-        return correlations
 
     def smooth_surface(data, pysub = 'hcp_999999', kernel=3, nr_iter=3, normalize = False):
 
@@ -1449,34 +1397,6 @@ class MRIUtils(Utils):
 
         return out_lists
 
-
-    def split_half_comb(input_list):
-
-        """ make list of lists, by spliting half
-        and getting all unique combinations
-        
-        Parameters
-        ----------
-        input_list : list/arr
-            list of items
-        Outputs
-        -------
-        unique_pairs : list/arr
-            list of tuples
-        
-        """
-
-        A = list(itertools.combinations(input_list, int(len(input_list)/2)))
-        
-        combined_pairs = []
-        for pair in A:
-            combined_pairs.append(tuple([pair, tuple([r for r in input_list if r not in pair])]))
-
-        # get unique pairs
-        seen = set()
-        unique_pairs = [t for t in combined_pairs if tuple(sorted(t)) not in seen and not seen.add(tuple(sorted(t)))]
-
-        return unique_pairs
 
 
     def resample_arr(upsample_data, osf = 10, final_sf = 1.6):

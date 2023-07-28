@@ -561,66 +561,6 @@ class PlotUtils(Utils):
         return mean_x, mean_x_std, mean_y, mean_y_std
 
 
-    def fwhmax_fwatmin(model, estimates, normalize_RFs=False, return_profiles=False):
-        
-        """
-        taken from marco aqil's code, all credits go to him
-        """
-        
-        model = model.lower()
-        x=np.linspace(-50,50,1000).astype('float32')
-
-        prf = estimates['betas'] * np.exp(-0.5*x[...,np.newaxis]**2 / estimates['size']**2)
-        vol_prf =  2*np.pi*estimates['size']**2
-
-        if 'dog' in model or 'dn' in model:
-            srf = estimates['sa'] * np.exp(-0.5*x[...,np.newaxis]**2 / estimates['ss']**2)
-            vol_srf = 2*np.pi*estimates['ss']*2
-
-        if normalize_RFs==True:
-
-            if model == 'gauss':
-                profile =  prf / vol_prf
-            elif model == 'css':
-                #amplitude is outside exponent in CSS
-                profile = (prf / vol_prf)**estimates['ns'] * estimates['betas']**(1 - estimates['ns'])
-            elif model =='dog':
-                profile = prf / vol_prf - \
-                        srf / vol_srf
-            elif 'dn' in model:
-                profile = (prf / vol_prf + estimates['nb']) /\
-                        (srf / vol_srf + estimates['sb']) - estimates['nb']/estimates['sb']
-        else:
-            if model == 'gauss':
-                profile = prf
-            elif model == 'css':
-                #amplitude is outside exponent in CSS
-                profile = prf**estimates['ns'] * estimates['betas']**(1 - estimates['ns'])
-            elif model =='dog':
-                profile = prf - srf
-            elif 'dn' in model:
-                profile = (prf + estimates['nb'])/(srf + estimates['sb']) - estimates['nb']/estimates['sb']
-
-
-        half_max = np.max(profile, axis=0)/2
-        fwhmax = np.abs(2*x[np.argmin(np.abs(profile-half_max), axis=0)])
-
-
-        if 'dog' in model or 'dn' in model:
-
-            min_profile = np.min(profile, axis=0)
-            fwatmin = np.abs(2*x[np.argmin(np.abs(profile-min_profile), axis=0)])
-
-            result = fwhmax, fwatmin
-        else:
-            result = fwhmax
-
-        if return_profiles:
-            return result, profile.T
-        else:
-            return result
-
-
  
 
 

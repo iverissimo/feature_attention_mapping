@@ -16,8 +16,6 @@ from nilearn.plotting import plot_anat
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from FAM.utils import mri as mri_utils
-
 
 class PreprocMRI:
 
@@ -182,7 +180,7 @@ class PreprocMRI:
 
             if ori_val != 'Left-to-Right':
                 print('anat file not RAS, reorienting')
-                mri_utils.reorient_nii_2RAS(input_pth = anat_preproc_sub,
+                self.MRIObj.mri_utils.reorient_nii_2RAS(input_pth = anat_preproc_sub,
                                     output_pth = op.join(self.MRIObj.proj_root_pth,'orig_anat', 'sub-{sj}'.format(sj=pp)))
 
             
@@ -665,10 +663,10 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
 
             if calc_tsnr:
                 # calculate tSNR before nordic
-                sub_tsnr['pre_nordic'].append(mri_utils.get_tsnr(mag_filename, return_mean = True))
+                sub_tsnr['pre_nordic'].append(self.MRIObj.mri_utils.get_tsnr(mag_filename, return_mean = True))
 
                 # calculate tSNR after nordic
-                sub_tsnr['post_nordic'].append(mri_utils.get_tsnr(nordic_nii, return_mean = True))
+                sub_tsnr['post_nordic'].append(self.MRIObj.mri_utils.get_tsnr(nordic_nii, return_mean = True))
 
         # make plot of tSNR for comparison
         if calc_tsnr:
@@ -1060,17 +1058,17 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
                     ### load and convert files in numpy arrays, to make format issue obsolete ###
                     # note, if we need headers or affines later on, we will need to get them from fmriprep folder
-                    bold_files = mri_utils.load_data_save_npz(bold_files, output_pth, save_subcortical=save_subcortical)
+                    bold_files = self.MRIObj.mri_utils.load_data_save_npz(bold_files, outdir = output_pth, save_subcortical=save_subcortical)
 
                     ### crop files, due to dummies TRs that were saved ##
                     # and extra ones, if we want to
                     crop_TR = self.MRIObj.mri_nr_cropTR[tsk]
 
-                    proc_files = mri_utils.crop_epi(bold_files, output_pth, num_TR_crop = crop_TR)
+                    proc_files = self.MRIObj.mri_utils.crop_epi(bold_files, outdir = output_pth, num_TR_crop = crop_TR)
 
                     ## first sub select confounds that we are using, and store in output dir
                     # even if we dont filter them out now, we might want to use them later in GLM
-                    confounds_list = mri_utils.select_confounds(confound_files, output_pth, reg_names = self.MRIObj.params['mri']['confounds']['regs'],
+                    confounds_list = self.MRIObj.mri_utils.select_confounds(confound_files, outdir = output_pth, reg_names = self.MRIObj.params['mri']['confounds']['regs'],
                                                                 CumulativeVarianceExplained = self.MRIObj.params['mri']['confounds']['CumulativeVarianceExplained'],
                                                                 select =  'num', num_components = 5, num_TR_crop = crop_TR)
 
@@ -1080,7 +1078,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
     
                         ## regress out confounds, 
                         ## and percent signal change
-                        proc_files = mri_utils.regressOUT_confounds(proc_files, confounds_list, output_pth, TR = self.MRIObj.TR, plot_vert = False,
+                        proc_files = self.MRIObj.mri_utils.regressOUT_confounds(proc_files, counfounds = confounds_list, outdir = output_pth, TR = self.MRIObj.TR, plot_vert = False,
                                                                     detrend = True, standardize = 'psc', standardize_confounds = True)
 
                     else: 
@@ -1089,13 +1087,13 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                         baseline_inter2 = self.MRIObj.params[tsk]['baseline_ind_inter2'] 
 
                         ## filter files, to remove drifts ##
-                        proc_files = mri_utils.filter_data(proc_files, output_pth, filter_type = self.MRIObj.params['mri']['filtering']['type'][tsk], 
-                                                first_modes_to_remove = self.MRIObj.params['mri']['filtering']['first_modes_to_remove'], 
-                                                baseline_inter1 = baseline_inter1, baseline_inter2 = baseline_inter2,
-                                                plot_vert = True)
+                        proc_files = self.MRIObj.mri_utils.filter_data(proc_files, outdir = output_pth, filter_type = self.MRIObj.params['mri']['filtering']['type'][tsk], 
+                                                                    first_modes_to_remove = self.MRIObj.params['mri']['filtering']['first_modes_to_remove'], 
+                                                                    baseline_inter1 = baseline_inter1, baseline_inter2 = baseline_inter2,
+                                                                    plot_vert = True, TR = self.MRIObj.TR)
                         
                         ### percent signal change ##
-                        proc_files = mri_utils.psc_epi(proc_files, output_pth)
+                        proc_files = self.MRIObj.mri_utils.psc_epi(proc_files, outdir = output_pth)
 
                     ## make new outdir, to save final files that will be used for further analysis
                     # avoids mistakes later on
@@ -1112,12 +1110,12 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                             hemi_files = []
                             
                             for hemi in hemispheres:
-                                hemi_files.append(mri_utils.average_epi([val for val in proc_files if hemi in val], 
-                                                            final_output_dir, method = 'mean'))
+                                hemi_files.append(self.MRIObj.mri_utils.average_epi([val for val in proc_files if hemi in val], 
+                                                            outdir = final_output_dir, method = 'mean'))
                             proc_files = hemi_files
                             
                         else:
-                            proc_files = mri_utils.average_epi(proc_files, final_output_dir, method = 'mean')
+                            proc_files = self.MRIObj.mri_utils.average_epi(proc_files, outdir = final_output_dir, method = 'mean')
                         
                     else:
                         # save FA files in final output folder too

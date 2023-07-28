@@ -207,6 +207,11 @@ freeview -v \
                                                                 annot_filename = annot_filename, hemisphere = 'BH',
                                                                 ROI_labels = self.MRIObj.params['plotting']['ROIs'][plot_key])
 
+            outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp))
+            # if output path doesn't exist, create it
+            os.makedirs(outdir, exist_ok=True)
+            print('saving files in %s'%outdir)
+            
             # and over sessions (if more than one)
             for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
                 
@@ -214,11 +219,6 @@ freeview -v \
                 
                 # path to post fmriprep dir
                 postfmriprep_pth = op.join(input_pth, 'sub-{sj}'.format(sj=pp), ses)
-
-                outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp), ses)
-                # if output path doesn't exist, create it
-                os.makedirs(outdir, exist_ok=True)
-                print('saving files in %s'%outdir)
                 
                 # and acquisition types
                 for acq in acq_keys:
@@ -262,6 +262,7 @@ freeview -v \
                         # get correlation value for each combination
                         corr_arr = []
                         for r in run_sh_lists:
+
                             ## correlate the two halfs
                             correlations = self.MRIObj.mri_utils.correlate_arrs(list(r[0]), list(r[-1]))
                             corr_arr.append(correlations)
@@ -279,18 +280,16 @@ freeview -v \
                                                 ))
 
                         ## plot average correlation values on flatmap surface ##
-                        corr_flatmap = cortex.Vertex(np.mean(corr_arr, axis=0), 
-                                                    self.pysub,
-                                                    vmin = 0, vmax = 1,
-                                                    cmap='hot')
-                        #cortex.quickshow(corr_flatmap, with_curvature=True, with_sulci=True)
-                        _ = cortex.quickflat.make_png(op.join(outdir,
-                                        'half_split_correlation_flatmap_sub-{sj}_{ses}_task-{tsk}_acq-{acq}.png'.format(sj=pp, ses=ses, tsk=tsk, acq=acq)), 
-                                        corr_flatmap, 
-                                        recache = False, with_colorbar = True,
-                                        with_curvature = True, with_sulci = True,
-                                        curvature_brightness = 0.4, curvature_contrast = 0.1)
-
+                        fig_name = op.join(outdir,
+                                        'half_split_correlation_flatmap_sub-{sj}_{ses}_task-{tsk}_acq-{acq}.png'.format(sj=pp, 
+                                                                                                                        ses=ses, 
+                                                                                                                        tsk=tsk, 
+                                                                                                                        acq=acq))
+                        self.plot_utils.plot_flatmap(np.mean(corr_arr, axis=0), 
+                                                    pysub = self.pysub, cmap='hot', 
+                                                    vmin1 = 0, vmax1 = 1, 
+                                                    fig_abs_name = fig_name)
+                        
                         ## save surface correlation for relevant ROIS
                         # to make distribution plots
                         for roi_name in ROIs_dict.keys():

@@ -300,4 +300,36 @@ class Model:
 
         return arr_out
     
+    def calc_rsq(self, data_arr, prediction):
+
+        """"
+        Calculate rsq of fit
+        """
+
+        return np.nan_to_num(1 - (np.nansum((data_arr - prediction)**2, axis=0)/ np.nansum(((data_arr - np.mean(data_arr))**2), axis=0)))
     
+    def error_resid(self, timecourse, prediction, mean_err = False, return_array = False):
+
+        """
+        calculate residual error between a timecourse and a model prediction
+
+        Parameters
+        ----------
+        timecourse : ndarray
+            The actual, measured time-series against which the model is fit
+        prediction : ndarray
+            model prediction timecourse
+        mean_err : bool
+            if True, will calculate the mean of squared residulas instead of sum
+        return_array: bool
+            if True, then function returns residual array instead of scalar
+        """
+
+        if return_array:
+            return (timecourse - prediction).flatten() # return error "timecourse", that will be used by minimize
+        else:
+            if mean_err:
+                return np.mean((timecourse - prediction) ** 2)  # calculate mean of squared residuals
+
+            else:
+                return np.sum((timecourse - prediction) ** 2) # calculate residual sum of squared errors

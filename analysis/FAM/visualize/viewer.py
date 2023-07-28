@@ -15,6 +15,8 @@ import cortex
 
 import subprocess
 
+from FAM.utils.plot import PlotUtils
+
 class Viewer:
 
     def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_999999'):
@@ -50,5 +52,8 @@ class Viewer:
 
         # set some generic variables useful for plotting
         self.bar_cond_colors = self.MRIObj.params['plotting']['cond_colors']
+
+        # initialize utilities class
+        self.plot_utils = PlotUtils() 
 
 

@@ -15,10 +15,8 @@ from scipy.ndimage import gaussian_filter
 from scipy.signal import savgol_filter, fftconvolve
 from scipy import fft, interpolate
 from scipy.stats import t, norm, linregress
-from scipy.interpolate import interp1d
 
-from nilearn import surface
-from nilearn.signal import clean
+from nilearn import surface, signal
 
 from nilearn.glm.first_level.hemodynamic_models import spm_hrf, spm_time_derivative, spm_dispersion_derivative
 from nilearn.glm.first_level import first_level
@@ -309,28 +307,6 @@ class MRIUtils(Utils):
             return tsnr
 
 
-    def weighted_corr(data1, data2, weights=None):
-
-        """
-        Compute (Weighted) correlation between two numpy arrays
-        with statsmodel
-        
-        Parameters
-        ----------
-        data1 : arr
-            numpy array 
-        data2 : arr
-            same as data1
-        weights : arr
-        
-        """ 
-
-        if weights is not None:
-            weights[np.where((np.isinf(weights)) | (np.isnan(weights)) | (weights == 0))] = 0.000000001
-
-        corr = weightstats.DescrStatsW(np.vstack((data1,data2)), weights=weights).corrcoef
-
-        return corr
 
 
     
@@ -376,7 +352,7 @@ class MRIUtils(Utils):
         return np.concatenate((lh_data_smooth,rh_data_smooth), axis=0)
 
 
-    def crop_epi(file, outdir, num_TR_crop = 5):
+    def crop_epi(self, file, outdir = None, num_TR_crop = 5):
 
         """ crop epi file (expects numpy file)
         and thus remove the first TRs
@@ -424,7 +400,6 @@ class MRIUtils(Utils):
                 print('making %s'%output_file)
                 
                 data = np.load(input_file,allow_pickle=True)
-                
                 crop_data = data[:,num_TR_crop:] 
                         
                 print('new file with shape %s' %str(crop_data.shape))
@@ -441,9 +416,9 @@ class MRIUtils(Utils):
 
         return outfiles
 
-
-    def filter_data(file, outdir, filter_type = 'HPgauss', plot_vert = False,
-                    first_modes_to_remove = 5, baseline_inter1 = None, baseline_inter2 = None, TR = 1.6, **kwargs):
+    def filter_data(self, file, outdir = None, filter_type = 'HPgauss', plot_vert = False,
+                    first_modes_to_remove = 5, baseline_inter1 = None, baseline_inter2 = None, TR = 1.6, 
+                    cut_off_hz = 0.01, window_length=201, polyorder=3):
         
         """ 
         Generic filtering function, implemented different types of filters
@@ -495,22 +470,22 @@ class MRIUtils(Utils):
                 data = np.load(input_file,allow_pickle=True)
     
                 ### implement filter types, by calling their specific functions
-
                 if filter_type == 'HPgauss':
 
-                    data_filt = gausskernel_data(data, **kwargs)
+                    data_filt = self.gausskernel_data(data, TR = TR, cut_off_hz = cut_off_hz)
                     
                 elif filter_type == 'sg':
 
-                    data_filt = savgol_data(data, **kwargs)
+                    data_filt = self.savgol_data(data, window_length = window_length, polyorder = polyorder)
 
                 elif filter_type == 'dc': 
 
-                    data_filt = dc_data(data, first_modes_to_remove = first_modes_to_remove, **kwargs) 
+                    data_filt = self.dc_data(data, first_modes_to_remove = first_modes_to_remove) 
 
                 elif filter_type == 'LinDetrend':
 
-                    data_filt = detrend_data(data, detrend_type = 'linear', TR = TR, baseline_inter1 = baseline_inter1, baseline_inter2 = baseline_inter2, **kwargs)
+                    data_filt = self.detrend_data(data, detrend_type = 'linear', TR = TR, 
+                                                        baseline_inter1 = baseline_inter1, baseline_inter2 = baseline_inter2)
                     
                 else:
                     raise NameError('filter type not implemented')
@@ -519,8 +494,7 @@ class MRIUtils(Utils):
                 # to compare the difference
                 if plot_vert:
 
-                    tsnr = np.mean(data, axis = -1)/np.std(data, axis = -1)
-                    tsnr[np.where(np.isinf(tsnr))] = np.nan
+                    tsnr = self.get_tsnr(data, return_mean=False)
                     
                     ind2plot = np.where(tsnr == np.nanmax(tsnr))[0][0]
                     fig = plt.figure()
@@ -545,8 +519,7 @@ class MRIUtils(Utils):
         
         return outfiles
 
-
-    def gausskernel_data(data, TR = 1.6, cut_off_hz = 0.01, **kwargs):
+    def gausskernel_data(self, data, TR = 1.6, cut_off_hz = 0.01):
         
         """ 
         High pass filter array with gaussian kernel
@@ -565,22 +538,18 @@ class MRIUtils(Utils):
         data_filt: arr
             filtered array
         """ 
-            
-        # save shape, for file reshaping later
-        arr_shape = data.shape
         
         sigma = (1/cut_off_hz) / (2 * TR) 
 
         # filter signal
-        filtered_signal = np.array(Parallel(n_jobs=2)(delayed(gaussian_filter)(i, sigma=sigma) for _,i in enumerate(data.T))) 
+        filtered_signal = np.array(Parallel(n_jobs=2)(delayed(gaussian_filter)(i, sigma=sigma) for _,i in enumerate(tqdm(data.T)))) 
 
         # add mean image back to avoid distribution around 0
         data_filt = data.T - filtered_signal + np.mean(filtered_signal, axis=0)
         
         return data_filt.T # to be again vertex, time
 
-
-    def savgol_data(data, window_length=201, polyorder=3, **kwargs):
+    def savgol_data(self, data, window_length=201, polyorder=3):
         
         """ 
         High pass savitzky golay filter array
@@ -615,8 +584,7 @@ class MRIUtils(Utils):
 
         return data_filt.T # to be again vertex, time
 
-
-    def dc_data(data, first_modes_to_remove=5, **kwargs):
+    def dc_data(self, data, first_modes_to_remove=5):
         
         """ 
         High pass discrete cosine filter array
@@ -645,9 +613,8 @@ class MRIUtils(Utils):
 
         return data_filt # vertex, time
 
-
-    def detrend_data(data, detrend_type = 'linear', baseline_inter1 = None, baseline_inter2 = None, 
-                                                    dct_set_nr = 1, TR = 1.6, **kwargs):
+    def detrend_data(self, data, detrend_type = 'linear', baseline_inter1 = None, baseline_inter2 = None, 
+                                dct_set_nr = 1, TR = 1.6, cut_off_hz = 0.01):
         
         """ 
         Detrend data array
@@ -701,7 +668,7 @@ class MRIUtils(Utils):
                 baseline_timepoints = np.concatenate((np.arange(data.shape[-1])[:baseline_inter1, ...],
                                                     np.arange(data.shape[-1])[baseline_inter2:, ...]))
 
-                trend_func = [interp1d(baseline_timepoints, np.concatenate((start_trend[ind], end_trend[ind])), kind='linear') for ind,_ in enumerate(tqdm(data))]
+                trend_func = [interpolate.interp1d(baseline_timepoints, np.concatenate((start_trend[ind], end_trend[ind])), kind='linear') for ind,_ in enumerate(tqdm(data))]
 
                 # and save trend line
                 trend_line = np.stack((trend_func[ind](np.arange(data.shape[-1])) for ind,_ in enumerate(tqdm(data))))
@@ -717,16 +684,14 @@ class MRIUtils(Utils):
         elif detrend_type == 'dct':
 
             frame_times = np.linspace(0, data.shape[-1]*TR, data.shape[-1], endpoint=False)
-            dc_set = discrete_cosine_transform(high_pass=0.01, frame_times=frame_times)
+            dc_set = discrete_cosine_transform(high_pass = cut_off_hz, frame_times=frame_times)
 
             raise NameError('Not implemented yet')
 
 
         return data_detr # vertex, time
 
-
-
-    def psc_epi(file, outdir):
+    def psc_epi(self, file, outdir = None):
 
         """ percent signal change file
         
@@ -789,8 +754,7 @@ class MRIUtils(Utils):
         
         return outfiles
 
-
-    def average_epi(file, outdir, method = 'mean'):
+    def average_epi(self, file, outdir = None, method = 'mean'):
 
         """ average epi files
         
@@ -847,11 +811,9 @@ class MRIUtils(Utils):
             # actually save
             np.save(output_file, avg_data)
 
-
         return output_file
 
-
-    def reorient_nii_2RAS(input_pth, output_pth):
+    def reorient_nii_2RAS(self, input_pth, output_pth):
 
         """
         Reorient niftis to RAS
@@ -867,8 +829,7 @@ class MRIUtils(Utils):
         """
 
         ## set output path where we want to store original files
-        if not op.isdir(output_pth):
-            os.makedirs(output_pth)
+        os.makedirs(output_pth, exist_ok=True)
 
         # list of original niftis
         orig_nii_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if val.endswith('.nii.gz')]
@@ -965,44 +926,23 @@ class MRIUtils(Utils):
         os.system(cmd_txt)
 
 
-    def crop_shift_arr(arr, crop_nr = None, shift = 0):
-        
-        """
-        helper function to crop and shift array
-        
-        Parameters
-        ----------
-        arr : array
-        original array
-        assumes time dim is last one (arr.shape[-1])
-        crop_nr : None or int
-            if not none, expects int with number of FIRST time points to crop
-        shift : int
-            positive or negative int, of number of time points to shift (if neg, will shift leftwards)
-            
-        """
-            
-        # if cropping
-        if crop_nr:
-            new_arr = arr[...,crop_nr:]
-        else:
-            new_arr = arr
-            
-        # if shiftting
-        out_arr = new_arr.copy()
-        if shift > 0:
-            out_arr[...,shift:] = new_arr[..., :-int(shift)]
-        elif shift < 0:
-            out_arr[...,:shift] = new_arr[..., np.abs(shift):]
-            
-        return out_arr
-        
-
-    def surf_data_from_cifti(data, axis, surf_name, medial_struct=False):
+    def surf_data_from_cifti(self, data, axis = None, surf_name = '', medial_struct=False):
 
         """
         load surface data from cifti, from one hemisphere
         taken from https://nbviewer.org/github/neurohackademy/nh2020-curriculum/blob/master/we-nibabel-markiewicz/NiBabel.ipynb
+
+        Parameters
+        ----------
+        data : array
+            cifti data, from cifti.get_fdata
+        axis:
+            relevant data axis, from cifti.get_axis
+        surf_name: str
+            surface name to load data from
+        medial_struct: bool
+            medial wall vertices
+
         """
 
         assert isinstance(axis, nib.cifti2.BrainModelAxis)
@@ -1017,10 +957,12 @@ class MRIUtils(Utils):
                 surf_data[vtx_indices] = data
                 return surf_data
 
-
-    def load_data_save_npz(file, outdir, save_subcortical=False):
+    def load_data_save_npz(self, file, outdir = None, save_subcortical=False, hemispheres = ['hemi-L','hemi-R'],
+                           cifti_hemis = {'hemi-L': 'CIFTI_STRUCTURE_CORTEX_LEFT', 'hemi-R': 'CIFTI_STRUCTURE_CORTEX_RIGHT'},
+                           subcortical_hemis = ['BRAIN_STEM', 'ACCUMBENS', 'AMYGDALA', 'CAUDATE', 'CEREBELLUM', 
+                            'DIENCEPHALON_VENTRAL', 'HIPPOCAMPUS', 'PALLIDUM', 'PUTAMEN', 'THALAMUS']):
         
-        """ load data file, be it nifti, gifti or cifti
+        """ load data file (nifti, gifti or cifti)
         and save as npz - (whole brain: ("vertex", TR))
         
         Parameters
@@ -1038,19 +980,11 @@ class MRIUtils(Utils):
             absolute output filename (or list of filenames)
             
         """
-        
-        # some params
-        hemispheres = ['hemi-L','hemi-R']
-        cifti_hemis = {'hemi-L': 'CIFTI_STRUCTURE_CORTEX_LEFT', 
-                    'hemi-R': 'CIFTI_STRUCTURE_CORTEX_RIGHT'}
-        subcortical_hemis = ['BRAIN_STEM', 'ACCUMBENS', 'AMYGDALA', 'CAUDATE', 'CEREBELLUM', 
-                            'DIENCEPHALON_VENTRAL', 'HIPPOCAMPUS', 'PALLIDUM', 'PUTAMEN', 'THALAMUS']
 
         # make sub-folder to save other files
         if save_subcortical:
             subcort_dir = op.join(outdir, 'subcortical')
-            if not op.isdir(subcort_dir): 
-                os.makedirs(subcort_dir)
+            os.makedirs(subcort_dir, exist_ok=True)
             
         # check if single filename or list of filenames
         if isinstance(file, list) or isinstance(file, np.ndarray): 
@@ -1076,7 +1010,6 @@ class MRIUtils(Utils):
             # if file already exists, skip
             if op.exists(output_file): 
                 print('already exists, skipping %s'%output_file)
-
             else:
                 print('making %s'%output_file)
                         
@@ -1089,7 +1022,7 @@ class MRIUtils(Utils):
 
                     # load data, per hemisphere
                     # note that surface data is (time, "vertex")
-                    data = np.vstack([surf_data_from_cifti(cifti_data, axes[1], cifti_hemis[hemi]) for hemi in hemispheres])
+                    data = np.vstack([self.surf_data_from_cifti(cifti_data, axis = axes[1], surf_name = cifti_hemis[hemi]) for hemi in hemispheres])
 
                     if save_subcortical:
                         print('also saving subcortical structures in separate folder')
@@ -1099,7 +1032,7 @@ class MRIUtils(Utils):
                         for name,_,_ in axes[-1].iter_structures():
                             if 'CORTEX' not in name:
                                 print('saving data for %s'%name)
-                                subcort_dict[name] = surf_data_from_cifti(cifti_data, axes[1], name, medial_struct=True)
+                                subcort_dict[name] = self.surf_data_from_cifti(cifti_data, axis = axes[1], surf_name = name, medial_struct=True)
                         
                         # save dict in folder
                         np.savez(op.join(subcort_dir, op.split(output_file)[-1].replace('_bold_','_struct-subcortical_bold_').replace('.npy','.npz')), **subcort_dict)
@@ -1327,63 +1260,6 @@ class MRIUtils(Utils):
         return t_val,p_val,z_score
 
 
-    def leave_one_out(input_list):
-
-        """ make list of lists, by leaving one out
-
-        Parameters
-        ----------
-        input_list : list/arr
-            list of items
-
-        Outputs
-        -------
-        out_lists : list/arr
-            list of lists, with each element
-            of the input_list left out of the returned lists once, in order
-
-        
-        """
-
-        out_lists = []
-        for x in input_list:
-            out_lists.append([y for y in input_list if y != x])
-
-        return out_lists
-
-
-
-    def resample_arr(upsample_data, osf = 10, final_sf = 1.6):
-
-        """ resample array
-        using cubic interpolation
-        
-        Parameters
-        ----------
-        upsample_data : arr
-            1d array that is upsampled
-        osf : int
-            oversampling factor (that data was upsampled by)
-        final_sf: float
-            final sampling rate that we want to obtain
-            
-        """
-        
-        # original scale of data in seconds
-        original_scale = np.arange(0, upsample_data.shape[-1]/osf, 1/osf)
-
-        # cubic interpolation of predictor
-        interp = interpolate.interp1d(original_scale, 
-                                    upsample_data, 
-                                    kind = "cubic", axis=-1)
-        
-        desired_scale = np.arange(0, upsample_data.shape[-1]/osf, final_sf) # we want the predictor to be sampled in TR
-
-        out_arr = interp(desired_scale)
-        
-        return out_arr
-
-
     def CV_FA(voxel,dm,betas):
         
         """ Use betas and DM to create prediction
@@ -1420,9 +1296,8 @@ class MRIUtils(Utils):
         return prediction, cv_r2
 
 
-    def select_confounds(file, outdir, reg_names = ['a_comp_cor','cosine','framewise_displacement'],
-                        CumulativeVarianceExplained = 0.4, num_TR_crop = 5, 
-                        select = 'num', num_components = 5):
+    def select_confounds(self, file, outdir = None, reg_names = ['a_comp_cor','cosine','framewise_displacement'],
+                        CumulativeVarianceExplained = 0.4, num_TR_crop = 5, select = 'num', num_components = 5):
         
         """ 
         function to subselect relevant nuisance regressors
@@ -1528,9 +1403,8 @@ class MRIUtils(Utils):
 
         return outfiles
 
-
-    def regressOUT_confounds(file, counfounds, outdir, TR=1.6, plot_vert = False, 
-                                            detrend = True, standardize = 'psc', standardize_confounds = True):
+    def regressOUT_confounds(self, file, counfounds = None, outdir = None, TR=1.6, plot_vert = False, 
+                                    detrend = True, standardize = 'psc', standardize_confounds = True):
         
         """ 
         regress out confounds from data
@@ -1603,7 +1477,7 @@ class MRIUtils(Utils):
                 conf_df = pd.read_csv(conf_file, sep="\t")
                 
                 # clean confounds from data
-                filtered_signal = clean(signals = data.T, confounds = conf_df.values, detrend = detrend, 
+                filtered_signal = signal.clean(signals = data.T, confounds = conf_df.values, detrend = detrend, 
                                 standardize = standardize, standardize_confounds = standardize_confounds, filter = False, t_r = TR)
                 
                 data_filt = filtered_signal.T
@@ -2016,63 +1890,6 @@ class MRIUtils(Utils):
         return avg_onset
 
 
-    def get_loo_filename(input_list, loo_key = 'loo_r1s1'):
-        
-        """ get filename for loo run, and return
-        that filename plus list with rest of files
-        
-        Parameters
-        ----------
-        input_list : list/arr
-            list of items
-        loo_key: str
-            key with info about run number and session number to leave out
-            (requires both, will through error if not provided)
-        
-        """
-        
-        if 'loo_' in loo_key:
-            
-            # find run to use
-            run_num = re.findall(r'r\d{1,3}', loo_key)[0][1:]
-            
-            # find ses number to use
-            ses_num = re.findall(r's\d{1,3}', loo_key)[0][1:]
-            
-            if len(ses_num) == 0 or len(run_num) == 0:
-                raise NameError('Run number or session number not provided')
-            else:
-                print('Leaving out run-{r} from ses-{s}'.format(r=run_num, s=ses_num))
-                test_filename = [x for x in input_list if 'run-{r}'.format(r=run_num) in x and \
-                                'ses-{s}'.format(s=ses_num) in x]
-                
-                train_filename = [x for x in input_list if x not in test_filename]
-        
-        if len(test_filename) == 0 or len(train_filename) == 0:
-                raise NameError('Could not find test/train runs with loo key')
-        else:
-            return test_filename, train_filename
-
-
-    def get_run_ses_from_str(input_name):
-        
-        """ 
-        get run number and session number from string
-        
-        Parameters
-        ----------
-        input_name : str
-            name of file
-        
-        """
-        # find run number
-        run_num = int(re.findall(r'run-\d{1,3}', input_name)[0][4:])
-        
-        # find ses number
-        ses_num = int(re.findall(r'ses-\d{1,3}', input_name)[0][4:])
-        
-        return run_num, ses_num
-
 
     def get_bar_overlap_dm(bar_arr):
         
@@ -2122,39 +1939,4 @@ class MRIUtils(Utils):
         return final_dm
 
 
-    def error_resid(timecourse, prediction, mean_err = False, return_array = False):
 
-        """
-
-        Helper function to get the residual error between a timecourse and a model prediction
-
-        Parameters
-        ----------
-        timecourse : ndarray
-            The actual, measured time-series against which the model is fit
-        prediction : ndarray
-            model prediction timecourse
-        mean_err : bool
-            if True, will calculate the mean of squared residulas instead of sum
-        return_array: bool
-            if True, then function returns residual array instead of scalar
-        """
-
-        if return_array:
-            return (timecourse - prediction).flatten() # return error "timecourse", that will be used by minimize
-        else:
-            if mean_err:
-                return np.mean((timecourse - prediction) ** 2)  # calculate mean of squared residuals
-
-            else:
-                return np.sum((timecourse - prediction) ** 2) # calculate residual sum of squared errors
-
-
-
-    def calc_rsq(voxel, prediction):
-
-        """"
-        Calculate rsq of fit
-        """
-
-        return 1 - (np.sum((voxel - prediction)**2)/ np.sum((voxel - np.mean(voxel))**2))  

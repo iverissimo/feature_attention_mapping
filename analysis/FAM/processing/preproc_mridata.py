@@ -1046,7 +1046,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                 fmriprep_pth = op.join(self.MRIObj.fmriprep_pth, 'sub-{sj}'.format(sj=pp), ses, 'func')
 
                 for tsk in tasks:
-                    print('Processign bold files from task-{t}'.format(t=tsk))
+                    print('Processing bold files from task-{t}'.format(t=tsk))
 
                     # bold files
                     bold_files = [op.join(fmriprep_pth,run) for run in os.listdir(fmriprep_pth) if 'space-{sp}'.format(sp=self.MRIObj.sj_space) in run \

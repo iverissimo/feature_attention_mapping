@@ -525,92 +525,15 @@ class PlotUtils(Utils):
         img_name = op.join(outfolder,'DM_TR-%4d.png')
         os.system("ffmpeg -r 6 -start_number 0 -i %s -vcodec mpeg4 -y %s"%(img_name, filename)) 
 
-
-    def get_weighted_bins(data_df, x_key = 'ecc', y_key = 'size', weight_key = 'rsq', n_bins = 10):
-
-        """ 
-        
-        Get weighted bins from dataframe, sorted by one of the variables
+    def get_NONuniform_polar_angle(self, xx = [], yy = [], rsq = [], angle_thresh = 3*np.pi/4, 
+                                   rsq_thresh = 0, pysub = 'hcp_999999'):
 
         """
-        
-        # sort values by eccentricity
-        data_df = data_df.sort_values(by=[x_key])
-
-        #divide in equally sized bins
-        bin_size = int(len(data_df)/n_bins) 
-        
-        mean_x = []
-        mean_x_std = []
-        mean_y = []
-        mean_y_std = []
-        
-        # for each bin calculate rsq-weighted means and errors of binned ecc/gain 
-        for j in range(n_bins): 
-            
-            mean_x.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][x_key],
-                                                weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).mean)
-            mean_x_std.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][x_key],
-                                                    weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
-
-            mean_y.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][y_key],
-                                                weights = data_df[bin_size * j:bin_size*(j+1)][weight_key]).mean)
-            mean_y_std.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][y_key],
-                                                    weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
-
-        return mean_x, mean_x_std, mean_y, mean_y_std
-
-
- 
-
-
-    def get_estimates_roi_df(participant, estimates_pp, ROIs = None, roi_verts = None, est_key = 'r2', model = 'gauss'):
-
-        """
-
-        Helper function to get estimates dataframe values for each ROI
-        will select values based on est key param 
-
-        """
-
-        ## save rsq values in dataframe, for plotting
-        df_est = pd.DataFrame({'sj': [], 'index': [], 'ROI': [], 'value': [], 'model': []})
-
-        for idx,rois_ks in enumerate(ROIs): 
-            
-            # mask estimates
-            print('masking estimates for ROI %s'%rois_ks)
-
-            if len(roi_verts[rois_ks]) > 0:
-                if isinstance(estimates_pp, dict):
-                    roi_arr = estimates_pp[est_key][roi_verts[rois_ks]]
-                else:
-                    roi_arr = estimates_pp[roi_verts[rois_ks]]
-            else:
-                print('No vertices found for ROI')
-                roi_arr = [np.nan]
-
-            df_est = pd.concat((df_est,
-                                pd.DataFrame({'sj': np.tile('sub-{sj}'.format(sj = participant), len(roi_arr)), 
-                                            'index': roi_verts[rois_ks], 
-                                            'ROI': np.tile(rois_ks, len(roi_arr)), 
-                                            'value': roi_arr,
-                                            'model': np.tile(model, len(roi_arr))})
-                            ))
-
-        return df_est
-
-
-    def get_NONuniform_polar_angle(xx, yy, rsq, angle_thresh = 3*np.pi/4, rsq_thresh = 0, pysub = 'hcp_999999'):
-
-        """
-
         Helper function to transform polar angle values into RGB values
         guaranteeing a non-uniform representation
-
         (this is, when we want to use half the color wheel to show the pa values)
         (useful for better visualization of boundaries)
-
+        
         Parameters
         ----------
         xx : arr
@@ -625,7 +548,6 @@ class PlotUtils(Utils):
             minimum rsq threshold to use 
         pysub: str
             name of pycortex subject folder
-
         """
 
         hsv_angle = []
@@ -665,11 +587,10 @@ class PlotUtils(Utils):
 
         return rgb_angle
 
-
-    def plot_pa_colorwheel(resolution=800, angle_thresh = 3*np.pi/4, cmap_name = 'hsv', continuous = True, fig_name = None):
+    def plot_pa_colorwheel(self, resolution=800, angle_thresh = 3*np.pi/4, cmap_name = 'hsv', 
+                           continuous = True, fig_name = None):
 
         """
-
         Helper function to create colorwheel image
         for polar angle plots returns 
 
@@ -684,7 +605,8 @@ class PlotUtils(Utils):
             colormap name (if string) or list of colors to use for colormap
         continuous: bool
             if continuous colormap or binned
-
+        fig_name: str
+            absolute figure name (if we want to save it, default no - None)
         """
 
         ## make circle
@@ -713,14 +635,18 @@ class PlotUtils(Utils):
                 #boundaries = np.linspace(0,1,len(cmap_name))
                 #norm = colors.BoundaryNorm(boundaries, colormap.N, clip=True)
                 norm = colors.Normalize(-angle_thresh, angle_thresh) 
+        
+        else:
+            cmap = cmap_name
+            norm = colors.Normalize(-angle_thresh, angle_thresh) # normalize between the point where we defined our color threshold
 
         # non-uniform colorwheel
         if angle_thresh != np.pi:
             
             ## for LH (RVF)
             circle_pa_left = circle_pa.copy()
-            # between thresh angle make it red
-            circle_pa_left[(circle_pa_left < -angle_thresh) | (circle_pa_left > angle_thresh)] = angle_thresh
+            ## between thresh angle make it red
+            #circle_pa_left[(circle_pa_left < -angle_thresh) | (circle_pa_left > angle_thresh)] = angle_thresh
 
             plt.imshow(circle_pa_left, cmap=cmap, norm=norm,origin='lower') # origin lower because imshow flips it vertically, now in right order for VF
             plt.axis('off')
@@ -730,8 +656,8 @@ class PlotUtils(Utils):
             ## for RH (LVF)
             circle_pa_right = circle_pa.copy()
             circle_pa_right = np.fliplr(circle_pa_right)
-            # between thresh angle make it red
-            circle_pa_right[(circle_pa_right < -angle_thresh) | (circle_pa_right > angle_thresh)] = angle_thresh
+            ## between thresh angle make it red
+            #circle_pa_right[(circle_pa_right < -angle_thresh) | (circle_pa_right > angle_thresh)] = angle_thresh
 
             plt.imshow(circle_pa_right, cmap=cmap, norm=norm,origin='lower')
             plt.axis('off')
@@ -746,6 +672,80 @@ class PlotUtils(Utils):
                 plt.savefig('{fn}_colorwheel_continuous.png'.format(fn = fig_name),dpi=100)
             else:
                 plt.savefig('{fn}_colorwheel_discrete.png'.format(fn = fig_name),dpi=100)
+
+
+
+
+    def get_weighted_bins(data_df, x_key = 'ecc', y_key = 'size', weight_key = 'rsq', n_bins = 10):
+
+        """ 
+        
+        Get weighted bins from dataframe, sorted by one of the variables
+
+        """
+        
+        # sort values by eccentricity
+        data_df = data_df.sort_values(by=[x_key])
+
+        #divide in equally sized bins
+        bin_size = int(len(data_df)/n_bins) 
+        
+        mean_x = []
+        mean_x_std = []
+        mean_y = []
+        mean_y_std = []
+        
+        # for each bin calculate rsq-weighted means and errors of binned ecc/gain 
+        for j in range(n_bins): 
+            
+            mean_x.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][x_key],
+                                                weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).mean)
+            mean_x_std.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][x_key],
+                                                    weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
+
+            mean_y.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][y_key],
+                                                weights = data_df[bin_size * j:bin_size*(j+1)][weight_key]).mean)
+            mean_y_std.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][y_key],
+                                                    weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
+
+        return mean_x, mean_x_std, mean_y, mean_y_std
+
+
+    def get_estimates_roi_df(participant, estimates_pp, ROIs = None, roi_verts = None, est_key = 'r2', model = 'gauss'):
+
+        """
+
+        Helper function to get estimates dataframe values for each ROI
+        will select values based on est key param 
+
+        """
+
+        ## save rsq values in dataframe, for plotting
+        df_est = pd.DataFrame({'sj': [], 'index': [], 'ROI': [], 'value': [], 'model': []})
+
+        for idx,rois_ks in enumerate(ROIs): 
+            
+            # mask estimates
+            print('masking estimates for ROI %s'%rois_ks)
+
+            if len(roi_verts[rois_ks]) > 0:
+                if isinstance(estimates_pp, dict):
+                    roi_arr = estimates_pp[est_key][roi_verts[rois_ks]]
+                else:
+                    roi_arr = estimates_pp[roi_verts[rois_ks]]
+            else:
+                print('No vertices found for ROI')
+                roi_arr = [np.nan]
+
+            df_est = pd.concat((df_est,
+                                pd.DataFrame({'sj': np.tile('sub-{sj}'.format(sj = participant), len(roi_arr)), 
+                                            'index': roi_verts[rois_ks], 
+                                            'ROI': np.tile(rois_ks, len(roi_arr)), 
+                                            'value': roi_arr,
+                                            'model': np.tile(model, len(roi_arr))})
+                            ))
+
+        return df_est
 
 
 

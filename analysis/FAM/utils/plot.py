@@ -3,24 +3,22 @@ import numpy as np
 import os
 from os import path as op
 import pandas as pd
-
+from tqdm import tqdm
 
 ## plotting packages
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import matplotlib.colors as colors
-
 import seaborn as sns
-
 import cortex
-
 from PIL import Image, ImageDraw
 
 ## imaging, processing, stats packages
 import nibabel as nib
-
 from statsmodels.stats import weightstats
 
+
+# local packages
 from FAM.utils.general import Utils
 
 class PlotUtils(Utils):
@@ -85,8 +83,7 @@ class PlotUtils(Utils):
 
         #return ax
     
-
-    def get_flatmaps(est_arr1, est_arr2 = None, 
+    def get_flatmaps(self, est_arr1, est_arr2 = None, 
                                 vmin1 = 0, vmax1 = .8, vmin2 = None, vmax2 = None,
                                 pysub = 'hcp_999999', cmap = 'BuBkRd'):
 
@@ -97,18 +94,24 @@ class PlotUtils(Utils):
         ----------
         est_arr1 : array
             data array
+        est_arr2 : array
+            data array
         cmap : str
             string with colormap name
-        vmin: int/float
-            minimum value
-        vmax: int/float 
-            maximum value
+        vmin1: int/float
+            minimum value est_arr1
+        vmin2: int/float
+            minimum value est_arr2
+        vmax1: int/float 
+            maximum value est_arr1
+        vmax2: int/float 
+            maximum value est_arr2
         subject: str
             overlay subject name to use
         """
 
         # if two arrays provided, then fig is 2D
-        if est_arr2:
+        if est_arr2 is not None:
             flatmap = cortex.Vertex2D(est_arr1, est_arr2,
                                     pysub,
                                     vmin = vmin1, vmax = vmax1,
@@ -122,10 +125,9 @@ class PlotUtils(Utils):
 
         return flatmap
 
-
-    def make_raw_vertex_image(data1, cmap = 'hot', vmin = 0, vmax = 1, 
-                            data2 = [], vmin2 = 0, vmax2 = 1, subject = 'fsaverage', data2D = False):  
-        
+    def make_raw_vertex_image(self, data1, cmap = 'hot', vmin = 0, vmax = 1, 
+                          data2 = [], vmin2 = 0, vmax2 = 1, pysub = 'hcp_999999', data2D = False):  
+    
         """ function to fix web browser bug in pycortex
             allows masking of data with nans
         
@@ -133,14 +135,22 @@ class PlotUtils(Utils):
         ----------
         data1 : array
             data array
+        data2 : array
+            alpha array
         cmap : str
             string with colormap name (not the alpha version)
         vmin: int/float
             minimum value
         vmax: int/float 
             maximum value
-        subject: str
+        vmin2: int/float
+            minimum value
+        vmax2: int/float 
+            maximum value
+        pysub: str
             overlay subject name to use
+        data2D: bool
+            if we want to add alpha or not
         
         Outputs
         -------
@@ -150,7 +160,7 @@ class PlotUtils(Utils):
         """
         
         # Get curvature
-        curv = cortex.db.get_surfinfo(subject, type = 'curvature', recache=False)#,smooth=1)
+        curv = cortex.db.get_surfinfo(pysub, type = 'curvature', recache=False)#,smooth=1)
         # Adjust curvature contrast / color. Alternately, you could work
         # with curv.data, maybe threshold it, and apply a color map.     
         curv.data[curv.data>0] = .1
@@ -162,7 +172,7 @@ class PlotUtils(Utils):
         curv.cmap = 'gray'
         
         # Create display data 
-        vx = cortex.Vertex(data1, subject, cmap = cmap, vmin = vmin, vmax = vmax)
+        vx = cortex.Vertex(data1, pysub, cmap = cmap, vmin = vmin, vmax = vmax)
         
         # Pick an arbitrary region to mask out
         # (in your case you could use np.isnan on your data in similar fashion)
@@ -186,17 +196,156 @@ class PlotUtils(Utils):
         display_data = curv_rgb + vx_rgb 
 
         # Create vertex RGB object out of R, G, B channels
-        vx_fin = cortex.VertexRGB(*display_data, subject, curvature_brightness = 0.4, curvature_contrast = 0.1)
+        vx_fin = cortex.VertexRGB(*display_data, pysub, curvature_brightness = 0.4, curvature_contrast = 0.1)
 
         return vx_fin
 
+    def zoom_to_roi(self, pysub, roi = None, hem = 'left', margin=10.0, ax=None):
 
-    def make_colormap(colormap = 'rainbow_r', bins = 256, add_alpha = True, invert_alpha = False, cmap_name = 'costum',
-                        discrete = False, return_cmap = False):
+        """
+        Plot zoomed in view of flatmap, around a given ROI.
+        need to give it the flatmap axis as ref, so it know what to do
+
+        Parameters
+        ----------
+        pysub : str
+            Name of the pycortex subject
+        roi: str
+            name of the ROI to zoom into
+        hem: str
+            left or right hemisphere
+        margin: float
+            margin around ROI - will add/subtract to axis max and min
+        ax: figure axis
+            where to plot (needs to be an axis where a flatmap is already plotted)
+        """
+
+        roi_verts = cortex.get_roi_verts(pysub, roi)[roi]
+        roi_map = cortex.Vertex.empty(pysub)
+        roi_map.data[roi_verts] = 1
+
+        (lflatpts, lpolys), (rflatpts, rpolys) = cortex.db.get_surf(pysub, "flat",
+                                                                    nudge=True)
+        sel_pts = dict(left=lflatpts, right=rflatpts)[hem]
+        roi_pts = sel_pts[np.nonzero(getattr(roi_map, hem))[0],:2]
+
+        xmin, ymin = roi_pts.min(0) - margin
+        xmax, ymax = roi_pts.max(0) + margin
+        
+        ax.axis([xmin, xmax, ymin, ymax])
+
+    def plot_flatmap(self, est_arr1, est_arr2 = None, verts = None, pysub = 'hcp_999999',
+                        vmin1 = 0, vmax1 = .8, vmin2 = None, vmax2 = None, 
+                        cmap='hot', fig_abs_name = None, recache = False, with_colorbar = True,
+                        with_curvature = True, with_sulci = True, with_labels=False,
+                        curvature_brightness = 0.4, curvature_contrast = 0.1, with_rois = True,
+                        zoom2ROI = None, hemi_list = ['left', 'right'], figsize=(15,5), dpi=300, margin = 10):
+
+        """
+        plot flatmap of data (1D)
+        with option to only show select vertices
+
+        Parameters
+        ----------
+        est_arr1 : array
+            data array
+        est_arr2 : array
+            data array
+        verts: array
+            list of vertices to select
+        cmap : str
+            string with colormap name
+        vmin1: int/float
+            minimum value est_arr1
+        vmin2: int/float
+            minimum value est_arr2
+        vmax1: int/float 
+            maximum value est_arr1
+        vmax2: int/float 
+            maximum value est_arr2
+        fig_abs_name: str
+            if provided, will save figure with this absolute name
+        zoom2ROI: str
+            if we want to zoom into an ROI, provide ROI name
+        hemi_list: list/arr
+            when zooming, which hemisphere to look at (can also be both)
+        """
+
+        # subselect vertices, if provided
+        if verts is not None:
+            surface_arr1 = np.zeros(est_arr1.shape[0])
+            surface_arr1[:] = np.nan
+            surface_arr1[verts] = est_arr1[verts]
+            if est_arr2 is not None:
+                surface_arr2 = np.zeros(est_arr2.shape[0])
+                surface_arr2[:] = np.nan
+                surface_arr2[verts] = est_arr2[verts]
+            else:
+                surface_arr2 = None
+        else:
+            surface_arr1 = est_arr1
+            surface_arr2 = est_arr2
+
+        if isinstance(cmap, str):
+            flatmap = self.get_flatmaps(surface_arr1, est_arr2 = surface_arr2, 
+                                vmin1 = vmin1, vmax1 = vmax1, vmin2 = vmin2, vmax2 = vmax2,
+                                cmap = cmap, pysub = pysub)
+        else:
+            if surface_arr2 is None:
+                data2D = False
+            else:
+                data2D = True
+            flatmap = self.make_raw_vertex_image(surface_arr1, 
+                                                cmap = cmap, 
+                                                vmin = vmin1, vmax = vmax1, 
+                                                data2 = surface_arr2, 
+                                                vmin2 = vmin2, vmax2 = vmax2, 
+                                                pysub = pysub, data2D = data2D)
+
+        if len(hemi_list)>1 and zoom2ROI is not None:
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize = figsize, dpi = dpi)
+        else:
+            fig, ax1 =  plt.subplots(1, figsize = figsize, dpi = dpi)
+
+        cortex.quickshow(flatmap, fig = ax1, recache = recache, with_colorbar = with_colorbar, with_rois = with_rois,
+                                with_curvature = with_curvature, with_sulci = with_sulci, with_labels = with_labels,
+                                curvature_brightness = curvature_brightness, curvature_contrast = curvature_contrast)
+        
+        if zoom2ROI is not None:
+            # Zoom on just one hemisphere
+            self.zoom_to_roi(pysub, roi = zoom2ROI, hem = hemi_list[0], ax=ax1, margin = margin)
+
+            if len(hemi_list)>1:
+                cortex.quickshow(flatmap, fig = ax2, recache = recache, with_colorbar = with_colorbar, with_rois = with_rois,
+                                with_curvature = with_curvature, with_sulci = with_sulci, with_labels = with_labels,
+                                curvature_brightness = curvature_brightness, curvature_contrast = curvature_contrast)
+                # Zoom on just one region
+                self.zoom_to_roi(pysub, roi = zoom2ROI, hem = hemi_list[1], ax=ax2, margin = margin)
+
+        # if we provide absolute name for figure, then save there
+        if fig_abs_name is not None:
+
+            fig_pth = op.split(fig_abs_name)[0]
+            # if output path doesn't exist, create it
+            os.makedirs(fig_pth, exist_ok = True)
+
+            print('saving %s' %fig_abs_name)
+            if zoom2ROI is not None:
+                fig.savefig(fig_abs_name, dpi = dpi)
+            else:
+                _ = cortex.quickflat.make_png(fig_abs_name, flatmap, recache = recache, with_colorbar = with_colorbar, with_rois = with_rois,
+                                                    with_curvature = with_curvature, with_sulci = with_sulci, with_labels = with_labels,
+                                                    curvature_brightness = curvature_brightness, curvature_contrast = curvature_contrast)
+            
+        return flatmap
+
+    def make_colormap(self, colormap = 'rainbow_r', bins = 256, add_alpha = True, invert_alpha = False, 
+                      cmap_name = 'custom', discrete = False, return_cmap = False):
 
         """ make custom colormap
         can add alpha channel to colormap,
         and save to pycortex filestore
+        
         Parameters
         ----------
         colormap : str or List/arr
@@ -204,6 +353,8 @@ class PlotUtils(Utils):
             if list/array then contains strings with color names, to create linear segmented cmap
         bins : int
             number of bins for colormap
+        add_alpha: bool
+            if we want to add an alpha channel
         invert_alpha : bool
             if we want to invert direction of alpha channel
             (y can be from 0 to 1 or 1 to 0)
@@ -211,10 +362,8 @@ class PlotUtils(Utils):
             new cmap filename, final one will have _alpha_#-bins added to it
         discrete : bool
             if we want a discrete colormap or not (then will be continuous)
-        Outputs
-        -------
-        rgb_fn : str
-            absolute path to new colormap
+        return_cmap: bool
+            if we want to return the cmap itself or the absolute path to new colormap
         """
         
         if isinstance(colormap, str): # if input is string (so existent colormap)
@@ -222,7 +371,7 @@ class PlotUtils(Utils):
             # get colormap
             cmap = cm.get_cmap(colormap)
 
-        else: # is list of strings
+        elif isinstance(colormap, list) or isinstance(colormap, np.ndarray): # is list of strings
             cvals  = np.arange(len(colormap))
             norm = plt.Normalize(min(cvals),max(cvals))
             tuples = list(zip(map(norm,cvals), colormap))
@@ -231,6 +380,9 @@ class PlotUtils(Utils):
             if discrete == True: # if we want a discrete colormap from list
                 cmap = colors.ListedColormap(colormap)
                 bins = int(len(colormap))
+        
+        else: # assumes it is colormap object
+            cmap = colormap #(range(256)) # note, to get full colormap we cannot make it discrete
 
         # convert into array
         cmap_array = cmap(range(bins))
@@ -278,46 +430,100 @@ class PlotUtils(Utils):
         else:
             return rgb_fn 
 
-
-    def create_glasser_df(path2file):
-
-        """ Function to create glasser dataframe
-        with ROI names, colors (RGBA) and vertex indices
+    def make_2D_colormap(self, rgb_color = '101', bins = 50, scale=[1,1]):
+        
+        """
+        generate 2D basic colormap, from RGB combination,
+        and save to pycortex filestore
 
         Parameters
         ----------
-        path2file : str 
-            path to the parcelation label file
+        rgb_color: str
+            combination of rgb values (ex: 101 means it will use red and blue)
+        bins: int
+            number of color bins between min and max value
+        scale: arr/list
+            int/float with how much to scale each color (ex: 1 == full red)
+        
         """
         
-        # we read in the atlas data, which consists of 180 separate regions per hemisphere. 
-        # These are labeled separately, so the labels go to 360.
-        cifti = nib.load(op.join(path2file,
-                            'Q1-Q6_RelatedParcellation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.59k_fs_LR.dlabel.nii'))
-
-        # get index data array
-        cifti_data = np.array(cifti.get_fdata(dtype=np.float32))[0]
-        # from header get label dict with key + rgba
-        cifti_hdr = cifti.header
-        label_dict = cifti_hdr.get_axis(0)[0][1]
+        ##generating grid of x bins
+        x,y = np.meshgrid(
+            np.linspace(0,1*scale[0],bins),
+            np.linspace(0,1*scale[1],bins)) 
         
-        ## make atlas data frame
-        atlas_df = pd.DataFrame(columns = ['ROI', 'index','R','G','B','A'])
+        # define color combination for plot
+        if rgb_color=='101': #red blue
+            col_grid = np.dstack((x,np.zeros_like(x), y))
+            name='RB'
+        elif rgb_color=='110': # red green
+            col_grid = np.dstack((x, y,np.zeros_like(x)))
+            name='RG'
+        elif rgb_color=='011': # green blue
+            col_grid = np.dstack((np.zeros_like(x),x, y))
+            name='GB'
+        
+        fig = plt.figure(figsize=(1,1))
+        ax = fig.add_axes([0,0,1,1])
+        # plot 
+        plt.imshow(col_grid,
+        extent = (0,1,0,1),
+        origin = 'lower')
+        ax.axis('off')
 
-        for key in label_dict.keys():
+        rgb_fn = op.join(op.split(cortex.database.default_filestore)[
+                            0], 'colormaps', 'custom2D_'+name+'_bins_%d.png'%bins)
 
-            if label_dict[key][0] != '???': 
-                atlas_df = pd.concat((atlas_df,
-                                    pd.DataFrame({'ROI': label_dict[key][0].replace('_ROI',''),
-                                                        'index': key,
-                                                        'R': label_dict[key][1][0],
-                                                        'G': label_dict[key][1][1],
-                                                        'B': label_dict[key][1][2],
-                                                        'A': label_dict[key][1][3]
-                                                        }, index=[0])
-                                    ))
-                
-        return atlas_df, cifti_data
+        plt.savefig(rgb_fn, dpi = 200)
+        
+        return rgb_fn
+
+    def add_data2overlay(self, flatmap = None, name = ''):
+
+        """
+        Helper func to add data to overlay.
+        Useful for ROI drawing
+        
+        Parameters
+        ----------
+        flatmap: pycortex data object
+            XD vertex data
+        name: str
+            name for data layer that will be added
+        """
+
+        # ADD ROI TO OVERLAY
+        cortex.utils.add_roi(flatmap, name = name, open_inkscape=False)
+
+    def plot_2D_DM(self, dm_array, filename):
+
+        """
+        Function to plot design matrix frame by frame 
+        and save movie in folder
+
+        Parameters
+        ----------
+        dm_array: array
+            design matrix [N x N x TR]
+        filename: str
+            absolute filename for output movie 
+        """
+
+        # if output path doesn't exist, create it
+        outfolder = op.split(filename)[0]
+        os.makedirs(outfolder, exist_ok=True)
+
+        print('saving files in %s'%outfolder)
+
+        dm_array = (dm_array * 255).astype(np.uint8)
+
+        for w in tqdm(range(dm_array.shape[-1])):
+            im = Image.fromarray(dm_array[...,w])
+            im.save(op.join(outfolder,"DM_TR-%s.png"%str(w).zfill(4)))  
+
+        ## save as video
+        img_name = op.join(outfolder,'DM_TR-%4d.png')
+        os.system("ffmpeg -r 6 -start_number 0 -i %s -vcodec mpeg4 -y %s"%(img_name, filename)) 
 
 
     def get_weighted_bins(data_df, x_key = 'ecc', y_key = 'size', weight_key = 'rsq', n_bins = 10):
@@ -353,95 +559,6 @@ class PlotUtils(Utils):
                                                     weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
 
         return mean_x, mean_x_std, mean_y, mean_y_std
-
-
-    def get_rois4plotting(self, params, sub_id = None, pysub = 'hcp_999999', use_atlas = None, atlas_pth = '', space = 'fsLR_den-170k'):
-
-        """ 
-
-        NOT DONE YET - BEFORE USE ATLAS WAS BOOL, NOW NEED TO DEFINE NONE IF USING HAND-DRAWN ROIS,
-        OR STRING OF GLASSER VS WANG ATLAS
-
-
-        helper function to get ROI names, vertice index and color palette
-    to be used in plotting scripts
-        
-        Parameters
-        ----------
-        params : dict
-            yaml dict with task related infos  
-        sub_id: str, int or list
-            subject ID to add as identifier in outputed dictionaries
-        pysub: str/dict
-            name of pycortex subject folder, where we drew all ROIs.
-            if dict, assumes key is participant ID, and value is sub specific pycortex folder 
-        use_atlas: bool
-            if we want to use the glasser atlas ROIs instead (this is, from the keys conglomerate defined in the params yml)
-        atlas_pth: str
-            path to atlas file
-        space: str
-            pycortex subject space
-        """ 
-
-        if use_atlas:
-            # Get Glasser atlas
-            atlas_df, atlas_array = create_glasser_df(atlas_pth)
-        
-        if sub_id:
-            
-            # if single id provided, put in list
-            if isinstance(sub_id, str) or isinstance(sub_id, int):
-                sub_id = [sub_id]
-
-            sub_id_list = ['sub-{sj}'.format(sj = str(pp).zfill(3)) if 'sub-' not in str(pp) else str(pp) for pp in sub_id]
-
-            ## start empty dictionaries  
-            ROIs = {}
-            color_codes = {}
-            roi_verts = {}
-
-            # loop over participant list
-            for pp in sub_id_list:
-
-                print('Getting ROIs for participants %s'%pp)
-
-                if use_atlas:
-                    print('Using Glasser ROIs')
-                    # ROI names
-                    ROIs[pp] = list(params['plotting']['ROIs']['glasser_atlas'].keys())
-
-                    # colors
-                    color_codes[pp] = {key: params['plotting']['ROIs']['glasser_atlas'][key]['color'] for key in ROIs[pp]}
-
-                    # get vertices for ROI
-                    roi_verts[pp] = {}
-                    for _,key in enumerate(ROIs[pp]):
-                        print(key)
-                        roi_verts[pp][key] = np.hstack((np.where(atlas_array == ind)[0] for ind in atlas_df[atlas_df['ROI'].isin(params['plotting']['ROIs']['glasser_atlas'][key]['ROI'])]['index'].values))
-
-                else:
-                    ## check if dict or str
-                    if isinstance(pysub, dict):
-                        pysub_pp = pysub[pp]
-                    else:
-                        pysub_pp = pysub
-
-                    # set ROI names
-                    ROIs[pp] = params['plotting']['ROIs'][space]
-
-                    # dictionary with one specific color per group - similar to fig3 colors
-                    color_codes[pp] = {key: params['plotting']['ROI_pal'][key] for key in ROIs[pp]}
-
-                    # get vertices for ROI
-                    roi_verts[pp] = {}
-                    for _,val in enumerate(ROIs[pp]):
-                        print(val)
-                        roi_verts[pp][val] = cortex.get_roi_verts(pysub_pp,val)[val]
-                
-        else:
-            raise NameError('No subject ID provided')
-        
-        return ROIs, roi_verts, color_codes
 
 
     def fwhmax_fwatmin(model, estimates, normalize_RFs=False, return_profiles=False):
@@ -504,63 +621,7 @@ class PlotUtils(Utils):
             return result
 
 
-    def import_fmriprep2pycortex(source_directory, sj, dataset=None, ses=None, acq=None):
-        
-        """Import a subject from fmriprep-output to pycortex
-        
-        Parameters
-        ----------
-        source_directory : string
-        Local directory that contains both fmriprep and freesurfer subfolders 
-        sj : string
-            Fmriprep subject name (without "sub-")
-        dataset : string
-        If you have multiple fmriprep outputs from different datasets, use this attribute
-        to add a prefix to every subject id ('ds01.01' rather than '01')
-        ses : string, optional
-        BIDS session that contains the anatomical data
-        acq : string, optional
-            If we intend to specific the acquisition of the T1w file (for naming purposes)
-        """
-        if dataset is not None:
-            pycortex_sub = '{ds}.{sub}'.format(ds=dataset, sub=sj)
-        else:
-            pycortex_sub = '{sub}'.format(sub=sj)
-
-        if pycortex_sub in cortex.database.db.subjects.keys():
-            print('subject %s already in filestore, will not overwrite'%pycortex_sub)
-        else:
-            
-            # import subject into pycortex database
-            cortex.fmriprep.import_subj(subject = sj, source_dir = source_directory, 
-                                session = ses, dataset = dataset, acq = acq)
-
-
-    def plot_pRF_DM(dm_array, filename):
-
-        """
-        Function to plot design matrix frame by frame 
-        and save movie in folder
-
-        """
-
-        # if output path doesn't exist, create it
-
-        outfolder = op.split(filename)[0]
-
-        if not op.isdir(outfolder): 
-            os.makedirs(outfolder)
-        print('saving files in %s'%filename)
-
-        dm_array = (dm_array * 255).astype(np.uint8)
-
-        for w in range(dm_array.shape[-1]):
-            im = Image.fromarray(dm_array[...,w])
-            im.save(op.join(outfolder,"DM_TR-%s.png"%str(w).zfill(4)))  
-
-        ## save as video
-        img_name = op.join(outfolder,'DM_TR-%4d.png')
-        os.system("ffmpeg -r 6 -start_number 0 -i %s -vcodec mpeg4 -y %s"%(img_name, filename))  
+ 
 
 
     def get_estimates_roi_df(participant, estimates_pp, ROIs = None, roi_verts = None, est_key = 'r2', model = 'gauss'):

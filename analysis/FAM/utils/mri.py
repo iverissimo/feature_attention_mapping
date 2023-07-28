@@ -1128,52 +1128,6 @@ class MRIUtils(Utils):
 
         return outfiles
 
-
-
-    def plot_DM(DM, vertex, output, names=['intercept','ACAO', 'ACUO', 'UCAO', 'UCUO'], save_fig = False):
-        
-        """ plot design matrix for a given vertex
-        similar to nilearn dm plotting func
-        
-        Parameters
-        ----------
-        DM : array
-            design matrix with shape (vertices, time, regressors)
-        vertex : int
-            vertex
-        output: str
-            absolute output filename
-            
-        """
-        X = DM[vertex]
-        
-        max_len = np.max([len(str(name)) for name in names])
-        
-        fig_height = 1 + .1 * X.shape[0] + .04 * max_len
-        if fig_height < 3:
-            fig_height = 3
-        elif fig_height > 10:
-            fig_height = 10
-        
-        plt.figure(figsize=(1 + .5 * len(names), fig_height))
-        ax = plt.subplot(1, 1, 1)
-
-        ax.imshow(X, interpolation='nearest', aspect='auto')
-        ax.set_label('conditions')
-        ax.set_ylabel('scan number')
-
-        ax.set_xticks(range(len(names)))
-        ax.set_xticklabels(names, rotation=60, ha='left')
-        # Set ticks above, to have a display more similar to the display of a
-        # corresponding dataframe
-        ax.xaxis.tick_top()
-
-        plt.tight_layout()
-
-        if save_fig: 
-            print('saving %s'%output)
-            plt.savefig(output)
-
     
     def fit_glm(voxel, dm, error='mse'):
         

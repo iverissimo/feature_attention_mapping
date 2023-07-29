@@ -129,8 +129,7 @@ match data_type:
                 print('Plotting vasculature proxy for pRF task')
 
                 plotter.plot_vasculature(participant_list = FAM_mri.MRIObj.sj_num, 
-                                                input_pth = None, 
-                                                file_ext = FAM_mri.get_mrifile_ext())
+                                        file_ext = FAM_mri.get_mrifile_ext())
 
             case 'bold':
                 
@@ -164,7 +163,6 @@ match data_type:
                                         run, ses, 
                                         task = task_name, input_pth = None,
                                         file_ext = FAM_mri.get_mrifile_ext()[task_name])
-
 
             case TypeError:
                 print('viz option NOT VALID')

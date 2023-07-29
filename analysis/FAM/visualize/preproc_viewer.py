@@ -576,7 +576,6 @@ freeview -v \
                 fig.savefig(op.join(outdir,'tSNR_ROIS_sub-{sj}_{ses}.png'.format(sj=pp, ses=ses)), dpi=100,bbox_inches = 'tight')
         #return tsnr_df
 
-
     def plot_vasculature(self, participant_list = [], input_pth = None, 
               file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'}):
 
@@ -587,8 +586,12 @@ freeview -v \
         
         Parameters
         ----------
+        participant_list: list
+            list of participants to check segmentations (if empty will run for all)
         input_pth: str
             path to look for files, if None then will get them from derivatives/freesurfer/sub-X folder
+        file_ext: dict
+            file extension to use (for each task)
         """ 
 
         ## output path to save plots
@@ -605,24 +608,22 @@ freeview -v \
         ## loop over participants
         for pp_ind, pp in enumerate(participant_list):
 
+            outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp))
+            # if output path doesn't exist, create it
+            os.makedirs(outdir, exist_ok=True)
+            print('saving files in %s'%outdir)
+
             # and over sessions (if more than one)
             for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
                 
                 # path to post fmriprep dir
                 postfmriprep_pth = op.join(input_pth, 'sub-{sj}'.format(sj=pp), ses)
 
-                outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp), ses)
-                # if output path doesn't exist, create it
-                if not op.isdir(outdir): 
-                    os.makedirs(outdir)
-                print('saving files in %s'%outdir)
-
                 ## bold filenames
                 bold_files = [op.join(postfmriprep_pth, run) for run in os.listdir(postfmriprep_pth) if 'space-{sp}'.format(sp=self.MRIObj.sj_space) in run \
                                     and 'acq-{a}'.format(a=self.MRIObj.acq) in run and 'task-pRF' in run and run.endswith(file_ext['pRF'])]
 
                 mean_epi = []
-
                 for file in bold_files:
                     ## use non-PSC file
                     if 'cropped' in file:
@@ -636,21 +637,15 @@ freeview -v \
                 
                 # normalize image by dividing the value of each vertex 
                 # by the value of the vertex with the maximum intensity
-                norm_data = mri_utils.normalize(mean_epi)
+                norm_data = self.MRIObj.mri_utils.normalize(mean_epi)
 
-                ## plot average tSNR values on flatmap surface ##
-                epi_flatmap = cortex.Vertex(norm_data, 
-                                            self.MRIObj.params['plotting']['pycortex_sub'],
-                                            vmin = 0, vmax = 1,
-                                            cmap='hot')
-                #cortex.quickshow(epi_flatmap, with_curvature=True, with_sulci=True)
-                _ = cortex.quickflat.make_png(op.join(outdir,
-                                'mean_epi_flatmap_sub-{sj}_{ses}_task-pRF.png'.format(sj=pp, ses=ses)), 
-                                epi_flatmap, 
-                                recache = False, with_colorbar = True,
-                                with_curvature = True, with_sulci = True,
-                                curvature_brightness = 0.4, curvature_contrast = 0.1)
-
+                ## plot 'vein map' on flatmap surface ##
+                fig_name = op.join(outdir,
+                                'mean_epi_flatmap_sub-{sj}_{ses}_task-pRF.png'.format(sj=pp, ses=ses))
+                self.plot_utils.plot_flatmap(norm_data, 
+                                            pysub = self.pysub, cmap='hot', 
+                                            vmin1 = 0, vmax1 = 1, 
+                                            fig_abs_name = fig_name)
 
     def plot_bold_on_surface(self, participant_list = [], input_pth = None, run_type = 'mean', task = 'pRF',
                          stim_on_screen = None, use_atlas_rois = None,

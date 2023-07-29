@@ -311,7 +311,9 @@ class pRF_model(Model):
         """  
 
         ## get list of files to load
-        bold_filelist = self.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
+        bold_filelist = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext,
+                                                 postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
+                                                 acq_name = self.MRIObj.acq)
         
         ## Load data array
         data = self.get_data4fitting(bold_filelist, task = 'pRF', run_type = run_type, chunk_num = chunk_num, vertex = vertex, 

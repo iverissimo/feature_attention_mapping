@@ -222,40 +222,6 @@ class Model:
         else:
             return data2fit
 
-
-    def get_bold_file_list(self, participant, task = 'pRF', ses = 'ses-mean', file_ext = '_cropped_dc_psc.npy'):
-
-        """
-        Helper function to get list of bold file names
-        to then be loaded and used
-
-        Parameters
-        ----------
-        participant: str
-            participant ID
-        ses: str
-            session we are looking at
-
-        """
-
-        ## get list of possible input paths
-        # (sessions)
-        input_list = glob.glob(op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space, 
-                                    'sub-{sj}'.format(sj = participant), 'ses-*'))
-
-        # list with absolute file names to be fitted
-        bold_filelist = [op.join(file_path, file) for file_path in input_list for file in os.listdir(file_path) if 'task-{tsk}'.format(tsk = task) in file and \
-                        'acq-{acq}'.format(acq = self.MRIObj.acq) in file and file.endswith(file_ext)]
-        
-        # if we're not combining sessions
-        if isinstance(ses, int) or (isinstance(ses, str) and len(re.findall(r'\d{1,10}', ses))>0):
-
-            ses_key = 'ses-{s}'.format(s = re.findall(r'\d{1,10}', str(ses))[0])
-            bold_filelist = [file for file in bold_filelist if ses_key in file]
-        
-        return bold_filelist
-
-
     def subselect_array(self, input_arr, task = 'pRF', chunk_num = None, vertex = None):
         
         """

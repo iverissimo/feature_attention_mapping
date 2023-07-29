@@ -43,7 +43,6 @@ class PreprocBeh:
         ## number of trials (= total #TRs)
         self.FA_total_trials = len(self.FA_bar_pass_all)
         
-    
     def load_events(self, participant, ses = 'ses-1', ses_type = 'func', tasks = ['pRF', 'FA']):
         
         """
@@ -98,7 +97,6 @@ class PreprocBeh:
                         events_df[tsk]['run-{r}'.format(r=(r+1))] = df_run
         
         return events_df
-    
     
     def load_trial_info(self, participant, ses = 'ses-1', ses_type = 'func', tasks = ['pRF', 'FA']):
         
@@ -155,7 +153,6 @@ class PreprocBeh:
         
         return trial_info_df
 
-
     def load_FA_bar_position(self, participant, ses = 'ses-1', ses_type = 'func', run_num = None):
         
         """
@@ -209,7 +206,6 @@ class PreprocBeh:
                         bar_pos_df['run-{r}'.format(r=(r+1))] = df_run
         
         return bar_pos_df
-    
     
     def get_pRF_behavioral_results(self, ses_type = 'func'):
         
@@ -298,7 +294,6 @@ class PreprocBeh:
                                                                     
         return df_summary
 
-
     def get_pRF_mask_bool(self, ses_type = 'func'):
         
         """
@@ -369,7 +364,32 @@ class PreprocBeh:
                                         ))
         
         return df_mask_bool
+    
+    def get_stim_on_screen(self, task = 'pRF', crop_nr = None, shift = 0):
 
+        """
+        Get boolean array indicating on which TRs stimuli is on screen
+        (useful for plotting/bookeeping)
+
+        Parameters
+        ----------
+        task: str
+            task name
+        crop_nr : None or int
+            if not none, expects int with number of FIRST time points to crop
+        shift : int
+            positive or negative int, of number of time points to shift (if neg, will shift leftwards)
+        """ 
+
+        # make stim on screen arr
+        if task == 'pRF':
+            stim_on_screen = np.zeros(self.pRF_total_trials)
+            stim_on_screen[self.pRF_bar_pass_trials] = 1
+        elif task == 'FA':
+            stim_on_screen = np.zeros(self.FA_total_trials)
+            stim_on_screen[self.FA_bar_pass_trials] = 1
+            
+        return self.MRIObj.mri_utils.crop_shift_arr(stim_on_screen, crop_nr = crop_nr, shift = shift)
 
     def get_FA_behavioral_results(self, ses_type = 'func'):
         

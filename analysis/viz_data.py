@@ -135,13 +135,26 @@ match data_type:
                 
                 print('Plotting BOLD amplitude')
 
-                task_name = 'pRF' if task.lower == 'prf' else 'FA' 
+                use_mean_run = ''
+                while use_mean_run not in ['y', 'n']:
+                    use_mean_run = int(input("Plot mean run? [y/n]: "))
+
+                if use_mean_run == 'y':
+                    run_type = 'mean'
+                    ses_num = None
+                else:
+                    run_type = ''
+                    while not isinstance(run_type, int):
+                        run_type = int(input("Which run number to choose? (Ex 1, 2, ..): "))
+                    ses_num = ''
+                    while not isinstance(ses_num, int):
+                        ses_num = int(input("Which session number to choose? (Ex 1, 2): "))
 
                 plotter.plot_bold_on_surface(participant_list = FAM_mri.MRIObj.sj_num, 
-                                            input_pth = None, 
-                                            run_type = 'mean', 
-                                            task = task_name,
-                                            stim_on_screen = None,
+                                            run_num = run_type, ses_num = ses_num, task = task, 
+                                            stim_on_screen = FAM_beh.get_stim_on_screen(task = task, 
+                                                                                        crop_nr = FAM_mri.MRIObj.mri_nr_cropTR[task], 
+                                                                                        shift = FAM_mri.MRIObj.shift_TRs_num),
                                             use_atlas_rois = use_atlas,
                                             file_ext = FAM_mri.get_mrifile_ext())
 

@@ -334,7 +334,9 @@ class GLMsingle_Model(Model):
         """ 
 
         ## get list of files to load
-        bold_filelist = self.get_bold_file_list(participant, task = 'FA', ses = 'ses-combined', file_ext = file_ext)
+        bold_filelist = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'FA', ses = 'ses-combined', file_ext = file_ext,
+                                                                postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
+                                                                acq_name = self.MRIObj.acq)
 
         ## Not correcting baseline
         self.correct_baseline['FA'] = False
@@ -364,7 +366,9 @@ class GLMsingle_Model(Model):
         # to give as input to glmsingle (excluding them from noise pool)
 
         # get prf bold filenames
-        prf_bold_files = self.get_bold_file_list(participant, task = 'pRF', ses = 'ses-mean', file_ext = nm_file_extent['pRF'])
+        prf_bold_files = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'pRF', ses = 'ses-mean', file_ext = nm_file_extent['pRF'],
+                                                                postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
+                                                                acq_name = self.MRIObj.acq)
 
         ## find unique session number
         prf_ses_num = np.unique([mri_utils.get_run_ses_from_str(f)[-1] for f in prf_bold_files])
@@ -405,7 +409,9 @@ class GLMsingle_Model(Model):
         ## now do the same correlation mask for the FA runs ###################
 
         # get prf bold filenames
-        fa_bold_files = self.get_bold_file_list(participant, task = 'FA', ses = 'ses-mean', file_ext = nm_file_extent['FA'])
+        fa_bold_files = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'FA', ses = 'ses-mean', file_ext = nm_file_extent['FA'],
+                                                                postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
+                                                                acq_name = self.MRIObj.acq)
 
         ## find unique session number
         fa_ses_num = np.unique([mri_utils.get_run_ses_from_str(f)[-1] for f in fa_bold_files])

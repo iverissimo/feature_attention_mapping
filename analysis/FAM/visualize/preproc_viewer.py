@@ -647,8 +647,8 @@ freeview -v \
                                             vmin1 = 0, vmax1 = 1, 
                                             fig_abs_name = fig_name)
 
-    def plot_bold_on_surface(self, participant_list = [], input_pth = None, run_type = 'mean', task = 'pRF',
-                         stim_on_screen = None, use_atlas_rois = None,
+    def plot_bold_on_surface(self, participant_list = [], input_pth = None, run_num = 'mean', ses_num = 1,
+                             task = 'pRF', stim_on_screen = None, use_atlas_rois = None,
                          file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'}):
 
         """
@@ -664,119 +664,84 @@ freeview -v \
             list with participant ID
         input_pth: str or None
             path to look for files, if None then will get them from derivatives/postfmriprep/<space>/sub-X folder
-        run_type: string or int
+        run_num: string or int
             if we want to average (mean vs median) or just plot a single run (1)
         stim_on_screen: arr
             boolean array with moments where stim was on screen
         file_ext: dict
-            dictionary with file extension per task, to select appropriate files
+            file extension to use (for each task)
         """ 
-        
-        ## if not array provided with instances where stim was on screen, make it
-        if not stim_on_screen:
             
-            # load preproc functions for object
-            mri_beh = preproc_behdata.PreprocBeh(self.MRIObj)
-            
-            # make stim on screen arr
-            if task == 'pRF':
-                stim_on_screen = np.zeros(mri_beh.pRF_total_trials)
-                stim_on_screen[mri_beh.pRF_bar_pass_trials] = 1
-            elif task == 'FA':
-                stim_on_screen = np.zeros(mri_beh.FA_total_trials)
-                stim_on_screen[mri_beh.FA_bar_pass_trials] = 1
-                
-            # crop and shift if it's the case
-            crop_nr = self.MRIObj.params[task]['crop_TR'] if self.MRIObj.params[task]['crop'] else None
-    
-            stim_on_screen = mri_utils.crop_shift_arr(stim_on_screen, 
-                                                    crop_nr = crop_nr, 
-                                                    shift = self.MRIObj.params['mri']['shift_DM_TRs'])
-            
-        ## output path to save plots
-        output_pth = op.join(self.outputdir, 'BOLD', task)
+        ## set output path where we want to save plots
+        output_pth = op.join(self.figures_pth, 'BOLD', task)
 
         ## input path, if not defined get's it from post-fmriprep dir
         if input_pth is None:
-            input_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space)
+            input_pth = self.MRIObj.postfmriprep_pth
 
-    
         ## if no participant list set, then run all
         if len(participant_list) == 0:
             participant_list = self.MRIObj.sj_num
 
-        ## get vertices for each relevant ROI
-        # from glasser atlas
-        ROIs, roi_verts, color_codes = plot_utils.get_rois4plotting(self.MRIObj.params, 
-                                                                sub_id = participant_list,
-                                                                pysub = self.MRIObj.params['plotting']['pycortex_sub'], 
-                                                                use_atlas = use_atlas_rois, 
-                                                                atlas_pth = op.join(self.MRIObj.derivatives_pth,
-                                                                                    'glasser_atlas','59k_mesh'), 
-                                                                space = self.MRIObj.sj_space)
-        
+        if use_atlas_rois is None:
+            plot_key = self.MRIObj.sj_space 
+            annot_filename = ''
+        else:
+            plot_key = use_atlas_rois
+            annot_filename = self.MRIObj.atlas_annot[plot_key]
+
         ## loop over participants
+        for pp_ind, pp in enumerate(participant_list):
 
-        for pp in participant_list:
+            ## get vertices for each relevant ROI
+            if (use_atlas_rois is None) or (pp_ind == 0):
+                ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = pp, pysub = self.pysub, use_atlas = use_atlas_rois, 
+                                                                annot_filename = annot_filename, hemisphere = 'BH',
+                                                                ROI_labels = self.MRIObj.params['plotting']['ROIs'][plot_key])
 
-            # and over sessions (if more than one)
-            for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
+            outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp))
+            # if output path doesn't exist, create it
+            os.makedirs(outdir, exist_ok=True)
+            print('saving files in %s'%outdir)
+
+            ## session key
+            ses = 'ses-{s}'.format(s = int(ses_num))
+
+            # run or runs (if average)
+            run_list = [run_num] if isinstance(run_num, int) else []
                 
-                # path to post fmriprep dir
-                postfmriprep_pth = op.join(input_pth, 'sub-{sj}'.format(sj=pp), ses)
-
-                outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp), ses, 'run-{rt}'.format(rt=run_type))
-                # if output path doesn't exist, create it
-                if not op.isdir(outdir): 
-                    os.makedirs(outdir)
-                print('saving files in %s'%outdir)
-
+            # load bold files
+            if ses not in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
+                print('No session files found for participant {p}, skipping'.format(p = pp))
+            else:
                 ## bold filenames
-                bold_files = [op.join(postfmriprep_pth, run) for run in os.listdir(postfmriprep_pth) if 'space-{sp}'.format(sp=self.MRIObj.sj_space) in run \
-                                    and 'acq-{a}'.format(a=self.MRIObj.acq) in run and \
-                              'task-{tsk}'.format(tsk=task) in run and run.endswith(file_ext[task])]
-
-                ## Load data we want to look at 
-                # single run
-                if isinstance(run_type, int):
-                    bold_files = [val for val in bold_files if 'run-{rt}'.format(rt=run_type) in val]
-                    if len(bold_files)>0:
-                        data_arr = np.load(bold_files[0],allow_pickle=True)
-                    else:
-                        raise NameError('run-{rt} doesnt exist in {ip}'.format(rt=run_type,
-                                                                                ip=input_pth))
-                # average runs
-                elif isinstance(run_type, str):
-                    match run_type:
-                        case 'mean':
-                            data_arr = np.mean(np.stack((np.load(val,allow_pickle=True) for val in bold_files)), axis = 0)
-                        case 'median':
-                            data_arr = np.median(np.stack((np.load(val,allow_pickle=True) for val in bold_files)), axis = 0)
-                        case TypeError:
-                            print('run-{rt} not implemented/exists'.format(rt=run_type))
-                            
-                            
+                bold_files = self.MRIObj.mri_utils.get_bold_file_list(pp, task = task, ses = ses, file_ext = file_ext,
+                                                                    postfmriprep_pth = input_pth, acq_name = self.MRIObj.acq,
+                                                                    run_list = run_list)
+                
+                # load runs
+                data_arr = np.mean(np.stack((np.load(val, allow_pickle=True) for val in bold_files)), axis = 0)
+ 
                 ### if FA then we also want to get average timecourse across ROI ####
                 # to check if something is off (some arousal artifact or so) 
-                if (task == 'FA') and (run_type in ['mean', 'median']):
+                if task == 'FA' and isinstance(run_num, str):
 
                     avg_bold_roi = {} #empty dictionary 
 
-                    for _,val in enumerate(ROIs['sub-{sj}'.format(sj=pp)]):    
-                        avg_bold_roi[val] = np.nanmean(data_arr[roi_verts['sub-{sj}'.format(sj=pp)][val]], axis=0)
+                    for _,roi_name in enumerate(ROIs_dict.keys()):    
+                        avg_bold_roi[roi_name] = np.nanmean(data_arr[ROIs_dict[roi_name]], axis=0)
                         
                     # plot data with model
                     fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
 
-                    time_sec = np.linspace(0,len(data_arr[0]) * self.MRIObj.params['mri']['TR'], num=len(data_arr[0])) # array with timepoints, in seconds
-                    
+                    time_sec = np.linspace(0,len(data_arr[0]) * self.MRIObj.TR, num=len(data_arr[0])) # array with timepoints, in seconds
                     plt.plot(time_sec, stim_on_screen, linewidth = 5, alpha = 1, linestyle = 'solid', color = 'gray')
 
-                    for _,key in enumerate(ROIs['sub-{sj}'.format(sj=pp)]):
-                        plt.plot(time_sec, avg_bold_roi[key], linewidth = 1.5, label = '%s'%key, color = color_codes['sub-{sj}'.format(sj=pp)][key], alpha = .6)
+                    for _,roi_name in enumerate(ROIs_dict.keys()): 
+                        plt.plot(time_sec, avg_bold_roi[roi_name], linewidth = 1.5, label = '%s'%roi_name, alpha = .6)
 
                     # also plot average of all time courses
-                    plt.plot(time_sec, np.mean(np.stack((avg_bold_roi[val] for val in ROIs['sub-{sj}'.format(sj=pp)]), axis = 0), axis = 0),
+                    plt.plot(time_sec, np.mean(np.stack((avg_bold_roi[roi_name] for roi_name in ROIs_dict.keys()), axis = 0), axis = 0),
                             linewidth = 2.5, label = 'average', linestyle = 'solid', color = 'k')
 
                     axis.set_xlabel('Time (s)',fontsize=20, labelpad=20)
@@ -784,19 +749,27 @@ freeview -v \
                     axis.legend(loc='upper left',fontsize=7)  # doing this to guarantee that legend is how I want it 
                     #axis.set_xlim([0, time_sec[-1]])
 
-                    fig.savefig(op.join(outdir, 'average_BOLD_across_runs_rois.png'))
-                ###
-
+                    fig.savefig(op.join(outdir, 'average_BOLD_across_runs_rois_sub-{sj}_{ses}_run-{run}_task-{tsk}_acq-{acq}.png'.format(sj = pp, 
+                                                                                                                                        ses = ses,
+                                                                                                                                        run = run_num, 
+                                                                                                                                        tsk = task, 
+                                                                                                                                        acq = self.MRIObj.acq)))
 
                 ######## make movie #########
                 movie_name = op.join(outdir,
-                                     'flatmap_space-{space}_type-BOLD_visual_movie.mp4'.format(space=self.MRIObj.sj_space))
+                                     'flatmap_space-{space}_type-BOLD_visual_movie_sub-{sj}_{ses}_run-{run}_task-{tsk}_acq-{acq}.mp4'.format(space=self.MRIObj.sj_space,
+                                                                                                                                             sj = pp, 
+                                                                                                                                            ses = ses,
+                                                                                                                                            run = run_num, 
+                                                                                                                                            tsk = task, 
+                                                                                                                                            acq = self.MRIObj.acq))
 
                 if not op.isfile(movie_name):
                     for num_tr in range(data_arr.shape[-1]):
 
-                        filename = op.join(outdir,'flatmap_space-{space}_type-BOLD_visual_TR-{time}.png'.format(space = self.MRIObj.sj_space,
-                                                                                                                time = str(num_tr).zfill(3)))
+                        filename = movie_name.replace('movie', 'visual_TR-{time}'.format(time = str(num_tr).zfill(3)))
+                        filename = filename.replace('.mp4', '.png')
+
                         if not op.isfile(filename): # if image already in dir, skip
                         
                             # set figure grid 

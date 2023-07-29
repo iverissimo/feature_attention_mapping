@@ -7,6 +7,7 @@ import pandas as pd
 import re, json
 from shutil import copy2
 import itertools
+import glob
 
 ## imaging, processing, stats packages
 import nibabel as nib
@@ -306,7 +307,44 @@ class MRIUtils(Utils):
         else:
             return tsnr
 
+    def get_bold_file_list(self, participant, task = 'pRF', ses = 'ses-mean', file_ext = '_cropped_dc_psc.npy',
+                                postfmriprep_pth = '', acq_name = 'nordic', run_list = []):
 
+        """
+        Helper function to get list of bold file names
+        to then be loaded and used
+
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        ses: str
+            session we are looking at
+
+        """
+
+        ## get list of possible input paths
+        # (sessions)
+        input_list = glob.glob(op.join(postfmriprep_pth, 'sub-{sj}'.format(sj = participant), 'ses-*'))
+
+        # list with absolute file names to be fitted
+        bold_filelist = [op.join(file_path, file) for file_path in input_list for file in os.listdir(file_path) if 'task-{tsk}'.format(tsk = task) in file and \
+                        'acq-{acq}'.format(acq = acq_name) in file and file.endswith(file_ext)]
+        
+        # if we're not combining sessions
+        if isinstance(ses, int) or (isinstance(ses, str) and len(re.findall(r'\d{1,10}', ses))>0):
+
+            ses_key = 'ses-{s}'.format(s = re.findall(r'\d{1,10}', str(ses))[0])
+            bold_filelist = [file for file in bold_filelist if ses_key in file]
+
+        if len(run_list)>0:
+            tmp_boldlist = []
+            for rn in run_list:
+                tmp_boldlist += [val for val in bold_filelist if 'run-{r}'.format(r=rn) in val]
+            
+            bold_filelist = tmp_boldlist
+        
+        return bold_filelist
 
 
     

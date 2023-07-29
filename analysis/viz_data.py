@@ -121,7 +121,6 @@ match data_type:
                 print('Plotting tSNR')
 
                 plotter.plot_tsnr(participant_list = FAM_mri.MRIObj.sj_num, 
-                                input_pth = None, 
                                 use_atlas_rois = use_atlas,
                                 file_ext = FAM_mri.get_mrifile_ext())
 

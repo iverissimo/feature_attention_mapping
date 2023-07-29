@@ -151,7 +151,6 @@ freeview -v \
                 convert_command = f'ffmpeg -framerate 5 -pattern_type glob -i "{output_pth}/*.png" -b:v 2M -c:v mpeg4 {output_pth}/{subject}.mp4'
                 subprocess.call(convert_command, shell=True)
 
-
     def compare_nordic2standard(self, participant_list = [], input_pth = None, 
                                 file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'},
                                 use_atlas_rois = None, acq_keys = ['standard', 'nordic'], plot_group = True):
@@ -461,8 +460,7 @@ freeview -v \
             fig.savefig(op.join(output_pth,'half_split_correlation_ROIS_distribution_sub-GROUP.png'), dpi=100,bbox_inches = 'tight')
 
         #return tsnr_df, corr_df, surf_avg_corr
-                            
-                        
+                                          
     def plot_tsnr(self, participant_list = [], input_pth = None, use_atlas_rois = None,
               file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'}):
 
@@ -473,16 +471,22 @@ freeview -v \
         
         Parameters
         ----------
+        participant_list: list
+            list of participants to check segmentations (if empty will run for all)
         input_pth: str
             path to look for files, if None then will get them from derivatives/freesurfer/sub-X folder
+        file_ext: dict
+            file extension to use (for each task)
+        use_atlas_rois: str
+            if we want to use atlas rois (glasser, wang) or not (then will default to hand-drawn)
         """ 
 
         ## output path to save plots
-        output_pth = op.join(self.outputdir, 'tSNR')
+        output_pth = op.join(self.figures_pth, 'tSNR')
 
         ## input path, if not defined get's it from post-fmriprep dir
         if input_pth is None:
-            input_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space)
+            input_pth = self.MRIObj.postfmriprep_pth
 
         ## empty dataframe to save mean values per run
         tsnr_df = pd.DataFrame({'sj': [], 'ses': [], 'task': [], 'ROI': [], 'mean_tsnr': []})
@@ -491,20 +495,27 @@ freeview -v \
         if len(participant_list) == 0:
             participant_list = self.MRIObj.sj_num
 
-        ## get vertices for each relevant ROI
-        # from glasser atlas
-        ROIs, roi_verts, color_codes = plot_utils.get_rois4plotting(self.MRIObj.params, 
-                                                                sub_id = participant_list,
-                                                                pysub = self.MRIObj.params['plotting']['pycortex_sub'], 
-                                                                use_atlas = use_atlas_rois, 
-                                                                atlas_pth = op.join(self.MRIObj.derivatives_pth,
-                                                                                    'glasser_atlas','59k_mesh'), 
-                                                                space = self.MRIObj.sj_space)
+        if use_atlas_rois is None:
+            plot_key = self.MRIObj.sj_space 
+            annot_filename = ''
+        else:
+            plot_key = use_atlas_rois
+            annot_filename = self.MRIObj.atlas_annot[plot_key]
         
         ## loop over participants
+        for pp_ind, pp in enumerate(participant_list):
 
-        for pp in participant_list:
+            if (use_atlas_rois is None) or (pp_ind == 0):
+                ## get vertices for each relevant ROI
+                ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = pp, pysub = self.pysub, use_atlas = use_atlas_rois, 
+                                                                annot_filename = annot_filename, hemisphere = 'BH',
+                                                                ROI_labels = self.MRIObj.params['plotting']['ROIs'][plot_key])
 
+            outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp))
+            # if output path doesn't exist, create it
+            os.makedirs(outdir, exist_ok=True)
+            print('saving files in %s'%outdir)
+            
             # and over sessions (if more than one)
             for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
                 
@@ -512,12 +523,6 @@ freeview -v \
                 
                 # path to post fmriprep dir
                 postfmriprep_pth = op.join(input_pth, 'sub-{sj}'.format(sj=pp), ses)
-
-                outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp), ses)
-                # if output path doesn't exist, create it
-                if not op.isdir(outdir): 
-                    os.makedirs(outdir)
-                print('saving files in %s'%outdir)
                     
                 ## load data for both tasks
                 for tsk in self.MRIObj.tasks:
@@ -536,29 +541,26 @@ freeview -v \
                         else:
                             r = r.replace(file_ext[tsk], '.npy')
 
-                        ## stack whole brain tsnr - will be used to weight correlations
-                        tsnr_arr.append(mri_utils.get_tsnr(np.load(r), return_mean = False))
+                        ## stack whole brain tsnr 
+                        tsnr_surf = self.MRIObj.mri_utils.get_tsnr(np.load(r), return_mean = False)
+                        tsnr_arr.append(tsnr_surf)
 
+                        # save rois values in df
                         tsnr_df = pd.concat((tsnr_df, 
-                                            pd.DataFrame({'sj': np.tile(pp, len(ROIs['sub-{sj}'.format(sj=pp)])), 
-                                                        'ses': np.tile(ses, len(ROIs['sub-{sj}'.format(sj=pp)])), 
-                                                        'task': np.tile(tsk, len(ROIs['sub-{sj}'.format(sj=pp)])), 
-                                                        'ROI': ROIs['sub-{sj}'.format(sj=pp)], 
-                                                        'mean_tsnr': [np.nanmean(mri_utils.get_tsnr(np.load(r), return_mean = False)[roi_verts['sub-{sj}'.format(sj=pp)][roi_name]]) for roi_name in ROIs['sub-{sj}'.format(sj=pp)]]})
+                                            pd.DataFrame({'sj': np.tile(pp, len(ROIs_dict.keys())), 
+                                                        'ses': np.tile(ses, len(ROIs_dict.keys())), 
+                                                        'task': np.tile(tsk, len(ROIs_dict.keys())), 
+                                                        'ROI': ROIs_dict.keys(), 
+                                                        'mean_tsnr': [np.nanmean(tsnr_surf[ROIs_dict[roi_name]]) for roi_name in ROIs_dict.keys()]})
                                             ))
                     
-                    ## plot average tSNR values on flatmap surface ##
-                    tSNR_flatmap = cortex.Vertex(np.mean(tsnr_arr, axis=0), 
-                                                self.MRIObj.params['plotting']['pycortex_sub'],
-                                                vmin = 0, vmax = 150,
-                                                cmap='hot')
-                    #cortex.quickshow(tSNR_flatmap, with_curvature=True, with_sulci=True)
-                    _ = cortex.quickflat.make_png(op.join(outdir,
-                                    'tSNR_flatmap_sub-{sj}_{ses}_task-{tsk}.png'.format(sj=pp, ses=ses, tsk=tsk)), 
-                                    tSNR_flatmap, 
-                                    recache = False, with_colorbar = True,
-                                    with_curvature = True, with_sulci = True,
-                                    curvature_brightness = 0.4, curvature_contrast = 0.1)
+                    ## plot average correlation values on flatmap surface ##
+                    fig_name = op.join(outdir,
+                                    'tSNR_flatmap_sub-{sj}_{ses}_task-{tsk}.png'.format(sj=pp, ses=ses, tsk=tsk))
+                    self.plot_utils.plot_flatmap(np.mean(tsnr_arr, axis=0), 
+                                                pysub = self.pysub, cmap='hot', 
+                                                vmin1 = 0, vmax1 = 150, 
+                                                fig_abs_name = fig_name)
 
                 ### plot tSNR across runs for the participant and session
                 fig, ax1 = plt.subplots(1, 1, figsize=(15,5), dpi=100, facecolor='w', edgecolor='k')
@@ -572,7 +574,6 @@ freeview -v \
                 ax1.set_ylim(0,150)
                          
                 fig.savefig(op.join(outdir,'tSNR_ROIS_sub-{sj}_{ses}.png'.format(sj=pp, ses=ses)), dpi=100,bbox_inches = 'tight')
-
         #return tsnr_df
 
 
@@ -591,19 +592,18 @@ freeview -v \
         """ 
 
         ## output path to save plots
-        output_pth = op.join(self.outputdir, 'vasculature')
+        output_pth = op.join(self.figures_pth, 'vasculature')
 
         ## input path, if not defined get's it from post-fmriprep dir
         if input_pth is None:
-            input_pth = op.join(self.MRIObj.derivatives_pth, 'post_fmriprep', self.MRIObj.sj_space)
-
-        ## loop over participants
+            input_pth = self.MRIObj.postfmriprep_pth
 
         ## if no participant list set, then run all
         if len(participant_list) == 0:
             participant_list = self.MRIObj.sj_num
         
-        for pp in participant_list:
+        ## loop over participants
+        for pp_ind, pp in enumerate(participant_list):
 
             # and over sessions (if more than one)
             for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:

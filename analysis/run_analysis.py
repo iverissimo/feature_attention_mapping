@@ -3,6 +3,8 @@ import os.path as op
 import numpy as np
 import argparse
 
+import time
+
 import yaml
 from FAM.processing import load_exp_settings, preproc_mridata, preproc_behdata
 from FAM.fitting.prf_model import pRF_model
@@ -52,6 +54,11 @@ parser.add_argument("--chunk_num",
                     type = int,
                     help = "Chunk number to fit or None [default]"
                     ) # if we want to divide in batches (chunks)
+parser.add_argument("--n_jobs", 
+                type = int, 
+                default = 8,
+                help="number of jobs for parallel"
+                )
 parser.add_argument("--prf_model_name", 
                     type = str, 
                     default = 'gauss',
@@ -95,6 +102,7 @@ system_dir = args.dir
 wf_dir = args.wf_dir
 task = args.task
 chunk_num = args.chunk_num
+n_jobs = args.n_jobs
 prf_model_name = args.prf_model_name
 fit_hrf = args.fit_hrf
 run_type = args.run_type
@@ -142,192 +150,50 @@ match task:
             # get participant models, which also will load 
             # DM and mask it according to participants behavior
             pp_prf_models = FAM_pRF.set_models(participant_list = FAM_data.sj_num, 
-                                               mask_DM = True, 
-                                               ses2model = ses2fit)
+                                               ses2model = ses2fit,
+                                               mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func'), # Make DM boolean mask based on subject responses
+                                               stim_on_screen = FAM_beh.get_stim_on_screen(task = task, 
+                                                                                        crop_nr = 0, shift = 0, dummy = 0) # dont crop here, to do so within func
+                                            )
             
+            ## actually fit
+            print('Fitting started!')
+            # to time it
+            start_time = time.time()
+
+            for pp in FAM_data.sj_num:
+
+                FAM_pRF.fit_data(pp, pp_prf_models, 
+                                ses = ses2fit, run_type = run_type, file_ext = FAM_mri.get_mrifile_ext()['pRF'],
+                                vertex = vertex, chunk_num = chunk_num, ROI = ROI,
+                                model2fit = prf_model_name,
+                                save_estimates = True,
+                                xtol = 1e-3, ftol = 1e-4, n_jobs = n_jobs)
+
+            print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
+
+    case 'FA':
+
+        if py_cmd == 'fitmodel': # fit pRF model
+
+            print('Need to load prf estimates')
+
+            ## now fit appropriate feature model
+            match fa_model_name: 
+
+                case 'glmsingle':
+
+                    ## load FA model class
+                    FAM_FA = GLMsingle_Model(FAM_data)
+
+                    _ = FAM_FA.fit_data(participant, pp_prf_estimates, 
+                                                    pp_prf_models['sub-{sj}'.format(sj = participant)][prf_ses]['{mname}_model'.format(mname = prf_model_name)],  
+                                                    file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 99, nm_file_extent = FAM_mri_preprocess.get_mrifile_ext()) 
 
 
 
 
 
-                   
 
 
-
-
-
-
-## where to define total chunks
-# if not calling model here, then where?
-# also want to be able to run fit locally, prf and glmsingle
-# which should be thorugh here
-
-
-
-
-
-
-## OLD ##
-
-match system_dir:
-
-    case 'lisa':
-
-        ## set start of slurm command
-
-        slurm_cmd = """#!/bin/bash
-#SBATCH -t {rtime}
-#SBATCH -N 1
-#SBATCH -v
-#SBATCH --cpus-per-task=16
-#SBATCH --output=$BD/slurm_{task}_{model}_fit_%A.out\n""".format(rtime=run_time, task = task, model = model2fit)
-                    
-        if partition_name is not None:
-            slurm_cmd += '#SBATCH --partition {p}\n'.format(p=partition_name)
-        if node_name is not None:
-            slurm_cmd += '#SBATCH -w {n}\n'.format(n=node_name)
-
-        # add memory for node
-        slurm_cmd += '#SBATCH --mem={mem}G\n'.format(mem=batch_mem_Gib)
-
-        # set fit folder name
-        if task == 'pRF':
-            fitfolder = params['mri']['fitting']['pRF']['fit_folder'] 
-        elif task == 'FA':
-            fitfolder = params['mri']['fitting']['FA']['fit_folder'][model2fit]
-
-        # batch dir to save .sh files
-        batch_dir = '/home/inesv/batch'
-
-        # loop over participants
-        for pp in FAM_data.sj_num:
-
-            # if we're chunking the data, then need to submit each chunk at a time
-            if chunk_data:
-                # total number of chunks
-                total_ch = FAM_data.params['mri']['fitting'][task]['total_chunks'][FAM_data.sj_space]
-                ch_list = np.arange(total_ch)
-            else:
-                ch_list = [None]
-
-            for ch in ch_list:
-
-                # set fitting model command 
-                fit_cmd = """python {pth}/fit_model.py --participant {pp} --task2model {task} --dir {dir} \
---ses {ses} --run_type {rt} --chunk_num {ch} \
---prf_model_name {prf_mod} --fa_model_name {fa_mod} --fit_hrf {fh} --wf_dir $TMPDIR\n\n""".format(pth = op.split(prf_model.__file__)[0],
-                                                        pp = pp,
-                                                        task = task,
-                                                        dir = system_dir,
-                                                        ses = ses2fit,
-                                                        rt = run_type,
-                                                        ch = ch,
-                                                        prf_mod = prf_model_name,
-                                                        fa_mod = fa_model_name,
-                                                        fh = int(fit_hrf))
-
-                if task == 'pRF':
-                    slurm_cmd = slurm_cmd + """# call the programs
-$START_EMAIL
-
-# make derivatives dir in node and sourcedata because we want to access behav files
-mkdir -p $TMPDIR/derivatives/{post_fmriprep,$FITFOLDER}/$SPACE/sub-$SJ_NR
-mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR
-
-wait
-
-cp -r $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/post_fmriprep/$SPACE
-
-wait
-
-cp -r $SOURCE_DIR/sub-$SJ_NR $TMPDIR/sourcedata/
-
-wait
-
-if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ] 
-then
-    cp -r $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/$FITFOLDER/$SPACE
-fi
-
-wait
-
-"""
-                else:
-                    # if we are fitting FA, then also need to copy pRF estimates to scratch
-
-                    slurm_cmd = slurm_cmd + """# call the programs
-$START_EMAIL
-
-# make derivatives dir in node and sourcedata because we want to access behav files
-mkdir -p $TMPDIR/derivatives/{post_fmriprep,$FITFOLDER,$PRFFITFOLDER}/$SPACE/sub-$SJ_NR
-mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR
-
-wait
-
-cp -r $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/post_fmriprep/$SPACE
-
-wait
-
-cp -r $SOURCE_DIR/sub-$SJ_NR $TMPDIR/sourcedata/
-
-wait
-
-if [ -d "$DERIV_DIR/$PRFFITFOLDER/$SPACE/sub-$SJ_NR" ] 
-then
-    cp -r $DERIV_DIR/$PRFFITFOLDER/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/$PRFFITFOLDER/$SPACE
-fi
-
-if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ] 
-then
-    cp -r $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/$FITFOLDER/$SPACE
-fi
-
-wait
-
-""".replace('$PRFFITFOLDER', params['mri']['fitting']['pRF']['fit_folder'])
-
-                ### update slurm job script
-
-                batch_string =  slurm_cmd + """$PY_CMD
-
-wait          # wait until programs are finished
-
-rsync -chavzP $TMPDIR/derivatives/ $DERIV_DIR
-
-wait          # wait until programs are finished
-
-$END_EMAIL
-"""
-
-                ### if we want to send email
-                if send_email == True:
-                    batch_string = batch_string.replace('$START_EMAIL', 'echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"')
-                    batch_string = batch_string.replace('$END_EMAIL', 'echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"')
                 
-                ## replace other variables
-
-                working_string = batch_string.replace('$SJ_NR', str(pp).zfill(3))
-                working_string = working_string.replace('$SPACE', FAM_data.sj_space)
-                working_string = working_string.replace('$FITFOLDER', fitfolder)
-                working_string = working_string.replace('$PY_CMD', fit_cmd)
-                working_string = working_string.replace('$BD', batch_dir)
-                working_string = working_string.replace('$DERIV_DIR', FAM_data.derivatives_pth)
-                working_string = working_string.replace('$SOURCE_DIR', FAM_data.sourcedata_pth)
-
-                print(working_string)
-
-                # run it
-                js_name = op.join(batch_dir, '{fname}_sub-{sj}_chunk-{ch}_run-{r}_FAM.sh'.format(fname=fitfolder,
-                                                                                        ch=ch,
-                                                                                        sj=pp,
-                                                                                        r=run_type))
-                of = open(js_name, 'w')
-                of.write(working_string)
-                of.close()
-
-                print('submitting ' + js_name + ' to queue')
-                os.system('sbatch ' + js_name)
-
-
-
-

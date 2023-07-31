@@ -365,7 +365,7 @@ class PreprocBeh:
         
         return df_mask_bool
     
-    def get_stim_on_screen(self, task = 'pRF', crop_nr = None, shift = 0, dummy = 5):
+    def get_stim_on_screen(self, task = 'pRF', crop_nr = 0, shift = 0, dummy = 0):
 
         """
         Get boolean array indicating on which TRs stimuli is on screen

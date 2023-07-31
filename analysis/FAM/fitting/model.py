@@ -6,10 +6,6 @@ import pandas as pd
 
 import glob
 
-from FAM.utils import mri as mri_utils
-from FAM.processing import preproc_behdata
-
-
 class Model:
 
     def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_999999'):
@@ -23,9 +19,6 @@ class Model:
             object from one of the classes defined in processing.load_exp_data
         outputdir: str
             absolute path to save fits
-        tasks: list
-            list with task ID names (prf and feature)
-            
         """
 
         ## set data object to use later on
@@ -36,7 +29,7 @@ class Model:
 
         # if output dir not defined, then make it in derivatives
         if outputdir is None:
-            self.outputdir = op.join(self.MRIObj.derivatives_pth,'plots')
+            self.outputdir = self.MRIObj.derivatives_pth
         else:
             self.outputdir = outputdir
             
@@ -119,7 +112,7 @@ class Model:
         elif 'loo_' in run_type:
             
             print('Leave-one out runs ({r})'.format(r = run_type))
-            _, file_list = mri_utils.get_loo_filename(file_list, loo_key=run_type)
+            _, file_list = self.MRIObj.mri_utils.get_loo_filename(file_list, loo_key=run_type)
 
         ## now actually load data
         print('Loading {x} files of task {t}'.format(x = len(file_list), t = task))
@@ -176,11 +169,11 @@ class Model:
                 crop_nr = self.crop_TRs_num[task] if self.crop_TRs[task] == True else None
                 only_edges = True if task == 'FA' else False
 
-                condition_per_TR = mri_utils.crop_shift_arr(bar_pass, 
+                condition_per_TR = self.MRIObj.mri_utils.crop_shift_arr(bar_pass, 
                                                             crop_nr = crop_nr, 
                                                             shift = self.shift_TRs_num)
 
-                data_out = mri_utils.baseline_correction(data_out, condition_per_TR, 
+                data_out = self.MRIObj.mri_utils.baseline_correction(data_out, condition_per_TR, 
                                                         num_baseline_TRs = self.corr_base_TRs[task], 
                                                         baseline_interval = baseline_interval, 
                                                         avg_type = 'median', only_edges = only_edges)
@@ -196,11 +189,10 @@ class Model:
 
             ## append run number, and ses number in list of ints
             # useful for when fitting several runs at same time
-            file_rn, file_sn = mri_utils.get_run_ses_from_str(file_list[r])
+            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(file_list[r])
             self.run_num_arr.append(file_rn)
             self.ses_num_arr.append(file_sn)
             
-
         # return filelist if that matters for fitting (mainly for FA task)
         if return_filenames:
             return data2fit, file_list

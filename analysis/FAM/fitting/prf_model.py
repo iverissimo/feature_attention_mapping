@@ -10,8 +10,6 @@ import cortex
 
 from scipy.optimize import LinearConstraint, NonlinearConstraint
 
-from FAM.utils import mri as mri_utils
-from FAM.processing import preproc_behdata
 from FAM.fitting.model import Model
 
 from prfpy.stimulus import PRFStimulus2D
@@ -45,9 +43,8 @@ class pRF_model(Model):
         # reset osf value, because model assumes 10 (for FA)
         self.osf = 1
                 
-    
-    def get_DM(self, participant, ses = 'mean', ses_type = 'func', mask_DM = True, filename = None, 
-                                osf = 1, res_scaling = .1):
+    def get_DM(self, participant, ses = 'mean', mask_bool_df = None, filename = None, 
+                    osf = 1, res_scaling = .1, stim_on_screen = []):
 
         """
         Get pRF Design matrix
@@ -58,17 +55,16 @@ class pRF_model(Model):
             participant number
         ses : str
             session number (default mean)
-        ses_type: str
-            type of session (default func)
-        mask_DM:
-            if we want to mask design matrix based on behavior
         filename: str
             absolute path to np file where we stored design matrix, if none it will make one anew
         osf: int
             oversampling factor, if bigger than one it will return DM of timepoints * osf
         res_scaling: float
             spatial rescaling factor
-
+        stim_on_screen: arr
+            boolean array with moments where stim was on screen
+        mask_bool_df: dataframe
+            if dataframe given, will be used to mask design matrix given behavioral performance
         """ 
 
         visual_dm = None
@@ -80,68 +76,66 @@ class pRF_model(Model):
                 visual_dm = np.load(filename)
             else:
                 save_dm = True
+
+        # number of TRs per condition (bar pass)
+        pRF_bar_pass_all = self.MRIObj.beh_utils.get_pRF_cond_per_TR(cond_TR_dict = self.MRIObj.pRF_nr_TRs, 
+                                                                    bar_pass_direction = self.MRIObj.pRF_bar_pass)
         
         # make design matrix
         if visual_dm is None:
 
             print('Making DM for sub-{pp}'.format(pp = participant))
             
-            ## get behavioral info 
-            mri_beh = preproc_behdata.PreprocBeh(self.MRIObj)
-
-            ## get boolean array of moments where bar was on screen
-            stim_on_screen = np.zeros(mri_beh.pRF_total_trials)
-            stim_on_screen[mri_beh.pRF_bar_pass_trials] = 1
-
             ## if we want to mask DM, then load behav mask
-            if mask_DM:
-                mask_bool_df = mri_beh.get_pRF_mask_bool(ses_type = ses_type)
-                # if we set a specific session, then select that one
-                if ses == 'ses-mean':
+            if mask_bool_df is not None:
+
+                # if we set a specific session, then select that one, else combine
+                if ses == 'mean':
                     mask_bool = mask_bool_df[mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant)]['mask_bool'].values
                 else:
-                    mask_bool = mask_bool_df[(mask_bool_df['ses'] == ses) & \
+                    mask_bool = mask_bool_df[(mask_bool_df['ses'] == 'ses-{s}'.format(s = ses)) & \
                                         (mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant))]['mask_bool'].values
                 dm_mask = np.prod(mask_bool, axis = 0)
             else:
-                dm_mask = np.ones(mri_beh.pRF_total_trials)
+                dm_mask = np.ones(np.array(stim_on_screen).shape[0])
 
             # multiply boolean array with mask
             stim_on_screen = stim_on_screen * dm_mask
                 
             ## crop and shift if such was the case
-            stim_on_screen = mri_utils.crop_shift_arr(stim_on_screen, 
-                                                        crop_nr = self.crop_TRs_num['pRF'], 
-                                                        shift = self.shift_TRs_num)
+            stim_on_screen = self.MRIObj.mri_utils.crop_shift_arr(stim_on_screen, 
+                                                                  crop_nr = self.MRIObj.mri_nr_cropTR['pRF'], 
+                                                                  shift = self.MRIObj.shift_TRs_num)
+
             # do same to bar pass direction str array
-            condition_per_TR = mri_utils.crop_shift_arr(mri_beh.pRF_bar_pass_all, 
-                                                        crop_nr = self.crop_TRs_num['pRF'], 
-                                                        shift = self.shift_TRs_num)
+            condition_per_TR = self.MRIObj.mri_utils.crop_shift_arr(pRF_bar_pass_all, 
+                                                                    crop_nr = self.MRIObj.mri_nr_cropTR['pRF'], 
+                                                                    shift = self.MRIObj.shift_TRs_num)
 
             # all possible positions in pixels for for midpoint of
             # y position for vertical bar passes, 
-            ver_y = self.screen_res[1]*np.linspace(0,1, self.MRIObj.pRF_nr_TRs['U-D'])
+            ver_y = self.MRIObj.screen_res[1]*np.linspace(0,1, self.MRIObj.pRF_nr_TRs['U-D'])
             # x position for horizontal bar passes 
-            hor_x = self.screen_res[0]*np.linspace(0,1, self.MRIObj.pRF_nr_TRs['L-R'])
+            hor_x = self.MRIObj.screen_res[0]*np.linspace(0,1, self.MRIObj.pRF_nr_TRs['L-R'])
 
             # coordenates for bar pass, for PIL Image
-            coordenates_bars = {'L-R': {'upLx': hor_x - 0.5 * self.bar_width['pRF'] * self.screen_res[0], 'upLy': np.repeat(self.screen_res[1], self.MRIObj.pRF_nr_TRs['L-R']),
-                                        'lowRx': hor_x + 0.5 * self.bar_width['pRF'] * self.screen_res[0], 'lowRy': np.repeat(0, self.MRIObj.pRF_nr_TRs['L-R'])},
-                                'R-L': {'upLx': np.array(list(reversed(hor_x - 0.5 * self.bar_width['pRF'] * self.screen_res[0]))), 'upLy': np.repeat(self.screen_res[1], self.MRIObj.pRF_nr_TRs['R-L']),
-                                        'lowRx': np.array(list(reversed(hor_x+ 0.5 * self.bar_width['pRF'] * self.screen_res[0]))), 'lowRy': np.repeat(0, self.MRIObj.pRF_nr_TRs['R-L'])},
-                                'U-D': {'upLx': np.repeat(0, self.MRIObj.pRF_nr_TRs['U-D']), 'upLy': ver_y+0.5 * self.bar_width['pRF'] * self.screen_res[1],
-                                        'lowRx': np.repeat(self.screen_res[0], self.MRIObj.pRF_nr_TRs['U-D']), 'lowRy': ver_y - 0.5 * self.bar_width['pRF'] * self.screen_res[1]},
-                                'D-U': {'upLx': np.repeat(0, self.MRIObj.pRF_nr_TRs['D-U']), 'upLy': np.array(list(reversed(ver_y + 0.5 * self.bar_width['pRF'] * self.screen_res[1]))),
-                                        'lowRx': np.repeat(self.screen_res[0], self.MRIObj.pRF_nr_TRs['D-U']), 'lowRy': np.array(list(reversed(ver_y - 0.5 * self.bar_width['pRF'] * self.screen_res[1])))}
+            coordenates_bars = {'L-R': {'upLx': hor_x - 0.5 * self.MRIObj.bar_width['pRF'] * self.MRIObj.screen_res[0], 'upLy': np.repeat(self.MRIObj.screen_res[1], self.MRIObj.pRF_nr_TRs['L-R']),
+                                        'lowRx': hor_x + 0.5 * self.MRIObj.bar_width['pRF'] * self.MRIObj.screen_res[0], 'lowRy': np.repeat(0, self.MRIObj.pRF_nr_TRs['L-R'])},
+                                'R-L': {'upLx': np.array(list(reversed(hor_x - 0.5 * self.MRIObj.bar_width['pRF'] * self.MRIObj.screen_res[0]))), 'upLy': np.repeat(self.MRIObj.screen_res[1], self.MRIObj.pRF_nr_TRs['R-L']),
+                                        'lowRx': np.array(list(reversed(hor_x+ 0.5 * self.MRIObj.bar_width['pRF'] * self.MRIObj.screen_res[0]))), 'lowRy': np.repeat(0, self.MRIObj.pRF_nr_TRs['R-L'])},
+                                'U-D': {'upLx': np.repeat(0, self.MRIObj.pRF_nr_TRs['U-D']), 'upLy': ver_y+0.5 * self.MRIObj.bar_width['pRF'] * self.MRIObj.screen_res[1],
+                                        'lowRx': np.repeat(self.MRIObj.screen_res[0], self.MRIObj.pRF_nr_TRs['U-D']), 'lowRy': ver_y - 0.5 * self.MRIObj.bar_width['pRF'] * self.MRIObj.screen_res[1]},
+                                'D-U': {'upLx': np.repeat(0, self.MRIObj.pRF_nr_TRs['D-U']), 'upLy': np.array(list(reversed(ver_y + 0.5 * self.MRIObj.bar_width['pRF'] * self.MRIObj.screen_res[1]))),
+                                        'lowRx': np.repeat(self.MRIObj.screen_res[0], self.MRIObj.pRF_nr_TRs['D-U']), 'lowRy': np.array(list(reversed(ver_y - 0.5 * self.MRIObj.bar_width['pRF'] * self.MRIObj.screen_res[1])))}
                                 }
 
             # save screen display for each TR (or if osf > 1 then for #TRs * osf)
-            visual_dm_array = np.zeros((len(condition_per_TR) * osf, round(self.screen_res[0] * res_scaling), round(self.screen_res[1] * res_scaling)))
+            visual_dm_array = np.zeros((len(condition_per_TR) * osf, round(self.MRIObj.screen_res[0] * res_scaling), round(self.MRIObj.screen_res[1] * res_scaling)))
             i = 0
 
             for trl, bartype in enumerate(condition_per_TR): # loop over bar pass directions
 
-                img = Image.new('RGB', tuple(self.screen_res)) # background image
+                img = Image.new('RGB', tuple(self.MRIObj.screen_res)) # background image
 
                 if bartype not in np.array(['empty','empty_long']): # if not empty screen
 
@@ -170,10 +164,9 @@ class pRF_model(Model):
                 print('Making and saving {file}'.format(file = filename))
                 np.save(filename, visual_dm)  
                     
-        return mri_utils.normalize(visual_dm)
+        return self.MRIObj.mri_utils.normalize(visual_dm)
 
-
-    def set_models(self, participant_list = [], mask_DM = True, ses2model = 'mean'):
+    def set_models(self, participant_list = [], mask_bool_df = None, ses2model = 'mean', stim_on_screen = []):
 
         """
         define pRF models to be used for each participant in participant list
@@ -182,14 +175,13 @@ class pRF_model(Model):
         ----------
         participant_list: list
             list with participant ID
-        mask_DM: bool
-            if we want to mask design matrix given behavioral performance
+        mask_bool_df: dataframe
+            if dataframe given, will be used to mask design matrix given behavioral performance
         ses2model: str
             which sessions are we modeling: 1, all, mean [default]. Note --> mean indicates average across runs
-            
+        stim_on_screen: arr
+            boolean array with moments where stim was on screen
         """                 
-
-        ## loop over participants
 
         ## if no participant list set, then run all
         if len(participant_list) == 0:
@@ -198,6 +190,7 @@ class pRF_model(Model):
         # empty dict where we'll store all participant models
         pp_models = {}
         
+        ## loop over participants
         for pp in participant_list:
 
             pp_models['sub-{sj}'.format(sj=pp)] = {}
@@ -216,7 +209,7 @@ class pRF_model(Model):
 
                 pp_models['sub-{sj}'.format(sj=pp)][ses] = {}
 
-                visual_dm = self.get_DM(pp, ses = ses, ses_type = 'func', mask_DM = mask_DM, 
+                visual_dm = self.get_DM(pp, ses = ses, mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
                                         filename = None, osf = self.osf, res_scaling = self.res_scaling)
 
                 # make stimulus object, which takes an input design matrix and sets up its real-world dimensions
@@ -284,12 +277,11 @@ class pRF_model(Model):
                 
                 pp_models['sub-{sj}'.format(sj=pp)][ses]['dog_model'] = dog_model
 
-
         return pp_models
 
 
-    def fit_data(self, participant, pp_models, ses = 'ses-mean',
-                    run_type = 'mean', chunk_num = None, vertex = None, ROI = None,
+    def fit_data(self, participant, pp_models, ses = 'mean',
+                    run_type = 'mean', chunk_num = None, vertex = [], ROI = None,
                     model2fit = 'gauss', file_ext = '_cropped_dc_psc.npy', 
                     outdir = None, save_estimates = False,
                     xtol = 1e-3, ftol = 1e-4, n_jobs = 16):

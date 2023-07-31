@@ -43,6 +43,15 @@ class FAMData:
 
         # timing
         self.TR = self.params['mri']['TR']
+
+        ## bar width ratio
+        self.bar_width = {key:self.params[key]['bar_width_ratio'] for key in self.tasks}
+
+        ## screen resolution in pix
+        screen_res = self.params['window']['size']
+        if self.params['window']['display'] == 'square': # if square display
+            screen_res = np.array([screen_res[1], screen_res[1]])
+        self.screen_res = screen_res
             
         # excluded participants
         self.exclude_sj = exclude_sj
@@ -56,6 +65,8 @@ class FAMData:
         
         # project root folder
         self.proj_root_pth = self.params['mri']['paths'][self.base_dir]['root']
+
+        self.batch_dir = op.join(self.proj_root_pth, 'batch')
 
         # in case we are computing things in a different workflow dir
         # useful when fitting models in /scratch node
@@ -212,16 +223,22 @@ class MRIData(BehData):
 
         ## number of cropped TRs
         # due to dummies TRs that were saved and extra ones as defined in params
+        self.crop_TRs = {key:self.params[key]['crop'] for key in self.tasks}
+        self.crop_TRs_num =  {key:self.params[key]['crop_TR'] for key in self.tasks}
         self.mri_nrdummyTRs = self.params['mri']['dummy_TR']
-        self.mri_nr_cropTR = {'pRF': self.mri_nrdummyTRs,
-                              'FA': self.mri_nrdummyTRs}
-        if self.params['pRF']['crop'] == True: 
-            self.mri_nr_cropTR['pRF'] += self.params['pRF']['crop_TR']
-        if self.params['FA']['crop'] == True: 
-            self.mri_nr_cropTR['FA'] += self.params['FA']['crop_TR']
+
+        self.mri_nr_cropTR = {'pRF': self.mri_nrdummyTRs, 'FA': self.mri_nrdummyTRs}
+
+        if self.crop_TRs['pRF'] == True: 
+            self.mri_nr_cropTR['pRF'] += self.crop_TRs_num['pRF']
+        if self.crop_TRs['FA']== True: 
+            self.mri_nr_cropTR['FA'] += self.crop_TRs_num['FA']
         
         ## if we're shifting TRs to account for dummy scans
         self.shift_TRs_num =  self.params['mri']['shift_DM_TRs']
+
+        ## if we did slicetime correction
+        self.stc = self.params['mri']['slicetimecorrection']
 
         # initialize utilities class
         self.mri_utils = MRIUtils() 

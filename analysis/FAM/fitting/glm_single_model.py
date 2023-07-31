@@ -33,7 +33,7 @@ import matplotlib.pyplot as plt
 
 class GLMsingle_Model(Model):
 
-    def __init__(self, MRIObj, outputdir = None, tasks = ['pRF', 'FA']):
+    def __init__(self, MRIObj, outputdir = None):
         
         """__init__
         constructor for class 

@@ -12,7 +12,7 @@ from FAM.processing import preproc_behdata
 
 class Model:
 
-    def __init__(self, MRIObj, outputdir = None, tasks = ['pRF', 'FA']):
+    def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_999999'):
         
         """__init__
         constructor for class 
@@ -32,41 +32,30 @@ class Model:
         # has relevant paths etc
         self.MRIObj = MRIObj
 
+        self.pysub = pysub
+
         # if output dir not defined, then make it in derivatives
-        self.outputdir = outputdir
+        if outputdir is None:
+            self.outputdir = op.join(self.MRIObj.derivatives_pth,'plots')
+        else:
+            self.outputdir = outputdir
             
         ### some relevant params ###
 
-        ## bar width ratio
-        self.bar_width = {key:self.MRIObj.params[key]['bar_width_ratio'] for key in tasks}
-
-        ## screen resolution in pix
-        screen_res = self.MRIObj.params['window']['size']
-        if self.MRIObj.params['window']['display'] == 'square': # if square display
-            screen_res = np.array([screen_res[1], screen_res[1]])
-        self.screen_res = screen_res
+        # set fit folder name
+        self.fitfolder = {self.MRIObj.params['mri']['fitting'][key]['fit_folder'] for key in self.MRIObj.tasks}
         
         ## type of model to fit
-        self.model_type = {key:self.MRIObj.params['mri']['fitting'][key]['fit_model'] for key in tasks}
+        self.model_type = {key:self.MRIObj.params['mri']['fitting'][key]['fit_model'] for key in self.MRIObj.tasks}
         
         ## type of optimizer to use
-        self.optimizer = {key:self.MRIObj.params['mri']['fitting'][key]['optimizer'] for key in tasks}
+        self.optimizer = {key:self.MRIObj.params['mri']['fitting'][key]['optimizer'] for key in self.MRIObj.tasks}
 
         # if we are fitting HRF params
         self.fit_hrf = self.MRIObj.params['mri']['fitting']['pRF']['fit_hrf']
-        
-        ## if we're shifting TRs to account for dummy scans
-        self.shift_TRs_num =  self.MRIObj.params['mri']['shift_DM_TRs']
-
-        ## if we're cropping TRs
-        self.crop_TRs = {key:self.MRIObj.params[key]['crop'] for key in tasks}
-        self.crop_TRs_num =  {key:self.MRIObj.params[key]['crop_TR'] for key in tasks}
-
-        ## if we did slicetime correction
-        self.stc = self.MRIObj.params['mri']['slicetimecorrection']
 
         # if we did stc, then we need to hrf onset
-        if self.stc:
+        if self.MRIObj.stc:
             self.hrf_onset = -self.MRIObj.TR/2
         else:
             self.hrf_onset = 0
@@ -78,19 +67,15 @@ class Model:
         self.res_scaling = 0.1
 
         ## if we want to keep the model baseline fixed a 0
-        self.fix_bold_baseline = {key:self.MRIObj.params['mri']['fitting'][key]['fix_bold_baseline'] for key in tasks}
+        self.fix_bold_baseline = {key:self.MRIObj.params['mri']['fitting'][key]['fix_bold_baseline'] for key in self.MRIObj.tasks}
 
         ## if we want to correct bold baseline of data
-        self.correct_baseline = {key:self.MRIObj.params['mri']['fitting'][key]['correct_baseline'] for key in tasks}
+        self.correct_baseline = {key:self.MRIObj.params['mri']['fitting'][key]['correct_baseline'] for key in self.MRIObj.tasks}
         # number of TRs to use for correction
-        self.corr_base_TRs = {key:self.MRIObj.params['mri']['fitting'][key]['num_baseline_TRs'] for key in tasks}
+        self.corr_base_TRs = {key:self.MRIObj.params['mri']['fitting'][key]['num_baseline_TRs'] for key in self.MRIObj.tasks}
 
         ## total number of chunks we divide data when fitting
-        self.total_chunks = {key:self.MRIObj.params['mri']['fitting'][key]['total_chunks'][self.MRIObj.sj_space] for key in tasks}
-
-        ## get behavioral info 
-        self.mri_beh = preproc_behdata.PreprocBeh(self.MRIObj)
-
+        self.total_chunks = {key:self.MRIObj.params['mri']['fitting'][key]['total_chunks'][self.MRIObj.sj_space] for key in self.MRIObj.tasks}
 
     def get_data4fitting(self, file_list, task = 'pRF', run_type = 'mean',
                             chunk_num = None, vertex = None,
@@ -299,3 +284,9 @@ class Model:
 
             else:
                 return np.sum((timecourse - prediction) ** 2) # calculate residual sum of squared errors
+            
+
+
+                    
+
+

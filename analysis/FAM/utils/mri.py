@@ -1089,7 +1089,7 @@ class MRIUtils(Utils):
 
         return outfiles
 
-    
+
     def fit_glm(voxel, dm, error='mse'):
         
         """ GLM fit on timeseries

@@ -4,8 +4,8 @@ import numpy as np
 import argparse
 
 import yaml
-from FAM.processing import load_exp_settings
-from FAM.fitting import prf_model
+from FAM.processing import load_exp_settings, preproc_mridata, preproc_behdata
+from FAM.fitting.prf_model import pRF_model
 
 # load settings from yaml
 with open('exp_params.yml', 'r') as f_in:
@@ -13,87 +13,161 @@ with open('exp_params.yml', 'r') as f_in:
 
 ## to get inputs 
 parser = argparse.ArgumentParser()
-parser.add_argument("--subject", help="Subject number (ex: 001, or 'group'/'all')", required=True)
-parser.add_argument("--task", type = str, help="On which task to fit model (pRF/FA)", required=True)
-# optional
-parser.add_argument("--dir", type = str, help="System we are running analysis (lisa [default] vs local)")
 
-# only relevant for pRF fitting
-parser.add_argument("--prf_model_name", type = str, help="Type of pRF model to fit: gauss [default], css, dn, etc...")
-parser.add_argument("--fit_hrf", type = int, help="1/0 - if we want to fit hrf on the data or not [default]")
+parser.add_argument("--subject",
+                    nargs = "*", # 0 or more values expected => creates a list
+                    type = str,  # any type/callable can be used here
+                    default = [],
+                    required = True,
+                    help = 'Subject number (ex:1). If "all" will run for all participants. If list of subs, will run only those (ex: 1 2 3 4)'
+                    )
+parser.add_argument("--task", 
+                    type = str, 
+                    default = 'pRF',
+                    required = True,
+                    help = "On which task to run analysis (pRF [default] vs FA)"
+                    )
+parser.add_argument("--cmd", 
+                    type = str, 
+                    default = 'fitmodel',
+                    required = True,
+                    help = "What analysis to run (ex: fitmodel)"
+                    )
+parser.add_argument("--dir", 
+                    type = str.lower, 
+                    default = 'local',
+                    help = "System we are running analysis in - local [default] vs slurm (snellius)"
+                    )
+parser.add_argument("--wf_dir", 
+                    type = str, 
+                    help="Path to workflow dir, if such if not standard root dirs (None [default] vs /scratch)"
+                    )
+parser.add_argument("--exclude_sj", 
+                    nargs = '*', # 0 or more values expected => creates a list
+                    default = [],
+                    type = int,
+                    help = "List of subs to exclude (ex: 1 2 3 4). Default []"
+                    )
+parser.add_argument("--chunk_num", 
+                    type = int,
+                    help = "Chunk number to fit or None [default]"
+                    ) # if we want to divide in batches (chunks)
+parser.add_argument("--prf_model_name", 
+                    type = str, 
+                    default = 'gauss',
+                    help="Type of pRF model to fit: gauss [default], css, dn, etc..."
+                    )
+parser.add_argument("--fit_hrf", 
+                    action = 'store_true',
+                    help="if option called, fit hrf on the data"
+                    )
+parser.add_argument("--run_type", 
+                    default = 'mean',
+                    help="Type of run to fit (mean of runs [default], 1, loo_r1s1, ...)"
+                    )
+parser.add_argument("--ses2fit", 
+                    default = 'mean',
+                    help="Session to fit (if mean [default] then will average both session when that's possible)"
+                    )
+parser.add_argument("--fa_model_name", 
+                    type = str, 
+                    default = 'glmsingle',
+                    help="Type of FA model to fit: glmsingle [default], gain, glm, etc...]"
+                    )
+parser.add_argument("--vertex",
+                    nargs = '*', 
+                    default = [],
+                    type = int,
+                    help="list of vertex indice(s) to fit or default []"
+                    )
+parser.add_argument("--ROI", 
+                    type = str,
+                    help="ROI name to fit or None [default]")
 
-# only relevant for FA fitting
-parser.add_argument("--fa_model_name", type = str, help="Type of FA model to fit: gain [default], glm, etc...")
-
-# data arguments
-parser.add_argument("--ses2fit", type = str, help="Session to fit (if ses-mean [default] then will average both session when that's possible)")
-parser.add_argument("--run_type", help="Type of run to fit (mean of runs [default], median, 1, loo_1, ...)")
-
-# if we want to divide in batches (chunks)
-parser.add_argument("--chunk_data", type = int, help="1/0 - if we want to divide the data into chunks [default] or not")
-
-#  only relevant if subject == group/all
-parser.add_argument("--exclude_sj", nargs='+', help="List of subjects to exclude, define as --exclude_sj 0 1 ...", default=[])
-
-# only relevant for LISA/slurm system 
-parser.add_argument("--node_name", type = str, help="Node name, to send job to [default None]")
-parser.add_argument("--partition_name", type = str, help="Partition name, to send job to [default None]")
-parser.add_argument("--batch_mem_Gib", type = int, help="Node memory limit [default 90]")
-parser.add_argument("--email", type = int, help="Send job email 1/0 [default 0]")
-
-## set variables 
+# parse the command line
 args = parser.parse_args()
 
-# subject id and processing step of pipeline
-sj = str(args.subject).zfill(3) 
-task = args.task 
-#
-#
-# type of session and run to use
-ses2fit = args.ses2fit if args.ses2fit is not None else 'ses-mean'
-run_type = args.run_type if args.run_type is not None else 'mean'
-#
-chunk_data = bool(args.chunk_data) if args.chunk_data is not None else True
-#
-#
-# if we want to exclude participants
+# access parser options
+sj = args.subject[0] if len(args.subject) == 1 else args.subject # for situation where 1 sj vs list
 exclude_sj = args.exclude_sj # list of excluded subjects
-if len(exclude_sj)>0:
-    exclude_sj = [val.zfill(3) for val in exclude_sj]
-    print('Excluding participants {expp}'.format(expp = exclude_sj))
-else:
-    exclude_sj = []
-#
-#
-# system location
-system_dir = args.dir if args.dir is not None else "lisa" 
-#
-#
-# prf model name and options
-prf_model_name = args.prf_model_name if args.prf_model_name is not None else "gauss" 
-fit_hrf = bool(args.fit_hrf) if args.fit_hrf is not None else False 
-#
-# FA model name
-fa_model_name = args.fa_model_name if args.fa_model_name is not None else 'gain'
+py_cmd = args.cmd # what step of pipeline we want to run
+system_dir = args.dir
+wf_dir = args.wf_dir
+task = args.task
+chunk_num = args.chunk_num
+prf_model_name = args.prf_model_name
+fit_hrf = args.fit_hrf
+run_type = args.run_type
+ses2fit = args.ses2fit # 'ses-mean'
+fa_model_name = args.fa_model_name
 
-model2fit = prf_model_name if task == 'pRF' else fa_model_name
+# vertex list
+if len(args.vertex)>0:
+    vertex = [int(val) for val in args.vertex]
+# ROI name
+ROI = args.ROI
 
-# SLURM options
-# for LISA
-node_name = args.node_name # node name to submit slurm job (or None)
-partition_name = args.partition_name # partition name to submit slurm job (or None)
-batch_mem_Gib = args.batch_mem_Gib if args.batch_mem_Gib is not None else 90
-run_time = '24:00:00' # should make input too
-send_email = bool(args.email) if args.email is not None else False
-
-## Load data object
+## Load data object --> as relevant paths, variables and utility functions
 print("Fitting data for subject {sj}!".format(sj=sj))
+
 FAM_data = load_exp_settings.MRIData(params, sj, 
                                     repo_pth = op.split(load_exp_settings.__file__)[0], 
-                                    base_dir = system_dir, 
-                                    exclude_sj = exclude_sj)
+                                    base_dir = system_dir, exclude_sj = exclude_sj)
 
 print('Subject list is {l}'.format(l=str(FAM_data.sj_num)))
+
+## Load preprocessing class for each data type ###
+
+# get behavioral info 
+FAM_beh = preproc_behdata.PreprocBeh(FAM_data)
+# and mri info
+FAM_mri = preproc_mridata.PreprocMRI(FAM_data)
+
+
+## load pRF model class
+FAM_pRF = pRF_model(FAM_data)
+
+# set specific params
+FAM_pRF.model_type['pRF'] = prf_model_name
+FAM_pRF.fit_hrf = fit_hrf
+
+
+## run specific steps ##
+match task:
+
+    case 'pRF':
+        
+        if py_cmd == 'fitmodel': # fit pRF model
+
+            # get participant models, which also will load 
+            # DM and mask it according to participants behavior
+            pp_prf_models = FAM_pRF.set_models(participant_list = FAM_data.sj_num, 
+                                               mask_DM = True, 
+                                               ses2model = ses2fit)
+            
+
+
+
+
+
+                   
+
+
+
+
+
+
+## where to define total chunks
+# if not calling model here, then where?
+# also want to be able to run fit locally, prf and glmsingle
+# which should be thorugh here
+
+
+
+
+
+
+## OLD ##
 
 match system_dir:
 

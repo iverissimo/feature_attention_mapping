@@ -21,7 +21,7 @@ from prfpy.fit import Iso2DGaussianFitter, CSS_Iso2DGaussianFitter, Norm_Iso2DGa
 
 class pRF_model(Model):
 
-    def __init__(self, MRIObj, outputdir = None, tasks = ['pRF', 'FA'], pysub = 'hcp_999999'):
+    def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_999999'):
         
         """__init__
         constructor for class 
@@ -34,22 +34,20 @@ class pRF_model(Model):
         """
 
         # need to initialize parent class (Model), indicating output infos
-        super().__init__(MRIObj = MRIObj, outputdir = outputdir, tasks = tasks)
+        super().__init__(MRIObj = MRIObj, outputdir = outputdir, pysub = pysub)
 
         # if output dir not defined, then make it in derivatives
         if outputdir is None:
-            self.outputdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'])
+            self.outputdir = op.join(self.MRIObj.derivatives_pth, self.fitfolder['pRF'])
         else:
             self.outputdir = outputdir
         
         # reset osf value, because model assumes 10 (for FA)
         self.osf = 1
+                
     
-        self.pysub = pysub
-            
-    
-    def get_DM(self, participant, ses = 'ses-mean', ses_type = 'func', mask_DM = True, filename = None, 
-                                    osf = 1, res_scaling = .1):
+    def get_DM(self, participant, ses = 'mean', ses_type = 'func', mask_DM = True, filename = None, 
+                                osf = 1, res_scaling = .1):
 
         """
         Get pRF Design matrix
@@ -59,7 +57,7 @@ class pRF_model(Model):
         participant : str
             participant number
         ses : str
-            session number (default ses-mean)
+            session number (default mean)
         ses_type: str
             type of session (default func)
         mask_DM:
@@ -175,7 +173,7 @@ class pRF_model(Model):
         return mri_utils.normalize(visual_dm)
 
 
-    def set_models(self, participant_list = [], mask_DM = True, combine_ses = True):
+    def set_models(self, participant_list = [], mask_DM = True, ses2model = 'mean'):
 
         """
         define pRF models to be used for each participant in participant list
@@ -186,8 +184,9 @@ class pRF_model(Model):
             list with participant ID
         mask_DM: bool
             if we want to mask design matrix given behavioral performance
-        combine_ses: bool
-            if we want to combine runs from different sessions (relevant for fitting of average across runs)
+        ses2model: str
+            which sessions are we modeling: 1, all, mean [default]. Note --> mean indicates average across runs
+            
         """                 
 
         ## loop over participants
@@ -204,10 +203,12 @@ class pRF_model(Model):
             pp_models['sub-{sj}'.format(sj=pp)] = {}
 
             # if we're combining sessions
-            if combine_ses:
+            if ses2model == 'mean':
                 sessions = ['ses-mean']
-            else:
+            elif ses2model == 'all':
                 sessions = self.MRIObj.session['sub-{sj}'.format(sj=pp)]
+            else:
+                sessions = ['ses-{s}'.format(s = ses2model)]
 
             ## go over sessions (if its the case)
             # and save DM and models

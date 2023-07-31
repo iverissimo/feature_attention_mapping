@@ -208,12 +208,9 @@ mri: # refers to the Psychopy SyncGenerator class
       N_PROCS: 4
 
     FA:
-      fit_model: 'gain'
+      fit_model: 'glmsingle' #'gain'
 
-      fit_folder: {'gain': 'FA_Gain_fit', 
-                    'glm': 'FA_GLM_fit', 
-                    'full_stim': 'FA_FullStim_fit',
-                    'glmsingle': FA_GLMsingle} # folders to store fits
+      fit_folder: 'FA_fit'
 
       optimizer: 'L-BFGS-B' #'lbfgsb' #'trust-constr'
 

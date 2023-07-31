@@ -49,7 +49,6 @@ class Viewer:
         # pycortex subject
         self.pysub = pysub
 
-
         # set some generic variables useful for plotting
         self.bar_cond_colors = self.MRIObj.params['plotting']['cond_colors']
 

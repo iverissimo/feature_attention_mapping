@@ -705,17 +705,17 @@ freeview -v \
             print('saving files in %s'%outdir)
 
             ## session key
-            ses = 'ses-{s}'.format(s = int(ses_num))
+            ses = 'ses-{s}'.format(s = ses_num)
 
             # run or runs (if average)
             run_list = [run_num] if isinstance(run_num, int) else []
                 
             # load bold files
-            if ses not in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
+            if ses != 'ses-mean' and ses not in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
                 print('No session files found for participant {p}, skipping'.format(p = pp))
             else:
                 ## bold filenames
-                bold_files = self.MRIObj.mri_utils.get_bold_file_list(pp, task = task, ses = ses, file_ext = file_ext,
+                bold_files = self.MRIObj.mri_utils.get_bold_file_list(pp, task = task, ses = ses, file_ext = file_ext[task],
                                                                     postfmriprep_pth = input_pth, acq_name = self.MRIObj.acq,
                                                                     run_list = run_list)
                 
@@ -767,7 +767,7 @@ freeview -v \
                 if not op.isfile(movie_name):
                     for num_tr in range(data_arr.shape[-1]):
 
-                        filename = movie_name.replace('movie', 'visual_TR-{time}'.format(time = str(num_tr).zfill(3)))
+                        filename = movie_name.replace('movie', 'TR-{time}'.format(time = str(num_tr).zfill(3)))
                         filename = filename.replace('.mp4', '.png')
 
                         if not op.isfile(filename): # if image already in dir, skip
@@ -799,7 +799,8 @@ freeview -v \
                             full_fig.savefig(filename)
 
                     ## save as video
-                    img_name = filename.replace('_TR-%s.png'%str(num_tr).zfill(3),'_TR-%3d.png')
+                    img_name = filename.replace('TR-{time}'.format(time = str(num_tr).zfill(3)),'TR-%3d')
+                    print(img_name)
                     os.system("ffmpeg -r 6 -start_number 0 -i %s -vcodec mpeg4 -y %s"%(img_name,movie_name)) 
 
                 else:
@@ -1017,25 +1018,7 @@ freeview -v \
         
         return axis
 
-    
-    def plot_periodogram(self, axis, timecourse = None, TR = 1.6):
 
-        """
-        Helper function that actually plots power spectral density
-            
-        """
-
-        sampling_frequency = 1 / TR  
-        freq, power = periodogram(timecourse, fs = sampling_frequency)#, detrend = False)
-        
-        axis.plot(freq, power, 'g-', alpha = .8, label='data')
-
-        axis.set_xlabel('Frequency (Hz)',fontsize = 15, labelpad = 10)
-        axis.set_ylabel('Power (dB)',fontsize = 15, labelpad = 10)
-
-        axis.axvline(x=0.01,color='r',ls='dashed', lw=2)
-        
-        return axis
 
 
 

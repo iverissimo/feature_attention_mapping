@@ -17,6 +17,8 @@ from PIL import Image, ImageDraw
 import nibabel as nib
 from statsmodels.stats import weightstats
 
+from scipy.signal import periodogram
+
 
 # local packages
 from FAM.utils.general import Utils
@@ -673,7 +675,24 @@ class PlotUtils(Utils):
             else:
                 plt.savefig('{fn}_colorwheel_discrete.png'.format(fn = fig_name),dpi=100)
 
+    def plot_periodogram(self, axis, timecourse = None, TR = 1.6):
 
+        """
+        plot power spectral density
+            
+        """
+
+        sampling_frequency = 1 / TR  
+        freq, power = periodogram(timecourse, fs = sampling_frequency)#, detrend = False)
+        
+        axis.plot(freq, power, 'g-', alpha = .8, label='data')
+
+        axis.set_xlabel('Frequency (Hz)',fontsize = 15, labelpad = 10)
+        axis.set_ylabel('Power (dB)',fontsize = 15, labelpad = 10)
+
+        axis.axvline(x=0.01,color='r',ls='dashed', lw=2)
+        
+        return axis
 
 
     def get_weighted_bins(data_df, x_key = 'ecc', y_key = 'size', weight_key = 'rsq', n_bins = 10):

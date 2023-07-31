@@ -220,7 +220,7 @@ class MRIData(BehData):
             self.mri_nr_cropTR['FA'] += self.params['FA']['crop_TR']
         
         ## if we're shifting TRs to account for dummy scans
-        self.shift_TRs_num =  self.MRIObj.params['mri']['shift_DM_TRs']
+        self.shift_TRs_num =  self.params['mri']['shift_DM_TRs']
 
         # initialize utilities class
         self.mri_utils = MRIUtils() 

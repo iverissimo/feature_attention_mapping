@@ -34,7 +34,6 @@ class PreprocMRI:
         # set data object to use later on
         self.MRIObj = MRIObj
 
-
     def BiasFieldCorrec(self, participant, file_type='T2w', input_pth = None):
         
         """
@@ -148,8 +147,7 @@ class PreprocMRI:
 
                 # save the output figure with all the anatomical images
                 fig.savefig("%s_BFC.png"%op.join(outfolder,op.split(orig)[-1].split('.')[0]),dpi=100)
-                
-        
+                 
     def check_anatpreproc(self, T2file = True):
         
         """
@@ -183,10 +181,8 @@ class PreprocMRI:
                 self.MRIObj.mri_utils.reorient_nii_2RAS(input_pth = anat_preproc_sub,
                                     output_pth = op.join(self.MRIObj.proj_root_pth,'orig_anat', 'sub-{sj}'.format(sj=pp)))
 
-            
             ##### if we collected T2w files for participant #######
             if T2file:
-                
                 # check for T2w files in sourcedata
                 T2w_files = [op.join(anat_pth, val) for val in os.listdir(anat_pth) if val.endswith('_T2w.nii.gz')]
 
@@ -205,7 +201,6 @@ class PreprocMRI:
                             self.BiasFieldCorrec(participant=pp)
                     
                     print('Participant T2w files already processed')
-                    
                     
             ##### check if masked T1w file in anat folder #####
             masked_T1_files = [op.join(anat_pth, val) for val in os.listdir(anat_pth) if val.endswith('_desc-masked_T1w.nii.gz')]
@@ -247,9 +242,7 @@ class PreprocMRI:
                     
             else:
                 print('Participant T1w files already processed')
-                
-                
-                
+                    
     def call_freesurfer(self, cmd='all', wf_dir = '/scratch/FAM_wf', batch_dir ='/home/inesv/batch',
                         partition_name = None, node_name = None,
                         batch_mem_Gib = 90, run_time = '50:00:00'):
@@ -297,10 +290,9 @@ class PreprocMRI:
             # path to store freesurfer outputs, in derivatives
             out_dir = op.join(self.MRIObj.freesurfer_pth, 'sub-{sj}'.format(sj=pp))
             print('saving files in %s'%out_dir)
-
-            if not op.exists(out_dir):
-                os.makedirs(out_dir)
-            elif len(os.listdir(out_dir)) > 0 and freesurfer_cmd == 'all':
+            os.makedirs(out_dir, exist_ok=True)
+                
+            if len(os.listdir(out_dir)) > 0 and freesurfer_cmd == 'all':
                 overwrite = ''
                 while overwrite not in ('y','yes','n','no'):
                     overwrite = input('dir already has files, continue with recon-all\n(y/yes/n/no)?: ')
@@ -314,12 +306,10 @@ class PreprocMRI:
             t1_filename = [op.join(anat_pth,run) for run in os.listdir(anat_pth) if run.endswith('masked_T1w.nii.gz')]
             t2_filename = [op.join(anat_pth,run) for run in os.listdir(anat_pth) if run.endswith('_T2w.nii.gz')]
 
-            
             if (len(t1_filename) == 0) and (len(t2_filename) == 0):
                 raise NameError('No source files present!! Check whats up')
             
             ### EDIT COMMAND STRING ####
-            
             if cmd == 'pial':
                 print("running pial fixes")
                 freesurfer_cmd += '-autorecon-pial '
@@ -339,7 +329,6 @@ class PreprocMRI:
                     freesurfer_cmd += '-T2 {T2_file} -T2pial '.format(T2_file = t2_filename[0].replace(anat_pth, op.join(wf_dir, 'anat')))
             
                 freesurfer_cmd += '-all '
-            
             
             # set batch string
             batch_string = slurm_fs_cmd + """
@@ -405,8 +394,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             print('submitting ' + js_name + ' to queue')
             print(batch_string)
             os.system('sbatch ' + js_name)
-
-            
+   
     def call_fmriprep(self, data_type='anat', wf_dir = '/scratch/FAM_wf', batch_dir ='/home/inesv/batch',
                      partition_name = None, node_name = None, use_fmap = True, low_mem = True,
                      node_mem = 5000, batch_mem_Gib = 90, run_time = '50:00:00'):
@@ -446,7 +434,6 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             # add memory for node
             fmriprep_cmd += '#SBATCH --mem={mem}G\n'.format(mem=batch_mem_Gib)
             
-                
             if data_type == 'anat':
                 fmriprep_cmd +="""\n# call the programs
 echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
@@ -469,9 +456,8 @@ wait          # wait until programs are finished
 
 echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 """
-                
+
             else:
-                
                 fmriprep_cmd +="""# call the programs
 echo "Job $SLURM_JOBID started at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
@@ -542,7 +528,6 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
             print('submitting ' + js_name + ' to queue')
             #print(batch_string)
             os.system('sbatch ' + js_name)
-
 
     def NORDIC(self, participant, input_pth = None, output_pth = None, calc_tsnr=False):
         
@@ -686,7 +671,6 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
             # save the output figure with all the anatomical images
             fig.savefig(op.join(op.split(nordic_nii)[0], 'mean_tSNR_NORDIC.png'))
 
-
     def check_funcpreproc(self):
             
         """
@@ -729,7 +713,6 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
                                     parrec_pth = op.join(self.MRIObj.proj_root_pth, 'raw_data', 'parrec', 
                                     'sub-{sj}'.format(sj = pp), ses))
 
-    
     def update_jsons(self, participant, input_pth = None, parrec_pth = None, json_folder = 'fmap', ses = 'ses-1', fmap_PE = 'AP'):
 
         """
@@ -749,7 +732,6 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
         ## set parrec path where raw data PAR/REC files are
         if parrec_pth is None:
             parrec_pth = op.join(self.MRIObj.proj_root_pth, 'raw_data', 'parrec', 'sub-{sj}'.format(sj=participant), ses)
-
 
         ## for fieldmap data json
         if json_folder == 'fmap':
@@ -810,12 +792,11 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
                 else:
                     print('No json file for topup run-%i'%(r+1))
                 
-
         ## for functional data json
         elif json_folder == 'func':
 
             ## loop over tasks
-            for tsk in self.MRIObj.params['general']['tasks']:
+            for tsk in self.MRIObj.tasks:
 
                 ## get json file list we want to update
                 json_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if 'task-{tsk}'.format(tsk=tsk) in val \
@@ -873,7 +854,6 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
 
                     else:
                         print('No json file for task %s func run-%i'%(tsk,(r+1)))
-
 
     def crop_fieldmaps(self, participant, dummys = 5, input_pth = None, output_pth = None):
 
@@ -935,7 +915,6 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
             else:
                 print('already cropped {file}, nr TRs is {nt}'.format(file=file, 
                                                                     nt=file_trs))
-
 
     def call_mriqc(self, wf_dir = '/scratch/FAM_wf', batch_dir ='/home/inesv/batch'):
             
@@ -1022,7 +1001,6 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
             print('submitting ' + js_name + ' to queue')
             os.system('sh ' + js_name) if self.MRIObj.base_dir == 'local' else os.system('sbatch ' + js_name)
-
 
     def post_fmriprep_proc(self, tasks = ['pRF', 'FA'], save_subcortical = False, hemispheres = ['hemi-L','hemi-R']):
 
@@ -1121,7 +1099,6 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                         # save FA files in final output folder too
                         for f in proc_files:
                             copyfile(f, op.join(final_output_dir,op.split(f)[-1]))
-
 
     def get_mrifile_ext(self):
 

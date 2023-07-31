@@ -137,11 +137,11 @@ match data_type:
 
                 use_mean_run = ''
                 while use_mean_run not in ['y', 'n']:
-                    use_mean_run = int(input("Plot mean run? [y/n]: "))
+                    use_mean_run = str(input("Plot mean run? [y/n]: "))
 
                 if use_mean_run == 'y':
                     run_type = 'mean'
-                    ses_num = None
+                    ses_num = 'mean'
                 else:
                     run_type = ''
                     while not isinstance(run_type, int):

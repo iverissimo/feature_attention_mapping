@@ -346,13 +346,7 @@ class MRIUtils(Utils):
         
         return bold_filelist
 
-
-    
-        
-
-
-
-    def smooth_surface(data, pysub = 'hcp_999999', kernel=3, nr_iter=3, normalize = False):
+    def smooth_surface(self, data, pysub = 'hcp_999999', kernel=3, nr_iter=3, normalize = False):
 
         """
         smooth surface data, with a given kernel size 
@@ -388,7 +382,6 @@ class MRIUtils(Utils):
             rh_data_smooth /= rh_data_smooth.max()
 
         return np.concatenate((lh_data_smooth,rh_data_smooth), axis=0)
-
 
     def crop_epi(self, file, outdir = None, num_TR_crop = 5):
 
@@ -900,8 +893,7 @@ class MRIUtils(Utils):
 
             nib.save(canonical_img, file)
 
-
-    def convert64bit_to_16bit(input_file, output_file):
+    def convert64bit_to_16bit(self, input_file, output_file):
 
         """
         Convert niftis from 64-bit (float) to 16-bit (int)
@@ -935,8 +927,7 @@ class MRIUtils(Utils):
         # save in same dir
         nib.save(new_image, output_file)
 
-
-    def convert_parrec2nii(input_dir, output_dir, cmd = None):
+    def convert_parrec2nii(self, input_dir, output_dir, cmd = None):
 
         """
         convert PAR/REC to nifti
@@ -962,7 +953,6 @@ class MRIUtils(Utils):
         # convert files
         print("Converting files to nifti-format")
         os.system(cmd_txt)
-
 
     def surf_data_from_cifti(self, data, axis = None, surf_name = '', medial_struct=False):
 

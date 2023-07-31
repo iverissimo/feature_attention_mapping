@@ -154,7 +154,8 @@ match data_type:
                                             run_num = run_type, ses_num = ses_num, task = task, 
                                             stim_on_screen = FAM_beh.get_stim_on_screen(task = task, 
                                                                                         crop_nr = FAM_mri.MRIObj.mri_nr_cropTR[task], 
-                                                                                        shift = FAM_mri.MRIObj.shift_TRs_num),
+                                                                                        shift = FAM_mri.MRIObj.shift_TRs_num,
+                                                                                        dummy = FAM_mri.MRIObj.mri_nrdummyTRs),
                                             use_atlas_rois = use_atlas,
                                             file_ext = FAM_mri.get_mrifile_ext())
 

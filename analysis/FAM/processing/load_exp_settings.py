@@ -212,8 +212,9 @@ class MRIData(BehData):
 
         ## number of cropped TRs
         # due to dummies TRs that were saved and extra ones as defined in params
-        self.mri_nr_cropTR = {'pRF': self.params['mri']['dummy_TR'],
-                              'FA': self.params['mri']['dummy_TR']}
+        self.mri_nrdummyTRs = self.params['mri']['dummy_TR']
+        self.mri_nr_cropTR = {'pRF': self.mri_nrdummyTRs,
+                              'FA': self.mri_nrdummyTRs}
         if self.params['pRF']['crop'] == True: 
             self.mri_nr_cropTR['pRF'] += self.params['pRF']['crop_TR']
         if self.params['FA']['crop'] == True: 

@@ -365,7 +365,7 @@ class PreprocBeh:
         
         return df_mask_bool
     
-    def get_stim_on_screen(self, task = 'pRF', crop_nr = None, shift = 0):
+    def get_stim_on_screen(self, task = 'pRF', crop_nr = None, shift = 0, dummy = 5):
 
         """
         Get boolean array indicating on which TRs stimuli is on screen
@@ -389,7 +389,7 @@ class PreprocBeh:
             stim_on_screen = np.zeros(self.FA_total_trials)
             stim_on_screen[self.FA_bar_pass_trials] = 1
             
-        return self.MRIObj.mri_utils.crop_shift_arr(stim_on_screen, crop_nr = crop_nr, shift = shift)
+        return self.MRIObj.mri_utils.crop_shift_arr(stim_on_screen, crop_nr = crop_nr - dummy, shift = shift)
 
     def get_FA_behavioral_results(self, ses_type = 'func'):
         

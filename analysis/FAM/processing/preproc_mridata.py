@@ -745,7 +745,7 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
                             and val.endswith('.PAR')]
 
             ## loop over runs
-            for r in range(self.MRIObj.params['mri']['nr_runs']):
+            for r in range(self.MRIObj.mri_nr_runs):
                 
                 # check if run file exists
                 jfile = [val for val in json_files if 'run-%i'%(r+1) in val or 'run-0%i'%(r+1) in val]
@@ -807,7 +807,7 @@ mv $OUTFILE.nii.gz $OUTPATH # move to post nordic folder
                                 and val.endswith('.PAR')]
 
                 ## loop over runs
-                for r in range(self.MRIObj.params['mri']['nr_runs']):
+                for r in range(self.MRIObj.mri_nr_runs):
                     
                     # check if run file exists
                     jfile = [val for val in json_files if 'run-%i'%(r+1) in val or 'run-0%i'%(r+1) in val]

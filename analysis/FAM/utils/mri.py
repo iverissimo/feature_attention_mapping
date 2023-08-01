@@ -307,7 +307,7 @@ class MRIUtils(Utils):
         else:
             return tsnr
 
-    def get_bold_file_list(self, participant, task = 'pRF', ses = 'ses-mean', file_ext = '_cropped_dc_psc.npy',
+    def get_bold_file_list(self, participant, task = 'pRF', ses = 'mean', file_ext = '_cropped_dc_psc.npy',
                                 postfmriprep_pth = '', acq_name = 'nordic', run_list = []):
 
         """
@@ -1088,7 +1088,227 @@ class MRIUtils(Utils):
             outfiles = outfiles[0] 
 
         return outfiles
+    
+    def select_confounds(self, file, outdir = None, reg_names = ['a_comp_cor','cosine','framewise_displacement'],
+                        CumulativeVarianceExplained = 0.4, num_TR_crop = 5, select = 'num', num_components = 5):
+        
+        """ 
+        function to subselect relevant nuisance regressors
+        from fmriprep confounds output tsv
+        and save them in new tsv in outdir
+        
+        Parameters
+        ----------
+        file : str/list/array
+            absolute filename of original confounds.tsv (or list of filenames)
+        outdir : str
+            path to save new file
+        reg_names : list
+            list with (sub-)strings of the nuisance regressor names
+        select: str
+            selection factor ('num' - select x number of components, 'cve' - use CVE as threshold)
+        CumulativeVarianceExplained: float
+            value of CVE up to which a_comp_cor components are selected
+        num_components: int
+            number of components to select
+        num_TR_crop: int
+            if we are cropping bold file TRs, also need to do it with confounds, to match
+            
+        Outputs
+        -------
+        out_file: str
+            absolute output filename (or list of filenames)
+        
+        """
+        
+        # check if single filename or list of filenames
+        if isinstance(file, list) or isinstance(file, np.ndarray): 
+            file_list = file  
+        else:
+            file_list = [file]
+        
+        # store output filename in list
+        outfiles = []
+        
+        # for each file, do the same
+        for input_file in file_list:
+            
+            # get file extension
+            file_extension = '.{a}'.format(a = input_file.rsplit('.')[-1])
+            
+            # set output filename
+            output_file = op.join(outdir, 
+                        op.split(input_file)[-1].replace(file_extension,'_{name}{ext}'.format(name = 'select_cropped',
+                                                                                            ext = file_extension)))
+                
+            # if file already exists, skip
+            if op.exists(output_file): 
+                print('already exists, skipping %s'%output_file)
+            
+            else:
+                print('making %s'%output_file)
+                
+                # load confounds tsv
+                data = pd.read_csv(input_file, sep="\t")
+                
+                # get names of nuisances regressors of interest
+                nuisance_columns = []
 
+                for reg in reg_names:
+
+                    if reg == 'a_comp_cor': # in this case, subselect a few, according to jason file
+
+                        # Opening JSON file
+                        f = open(input_file.replace(file_extension,'.json'))
+                        reg_info = json.load(f)
+                        reg_info = pd.DataFrame.from_dict(reg_info)
+                        f.close
+
+                        reg_info = reg_info.filter(regex=reg)
+
+                        if select == 'num': 
+                            cut_off_ind = num_components
+                        elif select == 'cve':  
+                            # cut off index
+                            cut_off_ind = np.where(reg_info.iloc[reg_info.index=='CumulativeVarianceExplained'].values[0] > CumulativeVarianceExplained)[0][0] 
+
+                        nuisance_columns += list(reg_info.columns[0:cut_off_ind])
+
+                    else:
+                        nuisance_columns += [col for col in data.columns if reg in col]
+                    
+                # get final df
+                filtered_data = data[nuisance_columns]
+                # dont forget to crop first TRs
+                crop_data = filtered_data.iloc[num_TR_crop:] 
+                
+                print('nuisance dataframe with %i TRs and %i columns: %s' %(len(crop_data),len(crop_data.columns),str(list(crop_data.columns))))
+
+                # saving as tsv file
+                crop_data.to_csv(output_file, sep="\t", index = False)
+                
+            # append out files
+            outfiles.append(output_file)
+            
+        # if input file was not list, then return output that is also not list
+        if not isinstance(file, list) and not isinstance(file, np.ndarray): 
+            outfiles = outfiles[0] 
+
+        return outfiles
+
+    def regressOUT_confounds(self, file, counfounds = None, outdir = None, TR=1.6, plot_vert = False, 
+                                    detrend = True, standardize = 'psc', standardize_confounds = True):
+        
+        """ 
+        regress out confounds from data
+        
+        Parameters
+        ----------
+        file : str/list/array
+            absolute filename to be filtered (or list of filenames)
+        counfounds : str/list/array
+            absolute filename of confounds tsv (or list of filenames)
+        outdir : str
+            path to save new file
+        detrend: bool
+            input for nilearn signal clean, Whether to detrend signals or not
+        standardize: str or False
+            input for nilearn signal clean, Strategy to standardize the signal (if False wont do it)
+        standardize_confounds: bool
+            input for nilearn signal clean, If set to True, the confounds are z-scored
+        
+        Outputs
+        -------
+        out_file: str
+            absolute output filename (or list of filenames)
+        """ 
+
+        # check if single filename or list of filenames
+        
+        if isinstance(file, list) or isinstance(file, np.ndarray): 
+            file_list = file  
+        else:
+            file_list = [file]
+        
+        # store output filename in list
+        outfiles = []
+        
+        # for each file, do the same
+        for input_file in file_list:
+            
+            # get file extension
+            file_extension = '.{b}'.format(b = input_file.rsplit('.', 2)[-1])
+
+            # if we are also standardizing, then add that to name
+            if isinstance(standardize, str):
+                stand_name = '_{s}'.format(s = standardize)
+            else:
+                stand_name = ''
+                standardize = False
+
+            # set output filename
+            output_file = op.join(outdir, 
+                        op.split(input_file)[-1].replace(file_extension,'_{c}{s}{ext}'.format(c = 'confound',
+                                                                                            s = stand_name,
+                                                                                            ext = file_extension)))
+            # if file already exists, skip
+            if op.exists(output_file): 
+                print('already exists, skipping %s'%output_file)
+            
+            else:
+                print('making %s'%output_file)
+                
+                data = np.load(input_file, allow_pickle = True)
+                
+                # get confound file for that run
+                run_id = re.search(r'run-._', input_file).group(0)
+                conf_file = [val for val in counfounds if run_id in val][0]
+
+                print('using confounds from %s'%conf_file)
+
+                # load dataframe
+                conf_df = pd.read_csv(conf_file, sep="\t")
+                
+                # clean confounds from data
+                filtered_signal = signal.clean(signals = data.T, confounds = conf_df.values, detrend = detrend, 
+                                standardize = standardize, standardize_confounds = standardize_confounds, filter = False, t_r = TR)
+                
+                data_filt = filtered_signal.T
+                
+                ## save filtered file
+                np.save(output_file,data_filt)
+
+                ## if we want to compare a high tSNR voxel before and after filtering
+                if plot_vert:
+                    tsnr = np.mean(data, axis = -1)/np.std(data, axis = -1)
+                    tsnr[np.where(np.isinf(tsnr))] = np.nan
+
+                    # psc original data, so they are in same scale
+                    mean_signal = data.mean(axis = -1)[..., np.newaxis]
+                    data_psc = (data - mean_signal)/np.absolute(mean_signal)
+                    data_psc *= 100
+                    
+                    ind2plot = np.where(tsnr == np.nanmax(tsnr))[0][0]
+                    fig = plt.figure()
+                    plt.plot(data_psc[ind2plot,...], color='dimgray',label='Original data')
+                    plt.plot(data_filt[ind2plot,...], color='mediumseagreen',label='Filtered data')
+
+                    plt.xlabel('Time (TR)')
+                    plt.ylabel('Signal amplitude (a.u.)')
+                    plt.legend(loc = 'upper right')
+
+                    fig.savefig(output_file.replace(file_extension,'_vertex_%i.png'%ind2plot))
+
+            # append out files
+            outfiles.append(output_file)
+            
+        # if input file was not list, then return output that is also not list
+        if not isinstance(file, list) and not isinstance(file, np.ndarray): 
+            outfiles = outfiles[0] 
+        
+        return outfiles
+
+    
 
     def fit_glm(voxel, dm, error='mse'):
         
@@ -1322,226 +1542,6 @@ class MRIUtils(Utils):
             cv_r2 = np.nan_to_num(1-np.sum((voxel-prediction)**2, axis=-1)/(voxel.shape[0]*voxel.var(0)))
 
         return prediction, cv_r2
-
-
-    def select_confounds(self, file, outdir = None, reg_names = ['a_comp_cor','cosine','framewise_displacement'],
-                        CumulativeVarianceExplained = 0.4, num_TR_crop = 5, select = 'num', num_components = 5):
-        
-        """ 
-        function to subselect relevant nuisance regressors
-        from fmriprep confounds output tsv
-        and save them in new tsv in outdir
-        
-        Parameters
-        ----------
-        file : str/list/array
-            absolute filename of original confounds.tsv (or list of filenames)
-        outdir : str
-            path to save new file
-        reg_names : list
-            list with (sub-)strings of the nuisance regressor names
-        select: str
-            selection factor ('num' - select x number of components, 'cve' - use CVE as threshold)
-        CumulativeVarianceExplained: float
-            value of CVE up to which a_comp_cor components are selected
-        num_components: int
-            number of components to select
-        num_TR_crop: int
-            if we are cropping bold file TRs, also need to do it with confounds, to match
-            
-        Outputs
-        -------
-        out_file: str
-            absolute output filename (or list of filenames)
-        
-        """
-        
-        # check if single filename or list of filenames
-        if isinstance(file, list) or isinstance(file, np.ndarray): 
-            file_list = file  
-        else:
-            file_list = [file]
-        
-        # store output filename in list
-        outfiles = []
-        
-        # for each file, do the same
-        for input_file in file_list:
-            
-            # get file extension
-            file_extension = '.{a}'.format(a = input_file.rsplit('.')[-1])
-            
-            # set output filename
-            output_file = op.join(outdir, 
-                        op.split(input_file)[-1].replace(file_extension,'_{name}{ext}'.format(name = 'select_cropped',
-                                                                                            ext = file_extension)))
-                
-            # if file already exists, skip
-            if op.exists(output_file): 
-                print('already exists, skipping %s'%output_file)
-            
-            else:
-                print('making %s'%output_file)
-                
-                # load confounds tsv
-                data = pd.read_csv(input_file, sep="\t")
-                
-                # get names of nuisances regressors of interest
-                nuisance_columns = []
-
-                for reg in reg_names:
-
-                    if reg == 'a_comp_cor': # in this case, subselect a few, according to jason file
-
-                        # Opening JSON file
-                        f = open(input_file.replace(file_extension,'.json'))
-                        reg_info = json.load(f)
-                        reg_info = pd.DataFrame.from_dict(reg_info)
-                        f.close
-
-                        reg_info = reg_info.filter(regex=reg)
-
-                        if select == 'num': 
-                            cut_off_ind = num_components
-                        elif select == 'cve':  
-                            # cut off index
-                            cut_off_ind = np.where(reg_info.iloc[reg_info.index=='CumulativeVarianceExplained'].values[0] > CumulativeVarianceExplained)[0][0] 
-
-                        nuisance_columns += list(reg_info.columns[0:cut_off_ind])
-
-                    else:
-                        nuisance_columns += [col for col in data.columns if reg in col]
-                    
-                # get final df
-                filtered_data = data[nuisance_columns]
-                # dont forget to crop first TRs
-                crop_data = filtered_data.iloc[num_TR_crop:] 
-                
-                print('nuisance dataframe with %i TRs and %i columns: %s' %(len(crop_data),len(crop_data.columns),str(list(crop_data.columns))))
-
-                # saving as tsv file
-                crop_data.to_csv(output_file, sep="\t", index = False)
-                
-            # append out files
-            outfiles.append(output_file)
-            
-        # if input file was not list, then return output that is also not list
-        if not isinstance(file, list) and not isinstance(file, np.ndarray): 
-            outfiles = outfiles[0] 
-
-        return outfiles
-
-    def regressOUT_confounds(self, file, counfounds = None, outdir = None, TR=1.6, plot_vert = False, 
-                                    detrend = True, standardize = 'psc', standardize_confounds = True):
-        
-        """ 
-        regress out confounds from data
-        
-        Parameters
-        ----------
-        file : str/list/array
-            absolute filename to be filtered (or list of filenames)
-        counfounds : str/list/array
-            absolute filename of confounds tsv (or list of filenames)
-        outdir : str
-            path to save new file
-        detrend: bool
-            input for nilearn signal clean, Whether to detrend signals or not
-        standardize: str or False
-            input for nilearn signal clean, Strategy to standardize the signal (if False wont do it)
-        standardize_confounds: bool
-            input for nilearn signal clean, If set to True, the confounds are z-scored
-        
-        Outputs
-        -------
-        out_file: str
-            absolute output filename (or list of filenames)
-        """ 
-
-        # check if single filename or list of filenames
-        
-        if isinstance(file, list) or isinstance(file, np.ndarray): 
-            file_list = file  
-        else:
-            file_list = [file]
-        
-        # store output filename in list
-        outfiles = []
-        
-        # for each file, do the same
-        for input_file in file_list:
-            
-            # get file extension
-            file_extension = '.{b}'.format(b = input_file.rsplit('.', 2)[-1])
-
-            # if we are also standardizing, then add that to name
-            if isinstance(standardize, str):
-                stand_name = '_{s}'.format(s = standardize)
-            else:
-                stand_name = ''
-                standardize = False
-
-            # set output filename
-            output_file = op.join(outdir, 
-                        op.split(input_file)[-1].replace(file_extension,'_{c}{s}{ext}'.format(c = 'confound',
-                                                                                            s = stand_name,
-                                                                                            ext = file_extension)))
-            # if file already exists, skip
-            if op.exists(output_file): 
-                print('already exists, skipping %s'%output_file)
-            
-            else:
-                print('making %s'%output_file)
-                
-                data = np.load(input_file, allow_pickle = True)
-                
-                # get confound file for that run
-                run_id = re.search(r'run-._', input_file).group(0)
-                conf_file = [val for val in counfounds if run_id in val][0]
-
-                print('using confounds from %s'%conf_file)
-
-                # load dataframe
-                conf_df = pd.read_csv(conf_file, sep="\t")
-                
-                # clean confounds from data
-                filtered_signal = signal.clean(signals = data.T, confounds = conf_df.values, detrend = detrend, 
-                                standardize = standardize, standardize_confounds = standardize_confounds, filter = False, t_r = TR)
-                
-                data_filt = filtered_signal.T
-                
-                ## save filtered file
-                np.save(output_file,data_filt)
-
-                ## if we want to compare a high tSNR voxel before and after filtering
-                if plot_vert:
-                    tsnr = np.mean(data, axis = -1)/np.std(data, axis = -1)
-                    tsnr[np.where(np.isinf(tsnr))] = np.nan
-
-                    # psc original data, so they are in same scale
-                    mean_signal = data.mean(axis = -1)[..., np.newaxis]
-                    data_psc = (data - mean_signal)/np.absolute(mean_signal)
-                    data_psc *= 100
-                    
-                    ind2plot = np.where(tsnr == np.nanmax(tsnr))[0][0]
-                    fig = plt.figure()
-                    plt.plot(data_psc[ind2plot,...], color='dimgray',label='Original data')
-                    plt.plot(data_filt[ind2plot,...], color='mediumseagreen',label='Filtered data')
-
-                    plt.xlabel('Time (TR)')
-                    plt.ylabel('Signal amplitude (a.u.)')
-                    plt.legend(loc = 'upper right')
-
-                    fig.savefig(output_file.replace(file_extension,'_vertex_%i.png'%ind2plot))
-
-            # append out files
-            outfiles.append(output_file)
-            
-        # if input file was not list, then return output that is also not list
-        if not isinstance(file, list) and not isinstance(file, np.ndarray): 
-            outfiles = outfiles[0] 
-        
-        return outfiles
 
 
     def get_ecc_limits(visual_dm, params, screen_size_deg = [11,11]):
@@ -1827,55 +1827,6 @@ class MRIUtils(Utils):
 
         
         return prediction
-
-
-
-    def baseline_correction(data, condition_per_TR, num_baseline_TRs = 6, baseline_interval = 'empty_long', 
-                            avg_type = 'median', only_edges = False, TR2task = 3):
-        
-        """Do baseline correction to timecourse
-        Useful when we want a fix baseline during fitting
-
-        Parameters
-        ----------
-        data : array
-        2D array with data timecourses
-        num_baseline_TRs: int
-            number of baseline TRs to consider (will always be the last X TRs of the interval)
-        baseline_interval : str
-        name of the condition to get baseline values
-        avg_type: str
-            type of averaging done
-        only_edges: bool
-            if we want to only use the edges of the array to correct (this is start and end)
-        TR2task: int
-            number of TRs between end of baseline period and start of bar pass (i.e., shifts baseline period in time by X TRs) 
-        """
-
-        baseline_index = [i for i, val in enumerate(condition_per_TR) if str(val) == baseline_interval]
-        interval_ind = []
-        for i, ind in enumerate(baseline_index):
-            if i > 0:
-                if (ind - baseline_index[i-1]) > 1: ## transition point
-                    interval_ind.append([baseline_index[i-1] - TR2task - num_baseline_TRs, baseline_index[i-1] - TR2task]) 
-
-        if condition_per_TR[-1] == baseline_interval:
-            interval_ind.append([baseline_index[-1] - TR2task - num_baseline_TRs, baseline_index[-1] - TR2task]) 
-        
-        if only_edges:
-            interval_ind = np.array((interval_ind[0], interval_ind[-1]))
-
-        # get baseline values
-        baseline_arr = np.hstack([data[..., ind[0]:ind[1]] for ind in interval_ind])
-
-        # average
-        if avg_type == 'median':
-            avg_baseline = np.median(baseline_arr, axis = -1)
-        else:
-            avg_baseline = np.mean(baseline_arr, axis = -1)
-
-        return data - avg_baseline[...,np.newaxis]
-
 
 
 

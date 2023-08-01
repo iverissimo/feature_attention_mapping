@@ -705,13 +705,14 @@ freeview -v \
             print('saving files in %s'%outdir)
 
             ## session key
-            ses = 'ses-{s}'.format(s = ses_num)
+            ses_key = 'ses-{s}'.format(s = ses_num)
+            ses = ses_num
 
             # run or runs (if average)
             run_list = [run_num] if isinstance(run_num, int) else []
                 
             # load bold files
-            if ses != 'ses-mean' and ses not in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
+            if ses_key != 'ses-mean' and ses_key not in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
                 print('No session files found for participant {p}, skipping'.format(p = pp))
             else:
                 ## bold filenames
@@ -750,7 +751,7 @@ freeview -v \
                     #axis.set_xlim([0, time_sec[-1]])
 
                     fig.savefig(op.join(outdir, 'average_BOLD_across_runs_rois_sub-{sj}_{ses}_run-{run}_task-{tsk}_acq-{acq}.png'.format(sj = pp, 
-                                                                                                                                        ses = ses,
+                                                                                                                                        ses = ses_key,
                                                                                                                                         run = run_num, 
                                                                                                                                         tsk = task, 
                                                                                                                                         acq = self.MRIObj.acq)))
@@ -759,7 +760,7 @@ freeview -v \
                 movie_name = op.join(outdir,
                                      'flatmap_space-{space}_type-BOLD_visual_movie_sub-{sj}_{ses}_run-{run}_task-{tsk}_acq-{acq}.mp4'.format(space=self.MRIObj.sj_space,
                                                                                                                                              sj = pp, 
-                                                                                                                                            ses = ses,
+                                                                                                                                            ses = ses_key,
                                                                                                                                             run = run_num, 
                                                                                                                                             tsk = task, 
                                                                                                                                             acq = self.MRIObj.acq))

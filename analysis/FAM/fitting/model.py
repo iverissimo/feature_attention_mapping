@@ -72,7 +72,7 @@ class Model:
 
     def get_data4fitting(self, file_list, task = 'pRF', run_type = 'mean',
                             chunk_num = None, vertex = None,
-                            baseline_interval = 'empty_long', ses = 1, return_filenames = False):
+                            baseline_interval = 'empty_long', ses = 'mean', return_filenames = False):
 
         """
         load data from file list
@@ -99,15 +99,18 @@ class Model:
             If we want to also return filenames in the same order of data array rows, or not (default)
 
         """  
-
-        # if loading specific run, select it
+        
+        # if loading specific run
         if isinstance(run_type, int) or (isinstance(run_type, str) and 'loo_' not in run_type and len(re.findall(r'\d{1,10}', run_type))>0):
 
-            run = re.findall(r'\d{1,10}', str(run_type))[0]
-            print('Loading run-{r} from ses-{s}'.format(r = run, s = ses))
+            if not isinstance(ses, int) or not (isinstance(ses, str) and len(re.findall(r'\d{1,10}', ses))>0):
+                raise ValueError('Want to run specific run but did not provide session number!')
+            else:
+                run = re.findall(r'\d{1,10}', str(run_type))[0]
+                print('Loading run-{r} from ses-{s}'.format(r = run, s = ses))
 
-            file_list = [file for file in file_list if 'run-{r}'.format(r = run) in file and 'ses-{s}'.format(s = ses) in file]
-            
+                file_list = [file for file in file_list if 'run-{r}'.format(r = run) in file and 'ses-{s}'.format(s = ses) in file]
+
         # if leaving one run out
         elif 'loo_' in run_type:
             
@@ -128,70 +131,54 @@ class Model:
                 data_arr = np.mean(data_arr, axis = 0)[np.newaxis, ...]
 
         # loop over runs
-        data2fit = np.array([])
+        data2fit = []
         self.run_num_arr = [] 
         self.ses_num_arr = []
 
         for r in range(data_arr.shape[0]):
             
-            # data for that run
-            data = data_arr[r]
-
-            # if we want to chunk it
-            if isinstance(chunk_num, int):
-                # number of vertices of chunk
-                num_vox_chunk = int(data.shape[0]/self.total_chunks[task])
-                print('Slicing data into chunk {ch} of {ch_total}'.format(ch = chunk_num, 
-                                            ch_total = self.total_chunks[task]))
-        
-                # chunk it
-                data_out = data[num_vox_chunk * int(chunk_num):num_vox_chunk * int(chunk_num + 1), :]
-            
-            # if we want specific vertex
-            elif isinstance(vertex, int) or isinstance(vertex, list) or isinstance(vertex, np.ndarray):
-                print('Slicing data into vertex {ver}'.format(ver = vertex))
-                data_out = data[vertex]
-                
-                if isinstance(vertex, int):
-                    data_out = data_out[np.newaxis,...]
-            
-            # return whole array
-            else:
-                print('Returning whole data array')
-                data_out = data
+            # subselect data for that run
+            data_out = self.subselect_array(data_arr[r], task = task, chunk_num = chunk_num, vertex = vertex)
 
             ## if we want to keep baseline fix, we need to correct it!
             if self.correct_baseline[task]:
                 print('Correcting baseline to be 0 centered')
 
+                # number of TRs per condition (bar pass)
+                if task == 'pRF':
+                    bar_pass = self.MRIObj.beh_utils.get_pRF_cond_per_TR(cond_TR_dict = self.MRIObj.pRF_nr_TRs, 
+                                                                                bar_pass_direction = self.MRIObj.pRF_bar_pass)
+                    only_edges = False
+                elif task == 'FA':
+                    bar_pass, _ = self.MRIObj.beh_utils.get_FA_run_struct(self.MRIObj.FA_bar_pass, 
+                                                                                num_bar_pos = self.MRIObj.FA_num_bar_position, 
+                                                                                empty_TR = self.MRIObj.FA_nr_TRs['empty_TR'], 
+                                                                                task_trial_TR = self.MRIObj.FA_nr_TRs['task_trial_TR'])
+                    only_edges = True
+                    
                 # crop and shift if such was the case
-                bar_pass = self.mri_beh.FA_bar_pass_all if task == 'FA' else self.mri_beh.pRF_bar_pass_all
-                crop_nr = self.crop_TRs_num[task] if self.crop_TRs[task] == True else None
-                only_edges = True if task == 'FA' else False
-
                 condition_per_TR = self.MRIObj.mri_utils.crop_shift_arr(bar_pass, 
-                                                            crop_nr = crop_nr, 
-                                                            shift = self.shift_TRs_num)
+                                                                    crop_nr = self.MRIObj.mri_nr_cropTR[task], 
+                                                                    shift = self.MRIObj.shift_TRs_num)
 
-                data_out = self.MRIObj.mri_utils.baseline_correction(data_out, condition_per_TR, 
+                data_out = self.baseline_correction(data_out, condition_per_TR, 
                                                         num_baseline_TRs = self.corr_base_TRs[task], 
                                                         baseline_interval = baseline_interval, 
                                                         avg_type = 'median', only_edges = only_edges)
 
-            ## STACK
-            if data_arr.shape[0]>1:
-                data2fit = np.vstack([data2fit, data_out[np.newaxis, ...]]) if data2fit.size else data_out[np.newaxis, ...]
-            else:
-                if task == 'FA':
-                    data2fit = data_out[np.newaxis, ...]
-                else:
-                    data2fit = data_out
+            ## append
+            data2fit.append(np.vstack(data_out[np.newaxis, ...]))
 
             ## append run number, and ses number in list of ints
             # useful for when fitting several runs at same time
             file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(file_list[r])
             self.run_num_arr.append(file_rn)
             self.ses_num_arr.append(file_sn)
+
+        if task == 'pRF':
+            data2fit = data2fit[0]
+        else:
+            data2fit = np.array(data2fit)
             
         # return filelist if that matters for fitting (mainly for FA task)
         if return_filenames:
@@ -227,7 +214,7 @@ class Model:
     
             # chunk it
             arr_out = input_arr[num_vox_chunk * int(chunk_num):num_vox_chunk * int(chunk_num + 1), :]
-        
+
         # if we want specific vertex
         elif isinstance(vertex, int) or isinstance(vertex, list) or isinstance(vertex, np.ndarray):
             print('Slicing array into vertex {ver}'.format(ver = vertex))
@@ -276,6 +263,53 @@ class Model:
 
             else:
                 return np.sum((timecourse - prediction) ** 2) # calculate residual sum of squared errors
+            
+
+    def baseline_correction(self, data, condition_per_TR = [], num_baseline_TRs = 6, baseline_interval = 'empty_long', 
+                                    avg_type = 'median', only_edges = False, TR2task = 3):
+        
+        """Do baseline correction to timecourse
+        Useful when we want a fix baseline during fitting
+
+        Parameters
+        ----------
+        data : array
+        2D array with data timecourses
+        num_baseline_TRs: int
+            number of baseline TRs to consider (will always be the last X TRs of the interval)
+        baseline_interval : str
+        name of the condition to get baseline values
+        avg_type: str
+            type of averaging done
+        only_edges: bool
+            if we want to only use the edges of the array to correct (this is start and end)
+        TR2task: int
+            number of TRs between end of baseline period and start of bar pass (i.e., shifts baseline period in time by X TRs) 
+        """
+
+        baseline_index = [i for i, val in enumerate(condition_per_TR) if str(val) == baseline_interval]
+        interval_ind = []
+        for i, ind in enumerate(baseline_index):
+            if i > 0:
+                if (ind - baseline_index[i-1]) > 1: ## transition point
+                    interval_ind.append([baseline_index[i-1] - TR2task - num_baseline_TRs, baseline_index[i-1] - TR2task]) 
+
+        if condition_per_TR[-1] == baseline_interval:
+            interval_ind.append([baseline_index[-1] - TR2task - num_baseline_TRs, baseline_index[-1] - TR2task]) 
+        
+        if only_edges:
+            interval_ind = np.array((interval_ind[0], interval_ind[-1]))
+
+        # get baseline values
+        baseline_arr = np.hstack([data[..., ind[0]:ind[1]] for ind in interval_ind])
+
+        # average
+        if avg_type == 'median':
+            avg_baseline = np.median(baseline_arr, axis = -1)
+        else:
+            avg_baseline = np.mean(baseline_arr, axis = -1)
+
+        return data - avg_baseline[...,np.newaxis]
             
 
 

@@ -90,6 +90,11 @@ parser.add_argument("--vertex",
 parser.add_argument("--ROI", 
                     type = str,
                     help="ROI name to fit or None [default]")
+parser.add_argument("--atlas", 
+                    type = str, 
+                    default = None,
+                    help = "If we want to use atlas ROIs (ex: glasser, wang) or not [default]."
+                    )
 
 # parse the command line
 args = parser.parse_args()
@@ -106,12 +111,14 @@ n_jobs = args.n_jobs
 prf_model_name = args.prf_model_name
 fit_hrf = args.fit_hrf
 run_type = args.run_type
-ses2fit = args.ses2fit # 'ses-mean'
+ses2fit = args.ses2fit 
 fa_model_name = args.fa_model_name
+use_atlas = args.atlas
 
 # vertex list
 if len(args.vertex)>0:
     vertex = [int(val) for val in args.vertex]
+
 # ROI name
 ROI = args.ROI
 
@@ -131,9 +138,8 @@ FAM_beh = preproc_behdata.PreprocBeh(FAM_data)
 # and mri info
 FAM_mri = preproc_mridata.PreprocMRI(FAM_data)
 
-
 ## load pRF model class
-FAM_pRF = pRF_model(FAM_data)
+FAM_pRF = pRF_model(FAM_data, use_atlas = use_atlas)
 
 # set specific params
 FAM_pRF.model_type['pRF'] = prf_model_name
@@ -146,6 +152,9 @@ match task:
     case 'pRF':
         
         if py_cmd == 'fitmodel': # fit pRF model
+
+            print('Fitting {mn} model on the data\n'.format(mn = prf_model_name))
+            print('fit HRF params set to {op}'.format(op = fit_hrf))
 
             # get participant models, which also will load 
             # DM and mask it according to participants behavior
@@ -174,12 +183,20 @@ match task:
 
     case 'FA':
 
-        if py_cmd == 'fitmodel': # fit pRF model
+        if py_cmd == 'fitmodel': # fit FA model
 
-            print('Need to load prf estimates')
+            print('Loading pRF {mn} model estimates\n'.format(mn = prf_model_name))
+            print('fit HRF params set to {op}'.format(op = fit_hrf))
+
+            ## load pRF estimates - implies pRF model was already fit (should change to fit pRF model on the spot if needed)
+            pp_prf_estimates, pp_prf_models = FAM_pRF.load_pRF_model_estimates(participant, ses = 'mean', run_type = 'mean', 
+                                                                    model_name = prf_model_name, iterative = True, fit_hrf = fit_hrf)
+
 
             ## now fit appropriate feature model
             match fa_model_name: 
+
+                print('Fitting {mn} model on the data\n'.format(mn = fa_model_name))
 
                 case 'glmsingle':
 

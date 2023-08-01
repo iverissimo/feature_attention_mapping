@@ -19,7 +19,7 @@ from prfpy.fit import Iso2DGaussianFitter, CSS_Iso2DGaussianFitter, Norm_Iso2DGa
 
 class pRF_model(Model):
 
-    def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_999999'):
+    def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_999999', use_atlas = None):
         
         """__init__
         constructor for class 
@@ -42,6 +42,15 @@ class pRF_model(Model):
         
         # reset osf value, because model assumes 10 (for FA)
         self.osf = 1
+
+        ## set variables useful when loading ROIs
+        if use_atlas is None:
+            self.plot_key = self.MRIObj.sj_space 
+            self.annot_filename = ''
+        else:
+            self.plot_key = use_atlas
+            self.annot_filename = self.MRIObj.atlas_annot[self.plot_key ]
+        self.use_atlas
                 
     def get_DM(self, participant, ses = 'mean', mask_bool_df = None, filename = None, 
                     osf = 1, res_scaling = .1, stim_on_screen = []):
@@ -279,12 +288,11 @@ class pRF_model(Model):
 
         return pp_models
 
-
     def fit_data(self, participant, pp_models, ses = 'mean',
                     run_type = 'mean', chunk_num = None, vertex = [], ROI = None,
                     model2fit = 'gauss', file_ext = '_cropped_dc_psc.npy', 
                     outdir = None, save_estimates = False,
-                    xtol = 1e-3, ftol = 1e-4, n_jobs = 16):
+                    xtol = 1e-3, ftol = 1e-4, n_jobs = 16, rsq_threshold = 0.05):
 
         """
         fit inputted pRF models to each participant in participant list
@@ -305,11 +313,22 @@ class pRF_model(Model):
 
         ## get list of files to load
         bold_filelist = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext,
-                                                 postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
-                                                 acq_name = self.MRIObj.acq)
-        
+                                                                postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
+                                                                acq_name = self.MRIObj.acq)
+                        
+        ## if we want an ROI, then get vertices
+        if ROI is not None:
+            ## get vertices for each relevant ROI
+            ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = participant, pysub = self.pysub, use_atlas = self.use_atlas, 
+                                                            annot_filename = self.annot_filename, hemisphere = 'BH',
+                                                            ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
+            if len(vertex) == 0:
+                vertex = ROIs_dict[ROI]
+            else:
+                vertex = ROIs_dict[ROI][vertex]
+
         ## Load data array
-        data = self.get_data4fitting(bold_filelist, task = 'pRF', run_type = run_type, chunk_num = chunk_num, vertex = vertex, 
+        data = self.get_data4fitting(bold_filelist, task = 'pRF', run_type = run_type, chunk_num = chunk_num, vertex = vertex,
                                     baseline_interval = 'empty_long', ses = ses, return_filenames = False)
 
         ## Set nan voxels to 0, to avoid issues when fitting
@@ -319,29 +338,29 @@ class pRF_model(Model):
         ## set output dir to save estimates
         if outdir is None:
             if 'loo_' in run_type:
-                outdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'], self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type)
+                outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type)
             else:
-                outdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'], self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), ses)
+                outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses))
             
         os.makedirs(outdir, exist_ok = True)
         print('saving files in %s'%outdir)
 
         ## set base filename that will be used for estimates
         basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
-                                                                            acq = self.MRIObj.acq,
-                                                                            rt = run_type)
+                                                                        acq = self.MRIObj.acq,
+                                                                        rt = run_type)
         if chunk_num is not None:
             basefilename += '_chunk-{ch}'.format(ch = str(chunk_num).zfill(3))
+        elif ROI is not None:
+            basefilename += '_ROI-{roi}'.format(roi = str(ROI))
         elif vertex is not None:
             basefilename += '_vertex-{ver}'.format(ver = str(vertex))
-        elif ROI:
-            basefilename += '_ROI-{roi}'.format(roi = str(ROI))
         
         basefilename += file_ext.replace('.npy', '.npz')
 
         ## set model parameters 
         # relevant for grid and iterative fitting
-        fit_params = self.get_fit_startparams(max_ecc_size = pp_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].screen_size_degrees/2.0)
+        fit_params = self.get_fit_startparams(max_ecc_size = pp_models['sub-{sj}'.format(sj = participant)]['ses-{s}'.format(s = ses)]['prf_stim'].screen_size_degrees/2.0)
 
         ## set constraints
         # for now only changes minimizer used, but can also be useful to put contraints on dog and dn
@@ -367,7 +386,7 @@ class pRF_model(Model):
 
             print("Gauss model GRID fit")
             gauss_fitter = Iso2DGaussianFitter(data = masked_data, 
-                                                model = pp_models['sub-{sj}'.format(sj = participant)][ses]['gauss_model'], 
+                                                model = pp_models['sub-{sj}'.format(sj = participant)]['ses-{s}'.format(s = ses)]['gauss_model'], 
                                                 n_jobs = n_jobs,
                                                 fit_hrf = self.fit_hrf)
 
@@ -380,17 +399,10 @@ class pRF_model(Model):
             # iterative fit
             print("Gauss model ITERATIVE fit")
 
-            # if self.fit_hrf:
-            #     # set hrf here, for now - grid gauss doesnt fit hrf params (need to raise issue in prfpy)
-            #     gauss_fitter.model.hrf_params = [1,1,0]
-
-            gauss_fitter.iterative_fit(rsq_threshold = 0.05, 
-                                        verbose = True,
+            gauss_fitter.iterative_fit(rsq_threshold = rsq_threshold, verbose = True,
                                         bounds = fit_params['gauss']['bounds'],
                                         constraints = constraints['gauss'],
-                                        #starting_params = gauss_fitter.gridsearch_params,
-                                        xtol = xtol,
-                                        ftol = ftol)
+                                        xtol = xtol, ftol = ftol)
 
             # if we want to save estimates
             if save_estimates and not op.isfile(it_gauss_filename):
@@ -410,7 +422,7 @@ class pRF_model(Model):
                 if model2fit == 'css':
 
                     fitter = CSS_Iso2DGaussianFitter(data = masked_data, 
-                                                    model = pp_models['sub-{sj}'.format(sj = participant)][ses]['{key}_model'.format(key = model2fit)], 
+                                                    model = pp_models['sub-{sj}'.format(sj = participant)]['ses-{s}'.format(s = ses)]['{key}_model'.format(key = model2fit)], 
                                                     n_jobs = n_jobs,
                                                     fit_hrf = self.fit_hrf,
                                                     previous_gaussian_fitter = gauss_fitter)
@@ -418,12 +430,12 @@ class pRF_model(Model):
                     fitter.grid_fit(fit_params['css']['n_grid'],
                                 fixed_grid_baseline = fit_params['css']['fixed_grid_baseline'],
                                 grid_bounds = fit_params['css']['grid_bounds'],
-                                rsq_threshold = 0.05)
+                                rsq_threshold = rsq_threshold)
                 
                 elif model2fit == 'dn':
 
                     fitter = Norm_Iso2DGaussianFitter(data = masked_data, 
-                                                    model = pp_models['sub-{sj}'.format(sj = participant)][ses]['{key}_model'.format(key = model2fit)], 
+                                                    model = pp_models['sub-{sj}'.format(sj = participant)]['ses-{s}'.format(s = ses)]['{key}_model'.format(key = model2fit)], 
                                                     n_jobs = n_jobs,
                                                     fit_hrf = self.fit_hrf,
                                                     previous_gaussian_fitter = gauss_fitter)
@@ -434,13 +446,12 @@ class pRF_model(Model):
                                     fit_params['dn']['surround_baseline_grid'],
                                 fixed_grid_baseline = fit_params['dn']['fixed_grid_baseline'],
                                 grid_bounds = fit_params['dn']['grid_bounds'],
-                                rsq_threshold = 0.05)
+                                rsq_threshold = rsq_threshold)
 
-                
                 elif model2fit == 'dog':
 
                     fitter = DoG_Iso2DGaussianFitter(data = masked_data, 
-                                                    model = pp_models['sub-{sj}'.format(sj = participant)][ses]['{key}_model'.format(key = model2fit)], 
+                                                    model = pp_models['sub-{sj}'.format(sj = participant)]['ses-{s}'.format(s = ses)]['{key}_model'.format(key = model2fit)], 
                                                     n_jobs = n_jobs,
                                                     fit_hrf = self.fit_hrf,
                                                     previous_gaussian_fitter = gauss_fitter)
@@ -449,19 +460,16 @@ class pRF_model(Model):
                                     fit_params['dog']['surround_size_grid'],
                                 fixed_grid_baseline = fit_params['dog']['fixed_grid_baseline'],
                                 grid_bounds = fit_params['dog']['grid_bounds'],
-                                rsq_threshold = 0.05)
-
+                                rsq_threshold = rsq_threshold)
 
                 # iterative fit
                 print("{key} model ITERATIVE fit".format(key = model2fit))
 
-                fitter.iterative_fit(rsq_threshold = 0.05, 
+                fitter.iterative_fit(rsq_threshold = rsq_threshold, 
                                     verbose = True,
                                     bounds = fit_params[model2fit]['bounds'],
                                     constraints = constraints[model2fit],
-                                    #starting_params = fitter.gridsearch_params, 
-                                    xtol = xtol,
-                                    ftol = ftol)
+                                    xtol = xtol, ftol = ftol)
 
                 # if we want to save estimates
                 if save_estimates:
@@ -486,12 +494,10 @@ class pRF_model(Model):
 
             return estimates, masked_data
 
-
     def get_fit_startparams(self, max_ecc_size = 6):
 
         """
-        Helper function that loads all fitting starting params
-        and bounds into a dictionary
+        Load all fitting starting params and bounds into a dictionary
 
         Parameters
         ----------
@@ -619,13 +625,11 @@ class pRF_model(Model):
 
             fitpar_dict['dog']['bounds'][4] = (0,0)
             fitpar_dict['dog']['fixed_grid_baseline'] = 0 
-
-                                        
+                 
         return fitpar_dict
 
-    
     def get_fit_constraints(self, method = 'L-BFGS-B', ss_larger_than_centre = True, 
-                        positive_centre_only = False, normalize_RFs = False):
+                                    positive_centre_only = False, normalize_RFs = False):
 
         """
         Helper function sets constraints - which depend on minimizer used -
@@ -699,7 +703,6 @@ class pRF_model(Model):
 
         return constraints
 
-    
     def load_pRF_model_estimates(self, participant, ses = 'ses-mean', run_type = 'mean', model_name = None, iterative = True, fit_hrf = False):
 
         """
@@ -825,11 +828,8 @@ class pRF_model(Model):
     def save_pRF_model_estimates(self, filename, final_estimates, model_type = 'gauss', grid = False):
     
         """
-        re-arrange estimates that were masked
-        and save all in numpy file
-        
-        (only works for gii files, should generalize for nii and cifti also)
-        
+        save estimates (key,value) in npz dict
+                
         Parameters
         ----------
         filename : str

@@ -8,6 +8,7 @@ import time
 import yaml
 from FAM.processing import load_exp_settings, preproc_mridata, preproc_behdata
 from FAM.fitting.prf_model import pRF_model
+from FAM.fitting.glm_single_model import GLMsingle_Model
 
 # load settings from yaml
 with open('exp_params.yml', 'r') as f_in:
@@ -189,23 +190,38 @@ match task:
             print('fit HRF params set to {op}'.format(op = fit_hrf))
 
             ## load pRF estimates - implies pRF model was already fit (should change to fit pRF model on the spot if needed)
-            pp_prf_estimates, pp_prf_models = FAM_pRF.load_pRF_model_estimates(participant, ses = 'mean', run_type = 'mean', 
-                                                                    model_name = prf_model_name, iterative = True, fit_hrf = fit_hrf)
+            pp_prf_estimates, pp_prf_models = FAM_pRF.load_pRF_model_estimates(participant_list = FAM_data.sj_num, 
+                                                                            ses = 'mean', run_type = 'mean', 
+                                                                            model_name = prf_model_name, iterative = True, 
+                                                                            fit_hrf = fit_hrf,
+                                                                            mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func'), # Make DM boolean mask based on subject responses
+                                                                            stim_on_screen = FAM_beh.get_stim_on_screen(task = task, 
+                                                                                                                        crop_nr = 0, 
+                                                                                                                        shift = 0, 
+                                                                                                                        dummy = 0) # dont crop here, to do so within func)
+                                                                            )
 
+            print('Fitting {mn} model on the data\n'.format(mn = fa_model_name))
 
             ## now fit appropriate feature model
-            match fa_model_name: 
-
-                print('Fitting {mn} model on the data\n'.format(mn = fa_model_name))
+            match fa_model_name:
 
                 case 'glmsingle':
 
                     ## load FA model class
                     FAM_FA = GLMsingle_Model(FAM_data)
 
-                    _ = FAM_FA.fit_data(participant, pp_prf_estimates, 
-                                                    pp_prf_models['sub-{sj}'.format(sj = participant)][prf_ses]['{mname}_model'.format(mname = prf_model_name)],  
-                                                    file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 99, nm_file_extent = FAM_mri_preprocess.get_mrifile_ext()) 
+                    ## actually fit
+                    print('Fitting started!')
+                    # to time it
+                    start_time = time.time()
+
+                    for pp in FAM_data.sj_num:
+
+                        _ = FAM_FA.fit_data(pp, pp_prf_estimates['sub-{sj}'.format(sj = pp)], 
+                                            pp_prf_models['sub-{sj}'.format(sj = pp)]['ses-mean']['{mname}_model'.format(mname = prf_model_name)],  
+                                            file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 99, 
+                                            nm_file_extent = FAM_mri.get_mrifile_ext()) 
 
 
 

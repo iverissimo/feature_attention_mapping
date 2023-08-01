@@ -10,6 +10,9 @@ import cortex
 
 from scipy.optimize import LinearConstraint, NonlinearConstraint
 
+from joblib import Parallel, delayed
+from tqdm import tqdm
+
 from FAM.fitting.model import Model
 
 from prfpy.stimulus import PRFStimulus2D
@@ -335,6 +338,14 @@ class pRF_model(Model):
         masked_data = data.copy()
         masked_data[np.where(np.isnan(data[...,0]))[0]] = 0
 
+        # if leaving one run out, then load test data to also calculate cv-r2
+        if 'loo_' in run_type:
+            test_file_list, _ = self.MRIObj.mri_utils.get_loo_filename(bold_filelist, loo_key=run_type)
+            test_run_num, test_ses_num = self.MRIObj.mri_utils.get_run_ses_from_str(test_file_list[0])
+            test_data = self.get_data4fitting(test_file_list, task = 'pRF', run_type = test_run_num, chunk_num = chunk_num, vertex = vertex,
+                                                            baseline_interval = 'empty_long', ses = test_ses_num, return_filenames = False)
+            test_data[np.where(np.isnan(test_data[...,0]))[0]] = 0
+            
         ## set output dir to save estimates
         if outdir is None:
             if 'loo_' in run_type:
@@ -403,6 +414,15 @@ class pRF_model(Model):
                                         bounds = fit_params['gauss']['bounds'],
                                         constraints = constraints['gauss'],
                                         xtol = xtol, ftol = ftol)
+            
+            # if leaving one run out, then calculate cv-r2 of model
+            if 'loo_' in run_type:
+                print('Calculate CV-rsq for left out data: run-{r}, ses-{s}'.format(r = test_run_num, s = test_ses_num))
+                cv_r2 = self.crossvalidate(test_data,
+                                            model_object = pp_models['sub-{sj}'.format(sj = participant)]['ses-{s}'.format(s = ses)]['gauss_model'], 
+                                            estimates = gauss_fitter.iterative_search_params, avg_hrf = False, n_jobs = n_jobs)
+            else:
+                cv_r2 = None
 
             # if we want to save estimates
             if save_estimates and not op.isfile(it_gauss_filename):
@@ -413,7 +433,7 @@ class pRF_model(Model):
                 # for it
                 print('saving %s'%it_gauss_filename)
                 self.save_pRF_model_estimates(it_gauss_filename, gauss_fitter.iterative_search_params, 
-                                                model_type = 'gauss')
+                                                model_type = 'gauss', cv_r2 = cv_r2)
 
             if model2fit != 'gauss':
 
@@ -470,6 +490,15 @@ class pRF_model(Model):
                                     bounds = fit_params[model2fit]['bounds'],
                                     constraints = constraints[model2fit],
                                     xtol = xtol, ftol = ftol)
+                
+                # if leaving one run out, then calculate cv-r2 of model
+                if 'loo_' in run_type:
+                    print('Calculate CV-rsq for left out data: run-{r}, ses-{s}'.format(r = test_run_num, s = test_ses_num))
+                    cv_r2 = self.crossvalidate(test_data,
+                                                model_object = pp_models['sub-{sj}'.format(sj = participant)]['ses-{s}'.format(s = ses)]['{key}_model'.format(key = model2fit)], 
+                                                estimates = fitter.iterative_search_params, avg_hrf = False, n_jobs = n_jobs)
+                else:
+                    cv_r2 = None
 
                 # if we want to save estimates
                 if save_estimates:
@@ -480,7 +509,7 @@ class pRF_model(Model):
                     # for it
                     print('saving %s'%it_model_filename)
                     self.save_pRF_model_estimates(it_model_filename, fitter.iterative_search_params, 
-                                                    model_type = model2fit)
+                                                    model_type = model2fit, cv_r2 = cv_r2)
 
         if not save_estimates:
             # if we're not saving them, assume we are running on the spot
@@ -703,16 +732,17 @@ class pRF_model(Model):
 
         return constraints
 
-    def load_pRF_model_estimates(self, participant, ses = 'ses-mean', run_type = 'mean', model_name = None, iterative = True, fit_hrf = False):
+    def load_pRF_model_estimates(self, participant_list = [], ses = 'mean', run_type = 'mean', model_name = None, 
+                                    iterative = True, fit_hrf = False, mask_bool_df = None, stim_on_screen = []):
 
         """
-        Helper function to load pRF model estimates
-        when they already where fitted and save in out folder
+        Load pRF model estimates
+        when they already where fitted and saved in out folder
 
         Parameters
         ----------
-        participant: str
-            participant ID
+        participant_list: list
+            list with participant ID
         ses: str
             session we are looking at
         run_type: str
@@ -721,7 +751,10 @@ class pRF_model(Model):
             model name to be loaded (if None defaults to class model)
         iterative: bool
             if we want to load iterative fitting results [default] or grid results
-
+        mask_bool_df: dataframe
+            if dataframe given, will be used to mask design matrix given behavioral performance
+        stim_on_screen: arr
+            boolean array with moments where stim was on screen
         """
 
         # if model name to load not given, use the one set in the class
@@ -735,31 +768,393 @@ class pRF_model(Model):
             est_folder = 'it_{model_name}'.format(model_name = model_name)
         else:
             est_folder = 'grid_{model_name}'.format(model_name = model_name)
-        
-        # if not doing mean across session, then set combine ses to false
-        combine_ses = True if ses == 'ses-mean' else False 
 
         # get participant models, which also will load 
         # DM and mask it according to participants behavior
-        pp_prf_models = self.set_models(participant_list = [participant], 
-                                                    mask_DM = True, combine_ses = combine_ses)
+        pp_prf_models = self.set_models(participant_list = participant_list, 
+                                        ses2model = ses, mask_bool_df = mask_bool_df,
+                                        stim_on_screen = stim_on_screen)
+        
+        # empty dict where we'll store all participant estimates
+        pp_prf_est_dict = {}
 
-        ## load estimates to make it easier to load later
-        if 'loo_' in run_type:
-            pRFdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'], self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type, est_folder)
-        else:
-            pRFdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'], self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), ses, est_folder)
+        ## loop over participant list
+        for participant in participant_list:
 
+            ## path to estimates
+            if 'loo_' in run_type:
+                pRFdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type, est_folder)
+                crossval = True
+            else:
+                pRFdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses), est_folder)
+                crossval = False
 
-        pp_prf_est_dict = self.load_pRF_model_chunks(pRFdir, 
-                                                    fit_model = model_name,
+            # append
+            pp_prf_est_dict['sub-{sj}'.format(sj=participant)] = self.load_pRF_model_chunks(pRFdir, fit_model = model_name,
                                                     basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
                                                                                                                 acq = self.MRIObj.acq,
                                                                                                                 rt = run_type),
-                                                    fit_hrf = fit_hrf,
-                                                    iterative = iterative)
-
+                                                    fit_hrf = fit_hrf, iterative = iterative, crossval = crossval)
+            
         return pp_prf_est_dict, pp_prf_models
+
+    def load_pRF_model_chunks(self, fit_path, fit_model = 'css', fit_hrf = False, basefilename = None, 
+                                    overwrite = False, iterative = True, crossval = False):
+
+        """ 
+        combine all chunks 
+        into one single estimate numpy array
+        assumes input is whole brain ("vertex", time)
+
+        Parameters
+        ----------
+        fit_path : str
+            absolute path to files
+        fit_model: str
+            fit model of estimates
+        fit_hrf: bool
+            if we fitted hrf or not
+        
+        Outputs
+        -------
+        estimates : npz 
+            numpy array of estimates
+        """
+
+        # if we are fitting HRF, then we want to look for those files
+        if fit_hrf:
+            filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-000' in x and 'HRF' in x]
+        else:
+            filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-000' in x and 'HRF' not in x]
+        
+        ## if we defined a base filename that should be used to fish out right estimates
+        if basefilename:
+            filename = [file for file in filename_list if basefilename in file][0]
+        else:
+            filename = filename_list[0]
+        
+        filename = filename.replace('_chunk-000', '')
+
+        if not op.exists(filename) or overwrite:
+        
+            for ch in np.arange(self.total_chunks['pRF']):
+                
+                # if we are fitting HRF, then we want to look for those files
+                if fit_hrf:
+                    chunk_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-%s'%str(ch).zfill(3) in x and 'HRF' in x]
+                else:
+                    chunk_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-%s'%str(ch).zfill(3) in x and 'HRF' not in x]
+                
+                ## if we defined a base filename that should be used to fish out right estimates
+                if basefilename:
+                    chunk_name = [file for file in chunk_name_list if basefilename in file][0]
+                else:
+                    chunk_name = chunk_name_list[0]
+
+                print('loading chunk %s'%chunk_name)
+                chunk = np.load(chunk_name) # load chunk
+                
+                if ch == 0:
+                    xx = chunk['x']
+                    yy = chunk['y']
+
+                    size = chunk['size']
+
+                    beta = chunk['betas']
+                    baseline = chunk['baseline']
+
+                    if 'css' in fit_model: 
+                        ns = chunk['ns']
+                    elif fit_model in ['dn', 'dog']:
+                        sa = chunk['sa']
+                        ss = chunk['ss']
+                    
+                    if 'dn' in fit_model:
+                        nb = chunk['nb']
+                        sb = chunk['sb']
+
+                    rsq = chunk['r2']
+                    # if we cross validated
+                    if crossval:
+                        cv_r2 = chunk['cv_r2']
+                    else:
+                        cv_r2 = np.zeros(xx.shape) 
+
+                    if fit_hrf and iterative:
+                        hrf_derivative = chunk['hrf_derivative']
+                        hrf_dispersion = chunk['hrf_dispersion']
+                    else: # assumes standard spm params
+                        hrf_derivative = np.ones(xx.shape)
+                        hrf_dispersion = np.zeros(xx.shape) 
+
+                else:
+                    xx = np.concatenate((xx, chunk['x']))
+                    yy = np.concatenate((yy, chunk['y']))
+
+                    size = np.concatenate((size, chunk['size']))
+
+                    beta = np.concatenate((beta, chunk['betas']))
+                    baseline = np.concatenate((baseline, chunk['baseline']))
+
+                    if 'css' in fit_model:
+                        ns = np.concatenate((ns, chunk['ns']))
+                    elif fit_model in ['dn', 'dog']:
+                        sa = np.concatenate((sa, chunk['sa']))
+                        ss = np.concatenate((ss, chunk['ss']))
+
+                    if 'dn' in fit_model:
+                        nb = np.concatenate((nb, chunk['nb']))
+                        sb = np.concatenate((sb, chunk['sb']))
+
+                    rsq = np.concatenate((rsq, chunk['r2']))
+
+                    # if we cross validated
+                    if crossval:
+                        cv_r2 = np.concatenate((cv_r2, chunk['cv_r2'])) 
+                    else:
+                        cv_r2 = np.concatenate((cv_r2, np.zeros(chunk['r2'].shape))) 
+                    
+                    if fit_hrf and iterative:
+                        hrf_derivative = np.concatenate((hrf_derivative, chunk['hrf_derivative']))
+                        hrf_dispersion = np.concatenate((hrf_dispersion, chunk['hrf_dispersion']))
+                    else: # assumes standard spm params
+                        hrf_derivative = np.concatenate((hrf_derivative, np.ones(xx.shape)))
+                        hrf_dispersion = np.concatenate((hrf_dispersion, np.zeros(xx.shape))) 
+            
+            print('shape of estimates is %s'%(str(xx.shape)))
+
+            # save file
+            print('saving %s'%filename)
+
+            if 'gauss' in fit_model:
+                np.savez(filename,
+                        x = xx,
+                        y = yy,
+                        size = size,
+                        betas = beta,
+                        baseline = baseline,
+                        hrf_derivative = hrf_derivative,
+                        hrf_dispersion = hrf_dispersion,
+                        r2 = rsq,
+                        cv_r2 = cv_r2)
+
+            elif 'css' in fit_model:
+                np.savez(filename,
+                        x = xx,
+                        y = yy,
+                        size = size,
+                        betas = beta,
+                        baseline = baseline,
+                        ns = ns,
+                        hrf_derivative = hrf_derivative,
+                        hrf_dispersion = hrf_dispersion,
+                        r2 = rsq,
+                        cv_r2 = cv_r2)
+
+            elif 'dn' in fit_model:
+                np.savez(filename,
+                        x = xx,
+                        y = yy,
+                        size = size,
+                        betas = beta,
+                        baseline = baseline,
+                        sa = sa,
+                        ss = ss,
+                        nb = nb,
+                        sb = sb,
+                        hrf_derivative = hrf_derivative,
+                        hrf_dispersion = hrf_dispersion,
+                        r2 = rsq,
+                        cv_r2 = cv_r2)
+
+            elif 'dog' in fit_model:
+                np.savez(filename,
+                        x = xx,
+                        y = yy,
+                        size = size,
+                        betas = beta,
+                        baseline = baseline,
+                        sa = sa,
+                        ss = ss,
+                        hrf_derivative = hrf_derivative,
+                        hrf_dispersion = hrf_dispersion,
+                        r2 = rsq,
+                        cv_r2 = cv_r2)
+            
+        else:
+            print('file already exists, loading %s'%filename)
+        
+        return np.load(filename)
+
+    def save_pRF_model_estimates(self, filename, final_estimates, model_type = 'gauss', grid = False, cv_r2 = None):
+    
+        """
+        save estimates (key,value) in npz dict
+                
+        Parameters
+        ----------
+        filename : str
+            absolute filename of estimates to be saved
+        final_estimates : arr
+            2d estimates (datapoints,estimates)
+        model_type: str
+            model type used for fitting
+        cv_r2: arr
+            crossvalidation r2
+        
+        """ 
+
+        # make dir if it doesnt exist already
+        os.makedirs(op.split(filename)[0], exist_ok = True)
+
+        if cv_r2 is None:
+            cv_r2 = np.zeros(final_estimates.shape[0]); cv_r2[:] = np.nan
+                
+        if model_type == 'gauss':
+
+            if self.fit_hrf and not grid:
+                np.savez(filename,
+                        x = final_estimates[..., 0],
+                        y = final_estimates[..., 1],
+                        size = final_estimates[..., 2],
+                        betas = final_estimates[...,3],
+                        baseline = final_estimates[..., 4],
+                        hrf_derivative = final_estimates[..., 5],
+                        hrf_dispersion = final_estimates[..., 6], 
+                        r2 = final_estimates[..., 7],
+                        cv_r2 = cv_r2)
+            
+            else:
+                np.savez(filename,
+                        x = final_estimates[..., 0],
+                        y = final_estimates[..., 1],
+                        size = final_estimates[..., 2],
+                        betas = final_estimates[...,3],
+                        baseline = final_estimates[..., 4],
+                        r2 = final_estimates[..., 5],
+                        cv_r2 = cv_r2)
+        
+        elif model_type == 'css':
+
+            if self.fit_hrf and not grid:
+                np.savez(filename,
+                        x = final_estimates[..., 0],
+                        y = final_estimates[..., 1],
+                        size = final_estimates[..., 2],
+                        betas = final_estimates[...,3],
+                        baseline = final_estimates[..., 4],
+                        ns = final_estimates[..., 5],
+                        hrf_derivative = final_estimates[..., 6],
+                        hrf_dispersion = final_estimates[..., 7], 
+                        r2 = final_estimates[..., 8],
+                        cv_r2 = cv_r2)
+            
+            else:
+                np.savez(filename,
+                        x = final_estimates[..., 0],
+                        y = final_estimates[..., 1],
+                        size = final_estimates[..., 2],
+                        betas = final_estimates[...,3],
+                        baseline = final_estimates[..., 4],
+                        ns = final_estimates[..., 5],
+                        r2 = final_estimates[..., 6],
+                        cv_r2 = cv_r2)
+
+        elif model_type == 'dn':
+
+            if self.fit_hrf and not grid:
+                np.savez(filename,
+                        x = final_estimates[..., 0],
+                        y = final_estimates[..., 1],
+                        size = final_estimates[..., 2],
+                        betas = final_estimates[...,3],
+                        baseline = final_estimates[..., 4],
+                        sa = final_estimates[..., 5],
+                        ss = final_estimates[..., 6], 
+                        nb = final_estimates[..., 7], 
+                        sb = final_estimates[..., 8], 
+                        hrf_derivative = final_estimates[..., 9],
+                        hrf_dispersion = final_estimates[..., 10], 
+                        r2 = final_estimates[..., 11],
+                        cv_r2 = cv_r2)
+            
+            else:
+                np.savez(filename,
+                        x = final_estimates[..., 0],
+                        y = final_estimates[..., 1],
+                        size = final_estimates[..., 2],
+                        betas = final_estimates[...,3],
+                        baseline = final_estimates[..., 4],
+                        sa = final_estimates[..., 5],
+                        ss = final_estimates[..., 6], 
+                        nb = final_estimates[..., 7], 
+                        sb = final_estimates[..., 8], 
+                        r2 = final_estimates[..., 9],
+                        cv_r2 = cv_r2)
+
+        elif model_type == 'dog':
+
+            if self.fit_hrf and not grid:
+                np.savez(filename,
+                        x = final_estimates[..., 0],
+                        y = final_estimates[..., 1],
+                        size = final_estimates[..., 2],
+                        betas = final_estimates[...,3],
+                        baseline = final_estimates[..., 4],
+                        sa = final_estimates[..., 5],
+                        ss = final_estimates[..., 6], 
+                        hrf_derivative = final_estimates[..., 7],
+                        hrf_dispersion = final_estimates[..., 8], 
+                        r2 = final_estimates[..., 9],
+                        cv_r2 = cv_r2)
+            
+            else:
+                np.savez(filename,
+                        x = final_estimates[..., 0],
+                        y = final_estimates[..., 1],
+                        size = final_estimates[..., 2],
+                        betas = final_estimates[...,3],
+                        baseline = final_estimates[..., 4],
+                        sa = final_estimates[..., 5],
+                        ss = final_estimates[..., 6], 
+                        r2 = final_estimates[..., 7],
+                        cv_r2 = cv_r2)
+
+    def crossvalidate(self, test_data, model_object = None, estimates = [], avg_hrf = False, n_jobs = 8):
+
+        """
+        Use previously fit parameters to obtain cross-validated Rsq
+        on test data
+
+        Parameters
+        ----------
+        test_data: arr
+            Test data for crossvalidation
+        model_object: pRF model object
+            fitter object, from prfpy, to call apropriate return prediction function
+        estimates: arr
+            2D array of iterative estimates (vertex, estimates), in same order of fitter
+        avg_hrf: bool
+            if we want to average hrf estimates across vertices or not (only used if HRF was fit)
+
+        """
+
+        # if we fit HRF, use median HRF estimates for crossvalidation
+        if (self.fit_hrf) and (avg_hrf) and (estimates.shape[0] > 1): 
+            median_hrf_params = np.nanmedian(estimates[:,-3:-1], axis = 0)
+            estimates[:,-3:-1] = median_hrf_params
+
+        # get model prediciton for all vertices
+        prediction = Parallel(n_jobs=n_jobs, verbose=10)(delayed(model_object.return_prediction)(*list(estimates[vert, :-1])) for vert in tdqm(range(test_data.shape[0])))
+        prediction = np.squeeze(prediction, axis=1)
+
+        #calculate CV-rsq        
+        CV_rsq = np.nan_to_num(1-np.sum((test_data-prediction)**2, axis=-1)/(test_data.shape[-1]*test_data.var(-1)))
+        
+        return CV_rsq
+
+
+
 
 
     def mask_pRF_model_estimates(self, estimates, ROI = None, x_ecc_lim = [-6,6], y_ecc_lim = [-6,6],
@@ -825,301 +1220,7 @@ class pRF_model(Model):
             return masked_dict
 
 
-    def save_pRF_model_estimates(self, filename, final_estimates, model_type = 'gauss', grid = False):
     
-        """
-        save estimates (key,value) in npz dict
-                
-        Parameters
-        ----------
-        filename : str
-            absolute filename of estimates to be saved
-        final_estimates : arr
-            2d estimates (datapoints,estimates)
-        model_type: str
-            model type used for fitting
-        
-        """ 
-
-        # make dir if it doesnt exist already
-        os.makedirs(op.split(filename)[0], exist_ok = True)
-                
-        if model_type == 'gauss':
-
-            if self.fit_hrf and not grid:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        hrf_derivative = final_estimates[..., 5],
-                        hrf_dispersion = final_estimates[..., 6], 
-                        r2 = final_estimates[..., 7])
-            
-            else:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        r2 = final_estimates[..., 5])
-        
-        elif model_type == 'css':
-
-            if self.fit_hrf and not grid:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        ns = final_estimates[..., 5],
-                        hrf_derivative = final_estimates[..., 6],
-                        hrf_dispersion = final_estimates[..., 7], 
-                        r2 = final_estimates[..., 8])
-            
-            else:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        ns = final_estimates[..., 5],
-                        r2 = final_estimates[..., 6])
-
-        elif model_type == 'dn':
-
-            if self.fit_hrf and not grid:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        sa = final_estimates[..., 5],
-                        ss = final_estimates[..., 6], 
-                        nb = final_estimates[..., 7], 
-                        sb = final_estimates[..., 8], 
-                        hrf_derivative = final_estimates[..., 9],
-                        hrf_dispersion = final_estimates[..., 10], 
-                        r2 = final_estimates[..., 11])
-            
-            else:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        sa = final_estimates[..., 5],
-                        ss = final_estimates[..., 6], 
-                        nb = final_estimates[..., 7], 
-                        sb = final_estimates[..., 8], 
-                        r2 = final_estimates[..., 9])
-
-        elif model_type == 'dog':
-
-            if self.fit_hrf and not grid:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        sa = final_estimates[..., 5],
-                        ss = final_estimates[..., 6], 
-                        hrf_derivative = final_estimates[..., 7],
-                        hrf_dispersion = final_estimates[..., 8], 
-                        r2 = final_estimates[..., 9])
-            
-            else:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        sa = final_estimates[..., 5],
-                        ss = final_estimates[..., 6], 
-                        r2 = final_estimates[..., 7])
-
-
-    def load_pRF_model_chunks(self, fit_path, fit_model = 'css', fit_hrf = False, basefilename = None, overwrite = False, iterative = True):
-
-        """ 
-        combine all chunks 
-        into one single estimate numpy array
-        assumes input is whole brain ("vertex", time)
-
-        Parameters
-        ----------
-        fit_path : str
-            absolute path to files
-        fit_model: str
-            fit model of estimates
-        fit_hrf: bool
-            if we fitted hrf or not
-        
-        Outputs
-        -------
-        estimates : npz 
-            numpy array of estimates
-        
-        """
-
-        # if we are fitting HRF, then we want to look for those files
-        if fit_hrf:
-            filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-000' in x and 'HRF' in x]
-        else:
-            filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-000' in x and 'HRF' not in x]
-        
-        ## if we defined a base filename that should be used to fish out right estimates
-        if basefilename:
-            filename = [file for file in filename_list if basefilename in file][0]
-        else:
-            filename = filename_list[0]
-        
-        filename = filename.replace('_chunk-000', '')
-
-        if not op.exists(filename) or overwrite:
-        
-            for ch in np.arange(self.total_chunks['pRF']):
-                
-                # if we are fitting HRF, then we want to look for those files
-                if fit_hrf:
-                    chunk_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-%s'%str(ch).zfill(3) in x and 'HRF' in x]
-                else:
-                    chunk_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-%s'%str(ch).zfill(3) in x and 'HRF' not in x]
-                
-                ## if we defined a base filename that should be used to fish out right estimates
-                if basefilename:
-                    chunk_name = [file for file in chunk_name_list if basefilename in file][0]
-                else:
-                    chunk_name = chunk_name_list[0]
-
-                print('loading chunk %s'%chunk_name)
-                chunk = np.load(chunk_name) # load chunk
-                
-                if ch == 0:
-                    xx = chunk['x']
-                    yy = chunk['y']
-
-                    size = chunk['size']
-
-                    beta = chunk['betas']
-                    baseline = chunk['baseline']
-
-                    if 'css' in fit_model: 
-                        ns = chunk['ns']
-                    elif fit_model in ['dn', 'dog']:
-                        sa = chunk['sa']
-                        ss = chunk['ss']
-                    
-                    if 'dn' in fit_model:
-                        nb = chunk['nb']
-                        sb = chunk['sb']
-
-                    rsq = chunk['r2']
-
-                    if fit_hrf and iterative:
-                        hrf_derivative = chunk['hrf_derivative']
-                        hrf_dispersion = chunk['hrf_dispersion']
-                    else: # assumes standard spm params
-                        hrf_derivative = np.ones(xx.shape)
-                        hrf_dispersion = np.zeros(xx.shape) 
-
-                else:
-                    xx = np.concatenate((xx, chunk['x']))
-                    yy = np.concatenate((yy, chunk['y']))
-
-                    size = np.concatenate((size, chunk['size']))
-
-                    beta = np.concatenate((beta, chunk['betas']))
-                    baseline = np.concatenate((baseline, chunk['baseline']))
-
-                    if 'css' in fit_model:
-                        ns = np.concatenate((ns, chunk['ns']))
-                    elif fit_model in ['dn', 'dog']:
-                        sa = np.concatenate((sa, chunk['sa']))
-                        ss = np.concatenate((ss, chunk['ss']))
-
-                    if 'dn' in fit_model:
-                        nb = np.concatenate((nb, chunk['nb']))
-                        sb = np.concatenate((sb, chunk['sb']))
-
-                    rsq = np.concatenate((rsq, chunk['r2']))
-                    
-                    if fit_hrf and iterative:
-                        hrf_derivative = np.concatenate((hrf_derivative, chunk['hrf_derivative']))
-                        hrf_dispersion = np.concatenate((hrf_dispersion, chunk['hrf_dispersion']))
-                    else: # assumes standard spm params
-                        hrf_derivative = np.concatenate((hrf_derivative, np.ones(xx.shape)))
-                        hrf_dispersion = np.concatenate((hrf_dispersion, np.zeros(xx.shape))) 
-            
-            print('shape of estimates is %s'%(str(xx.shape)))
-
-            # save file
-            print('saving %s'%filename)
-
-            if 'gauss' in fit_model:
-                np.savez(filename,
-                        x = xx,
-                        y = yy,
-                        size = size,
-                        betas = beta,
-                        baseline = baseline,
-                        hrf_derivative = hrf_derivative,
-                        hrf_dispersion = hrf_dispersion,
-                        r2 = rsq)
-
-            elif 'css' in fit_model:
-                np.savez(filename,
-                        x = xx,
-                        y = yy,
-                        size = size,
-                        betas = beta,
-                        baseline = baseline,
-                        ns = ns,
-                        hrf_derivative = hrf_derivative,
-                        hrf_dispersion = hrf_dispersion,
-                        r2 = rsq)
-
-            elif 'dn' in fit_model:
-                np.savez(filename,
-                        x = xx,
-                        y = yy,
-                        size = size,
-                        betas = beta,
-                        baseline = baseline,
-                        sa = sa,
-                        ss = ss,
-                        nb = nb,
-                        sb = sb,
-                        hrf_derivative = hrf_derivative,
-                        hrf_dispersion = hrf_dispersion,
-                        r2 = rsq)
-
-            elif 'dog' in fit_model:
-                np.savez(filename,
-                        x = xx,
-                        y = yy,
-                        size = size,
-                        betas = beta,
-                        baseline = baseline,
-                        sa = sa,
-                        ss = ss,
-                        hrf_derivative = hrf_derivative,
-                        hrf_dispersion = hrf_dispersion,
-                        r2 = rsq)
-            
-        else:
-            print('file already exists, loading %s'%filename)
-        
-        return np.load(filename)
-
     def get_prf_estimate_keys(self, prf_model_name = 'gauss'):
 
         """ 

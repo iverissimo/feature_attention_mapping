@@ -235,7 +235,6 @@ class Model:
         """"
         Calculate rsq of fit
         """
-
         return np.nan_to_num(1 - (np.nansum((data_arr - prediction)**2, axis=0)/ np.nansum(((data_arr - np.mean(data_arr))**2), axis=0)))
     
     def error_resid(self, timecourse, prediction, mean_err = False, return_array = False):

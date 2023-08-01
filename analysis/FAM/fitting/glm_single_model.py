@@ -11,18 +11,9 @@ from scipy.interpolate import pchip
 
 from PIL import Image, ImageDraw
 
-from FAM.utils import mri as mri_utils
-from FAM.processing import preproc_behdata
 from FAM.fitting.model import Model
 
-from scipy.optimize import minimize
-from scipy.ndimage import gaussian_filter
 
-from joblib import Parallel, delayed
-from tqdm import tqdm
-
-from prfpy.stimulus import PRFStimulus2D
-from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel, Norm_Iso2DGaussianModel, DoG_Iso2DGaussianModel
 from glmsingle.glmsingle import GLM_single
 from glmsingle.glmsingle import getcanonicalhrf
 
@@ -33,7 +24,7 @@ import matplotlib.pyplot as plt
 
 class GLMsingle_Model(Model):
 
-    def __init__(self, MRIObj, outputdir = None):
+    def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_999999', use_atlas = None):
         
         """__init__
         constructor for class 
@@ -44,13 +35,11 @@ class GLMsingle_Model(Model):
             object from one of the classes defined in processing.load_exp_data
         outputdir: str or None
             path to general output directory
-        tasks: list
-            list of strings with task names (mostly needed for Model object input)
             
         """
 
         # need to initialize parent class (Model), indicating output infos
-        super().__init__(MRIObj = MRIObj, outputdir = outputdir, tasks = tasks)
+        super().__init__(MRIObj = MRIObj, outputdir = outputdir, pysub = pysub)
 
         ## prf rsq threshold, to select visual voxels
         # worth fitting
@@ -59,31 +48,123 @@ class GLMsingle_Model(Model):
         # prf estimate bounds
         self.prf_bounds = None
 
+        ## Not correcting baseline
+        self.correct_baseline['FA'] = False
+
         # if output dir not defined, then make it in derivatives
         if outputdir is None:
-            self.outputdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['FA']['fit_folder']['glmsingle'])
+            self.outputdir = op.join(self.MRIObj.derivatives_pth, self.fitfolder['FA'], 'glmsingle')
         else:
             self.outputdir = outputdir
 
+        ## set variables useful when loading ROIs
+        if use_atlas is None:
+            self.plot_key = self.MRIObj.sj_space 
+            self.annot_filename = ''
+        else:
+            self.plot_key = use_atlas
+            self.annot_filename = self.MRIObj.atlas_annot[self.plot_key ]
+        self.use_atlas
+
+    def get_correlation_mask(self, participant, task = 'pRF', ses = 'mean', file_ext = '_cropped_dc_psc.npy',
+                                n_jobs = 8, seed_num = 2023, perc_thresh_nm = 95, smooth = True,
+                                kernel=3, nr_iter=3, normalize = False):
+
+        """
+        Split half correlate all runs in a task
+        and create binary mask of task relevant vertices
+        to be used in noise pool
+
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        prf_estimates : dict
+            dict with participant prf estimates
+        prf_modelobj: object
+            pRF model object from prfpy, to use to create HRF
+        smooth_nm: bool
+            if we want to smooth noise mask
+        perc_thresh_nm: int
+            noise mask percentile threshold
+        file_extent_nm: dict
+            dict with file extension for task files to be used for noise mask
+        perc_thresh_nm: int
+            noise mask percentile threshold
+        smooth: bool
+            if we want to return smoothed mask
+        """
+
+        # get bold filenames
+        task_bold_files = self.MRIObj.mri_utils.get_bold_file_list(participant, task = task, 
+                                                                ses = ses, file_ext = file_ext,
+                                                                postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
+                                                                acq_name = self.MRIObj.acq)
+        
+        ## find unique session number
+        task_ses_num = np.unique([self.MRIObj.mri_utils.get_run_ses_from_str(f)[-1] for f in task_bold_files])
+
+        ## for each session, get split half correlation values
+        corr_arr = []
+        random_corr_arr = []
+        ind_seed = int(participant) # seed index, to vary across participants
+
+        for sn in task_ses_num:
+
+            ses_files = [f for f in task_bold_files if 'ses-{s}'.format(s = sn) in f]
+
+            ## split runs in half and get unique combinations
+            run_sh_lists = self.MRIObj.mri_utils.split_half_comb(ses_files)
+
+            # get correlation value for each combination
+            for r in run_sh_lists:
+                ## correlate the two halfs
+                corr_arr.append(self.MRIObj.mri_utils.correlate_arrs(list(r[0]), list(r[-1]), 
+                                                                     n_jobs = n_jobs, shuffle_axis = None, seed=None))
+                ## correlate with randomized half
+                random_corr_arr.append(self.MRIObj.mri_utils.correlate_arrs(list(r[0]), list(r[-1]), 
+                                                                            n_jobs = n_jobs, shuffle_axis = -1, 
+                                                                            seed = int(seed_num * ind_seed)))
+                ind_seed += 1 # and update ind just as extra precaution
+
+        # average values 
+        task_avg_sh_corr = np.nanmean(corr_arr, axis = 0)
+        task_avg_sh_rand_corr = np.nanmean(random_corr_arr, axis = 0)
+
+        threshold = np.nanpercentile(task_avg_sh_rand_corr, perc_thresh_nm)
+
+        print('X percentile for {tsk} correlation mask is {val}'.format(tsk = task, val = '%.3f'%threshold))
+
+        ## make final mask
+        if smooth:
+            final_corr_arr = self.MRIObj.mri_utils.smooth_surface(task_avg_sh_corr, pysub = self.pysub, 
+                                                            kernel = kernel, nr_iter = nr_iter, normalize = normalize)
+        else:
+            final_corr_arr = task_avg_sh_corr
+
+        # we want to exclude vertices above threshold
+        binary_mask = np.ones(final_corr_arr.shape)
+        binary_mask[final_corr_arr >= threshold] = 0
+
+        return binary_mask
 
     def get_single_trial_combinations(self):
 
         """
-        Helper function to get all possible trial combinations
+        Get all possible trial combinations
         (useful to keep track of single trial DM later)
 
-        will return a DataFrame 
-        where the columns indicate the attended and unattended bar midpoint position (x,y) and bar pass direction (vertical vs horizontal)
-        and each row is a unique trial type
-            
+        Returns DataFrame where each row is a unique trial type
+        Columns: 
+            - attended and unattended bar midpoint position (x,y)
+            - bar pass direction (vertical vs horizontal)
         """
 
-
         # define bar width in pixel
-        bar_width_pix = self.screen_res * self.bar_width['FA']
+        bar_width_pix = self.MRIObj.screen_res * self.MRIObj.bar_width['FA']
 
         # define number of bars per direction
-        num_bars = np.array(self.MRIObj.params['FA']['num_bar_position']) 
+        num_bars = np.array(self.MRIObj.FA_num_bar_position) 
 
         # all possible positions in pixels [x,y] for midpoint of
         # vertical bar passes, 
@@ -112,7 +193,7 @@ class GLMsingle_Model(Model):
         # define dictionary to save positions and directions
         # of all bars
         trial_combinations_dict = {'AttBar_bar_midpoint': [], 'AttBar_bar_pass_direction': [],
-                                        'UnattBar_bar_midpoint': [], 'UnattBar_bar_pass_direction': []}
+                                    'UnattBar_bar_midpoint': [], 'UnattBar_bar_pass_direction': []}
 
         # append all postions in dict 
         for att_ori in attend_orientation:
@@ -137,7 +218,6 @@ class GLMsingle_Model(Model):
 
         ## turn into dataframe
         self.trial_combinations_df = pd.DataFrame.from_dict(trial_combinations_dict).apply(pd.Series.explode).reset_index().drop(columns=['index'])
-
 
     def make_singletrial_dm(self, participant, run_num_arr =[], ses_num_arr = []):
 
@@ -165,15 +245,16 @@ class GLMsingle_Model(Model):
         except AttributeError:
             self.get_single_trial_combinations()
 
-
-        # set number of TRs to crop
-        crop_nr = self.crop_TRs_num['FA'] if self.crop_TRs['FA'] == True else None
-
         ## get conditions per TR
-        ## crop and shift if such was the case
-        condition_per_TR = mri_utils.crop_shift_arr(self.mri_beh.FA_bar_pass_all,
-                                                crop_nr = crop_nr, 
-                                                shift = self.shift_TRs_num)
+        FA_bar_pass_all, _ = self.MRIObj.beh_utils.get_FA_run_struct(self.MRIObj.FA_bar_pass, 
+                                                                num_bar_pos = self.MRIObj.FA_num_bar_position, 
+                                                                empty_TR = self.MRIObj.FA_nr_TRs['empty_TR'], 
+                                                                task_trial_TR = self.MRIObj.FA_nr_TRs['task_trial_TR'])
+
+        # crop and shift if such was the case
+        condition_per_TR = self.MRIObj.mri_utils.crop_shift_arr(FA_bar_pass_all, 
+                                                            crop_nr = self.MRIObj.mri_nr_cropTR['FA'], 
+                                                            shift = self.MRIObj.shift_TRs_num)
 
         ## make single trial DM
         # with shape [runs, TRs, conditions]
@@ -184,6 +265,8 @@ class GLMsingle_Model(Model):
 
             ses_num = ses_num_arr[file_ind]
             run_num = run_num_arr[file_ind]
+
+            ##### CHANGING SCRIPT HERE ########
 
             ## get bar position df for run
             run_bar_pos_df = self.mri_beh.load_FA_bar_position(participant, ses = 'ses-{s}'.format(s = ses_num), 
@@ -289,7 +372,7 @@ class GLMsingle_Model(Model):
 
         ## get conditions per TR
         ## crop and shift if such was the case
-        condition_per_TR = mri_utils.crop_shift_arr(self.mri_beh.FA_bar_pass_all,
+        condition_per_TR = self.MRIObj.mri_utils.crop_shift_arr(self.mri_beh.FA_bar_pass_all,
                                                 crop_nr = crop_nr, 
                                                 shift = self.shift_TRs_num)
         
@@ -315,12 +398,13 @@ class GLMsingle_Model(Model):
             return np.stack(avg_all)
 
 
-    def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 95, pysub = 'hcp_999999',
-                        nm_file_extent = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_LinDetrend_psc.npy'}):
+    def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', 
+                        smooth_nm = True, perc_thresh_nm = 95, n_jobs = 8,
+                        seed_num = 2023, kernel = 3, nr_iter = 3, normalize = False,
+                        file_extent_nm = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_LinDetrend_psc.npy'}):
 
         """
         fit GLM single on participant data
-
 
         Parameters
         ----------
@@ -330,28 +414,32 @@ class GLMsingle_Model(Model):
             dict with participant prf estimates
         prf_modelobj: object
             pRF model object from prfpy, to use to create HRF
-
+        smooth_nm: bool
+            if we want to smooth noise mask
+        perc_thresh_nm: int
+            noise mask percentile threshold
+        file_extent_nm: dict
+            dict with file extension for task files to be used for noise mask
         """ 
 
         ## get list of files to load
-        bold_filelist = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'FA', ses = 'ses-combined', file_ext = file_ext,
+        bold_filelist = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'FA', ses = 'all', file_ext = file_ext,
                                                                 postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
                                                                 acq_name = self.MRIObj.acq)
 
-        ## Not correcting baseline
-        self.correct_baseline['FA'] = False
-
         ## Load data array and file list names
         data, train_file_list = self.get_data4fitting(bold_filelist, task = 'FA', run_type = 'all', 
-                                                chunk_num = None, vertex = None, ses = 'ses-combined',
-                                                baseline_interval = 'empty', return_filenames = True)
+                                                chunk_num = None, vertex = None, ses = 'all',
+                                                baseline_interval = 'empty', correct_baseline = None, return_filenames = True)
+        
+        ##### CHANGING SCRIPT HERE ########
 
         ## Make single trial DM for all runs
         single_trl_DM = self.make_singletrial_dm(participant, 
                                                 run_num_arr = self.run_num_arr, 
                                                 ses_num_arr = self.ses_num_arr)
 
-        print('Fitting files %s'%str(train_file_list))
+        print('Fitting {n} files: {f}'.format(n = len(train_file_list), f = str(train_file_list)))
 
         ## set output dir to save estimates
         outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant))
@@ -362,92 +450,22 @@ class GLMsingle_Model(Model):
         ## get average hrf
         hrf_final = self.get_average_hrf(pp_prf_estimates, prf_modelobj, rsq_threshold = self.prf_rsq_threshold)
         
+        ##################################
+
         ### make mask array of pRF high fitting voxels,
         # to give as input to glmsingle (excluding them from noise pool)
+        binary_prf_mask = self.get_correlation_mask(participant, task = 'pRF', ses = 'mean', 
+                                                    file_ext = file_extent_nm['pRF'], n_jobs = n_jobs, 
+                                                    seed_num = seed_num, perc_thresh_nm = perc_thresh_nm, 
+                                                    smooth = smooth_nm, kernel = kernel, nr_iter = nr_iter, 
+                                                    normalize = normalize)
 
-        # get prf bold filenames
-        prf_bold_files = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'pRF', ses = 'ses-mean', file_ext = nm_file_extent['pRF'],
-                                                                postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
-                                                                acq_name = self.MRIObj.acq)
-
-        ## find unique session number
-        prf_ses_num = np.unique([mri_utils.get_run_ses_from_str(f)[-1] for f in prf_bold_files])
-
-        ## for each session, get split half correlation values
-        corr_arr = []
-        random_corr_arr = []
-        ind_seed = int(participant) # seed index, to vary across participants
-        for sn in prf_ses_num:
-
-            ses_files = [f for f in prf_bold_files if 'ses-{s}'.format(s = sn) in f]
-
-            ## split runs in half and get unique combinations
-            run_sh_lists = mri_utils.split_half_comb(ses_files)
-
-            # get correlation value for each combination
-            for r in run_sh_lists:
-                ## correlate the two halfs
-                corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8))
-                ## correlate with randomized half
-                random_corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8, shuffle_axis = -1, seed = int(2023 * ind_seed)))
-                ind_seed += 1
-
-        # average values 
-        prf_avg_sh_corr = np.nanmean(corr_arr, axis = 0)
-        prf_avg_sh_rand_corr = np.nanmean(random_corr_arr, axis = 0)
-
-        print('X percentile for pRF runs at %.3f'%np.nanpercentile(prf_avg_sh_rand_corr, perc_thresh_nm))
-
-        ## make final mask
-        # if smoothing mask 
-        corr_prf = mri_utils.smooth_surface(prf_avg_sh_corr, pysub = pysub, kernel=3, nr_iter=3, normalize = False) if smooth_nm else prf_avg_sh_corr
-
-        # we want to exclude vertices above threshold
-        binary_prf_mask = np.ones(corr_prf.shape)
-        binary_prf_mask[corr_prf >= np.nanpercentile(prf_avg_sh_rand_corr, perc_thresh_nm)] = 0
-
-        ## now do the same correlation mask for the FA runs ###################
-
-        # get prf bold filenames
-        fa_bold_files = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'FA', ses = 'ses-mean', file_ext = nm_file_extent['FA'],
-                                                                postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
-                                                                acq_name = self.MRIObj.acq)
-
-        ## find unique session number
-        fa_ses_num = np.unique([mri_utils.get_run_ses_from_str(f)[-1] for f in fa_bold_files])
-
-        ## for each session, get split half correlation values
-        corr_arr = []
-        random_corr_arr = []
-        ind_seed = int(participant)+93 # seed index, to vary across participants
-        for sn in fa_ses_num:
-
-            ses_files = [f for f in fa_bold_files if 'ses-{s}'.format(s = sn) in f]
-
-            ## split runs in half and get unique combinations
-            run_sh_lists = mri_utils.split_half_comb(ses_files)
-
-            # get correlation value for each combination
-            for r in run_sh_lists:
-                ## correlate the two halfs
-                corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8))
-                ## correlate with randomized half
-                random_corr_arr.append(mri_utils.correlate_arrs(list(r[0]), list(r[-1]), n_jobs = 8, shuffle_axis = -1, seed = int(2023 * ind_seed)))
-                ind_seed += 1
-
-        # average values 
-        fa_avg_sh_corr = np.nanmean(corr_arr, axis = 0)
-        fa_avg_sh_rand_corr = np.nanmean(random_corr_arr, axis = 0)
-
-        print('X percentile for FA runs at %.3f'%np.nanpercentile(fa_avg_sh_rand_corr, perc_thresh_nm))
-
-        ## make final mask
-        # if smoothing mask 
-        corr_fa = mri_utils.smooth_surface(fa_avg_sh_corr, pysub = pysub, kernel=3, nr_iter=3, normalize = False) if smooth_nm else fa_avg_sh_corr
-
-        # we want to exclude vertices above threshold
-        binary_fa_mask = np.ones(corr_fa.shape)
-        binary_fa_mask[corr_fa >= np.nanpercentile(fa_avg_sh_rand_corr, perc_thresh_nm)] = 0
+        ## now do the same correlation mask for the FA runs
+        binary_fa_mask = self.get_correlation_mask(participant, task = 'FA', ses = 'mean', 
+                                                    file_ext = file_extent_nm['FA'], n_jobs = n_jobs, 
+                                                    seed_num = int(seed_num * 2), perc_thresh_nm = perc_thresh_nm, 
+                                                    smooth = smooth_nm, kernel = kernel, nr_iter = nr_iter, 
+                                                    normalize = normalize)
 
         ### final mask is multiplication of the two
         final_mask = binary_fa_mask * binary_prf_mask

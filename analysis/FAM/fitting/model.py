@@ -72,7 +72,7 @@ class Model:
 
     def get_data4fitting(self, file_list, task = 'pRF', run_type = 'mean',
                             chunk_num = None, vertex = None,
-                            baseline_interval = 'empty_long', ses = 'mean', return_filenames = False):
+                            baseline_interval = 'empty_long', ses = 'mean', return_filenames = False, correct_baseline = None):
 
         """
         load data from file list
@@ -97,8 +97,10 @@ class Model:
             session number, only relevant when loading one specific run number (associated to a session number)
         return_filenames: bool
             If we want to also return filenames in the same order of data array rows, or not (default)
-
         """  
+
+        if correct_baseline is None:
+            correct_baseline = self.correct_baseline[task]
         
         # if loading specific run
         if isinstance(run_type, int) or (isinstance(run_type, str) and 'loo_' not in run_type and len(re.findall(r'\d{1,10}', run_type))>0):
@@ -141,7 +143,7 @@ class Model:
             data_out = self.subselect_array(data_arr[r], task = task, chunk_num = chunk_num, vertex = vertex)
 
             ## if we want to keep baseline fix, we need to correct it!
-            if self.correct_baseline[task]:
+            if correct_baseline:
                 print('Correcting baseline to be 0 centered')
 
                 # number of TRs per condition (bar pass)

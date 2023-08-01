@@ -1145,7 +1145,7 @@ class pRF_model(Model):
             estimates[:,-3:-1] = median_hrf_params
 
         # get model prediciton for all vertices
-        prediction = Parallel(n_jobs=n_jobs, verbose=10)(delayed(model_object.return_prediction)(*list(estimates[vert, :-1])) for vert in tdqm(range(test_data.shape[0])))
+        prediction = Parallel(n_jobs=n_jobs, verbose=10)(delayed(model_object.return_prediction)(*list(estimates[vert, :-1])) for vert in tqdm(range(test_data.shape[0])))
         prediction = np.squeeze(prediction, axis=1)
 
         #calculate CV-rsq        

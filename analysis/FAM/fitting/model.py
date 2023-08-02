@@ -8,7 +8,7 @@ import glob
 
 class Model:
 
-    def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_999999'):
+    def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_999999', use_atlas = None):
         
         """__init__
         constructor for class 
@@ -32,11 +32,21 @@ class Model:
             self.outputdir = self.MRIObj.derivatives_pth
         else:
             self.outputdir = outputdir
+
+        ## set variables useful when loading ROIs
+        if use_atlas is None:
+            self.plot_key = self.MRIObj.sj_space 
+            self.annot_filename = ''
+        else:
+            self.plot_key = use_atlas
+            self.annot_filename = self.MRIObj.atlas_annot[self.plot_key ]
+        
+        self.use_atlas = use_atlas
             
         ### some relevant params ###
 
         # set fit folder name
-        self.fitfolder = {self.MRIObj.params['mri']['fitting'][key]['fit_folder'] for key in self.MRIObj.tasks}
+        self.fitfolder = {key:self.MRIObj.params['mri']['fitting'][key]['fit_folder'] for key in self.MRIObj.tasks}
         
         ## type of model to fit
         self.model_type = {key:self.MRIObj.params['mri']['fitting'][key]['fit_model'] for key in self.MRIObj.tasks}
@@ -160,7 +170,7 @@ class Model:
                     
                 # crop and shift if such was the case
                 condition_per_TR = self.MRIObj.mri_utils.crop_shift_arr(bar_pass, 
-                                                                    crop_nr = self.MRIObj.mri_nr_cropTR[task], 
+                                                                    crop_nr = self.MRIObj.task_nr_cropTR[task], 
                                                                     shift = self.MRIObj.shift_TRs_num)
 
                 data_out = self.baseline_correction(data_out, condition_per_TR, 

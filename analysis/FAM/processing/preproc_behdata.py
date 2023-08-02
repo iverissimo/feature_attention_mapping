@@ -153,7 +153,7 @@ class PreprocBeh:
         
         return trial_info_df
 
-    def load_FA_bar_position(self, participant, ses = 'ses-1', ses_type = 'func', run_num = None):
+    def load_FA_bar_position(self, participant, ses_num = None, ses_type = 'func', run_num = None):
         
         """
         Load bar position from pickle files
@@ -167,43 +167,52 @@ class PreprocBeh:
         ses_type: str
             type of session (default func)
         run_num: 
-
         """ 
-        
-        # input path will be in sourcedata
-        input_pth = op.join(self.MRIObj.sourcedata_pth, 'sub-{sj}'.format(sj=participant), ses, ses_type)
-        
-        # if session type doesn't exist
-        if not op.exists(input_pth) or not os.listdir(input_pth):
-            print('no files in %s'%input_pth)
+
+        # if we provided a specific session number, only load that
+        if ses_num:
+            sessions = ['ses-{s}'.format(s = ses_num)]
         else:
-            print('loading files from %s'%input_pth)
-                   
-            bp_files = [op.join(input_pth,x) for x in os.listdir(input_pth) if 'task-FA' in x \
-                            and x.endswith(self.MRIObj.bar_pos_ext)]
+            sessions = self.MRIObj.session['sub-{sj}'.format(sj=participant)]
             
-            print('{nr} bar position files found for task-FA'.format(nr=len(bp_files)))
-            
-            # save in dict
-            bar_pos_df = {}
+        # save in dict
+        bar_pos_df = {}
 
-            # if we provided a specific run number, only load that
-            if run_num:
-                run_filename = [val for val in bp_files if 'run-{r}'.format(r=run_num) in val][0]
-                print('Loading {f}'.format(f=op.split(run_filename)[-1]))
-                bar_pos_df = pd.read_pickle(run_filename)
-                
+        for ses in sessions:
+
+            bar_pos_df[ses] = {}
+
+            # input path will be in sourcedata
+            input_pth = op.join(self.MRIObj.sourcedata_pth, 'sub-{sj}'.format(sj=participant), ses, ses_type)
+            
+            # if session type doesn't exist
+            if not op.exists(input_pth) or not os.listdir(input_pth):
+                print('no files in %s'%input_pth)
             else:
-                # for each run
-                for r in np.arange(self.MRIObj.mri_nr_runs):
+                print('loading files from %s'%input_pth)
+                    
+                bp_files = [op.join(input_pth,x) for x in os.listdir(input_pth) if 'task-FA' in x \
+                                and x.endswith(self.MRIObj.bar_pos_ext)]
+                
+                print('{nr} bar position files found for task-FA'.format(nr=len(bp_files)))
 
-                    run_filename = [val for val in bp_files if 'run-{r}'.format(r=(r+1)) in val]
-                    if len(run_filename) == 0:
-                        print('No trial info file for run-{r}'.format(r=(r+1)))
-                    else:
-                        print('Loading {f}'.format(f=op.split(run_filename[0])[-1]))
-                        df_run = pd.read_pickle(run_filename[0])
-                        bar_pos_df['run-{r}'.format(r=(r+1))] = df_run
+                # if we provided a specific run number, only load that
+                if run_num:
+                    run_filename = [val for val in bp_files if 'run-{r}'.format(r=run_num) in val][0]
+                    print('Loading {f}'.format(f=op.split(run_filename)[-1]))
+                    
+                    bar_pos_df[ses]['run-{r}'.format(r=run_num)] = pd.read_pickle(run_filename)
+                    
+                else:
+                    # for each run
+                    for r in np.arange(self.MRIObj.mri_nr_runs):
+
+                        run_filename = [val for val in bp_files if 'run-{r}'.format(r=(r+1)) in val]
+                        if len(run_filename) == 0:
+                            print('No trial info file for run-{r}'.format(r=(r+1)))
+                        else:
+                            print('Loading {f}'.format(f=op.split(run_filename[0])[-1]))
+                            bar_pos_df[ses]['run-{r}'.format(r=(r+1))] = pd.read_pickle(run_filename[0])
         
         return bar_pos_df
     
@@ -294,7 +303,7 @@ class PreprocBeh:
                                                                     
         return df_summary
 
-    def get_pRF_mask_bool(self, ses_type = 'func'):
+    def get_pRF_mask_bool(self, ses_type = 'func', crop_nr = 0, shift = 0):
         
         """
         Make boolean mask based on subject responses, 
@@ -356,6 +365,8 @@ class PreprocBeh:
                 mask_bool[mask_bool>=.75] = 1
                 mask_bool[mask_bool!=1] = 0
 
+                mask_bool = self.MRIObj.mri_utils.crop_shift_arr(mask_bool, crop_nr = crop_nr, shift = shift)
+
                 ## append in df
                 df_mask_bool = pd.concat((df_mask_bool,
                                             pd.DataFrame({'sj': ['sub-{sj}'.format(sj=pp)], 
@@ -365,7 +376,7 @@ class PreprocBeh:
         
         return df_mask_bool
     
-    def get_stim_on_screen(self, task = 'pRF', crop_nr = 0, shift = 0, dummy = 0):
+    def get_stim_on_screen(self, task = 'pRF', crop_nr = 0, shift = 0):
 
         """
         Get boolean array indicating on which TRs stimuli is on screen
@@ -389,7 +400,7 @@ class PreprocBeh:
             stim_on_screen = np.zeros(self.FA_total_trials)
             stim_on_screen[self.FA_bar_pass_trials] = 1
             
-        return self.MRIObj.mri_utils.crop_shift_arr(stim_on_screen, crop_nr = crop_nr - dummy, shift = shift)
+        return self.MRIObj.mri_utils.crop_shift_arr(stim_on_screen, crop_nr = crop_nr, shift = shift)
 
     def get_FA_behavioral_results(self, ses_type = 'func'):
         

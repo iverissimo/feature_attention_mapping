@@ -124,13 +124,13 @@ if len(args.vertex)>0:
 ROI = args.ROI
 
 ## Load data object --> as relevant paths, variables and utility functions
-print("Fitting data for subject {sj}!".format(sj=sj))
+print("\nFitting data for subject {sj}!".format(sj=sj))
 
 FAM_data = load_exp_settings.MRIData(params, sj, 
                                     repo_pth = op.split(load_exp_settings.__file__)[0], 
                                     base_dir = system_dir, exclude_sj = exclude_sj)
 
-print('Subject list is {l}'.format(l=str(FAM_data.sj_num)))
+print('Subject list is {l}\n'.format(l=str(FAM_data.sj_num)))
 
 ## Load preprocessing class for each data type ###
 
@@ -155,15 +155,18 @@ match task:
         if py_cmd == 'fitmodel': # fit pRF model
 
             print('Fitting {mn} model on the data\n'.format(mn = prf_model_name))
-            print('fit HRF params set to {op}'.format(op = fit_hrf))
+            print('fit HRF params set to {op}\n'.format(op = fit_hrf))
 
             # get participant models, which also will load 
             # DM and mask it according to participants behavior
             pp_prf_models = FAM_pRF.set_models(participant_list = FAM_data.sj_num, 
                                                ses2model = ses2fit,
-                                               mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func'), # Make DM boolean mask based on subject responses
+                                               mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                                                        crop_nr = FAM_data.task_nr_cropTR[task], 
+                                                                                        shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
                                                stim_on_screen = FAM_beh.get_stim_on_screen(task = task, 
-                                                                                        crop_nr = 0, shift = 0, dummy = 0) # dont crop here, to do so within func
+                                                                                        crop_nr = FAM_data.task_nr_cropTR[task], 
+                                                                                        shift = FAM_data.shift_TRs_num) # dont crop here, to do so within func
                                             )
             
             ## actually fit
@@ -187,18 +190,19 @@ match task:
         if py_cmd == 'fitmodel': # fit FA model
 
             print('Loading pRF {mn} model estimates\n'.format(mn = prf_model_name))
-            print('fit HRF params set to {op}'.format(op = fit_hrf))
+            print('fit HRF params set to {op}\n'.format(op = fit_hrf))
 
             ## load pRF estimates - implies pRF model was already fit (should change to fit pRF model on the spot if needed)
             pp_prf_estimates, pp_prf_models = FAM_pRF.load_pRF_model_estimates(participant_list = FAM_data.sj_num, 
                                                                             ses = 'mean', run_type = 'mean', 
                                                                             model_name = prf_model_name, iterative = True, 
                                                                             fit_hrf = fit_hrf,
-                                                                            mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func'), # Make DM boolean mask based on subject responses
-                                                                            stim_on_screen = FAM_beh.get_stim_on_screen(task = task, 
-                                                                                                                        crop_nr = 0, 
-                                                                                                                        shift = 0, 
-                                                                                                                        dummy = 0) # dont crop here, to do so within func)
+                                                                            mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                                                                                    crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                                                    shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
+                                                                            stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                                                                                        crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                                                        shift = FAM_data.shift_TRs_num) # dont crop here, to do so within func)
                                                                             )
 
             print('Fitting {mn} model on the data\n'.format(mn = fa_model_name))
@@ -209,7 +213,7 @@ match task:
                 case 'glmsingle':
 
                     ## load FA model class
-                    FAM_FA = GLMsingle_Model(FAM_data)
+                    FAM_FA = GLMsingle_Model(FAM_data, use_atlas = use_atlas)
 
                     ## actually fit
                     print('Fitting started!')
@@ -218,10 +222,14 @@ match task:
 
                     for pp in FAM_data.sj_num:
 
+                        # get participant bar positions for FA task
+                        pp_bar_pos_df = FAM_beh.load_FA_bar_position(pp, ses_num = None, ses_type = 'func', run_num = None)
+
                         _ = FAM_FA.fit_data(pp, pp_prf_estimates['sub-{sj}'.format(sj = pp)], 
                                             pp_prf_models['sub-{sj}'.format(sj = pp)]['ses-mean']['{mname}_model'.format(mname = prf_model_name)],  
                                             file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 99, 
-                                            file_extent_nm = FAM_mri.get_mrifile_ext()) 
+                                            file_extent_nm = FAM_mri.get_mrifile_ext(),
+                                            pp_bar_pos_df = pp_bar_pos_df) 
 
 
 

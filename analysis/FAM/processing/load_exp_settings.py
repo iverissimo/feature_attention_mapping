@@ -221,18 +221,17 @@ class MRIData(BehData):
         # pycortex subject 
         self.pysub = self.params['plotting']['pycortex_sub']
 
-        ## number of cropped TRs
-        # due to dummies TRs that were saved and extra ones as defined in params
-        self.crop_TRs = {key:self.params[key]['crop'] for key in self.tasks}
-        self.crop_TRs_num =  {key:self.params[key]['crop_TR'] for key in self.tasks}
+        ## set number of cropped TRs
+        # number of dummy scans
         self.mri_nrdummyTRs = self.params['mri']['dummy_TR']
-
-        self.mri_nr_cropTR = {'pRF': self.mri_nrdummyTRs, 'FA': self.mri_nrdummyTRs}
-
-        if self.crop_TRs['pRF'] == True: 
-            self.mri_nr_cropTR['pRF'] += self.crop_TRs_num['pRF']
-        if self.crop_TRs['FA']== True: 
-            self.mri_nr_cropTR['FA'] += self.crop_TRs_num['FA']
+        # if we want to crop further
+        self.crop_TRs = {key:self.params[key]['crop'] for key in self.tasks}
+        # then save number of TRs that should be cropped
+        # (to use in DMs when fitting models)
+        self.task_nr_cropTR =  {key:self.params[key]['crop_TR'] if self.crop_TRs[key] else 0 for key in self.tasks}
+        # do same but for mri data
+        # which will also include dummies
+        self.mri_nr_cropTR =  {key:int(self.mri_nrdummyTRs + self.params[key]['crop_TR']) if self.crop_TRs[key] else self.mri_nrdummyTRs for key in self.tasks}
         
         ## if we're shifting TRs to account for dummy scans
         self.shift_TRs_num =  self.params['mri']['shift_DM_TRs']

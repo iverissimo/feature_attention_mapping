@@ -35,7 +35,7 @@ class pRF_model(Model):
         """
 
         # need to initialize parent class (Model), indicating output infos
-        super().__init__(MRIObj = MRIObj, outputdir = outputdir, pysub = pysub)
+        super().__init__(MRIObj = MRIObj, outputdir = outputdir, pysub = pysub, use_atlas = use_atlas)
 
         # if output dir not defined, then make it in derivatives
         if outputdir is None:
@@ -46,14 +46,15 @@ class pRF_model(Model):
         # reset osf value, because model assumes 10 (for FA)
         self.osf = 1
 
-        ## set variables useful when loading ROIs
-        if use_atlas is None:
-            self.plot_key = self.MRIObj.sj_space 
-            self.annot_filename = ''
-        else:
-            self.plot_key = use_atlas
-            self.annot_filename = self.MRIObj.atlas_annot[self.plot_key ]
-        self.use_atlas
+        # number of TRs per condition (bar pass)
+        pRF_bar_pass_all = self.MRIObj.beh_utils.get_pRF_cond_per_TR(cond_TR_dict = self.MRIObj.pRF_nr_TRs, 
+                                                                    bar_pass_direction = self.MRIObj.pRF_bar_pass)
+        
+        # do same to bar pass direction str array
+        self.condition_per_TR = self.MRIObj.mri_utils.crop_shift_arr(pRF_bar_pass_all, 
+                                                                crop_nr = self.MRIObj.task_nr_cropTR['pRF'], 
+                                                                shift = self.MRIObj.shift_TRs_num)
+
                 
     def get_DM(self, participant, ses = 'mean', mask_bool_df = None, filename = None, 
                     osf = 1, res_scaling = .1, stim_on_screen = []):
@@ -89,10 +90,6 @@ class pRF_model(Model):
             else:
                 save_dm = True
 
-        # number of TRs per condition (bar pass)
-        pRF_bar_pass_all = self.MRIObj.beh_utils.get_pRF_cond_per_TR(cond_TR_dict = self.MRIObj.pRF_nr_TRs, 
-                                                                    bar_pass_direction = self.MRIObj.pRF_bar_pass)
-        
         # make design matrix
         if visual_dm is None:
 
@@ -113,16 +110,6 @@ class pRF_model(Model):
 
             # multiply boolean array with mask
             stim_on_screen = stim_on_screen * dm_mask
-                
-            ## crop and shift if such was the case
-            stim_on_screen = self.MRIObj.mri_utils.crop_shift_arr(stim_on_screen, 
-                                                                  crop_nr = self.MRIObj.mri_nr_cropTR['pRF'], 
-                                                                  shift = self.MRIObj.shift_TRs_num)
-
-            # do same to bar pass direction str array
-            condition_per_TR = self.MRIObj.mri_utils.crop_shift_arr(pRF_bar_pass_all, 
-                                                                    crop_nr = self.MRIObj.mri_nr_cropTR['pRF'], 
-                                                                    shift = self.MRIObj.shift_TRs_num)
 
             # all possible positions in pixels for for midpoint of
             # y position for vertical bar passes, 
@@ -142,10 +129,10 @@ class pRF_model(Model):
                                 }
 
             # save screen display for each TR (or if osf > 1 then for #TRs * osf)
-            visual_dm_array = np.zeros((len(condition_per_TR) * osf, round(self.MRIObj.screen_res[0] * res_scaling), round(self.MRIObj.screen_res[1] * res_scaling)))
+            visual_dm_array = np.zeros((len(self.condition_per_TR) * osf, round(self.MRIObj.screen_res[0] * res_scaling), round(self.MRIObj.screen_res[1] * res_scaling)))
             i = 0
 
-            for trl, bartype in enumerate(condition_per_TR): # loop over bar pass directions
+            for trl, bartype in enumerate(self.condition_per_TR): # loop over bar pass directions
 
                 img = Image.new('RGB', tuple(self.MRIObj.screen_res)) # background image
 
@@ -162,8 +149,8 @@ class pRF_model(Model):
                                 outline = (255,255,255))
 
                     # increment counter
-                    if trl < (len(condition_per_TR) - 1):
-                        i = i+1 if condition_per_TR[trl] == condition_per_TR[trl+1] else 0    
+                    if trl < (len(self.condition_per_TR) - 1):
+                        i = i+1 if self.condition_per_TR[trl] == self.condition_per_TR[trl+1] else 0    
                 
                 ## save in array, and apply mask
                 visual_dm_array[int(trl*osf):int(trl*osf + osf), ...] = np.array(img)[::round(1/res_scaling),::round(1/res_scaling),0][np.newaxis,...] * stim_on_screen[trl]

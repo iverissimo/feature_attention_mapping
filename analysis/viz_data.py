@@ -106,13 +106,13 @@ match data_type:
                     freeview_cmd = input("View segmentations (view) or make movie (movie)?: ")
 
                 plotter.check_fs_seg(check_type = freeview_cmd, use_T2 = T2_file, 
-                                     participant_list = FAM_mri.MRIObj.sj_num)
+                                     participant_list = FAM_data.sj_num)
 
             case 'nordic':
 
                 print('Comparing NORDIC to standard runs')
 
-                plotter.compare_nordic2standard(participant_list = FAM_mri.MRIObj.sj_num, 
+                plotter.compare_nordic2standard(participant_list = FAM_data.sj_num, 
                                                 use_atlas_rois = use_atlas,
                                                 file_ext = FAM_mri.get_mrifile_ext())
 
@@ -120,7 +120,7 @@ match data_type:
 
                 print('Plotting tSNR')
 
-                plotter.plot_tsnr(participant_list = FAM_mri.MRIObj.sj_num, 
+                plotter.plot_tsnr(participant_list = FAM_data.sj_num, 
                                 use_atlas_rois = use_atlas,
                                 file_ext = FAM_mri.get_mrifile_ext())
 
@@ -128,7 +128,7 @@ match data_type:
 
                 print('Plotting vasculature proxy for pRF task')
 
-                plotter.plot_vasculature(participant_list = FAM_mri.MRIObj.sj_num, 
+                plotter.plot_vasculature(participant_list = FAM_data.sj_num, 
                                         file_ext = FAM_mri.get_mrifile_ext())
 
             case 'bold':
@@ -150,12 +150,11 @@ match data_type:
                     while not isinstance(ses_num, int):
                         ses_num = int(input("Which session number to choose? (Ex 1, 2): "))
 
-                plotter.plot_bold_on_surface(participant_list = FAM_mri.MRIObj.sj_num, 
+                plotter.plot_bold_on_surface(participant_list = FAM_data.sj_num, 
                                             run_num = run_type, ses_num = ses_num, task = task, 
                                             stim_on_screen = FAM_beh.get_stim_on_screen(task = task, 
-                                                                                        crop_nr = FAM_mri.MRIObj.mri_nr_cropTR[task], 
-                                                                                        shift = FAM_mri.MRIObj.shift_TRs_num,
-                                                                                        dummy = FAM_mri.MRIObj.mri_nrdummyTRs),
+                                                                                        crop_nr = FAM_data.task_nr_cropTR[task], 
+                                                                                        shift = FAM_data.shift_TRs_num),
                                             use_atlas_rois = use_atlas,
                                             file_ext = FAM_mri.get_mrifile_ext())
 
@@ -173,7 +172,7 @@ match data_type:
                 while isinstance(ses, int) == False:
                     ses = int(input("Which session number to choose? (Ex 1, 2): "))
 
-                plotter.check_click_bold(FAM_mri.MRIObj.sj_num[0], 
+                plotter.check_click_bold(FAM_data.sj_num[0], 
                                         run, ses, 
                                         task = task_name, input_pth = None,
                                         file_ext = FAM_mri.get_mrifile_ext()[task_name])

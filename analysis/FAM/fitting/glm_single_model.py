@@ -13,7 +13,6 @@ from PIL import Image, ImageDraw
 
 from FAM.fitting.model import Model
 
-
 from glmsingle.glmsingle import GLM_single
 from glmsingle.glmsingle import getcanonicalhrf
 
@@ -39,7 +38,7 @@ class GLMsingle_Model(Model):
         """
 
         # need to initialize parent class (Model), indicating output infos
-        super().__init__(MRIObj = MRIObj, outputdir = outputdir, pysub = pysub)
+        super().__init__(MRIObj = MRIObj, outputdir = outputdir, pysub = pysub, use_atlas = use_atlas)
 
         ## prf rsq threshold, to select visual voxels
         # worth fitting
@@ -57,18 +56,20 @@ class GLMsingle_Model(Model):
         else:
             self.outputdir = outputdir
 
-        ## set variables useful when loading ROIs
-        if use_atlas is None:
-            self.plot_key = self.MRIObj.sj_space 
-            self.annot_filename = ''
-        else:
-            self.plot_key = use_atlas
-            self.annot_filename = self.MRIObj.atlas_annot[self.plot_key ]
-        self.use_atlas
+        ## get conditions per TR
+        FA_bar_pass_all, _ = self.MRIObj.beh_utils.get_FA_run_struct(self.MRIObj.FA_bar_pass, 
+                                                                num_bar_pos = self.MRIObj.FA_num_bar_position, 
+                                                                empty_TR = self.MRIObj.FA_nr_TRs['empty_TR'], 
+                                                                task_trial_TR = self.MRIObj.FA_nr_TRs['task_trial_TR'])
+
+        # crop and shift if such was the case
+        self.condition_per_TR = self.MRIObj.mri_utils.crop_shift_arr(FA_bar_pass_all, 
+                                                            crop_nr = self.MRIObj.task_nr_cropTR['FA'], 
+                                                            shift = self.MRIObj.shift_TRs_num)
 
     def get_correlation_mask(self, participant, task = 'pRF', ses = 'mean', file_ext = '_cropped_dc_psc.npy',
                                 n_jobs = 8, seed_num = 2023, perc_thresh_nm = 95, smooth = True,
-                                kernel=3, nr_iter=3, normalize = False):
+                                kernel=3, nr_iter=3, normalize = False, figure_name = None):
 
         """
         Split half correlate all runs in a task
@@ -81,8 +82,6 @@ class GLMsingle_Model(Model):
             participant ID
         prf_estimates : dict
             dict with participant prf estimates
-        prf_modelobj: object
-            pRF model object from prfpy, to use to create HRF
         smooth_nm: bool
             if we want to smooth noise mask
         perc_thresh_nm: int
@@ -146,6 +145,18 @@ class GLMsingle_Model(Model):
         binary_mask = np.ones(final_corr_arr.shape)
         binary_mask[final_corr_arr >= threshold] = 0
 
+        # if we want to plot --> will change to just save correlation file somewhere
+        if figure_name:
+            ## plot pRF correlation flatmap used for mask
+            flatmap = cortex.Vertex(final_corr_arr, 
+                            self.pysub,
+                            vmin = 0, vmax = 1, #.7,
+                            cmap='hot')
+            cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
+
+            print('saving %s' %figure_name)
+            _ = cortex.quickflat.make_png(figure_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False) 
+
         return binary_mask
 
     def get_single_trial_combinations(self):
@@ -168,14 +179,14 @@ class GLMsingle_Model(Model):
 
         # all possible positions in pixels [x,y] for midpoint of
         # vertical bar passes, 
-        ver_y = np.sort(np.concatenate((-np.arange(bar_width_pix[1]/2,self.screen_res[1]/2,bar_width_pix[1])[0:int(num_bars[1]/2)],
-                                        np.arange(bar_width_pix[1]/2,self.screen_res[1]/2,bar_width_pix[1])[0:int(num_bars[1]/2)])))
+        ver_y = np.sort(np.concatenate((-np.arange(bar_width_pix[1]/2,self.MRIObj.screen_res[1]/2,bar_width_pix[1])[0:int(num_bars[1]/2)],
+                                        np.arange(bar_width_pix[1]/2,self.MRIObj.screen_res[1]/2,bar_width_pix[1])[0:int(num_bars[1]/2)])))
 
         ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(ver_y)])
 
         # horizontal bar passes 
-        hor_x = np.sort(np.concatenate((-np.arange(bar_width_pix[0]/2,self.screen_res[0]/2,bar_width_pix[0])[0:int(num_bars[0]/2)],
-                                        np.arange(bar_width_pix[0]/2,self.screen_res[0]/2,bar_width_pix[0])[0:int(num_bars[0]/2)])))
+        hor_x = np.sort(np.concatenate((-np.arange(bar_width_pix[0]/2,self.MRIObj.screen_res[0]/2,bar_width_pix[0])[0:int(num_bars[0]/2)],
+                                        np.arange(bar_width_pix[0]/2,self.MRIObj.screen_res[0]/2,bar_width_pix[0])[0:int(num_bars[0]/2)])))
 
         hor_bar_pos_pix = np.array([np.array([x,0]) for _,x in enumerate(hor_x)])
 
@@ -219,7 +230,7 @@ class GLMsingle_Model(Model):
         ## turn into dataframe
         self.trial_combinations_df = pd.DataFrame.from_dict(trial_combinations_dict).apply(pd.Series.explode).reset_index().drop(columns=['index'])
 
-    def make_singletrial_dm(self, participant, run_num_arr =[], ses_num_arr = []):
+    def make_singletrial_dm(self, run_num_arr =[], ses_num_arr = [], pp_bar_pos_df = {}):
 
         """
         Make single trial design matrix
@@ -235,7 +246,8 @@ class GLMsingle_Model(Model):
         ses_num_arr: list
             list of ints with each ses number of the abovementioned run
             (DM will be in same order of ses IDs in this list)
-            
+        pp_bar_pos_df: dataframe
+            participant bar position data frame, for all runs of task (from preproc_beh class)
         """
 
         ## get all possible trial combinations
@@ -245,20 +257,9 @@ class GLMsingle_Model(Model):
         except AttributeError:
             self.get_single_trial_combinations()
 
-        ## get conditions per TR
-        FA_bar_pass_all, _ = self.MRIObj.beh_utils.get_FA_run_struct(self.MRIObj.FA_bar_pass, 
-                                                                num_bar_pos = self.MRIObj.FA_num_bar_position, 
-                                                                empty_TR = self.MRIObj.FA_nr_TRs['empty_TR'], 
-                                                                task_trial_TR = self.MRIObj.FA_nr_TRs['task_trial_TR'])
-
-        # crop and shift if such was the case
-        condition_per_TR = self.MRIObj.mri_utils.crop_shift_arr(FA_bar_pass_all, 
-                                                            crop_nr = self.MRIObj.mri_nr_cropTR['FA'], 
-                                                            shift = self.MRIObj.shift_TRs_num)
-
         ## make single trial DM
         # with shape [runs, TRs, conditions]
-        single_trl_DM = np.zeros((len(run_num_arr), len(condition_per_TR), len(self.trial_combinations_df)))
+        single_trl_DM = np.zeros((len(run_num_arr), len(self.condition_per_TR), len(self.trial_combinations_df)))
 
         ## loop over runs
         for file_ind in range(len(run_num_arr)):
@@ -266,11 +267,8 @@ class GLMsingle_Model(Model):
             ses_num = ses_num_arr[file_ind]
             run_num = run_num_arr[file_ind]
 
-            ##### CHANGING SCRIPT HERE ########
-
             ## get bar position df for run
-            run_bar_pos_df = self.mri_beh.load_FA_bar_position(participant, ses = 'ses-{s}'.format(s = ses_num), 
-                                                    ses_type = 'func', run_num = run_num)
+            run_bar_pos_df = pp_bar_pos_df['ses-{s}'.format(s = ses_num)]['run-{r}'.format(r=run_num)]
 
             ## get run bar midpoint and direction values
             # for each bar type
@@ -284,7 +282,7 @@ class GLMsingle_Model(Model):
             trl_ind = 0
 
             ## fill DM for all TRs
-            for i_TR, cond in enumerate(condition_per_TR):
+            for i_TR, cond in enumerate(self.condition_per_TR):
                 
                 if cond == 'task':
                     
@@ -302,7 +300,6 @@ class GLMsingle_Model(Model):
                     trl_ind += 1
 
         return single_trl_DM
-
 
     def get_average_hrf(self, pp_prf_estimates, prf_modelobj, rsq_threshold = None):
 
@@ -329,8 +326,7 @@ class GLMsingle_Model(Model):
         print('selecting %i HRFs to average'%len(ind2use))
 
         ## make hrfs for all high rsq visual voxels
-        # shifted by onset (stc)
-        # upsampled
+        # shifted by onset (stc) and upsampled
         hrf_ind2use = [prf_modelobj.create_hrf(hrf_params = [1, 
                                                             pp_prf_estimates['hrf_derivative'][vert],
                                                             pp_prf_estimates['hrf_dispersion'][vert]], 
@@ -339,7 +335,7 @@ class GLMsingle_Model(Model):
         hrf_ind2use = np.vstack(hrf_ind2use)
 
         ## average HRF, weighted by the pRF RSQ
-        avg_hrf = np.average(hrf_ind2use, axis=0, weights=pp_prf_estimates['r2'][ind2use])
+        avg_hrf = np.average(hrf_ind2use, axis=0, weights=self.MRIObj.mri_utils.normalize(pp_prf_estimates['r2'][ind2use]))
 
         ## convolve to get the predicted response 
         # to the desired stimulus duration
@@ -352,9 +348,7 @@ class GLMsingle_Model(Model):
         hrf_final = pchip(np.asarray(range(hrf_stim_convolved.shape[0])) * res_step,
                         hrf_stim_convolved)(np.asarray(np.arange(0, int((hrf_stim_convolved.shape[0]-1) * res_step), self.MRIObj.TR)))
         
-
         return hrf_final/np.max(hrf_final)
-
 
     def get_singletrial_avg_estimates(self, estimate_arr = [], single_trl_DM = [], return_std = True):
 
@@ -366,18 +360,9 @@ class GLMsingle_Model(Model):
         [vertex, average_estimate4trialtype]
 
         """
-
-        # set number of TRs to crop
-        crop_nr = self.crop_TRs_num['FA'] if self.crop_TRs['FA'] == True else None
-
-        ## get conditions per TR
-        ## crop and shift if such was the case
-        condition_per_TR = self.MRIObj.mri_utils.crop_shift_arr(self.mri_beh.FA_bar_pass_all,
-                                                crop_nr = crop_nr, 
-                                                shift = self.shift_TRs_num)
         
         ## subselect task TRs indices
-        task_indices = np.where((condition_per_TR) == 'task')[0]
+        task_indices = np.where((self.condition_per_TR) == 'task')[0]
         
         ## now append the estimate for that vertex for the same trial type (and std if we also want that)
         avg_all = []
@@ -401,6 +386,7 @@ class GLMsingle_Model(Model):
     def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', 
                         smooth_nm = True, perc_thresh_nm = 95, n_jobs = 8,
                         seed_num = 2023, kernel = 3, nr_iter = 3, normalize = False,
+                        pp_bar_pos_df = {},
                         file_extent_nm = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_LinDetrend_psc.npy'}):
 
         """
@@ -420,7 +406,15 @@ class GLMsingle_Model(Model):
             noise mask percentile threshold
         file_extent_nm: dict
             dict with file extension for task files to be used for noise mask
+        pp_bar_pos_df: dataframe
+            participant bar position data frame, for all runs of task (from preproc_beh class)
         """ 
+
+        ## set output dir to save estimates
+        outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant))
+
+        os.makedirs(outdir, exist_ok = True)
+        print('saving files in %s'%outdir)
 
         ## get list of files to load
         bold_filelist = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'FA', ses = 'all', file_ext = file_ext,
@@ -431,41 +425,33 @@ class GLMsingle_Model(Model):
         data, train_file_list = self.get_data4fitting(bold_filelist, task = 'FA', run_type = 'all', 
                                                 chunk_num = None, vertex = None, ses = 'all',
                                                 baseline_interval = 'empty', correct_baseline = None, return_filenames = True)
-        
-        ##### CHANGING SCRIPT HERE ########
-
+    
         ## Make single trial DM for all runs
-        single_trl_DM = self.make_singletrial_dm(participant, 
-                                                run_num_arr = self.run_num_arr, 
-                                                ses_num_arr = self.ses_num_arr)
+        single_trl_DM = self.make_singletrial_dm(run_num_arr = self.run_num_arr, 
+                                                ses_num_arr = self.ses_num_arr,
+                                                pp_bar_pos_df = pp_bar_pos_df)
 
         print('Fitting {n} files: {f}'.format(n = len(train_file_list), f = str(train_file_list)))
-
-        ## set output dir to save estimates
-        outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant))
-
-        os.makedirs(outdir, exist_ok = True)
-        print('saving files in %s'%outdir)
 
         ## get average hrf
         hrf_final = self.get_average_hrf(pp_prf_estimates, prf_modelobj, rsq_threshold = self.prf_rsq_threshold)
         
-        ##################################
-
         ### make mask array of pRF high fitting voxels,
         # to give as input to glmsingle (excluding them from noise pool)
         binary_prf_mask = self.get_correlation_mask(participant, task = 'pRF', ses = 'mean', 
                                                     file_ext = file_extent_nm['pRF'], n_jobs = n_jobs, 
                                                     seed_num = seed_num, perc_thresh_nm = perc_thresh_nm, 
                                                     smooth = smooth_nm, kernel = kernel, nr_iter = nr_iter, 
-                                                    normalize = normalize)
+                                                    normalize = normalize, 
+                                                    figure_name = op.join(outdir, 'modeltypeD_pRFcorrelation.png'))
 
         ## now do the same correlation mask for the FA runs
         binary_fa_mask = self.get_correlation_mask(participant, task = 'FA', ses = 'mean', 
                                                     file_ext = file_extent_nm['FA'], n_jobs = n_jobs, 
                                                     seed_num = int(seed_num * 2), perc_thresh_nm = perc_thresh_nm, 
                                                     smooth = smooth_nm, kernel = kernel, nr_iter = nr_iter, 
-                                                    normalize = normalize)
+                                                    normalize = normalize,
+                                                    figure_name = op.join(outdir, 'modeltypeD_FAcorrelation.png'))
 
         ### final mask is multiplication of the two
         final_mask = binary_fa_mask * binary_prf_mask
@@ -477,7 +463,7 @@ class GLMsingle_Model(Model):
         opt['wantlibrary'] = 0
         opt['wantglmdenoise'] = 1
         opt['wantfracridge'] = 1
-        opt['hrfonset'] = 0 #FAM_FA.hrf_onset
+        opt['hrfonset'] = 0 # already setting onset in hrf
         opt['hrftoassume'] = hrf_final
         opt['brainexclude'] = final_mask.astype(int)
         opt['sessionindicator'] = self.ses_num_arr 
@@ -487,8 +473,7 @@ class GLMsingle_Model(Model):
         # define polynomials to project out from data (we only want to use intercept and slope)
         opt['maxpolydeg'] = [[0, 1] for _ in range(data.shape[0])]
 
-        # for the purpose of this example we will keep the relevant outputs in memory
-        # and also save them to the disk
+        # keep relevant outputs in memory and also save them to the disk
         opt['wantfileoutputs'] = [1,1,1,1]
         opt['wantmemoryoutputs'] = [1,1,1,1]
 
@@ -516,10 +501,9 @@ class GLMsingle_Model(Model):
         # run GLMsingle
         results_glmsingle = glmsingle_obj.fit(dm_list,
                                             data_list,
-                                            self.MRIObj.params['FA']['bars_phase_dur'],
+                                            self.MRIObj.FA_bars_phase_dur,
                                             self.MRIObj.TR,
                                             outputdir = outdir)
-                                            #figuredir=outdir)
 
         elapsed_time = time.time() - start_time
 
@@ -528,13 +512,12 @@ class GLMsingle_Model(Model):
             f'{time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}'
         )
 
-
         ## for now plot and save a few inspection figures too,
         # to see get a sense on quality of fit
 
         ## plot ON OFF R2
         flatmap = cortex.Vertex(results_glmsingle['typea']['onoffR2'], 
-                  pysub,
+                  self.pysub,
                    vmin = 0, vmax = 15, #.7,
                    cmap='hot')
 
@@ -544,18 +527,17 @@ class GLMsingle_Model(Model):
 
         ## plot ON OFF betas
         flatmap = cortex.Vertex(results_glmsingle['typea']['betasmd'][...,0], 
-                  pysub,
+                  self.pysub,
                    vmin = -2, vmax = 2, #.7,
                    cmap='RdBu_r')
 
         fig_name = op.join(outdir, 'modeltypeA_ONOFF_betas.png')
         print('saving %s' %fig_name)
         _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
-
+        
         ## plot Full Model noise pool 
         flatmap = cortex.Vertex(results_glmsingle['typed']['noisepool'], 
-                        pysub,
+                        self.pysub,
                         vmin = 0, vmax = 1, #.7,
                         cmap='hot')
 
@@ -563,10 +545,9 @@ class GLMsingle_Model(Model):
         print('saving %s' %fig_name)
         _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
-        
         ## plot Full Model RSQ
         flatmap = cortex.Vertex(results_glmsingle['typed']['R2'], 
-                  pysub,
+                  self.pysub,
                    vmin = 0, vmax = 50, #.7,
                    cmap='hot')
         
@@ -576,7 +557,7 @@ class GLMsingle_Model(Model):
 
         ## plot Full Model betas
         flatmap = cortex.Vertex(np.mean(results_glmsingle['typed']['betasmd'], axis = -1), 
-                  pysub,
+                  self.pysub,
                    vmin = -2, vmax = 2, #.7,
                    cmap='RdBu_r')
 
@@ -584,13 +565,12 @@ class GLMsingle_Model(Model):
         print('saving %s' %fig_name)
         _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
-
         ## plot Full Model betas for only high fitting RSQ
         avg_betas = np.mean(results_glmsingle['typed']['betasmd'], axis = -1)
         avg_betas[pp_prf_estimates['r2']< self.prf_rsq_threshold] = np.nan
 
         flatmap = cortex.Vertex(avg_betas, 
-                        pysub,
+                        self.pysub,
                         vmin = -2, vmax = 2, #.7,
                         cmap='RdBu_r')
 
@@ -598,10 +578,9 @@ class GLMsingle_Model(Model):
         print('saving %s' %fig_name)
         _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
-
         ## plot Full Model FracRidge
         flatmap = cortex.Vertex(results_glmsingle['typed']['FRACvalue'], 
-                  pysub,
+                  self.pysub,
                    vmin = 0, vmax = 1, #.7,
                    cmap='copper')
 
@@ -620,7 +599,7 @@ class GLMsingle_Model(Model):
 
         ## plot pRF binary mask
         flatmap = cortex.Vertex(binary_prf_mask, 
-                        pysub,
+                        self.pysub,
                         vmin = 0, vmax = 1, #.7,
                         cmap='hot')
         cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
@@ -629,20 +608,9 @@ class GLMsingle_Model(Model):
         print('saving %s' %fig_name)
         _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
-        ## plot pRF correlation flatmap used for mask
-        flatmap = cortex.Vertex(corr_prf, 
-                        pysub,
-                        vmin = 0, vmax = 1, #.7,
-                        cmap='hot')
-        cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
-
-        fig_name = op.join(outdir, 'modeltypeD_pRFcorrelation.png')
-        print('saving %s' %fig_name)
-        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False) 
-
         ## plot FA binary mask
         flatmap = cortex.Vertex(binary_fa_mask, 
-                        pysub,
+                        self.pysub,
                         vmin = 0, vmax = 1, #.7,
                         cmap='hot')
         cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
@@ -651,24 +619,12 @@ class GLMsingle_Model(Model):
         print('saving %s' %fig_name)
         _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
-        ## plot FA correlation flatmap used for mask
-        flatmap = cortex.Vertex(corr_fa, 
-                        pysub,
-                        vmin = 0, vmax = 1, #.7,
-                        cmap='hot')
-        cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
-
-        fig_name = op.join(outdir, 'modeltypeD_FAcorrelation.png')
-        print('saving %s' %fig_name)
-        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False) 
-
-
         ## plot beta standard deviation, to see how much they vary
         _, std_surf = self.get_singletrial_avg_estimates(estimate_arr = results_glmsingle['typed']['betasmd'], 
                                                         single_trl_DM = single_trl_DM, return_std = True)
 
         flatmap = cortex.Vertex(np.mean(std_surf, axis = 0), 
-                        pysub,
+                        self.pysub,
                         vmin = 0, vmax = 2, #.7,
                         cmap='gnuplot')
 

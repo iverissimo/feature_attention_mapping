@@ -19,6 +19,8 @@ class Model:
             object from one of the classes defined in processing.load_exp_data
         outputdir: str
             absolute path to save fits
+        use_atlas: str
+            If we want to use atlas ROIs (ex: glasser, wang) or not [default].
         """
 
         ## set data object to use later on

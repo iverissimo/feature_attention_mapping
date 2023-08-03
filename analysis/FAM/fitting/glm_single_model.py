@@ -34,6 +34,8 @@ class GLMsingle_Model(Model):
             object from one of the classes defined in processing.load_exp_data
         outputdir: str or None
             path to general output directory
+        use_atlas: str
+            If we want to use atlas ROIs (ex: glasser, wang) or not [default].
             
         """
 
@@ -66,10 +68,30 @@ class GLMsingle_Model(Model):
         self.condition_per_TR = self.MRIObj.mri_utils.crop_shift_arr(FA_bar_pass_all, 
                                                             crop_nr = self.MRIObj.task_nr_cropTR['FA'], 
                                                             shift = self.MRIObj.shift_TRs_num)
+        
+        # define bar width in pixel
+        self.bar_width_pix = self.MRIObj.screen_res * self.MRIObj.bar_width['FA']
+
+        # define number of bars per direction
+        num_bars = np.array(self.MRIObj.FA_num_bar_position) 
+
+        # all possible positions in pixels [x,y] for midpoint of
+        # vertical bar passes, 
+        self.bar_y_coords_pix = np.sort(np.concatenate((-np.arange(self.bar_width_pix[1]/2,self.MRIObj.screen_res[1]/2,self.bar_width_pix[1])[0:int(num_bars[1]/2)],
+                                        np.arange(self.bar_width_pix[1]/2,self.MRIObj.screen_res[1]/2,self.bar_width_pix[1])[0:int(num_bars[1]/2)])))
+
+        self.ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(self.bar_y_coords_pix)])
+
+        # horizontal bar passes 
+        self.bar_x_coords_pix = np.sort(np.concatenate((-np.arange(self.bar_width_pix[0]/2,self.MRIObj.screen_res[0]/2,self.bar_width_pix[0])[0:int(num_bars[0]/2)],
+                                        np.arange(self.bar_width_pix[0]/2,self.MRIObj.screen_res[0]/2,self.bar_width_pix[0])[0:int(num_bars[0]/2)])))
+
+        self.hor_bar_pos_pix = np.array([np.array([x,0]) for _,x in enumerate(self.bar_x_coords_pix)])
+
 
     def get_correlation_mask(self, participant, task = 'pRF', ses = 'mean', file_ext = '_cropped_dc_psc.npy',
                                 n_jobs = 8, seed_num = 2023, perc_thresh_nm = 95, smooth = True,
-                                kernel=3, nr_iter=3, normalize = False, figure_name = None):
+                                kernel=3, nr_iter=3, normalize = False, filename = None):
 
         """
         Split half correlate all runs in a task
@@ -80,18 +102,30 @@ class GLMsingle_Model(Model):
         ----------
         participant: str
             participant ID
+        task: str
+            name of task [pRF vs FA]
+        ses: int or str
+            which session to get files from
         prf_estimates : dict
             dict with participant prf estimates
-        smooth_nm: bool
+        file_ext: str
+            bold file extension
+        n_jobs: int
+            number of jobs for parallel
+        seed_num: int
+            seed to initialize random (for reproducibility)
+        smooth: bool
             if we want to smooth noise mask
         perc_thresh_nm: int
             noise mask percentile threshold
-        file_extent_nm: dict
-            dict with file extension for task files to be used for noise mask
-        perc_thresh_nm: int
-            noise mask percentile threshold
-        smooth: bool
-            if we want to return smoothed mask
+        filename: str
+            if given, will save correlation file with absolute filename
+        kernel : int
+            size of "kernel" to use for smoothing (factor)
+        nr_iter: int
+            number of iterations to repeat smoothing, larger values smooths more
+        normalize: bool
+            if we want to max normalize smoothed data (default = False)
         """
 
         # get bold filenames
@@ -145,53 +179,23 @@ class GLMsingle_Model(Model):
         binary_mask = np.ones(final_corr_arr.shape)
         binary_mask[final_corr_arr >= threshold] = 0
 
-        # if we want to plot --> will change to just save correlation file somewhere
-        if figure_name:
-            ## plot pRF correlation flatmap used for mask
-            flatmap = cortex.Vertex(final_corr_arr, 
-                            self.pysub,
-                            vmin = 0, vmax = 1, #.7,
-                            cmap='hot')
-            cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
-
-            print('saving %s' %figure_name)
-            _ = cortex.quickflat.make_png(figure_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False) 
+        # save correlation file
+        if filename:
+            np.save(filename, final_corr_arr)
 
         return binary_mask
 
     def get_single_trial_combinations(self):
 
         """
-        Get all possible trial combinations
-        (useful to keep track of single trial DM later)
+        Get all possible trial combinations (useful to keep track of single trial DM later)
 
-        Returns DataFrame where each row is a unique trial type
-        Columns: 
-            - attended and unattended bar midpoint position (x,y)
-            - bar pass direction (vertical vs horizontal)
+        Returns DataFrame where each row is a unique trial type.
+        Columns indicate attended and unattended bar midpoint position (x,y) and bar pass direction (vertical vs horizontal)
         """
 
-        # define bar width in pixel
-        bar_width_pix = self.MRIObj.screen_res * self.MRIObj.bar_width['FA']
-
-        # define number of bars per direction
-        num_bars = np.array(self.MRIObj.FA_num_bar_position) 
-
-        # all possible positions in pixels [x,y] for midpoint of
-        # vertical bar passes, 
-        ver_y = np.sort(np.concatenate((-np.arange(bar_width_pix[1]/2,self.MRIObj.screen_res[1]/2,bar_width_pix[1])[0:int(num_bars[1]/2)],
-                                        np.arange(bar_width_pix[1]/2,self.MRIObj.screen_res[1]/2,bar_width_pix[1])[0:int(num_bars[1]/2)])))
-
-        ver_bar_pos_pix = np.array([np.array([0,y]) for _,y in enumerate(ver_y)])
-
-        # horizontal bar passes 
-        hor_x = np.sort(np.concatenate((-np.arange(bar_width_pix[0]/2,self.MRIObj.screen_res[0]/2,bar_width_pix[0])[0:int(num_bars[0]/2)],
-                                        np.arange(bar_width_pix[0]/2,self.MRIObj.screen_res[0]/2,bar_width_pix[0])[0:int(num_bars[0]/2)])))
-
-        hor_bar_pos_pix = np.array([np.array([x,0]) for _,x in enumerate(hor_x)])
-
         ## make all possible combinations
-        pos_dict = {'horizontal': hor_bar_pos_pix, 'vertical': ver_bar_pos_pix}
+        pos_dict = {'horizontal': self.hor_bar_pos_pix, 'vertical': self.ver_bar_pos_pix}
         attend_orientation = ['vertical','horizontal']
         unattend_orientation = ['vertical','horizontal']
 
@@ -230,16 +234,13 @@ class GLMsingle_Model(Model):
         ## turn into dataframe
         self.trial_combinations_df = pd.DataFrame.from_dict(trial_combinations_dict).apply(pd.Series.explode).reset_index().drop(columns=['index'])
 
-    def make_singletrial_dm(self, run_num_arr =[], ses_num_arr = [], pp_bar_pos_df = {}):
+    def make_singletrial_dm(self, run_num_arr = [], ses_num_arr = [], pp_bar_pos_df = {}):
 
         """
-        Make single trial design matrix
-        for one or more runs
+        Make single trial design matrix for one or more runs 
 
         Parameters
         ----------
-        participant: str
-            participant ID
         run_num_arr: list
             list of ints with each run number to add to the design matrix 
             (DM will be in same order of runs IDs in this list)
@@ -304,19 +305,17 @@ class GLMsingle_Model(Model):
     def get_average_hrf(self, pp_prf_estimates, prf_modelobj, rsq_threshold = None):
 
         """
-        Make average pRF to give as input to glm single model
-        Requires previously obtained HRF params from pRF fitting and 
-        Defined pRF models
+        Make average HRF to give as input to glm single model
+        (requires previously obtained HRF params from pRF fitting)
 
         Parameters
         ----------
         pp_prf_estimates : dict
             dict with participant prf estimates
         prf_modelobj: object
-            pRF model object from prfpy, to use to create HRF
+            pRF model object from prfpy, used to create HRF
         rsq_threshold: float or None
-            fit vertices where prf fit above certain rsq threshold 
-            
+            will only fit vertices where prf fit above certain rsq threshold 
         """
 
         ## find indices where pRF rsq high
@@ -353,8 +352,17 @@ class GLMsingle_Model(Model):
     def subselect_trial_combinations(self, att_bar_xy = [], unatt_bar_xy = [], orientation_bars = None):
 
         """
-        subselect trial combinations according to (un)attended bar position
-        or bar orientations, and obtain dataframe with possible trials
+        subselect trial combinations according to (un)attended bar position or bar orientations, 
+        and obtain dataframe with possible trials
+
+        Parameters
+        ----------
+        att_bar_xy : list
+            list with [x,y] bar coordinates for attended bar 
+        unatt_bar_xy : list
+            list with [x,y] bar coordinates for unattended bar
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
         """
 
         try:
@@ -378,16 +386,27 @@ class GLMsingle_Model(Model):
 
         return ref_df
 
-    def get_singletrial_avg_estimates(self, estimate_arr = [], single_trl_DM = [], return_std = True,
+    def get_singletrial_estimates(self, estimate_arr = [], single_trl_DM = [], return_std = True,
                                             att_bar_xy = [], unatt_bar_xy = [], average_betas = True):
 
         """
-        Helper function that takes in an estimate array from glmsingle
-        [vertex, singletrials] (note: single trial number is multiplied by nr of runs)
-        
-        and outputs an average value for each single trial type (our condition)
-        [vertex, average_estimate4trialtype]
+        Get beta values for each single trial type (our condition)
+        and return an array of [conditions, vertex, runs] --> or without runs if we average
 
+        Parameters
+        ----------
+        estimate_arr: array
+            estimate array from glmsingle [vertex, singletrials] (note: single trial number is multiplied by nr of runs)
+        single_trl_DM: arr
+            single trial design matrix for one or more runs 
+        att_bar_xy : list
+            list with [x,y] bar coordinates for attended bar 
+        unatt_bar_xy : list
+            list with [x,y] bar coordinates for unattended bar
+        return_std: bool
+            if we want to obtain standard deviation across runs
+        average_betas: bool
+            if we want to average betas across runs
         """
 
         # get reference df
@@ -490,6 +509,8 @@ class GLMsingle_Model(Model):
             dict with participant prf estimates
         prf_modelobj: object
             pRF model object from prfpy, to use to create HRF
+        file_ext: str
+            file extent for FA trials to be fitted
         smooth_nm: bool
             if we want to smooth noise mask
         perc_thresh_nm: int
@@ -498,6 +519,16 @@ class GLMsingle_Model(Model):
             dict with file extension for task files to be used for noise mask
         pp_bar_pos_df: dataframe
             participant bar position data frame, for all runs of task (from preproc_beh class)
+        n_jobs: int
+            number of jobs for parallel
+        seed_num: int
+            seed to initialize random (for reproducibility)
+        kernel : int
+            size of "kernel" to use for smoothing (factor)
+        nr_iter: int
+            number of iterations to repeat smoothing, larger values smooths more
+        normalize: bool
+            if we want to max normalize smoothed data (default = False)
         """ 
 
         ## set output dir to save estimates
@@ -533,7 +564,9 @@ class GLMsingle_Model(Model):
                                                     seed_num = seed_num, perc_thresh_nm = perc_thresh_nm, 
                                                     smooth = smooth_nm, kernel = kernel, nr_iter = nr_iter, 
                                                     normalize = normalize, 
-                                                    figure_name = op.join(outdir, 'modeltypeD_pRFcorrelation.png'))
+                                                    filename = op.join(outdir, 'spcorrelation_task-pRF.npy'))
+        # also save binary mask, to later check
+        np.save(op.join(outdir, 'binary_mask_spcorrelation_task-pRF.npy'), binary_prf_mask)
 
         ## now do the same correlation mask for the FA runs
         binary_fa_mask = self.get_correlation_mask(participant, task = 'FA', ses = 'mean', 
@@ -541,7 +574,9 @@ class GLMsingle_Model(Model):
                                                     seed_num = int(seed_num * 2), perc_thresh_nm = perc_thresh_nm, 
                                                     smooth = smooth_nm, kernel = kernel, nr_iter = nr_iter, 
                                                     normalize = normalize,
-                                                    figure_name = op.join(outdir, 'modeltypeD_FAcorrelation.png'))
+                                                    filename = op.join(outdir, 'spcorrelation_task-FA.npy'))
+        # also save binary mask, to later check
+        np.save(op.join(outdir, 'binary_mask_spcorrelation_task-FA.npy'), binary_prf_mask)
 
         ### final mask is multiplication of the two
         final_mask = binary_fa_mask * binary_prf_mask
@@ -710,7 +745,7 @@ class GLMsingle_Model(Model):
         _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
         ## plot beta standard deviation, to see how much they vary
-        _, std_surf = self.get_singletrial_avg_estimates(estimate_arr = results_glmsingle['typed']['betasmd'], 
+        _, std_surf = self.get_singletrial_estimates(estimate_arr = results_glmsingle['typed']['betasmd'], 
                                                         single_trl_DM = single_trl_DM, return_std = True)
 
         flatmap = cortex.Vertex(np.mean(std_surf, axis = 0), 

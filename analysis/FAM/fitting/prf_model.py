@@ -31,6 +31,10 @@ class pRF_model(Model):
         ----------
         MRIObj : MRIData object
             object from one of the classes defined in processing.load_exp_data
+        outputdir: str or None
+            path to general output directory
+        use_atlas: str
+            If we want to use atlas ROIs (ex: glasser, wang) or not [default].
             
         """
 

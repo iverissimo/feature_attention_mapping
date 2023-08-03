@@ -225,6 +225,9 @@ mri: # refers to the Psychopy SyncGenerator class
       glm_task_regs: ['full_stim'] #['att_bar', 'unatt_bar', 'full_stim'] # regressor names for GLM fitting
       glm_nuisance_regs: True
 
+      glmsingle_models: {'A': 'TYPEA_ONOFF.npy', 'B': 'TYPEB_FITHRF.npy',
+                        'C': 'TYPEC_FITHRF_GLMDENOISE.npy', 'D': 'TYPED_FITHRF_GLMDENOISE_RR.npy'}
+
     
 eyetracking:
 

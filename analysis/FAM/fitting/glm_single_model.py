@@ -492,6 +492,25 @@ class GLMsingle_Model(Model):
             
         self.single_trial_reference_df = single_trial_reference_df
 
+    def load_estimates(self, participant, model_type = 'D'):
+
+        """
+        Load glm single estimates dict
+
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        model_type: str
+            model to load estimates from (A-D)
+        """
+
+        ## path to files
+        fitpath = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant))
+
+        return np.load(op.join(fitpath, self.MRIObj.params['mri']['fitting']['FA']['glmsingle_models'][model_type]),
+                       allow_pickle=True).item()
+    
     def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', 
                         smooth_nm = True, perc_thresh_nm = 95, n_jobs = 8,
                         seed_num = 2023, kernel = 3, nr_iter = 3, normalize = False,

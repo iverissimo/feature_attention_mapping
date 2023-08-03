@@ -9,6 +9,7 @@ import yaml
 from FAM.processing import load_exp_settings, preproc_mridata, preproc_behdata
 from FAM.fitting.prf_model import pRF_model
 from FAM.fitting.glm_single_model import GLMsingle_Model
+from FAM.fitting.feature_model import Gain_model, GLM_model, FullStim_model
 
 # load settings from yaml
 with open('exp_params.yml', 'r') as f_in:
@@ -217,8 +218,6 @@ match task:
 
                     ## actually fit
                     print('Fitting started!')
-                    # to time it
-                    start_time = time.time()
 
                     for pp in FAM_data.sj_num:
 
@@ -230,6 +229,88 @@ match task:
                                             file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 99, 
                                             file_extent_nm = FAM_mri.get_mrifile_ext(),
                                             pp_bar_pos_df = pp_bar_pos_df) 
+                        
+                case 'gain':
+
+                    ## load FA model class
+                    FAM_FA = Gain_model(FAM_data)
+
+                    ## actually fit
+                    print('Fitting started!')
+                    # to time it
+                    start_time = time.time()
+
+                    for pp in FAM_data.sj_num:
+
+                        _ = FAM_FA.fit_data(pp, pp_prf_estimates, 
+                                            ses = ses2fit, run_type = run_type,
+                                            chunk_num = chunk_num, vertex = vertex, ROI = ROI,
+                                            prf_model_name = prf_model_name, rsq_threshold = None, file_ext = FAM_mri.get_mrifile_ext()['FA'], 
+                                            outdir = None, save_estimates = True,
+                                            fit_overlap = True,
+                                            xtol = 1e-3, ftol = 1e-4, n_jobs = 16) 
+
+                    print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
+
+                case 'glm':
+
+                    ## load FA model class
+                    FAM_FA = GLM_model(FAM_data)
+
+                    # if we want to fit hrf
+                    FAM_FA.fit_hrf = FAM_pRF.fit_hrf
+
+                    ## actually fit
+                    print('Fitting started!')
+                    # to time it
+                    start_time = time.time()
+
+                    for pp in FAM_data.sj_num:
+
+                        _ = FAM_FA.fit_data(pp, pp_prf_estimates, 
+                                            ses = ses2fit, run_type = run_type,
+                                            chunk_num = chunk_num, vertex = vertex, ROI = ROI,
+                                            prf_model_name = prf_model_name, rsq_threshold = None, file_ext = FAM_mri.get_mrifile_ext()['FA'],
+                                            outdir = None, save_estimates = True,
+                                            fit_overlap = False, fit_full_stim = True,
+                                            n_jobs = 16) 
+
+                    print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
+
+                case 'full_stim':
+
+                    ## load FA model class
+                    FAM_FA = FullStim_model(FAM_data)
+
+                    # if we want to fit hrf
+                    FAM_FA.fit_hrf = FAM_pRF.fit_hrf
+                    # set prf bounds
+                    
+                    ## get bounds used for prf estimates of specific model
+                    pp_prf_stim = pp_prf_models['sub-{sj}'.format(sj = FAM_data.sj_num[0])]['ses-mean']['prf_stim']
+                    FAM_FA.prf_bounds = FAM_pRF.get_fit_startparams(max_ecc_size = pp_prf_stim.screen_size_degrees/2.0)[FAM_pRF.model_type['pRF']]['bounds']
+
+                    ## actually fit
+                    print('Fitting started!')
+                    # to time it
+                    start_time = time.time()
+
+                    for pp in FAM_data.sj_num:
+
+                        _ = FAM_FA.fit_data(pp, pp_prf_estimates, 
+                                            ses = ses2fit, run_type = run_type,
+                                            chunk_num = chunk_num, vertex = vertex, ROI = ROI,
+                                            prf_model_name = prf_model_name, rsq_threshold = None, file_ext = FAM_mri.get_mrifile_ext()['FA'], 
+                                            outdir = None, save_estimates = True,
+                                            prf_pars2vary = ['betas'], reg_name = 'full_stim', bar_keys = ['att_bar', 'unatt_bar'],
+                                            xtol = 1e-3, ftol = 1e-4, n_jobs = 16, prf_bounds = None) 
+
+                        print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
+
+
+
+
+
 
 
 

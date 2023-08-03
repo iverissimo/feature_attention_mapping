@@ -353,3 +353,50 @@ class Utils:
         ses_num = int(re.findall(r'ses-\d{1,3}', input_name)[0][4:])
         
         return run_num, ses_num
+    
+    def get_bar_overlap_dm(self, bar_arr):
+        
+        """
+        get DM of spatial positions where bars overlap
+
+        Parameters
+        ----------
+        bar_arr: arr
+            4D array with [bars,x,y,t]
+
+        """ 
+        
+        if len(bar_arr.shape) != 4:
+            raise ValueError('Input array must be 4D')
+            
+        # sum over bars, and set locations of overlap as 1, else 0
+        overlap_dm = np.sum(bar_arr, axis = 0)
+        overlap_dm[overlap_dm <= 1] = 0
+        overlap_dm[overlap_dm > 1] = 1
+        
+        return overlap_dm
+
+
+    def sum_bar_dms(self, stacked_dms, overlap_dm = None, overlap_weight = 1):
+
+        """
+        sum visual dms of both bars
+        and set value of overlap if given
+
+        Parameters
+        ----------
+        stacked_dms: arr
+            4D array with [bars,x,y,t]. Assumes dms we're already weighted (if such is the case)
+        overlap_dm: arr
+            if not None, excepts binary array of [x,y,t] with overlap positions in time
+        overlap_weight: int/float
+            weight to give overlap area
+
+        """ 
+
+        final_dm = np.sum(stacked_dms, axis=0) 
+        
+        if overlap_dm is not None:
+            final_dm[overlap_dm == 1] = overlap_weight
+        
+        return final_dm

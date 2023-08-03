@@ -8,8 +8,6 @@ import glob
 
 from PIL import Image, ImageDraw
 
-from FAM.utils import mri as mri_utils
-from FAM.processing import preproc_behdata
 from FAM.fitting.model import Model
 
 from scipy.optimize import minimize
@@ -23,7 +21,7 @@ from prfpy.model import Iso2DGaussianModel, CSS_Iso2DGaussianModel, Norm_Iso2DGa
 
 class FA_model(Model):
 
-    def __init__(self, MRIObj, outputdir = None, tasks = ['pRF', 'FA']):
+    def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_999999', use_atlas = None):
         
         """__init__
         constructor for class 
@@ -34,13 +32,12 @@ class FA_model(Model):
             object from one of the classes defined in processing.load_exp_data
         outputdir: str or None
             path to general output directory
-        tasks: list
-            list of strings with task names (mostly needed for Model object input)
-            
+        use_atlas: str
+            If we want to use atlas ROIs (ex: glasser, wang) or not [default].
         """
 
         # need to initialize parent class (Model), indicating output infos
-        super().__init__(MRIObj = MRIObj, outputdir = outputdir, tasks = tasks)
+        super().__init__(MRIObj = MRIObj, outputdir = outputdir, pysub = pysub, use_atlas = use_atlas)
 
         ## prf rsq threshold, to select visual voxels
         # worth fitting
@@ -86,7 +83,7 @@ class FA_model(Model):
             stim_dur = (stim_dur_seconds / self.MRIObj.TR) * osf # then we need to transform stim dur in seconds to TR
 
         ## crop and shift if such was the case
-        condition_per_TR = mri_utils.crop_shift_arr(FA_bar_pass_all,
+        condition_per_TR = self.MRIObj.mri_utils.crop_shift_arr(FA_bar_pass_all,
                                                 crop_nr = crop_nr, 
                                                 shift = self.shift_TRs_num)
         
@@ -142,7 +139,7 @@ class FA_model(Model):
         # swap axis to have time in last axis [x,y,t]
         visual_dm = visual_dm_array.transpose([1,2,0])
         
-        return mri_utils.normalize(visual_dm)
+        return self.MRIObj.mri_utils.normalize(visual_dm)
             
     
     def get_visual_DM_dict(self, participant, filelist, save_overlap = True, save_full_stim = True):
@@ -178,7 +175,7 @@ class FA_model(Model):
         for ind, file in enumerate(filelist):
             
             ## get run and ses from file
-            run_num, ses_num = mri_utils.get_run_ses_from_str(file) 
+            run_num, ses_num = self.MRIObj.mri_utils.get_run_ses_from_str(file) 
             
             out_dict['r{r}s{s}'.format(r = run_num, s = ses_num)] = {}
             
@@ -208,7 +205,7 @@ class FA_model(Model):
             if save_overlap:
                 ## GET DM FOR OVERLAP OF BARS
                 out_dict['r{r}s{s}'.format(r = run_num, 
-                                            s = ses_num)]['overlap'] = mri_utils.get_bar_overlap_dm(np.stack((out_dict['r{r}s{s}'.format(r = run_num, s = ses_num)]['att_bar'],
+                                            s = ses_num)]['overlap'] = self.MRIObj.mri_utils.get_bar_overlap_dm(np.stack((out_dict['r{r}s{s}'.format(r = run_num, s = ses_num)]['att_bar'],
                                                                                                              out_dict['r{r}s{s}'.format(r = run_num, s = ses_num)]['unatt_bar'])))
 
             if save_full_stim:
@@ -523,7 +520,7 @@ class FA_model(Model):
         # and parameters
         model_arr = model_function(tc_pars, **kws_dict)
 
-        return mri_utils.error_resid(timecourse, model_arr, mean_err = False, return_array = False)
+        return self.error_resid(timecourse, model_arr, mean_err = False, return_array = False)
 
     
     def get_fit_timecourse(self, pars, reg_name = 'full_stim', bar_keys = ['att_bar', 'unatt_bar'], parameters_keys = []):
@@ -562,12 +559,12 @@ class FA_model(Model):
                 # will weight and sum bars
                 if 'overlap' in list(self.visual_dm_dict[run_id].keys()):
                     
-                    run_visual_dm = mri_utils.sum_bar_dms(np.stack((self.visual_dm_dict[run_id][bar_keys[0]] * pars[parameters_keys.index('gain_{v}'.format(v = bar_keys[0]))],
+                    run_visual_dm = self.MRIObj.mri_utils.sum_bar_dms(np.stack((self.visual_dm_dict[run_id][bar_keys[0]] * pars[parameters_keys.index('gain_{v}'.format(v = bar_keys[0]))],
                                                                     self.visual_dm_dict[run_id][bar_keys[1]] * pars[parameters_keys.index('gain_{v}'.format(v = bar_keys[1]))])), 
                                                         overlap_dm = self.visual_dm_dict[run_id]['overlap'], 
                                                         overlap_weight = pars[parameters_keys.index('gain_overlap')])
                 else:
-                    run_visual_dm = mri_utils.sum_bar_dms(np.stack((self.visual_dm_dict[run_id][bar_keys[0]] * pars[parameters_keys.index('gain_{v}'.format(v = bar_keys[0]))],
+                    run_visual_dm = self.MRIObj.mri_utils.sum_bar_dms(np.stack((self.visual_dm_dict[run_id][bar_keys[0]] * pars[parameters_keys.index('gain_{v}'.format(v = bar_keys[0]))],
                                                                 self.visual_dm_dict[run_id][bar_keys[1]] * pars[parameters_keys.index('gain_{v}'.format(v = bar_keys[1]))])), 
                                                                 overlap_dm = None)
             
@@ -648,7 +645,7 @@ class FA_model(Model):
             run_timecourse = model_obj.return_prediction(*list([pars[parameters_keys.index(name)] for name in self.prf_est_keys if 'hrf' not in name]))
             
             ## resample to TR and stack
-            model_arr = np.vstack([model_arr, mri_utils.resample_arr(run_timecourse, osf = self.osf, final_sf = self.MRIObj.TR)]) if model_arr.size else mri_utils.resample_arr(run_timecourse, osf = self.osf, final_sf = self.MRIObj.TR)
+            model_arr = np.vstack([model_arr, self.MRIObj.mri_utils.resample_arr(run_timecourse, osf = self.osf, final_sf = self.MRIObj.TR)]) if model_arr.size else self.MRIObj.mri_utils.resample_arr(run_timecourse, osf = self.osf, final_sf = self.MRIObj.TR)
 
         # temporary, for testing purposes
         self.model_obj = model_obj
@@ -751,7 +748,7 @@ class FullStim_model(FA_model):
 
         # if output dir not defined, then make it in derivatives
         if outputdir is None:
-            self.outputdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['FA']['fit_folder']['full_stim'])
+            self.outputdir = op.join(self.MRIObj.derivatives_pth, self.fitfolder['FA'], 'full_stim')
         else:
             self.outputdir = outputdir
 
@@ -842,7 +839,7 @@ class Gain_model(FA_model):
 
         # if output dir not defined, then make it in derivatives
         if outputdir is None:
-            self.outputdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['FA']['fit_folder']['gain'])
+            self.outputdir = op.join(self.MRIObj.derivatives_pth, self.fitfolder['FA'], 'gain')
         else:
             self.outputdir = outputdir
     
@@ -942,7 +939,7 @@ class GLM_model(FA_model):
 
         # if output dir not defined, then make it in derivatives
         if outputdir is None:
-            self.outputdir = op.join(self.MRIObj.derivatives_pth, self.MRIObj.params['mri']['fitting']['FA']['fit_folder']['glm'])
+            self.outputdir = op.join(self.MRIObj.derivatives_pth, self.fitfolder['FA'], 'glm')
         else:
             self.outputdir = outputdir
 
@@ -985,7 +982,7 @@ class GLM_model(FA_model):
         if self.add_nuisance_reg:
 
             # get ses and run number 
-            run_num, ses_num = mri_utils.get_run_ses_from_str(self.train_file_list[0]) ## assumes we are fitting one run, will need to change later if such is the case
+            run_num, ses_num = self.MRIObj.mri_utils.get_run_ses_from_str(self.train_file_list[0]) ## assumes we are fitting one run, will need to change later if such is the case
 
             confounds_df = self.load_nuisance_df(participant, run_num = run_num, ses_num = ses_num)
         else:
@@ -1097,7 +1094,7 @@ class GLM_model(FA_model):
         design_matrix, all_regressor_names = self.get_fa_glm_dm(tc_dict, nuisances_df = nuisances_df, bar_keys = bar_keys)
 
         ## Fit the GLM
-        prediction, betas, r2, _ = mri_utils.fit_glm(train_timecourse, design_matrix.T, error='mse')
+        prediction, betas, r2, _ = self.MRIObj.mri_utils.fit_glm_tc(train_timecourse, design_matrix.T)
 
         # set output params as dict
         out_dict = tc_dict.copy()
@@ -1124,10 +1121,12 @@ class GLM_model(FA_model):
         # contrast array for full stim vs all others
         contrast_array = np.array([1 if reg_name == 'full_stim' else 0 for reg_name in all_regressor_names])
 
-        t_val,p_val,z_score = mri_utils.compute_stats(run_data[vertex], design_matrix.T, 
-                                                    contrast_array, vertex_df[all_regressor_names].values[0], 
-                                                    pvalue = 'oneside')
-
+        t_val,p_val,z_score = self.MRIObj.mri_utils.calc_contrast_stats(betas = vertex_df[all_regressor_names].values[0], 
+                                                                contrast = contrast_array, 
+                                                                sse = ((run_data[vertex] - (design_matrix.T.dot(vertex_df[all_regressor_names].values[0]))) ** 2).sum(),
+                                                                df = design_matrix.T.shape[0] - design_matrix.T.shape[1], 
+                                                                design_var = self.design_variance(design_matrix.T, contrast_array), 
+                                                                pval_1sided = True)
         return t_val
 
 

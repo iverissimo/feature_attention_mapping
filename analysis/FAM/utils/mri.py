@@ -1308,10 +1308,8 @@ class MRIUtils(Utils):
         
         return outfiles
 
+    def fit_glm_tc(self, voxel, dm):
     
-
-    def fit_glm(voxel, dm, error='mse'):
-        
         """ GLM fit on timeseries
         Regress a created design matrix on the input_data.
 
@@ -1321,44 +1319,25 @@ class MRIUtils(Utils):
             timeseries of a single voxel
         dm : arr
             DM array (#TR,#regressors)
-        
-
-        Outputs
-        -------
-        prediction : arr
-            model fit for voxel
-        betas : arr
-            betas for model
-        r2 : arr
-            coefficient of determination
-        mse/rss : arr
-            mean of the squared residuals/residual sum of squares
-        
         """
 
-        if np.isnan(voxel).any() or np.isnan(dm).any():
+        if np.isnan(voxel).any():
             betas = np.repeat(np.nan, dm.shape[-1])
             prediction = np.repeat(np.nan, dm.shape[0])
             mse = np.nan
             r2 = np.nan
 
         else:   # if not nan (some vertices might have nan values)
-            betas = np.linalg.lstsq(dm, voxel, rcond = None)[0]
+            betas = np.linalg.lstsq(dm, voxel, rcond = -1)[0]
             prediction = dm.dot(betas)
 
             mse = np.mean((voxel - prediction) ** 2) # calculate mean of squared residuals
-            rss =  np.sum((voxel - prediction) ** 2) # calculate residual sum of squared errors
-
-            r2 = 1 - (np.sum((voxel - prediction)**2)/ np.sum((voxel - np.mean(voxel))**2))  # and the rsq
-
-        if error == 'mse': 
-            return prediction, betas, r2, mse
-        else:
-            return prediction, betas, r2, rss 
-
-
-    def set_contrast(dm_col,tasks,contrast_val=[1],num_cond=1):
+            r2 = np.nan_to_num(1 - (np.nansum((voxel - prediction)**2, axis=0)/ np.nansum(((voxel - np.mean(voxel))**2), axis=0)))# and the rsq
         
+        return prediction, betas, r2, mse
+
+    def set_contrast(self, dm_col, tasks, contrast_val = [1], num_cond = 1):
+    
         """ define contrast matrix
 
         Parameters
@@ -1382,7 +1361,6 @@ class MRIUtils(Utils):
             contrast array
 
         """
-        
         contrast = np.zeros(len(dm_col))
 
         if num_cond == 1: # if only one contrast value to give ("task vs implicit intercept")
@@ -1409,101 +1387,67 @@ class MRIUtils(Utils):
         print('contrast for %s is %s'%(tasks,contrast))
         return contrast
 
-
-    def design_variance(X, which_predictor=1):
-            
-            ''' Returns the design variance of a predictor (or contrast) in X.
-            
-            Parameters
-            ----------
-            X : numpy array
-                Array of shape (N, P)
-            which_predictor : int or list/array
-                The index of the predictor you want the design var from.
-                Note that 0 refers to the intercept!
-                Alternatively, "which_predictor" can be a contrast-vector
-                
-            Outputs
-            -------
-            des_var : float
-                Design variance of the specified predictor/contrast from X.
-            '''
+    def design_variance(self, X, which_predictor=[]):
         
-            is_single = isinstance(which_predictor, int)
-            if is_single:
-                idx = which_predictor
-            else:
-                idx = np.array(which_predictor) != 0
-
-            if np.isnan(X).any():
-                des_var = np.nan
-            else:
-                c = np.zeros(X.shape[1])
-                c[idx] = 1 if is_single == 1 else which_predictor[idx]
-                des_var = c.dot(np.linalg.pinv(X.T.dot(X))).dot(c.T)
-            
-            return des_var
-
-    def compute_stats(voxel, dm, contrast, betas, pvalue = 'oneside'):
-        
-        """ compute statistis for GLM
+        """Returns the design variance of a predictor (or contrast) in X.
 
         Parameters
         ----------
-        voxel : arr
-            timeseries of a single voxel
-        dm : arr
-            DM array (#TR,#regressors)
-        contrast: arr
-            contrast vector
-        betas : arr
-            betas for model at that voxel
-        pvalue : str
-            type of tail for p-value - 'oneside'/'twoside'
+        X : numpy array
+            Array of shape (N, P)
+        which_predictor : list/array
+            contrast-vector of the predictors you want the design var from.
 
         Outputs
         -------
-        t_val : float
-            t-statistic for that voxel relative to contrast
-        p_val : float
-            p-value for that voxel relative to contrast
-        z_score : float
-            z-score for that voxel relative to contrast
-        
+        des_var : float
+            Design variance of the specified predictor/contrast from X.
         """
 
-        if np.isnan(voxel).any() or np.isnan(dm).any():
-            t_val = np.nan
-            p_val = np.nan
-            z_score = np.nan
+        idx = np.array(which_predictor) != 0
 
-        else:   # if not nan (some vertices might have nan values)
-            
-            # calculate design variance
-            design_var = design_variance(dm, contrast)
-            
-            # sum of squared errors
-            sse = ((voxel - (dm.dot(betas))) ** 2).sum() 
-            
-            #degrees of freedom = N - P = timepoints - predictores
-            df = (dm.shape[0] - dm.shape[1])
-            
-            # t statistic for vertex
-            t_val = contrast.dot(betas) / np.sqrt((sse/df) * design_var)
+        c = np.zeros(X.shape[1])
+        c[idx] = which_predictor[idx]
+        des_var = c.dot(np.linalg.pinv(X.T.dot(X))).dot(c.T)
 
-            if pvalue == 'oneside': 
-                # compute the p-value (right-tailed)
-                p_val = t.sf(t_val, df) 
+        return des_var
 
-                # z-score corresponding to certain p-value
-                z_score = norm.isf(np.clip(p_val, 1.e-300, 1. - 1.e-16)) # deal with inf values of scipy
+    def calc_contrast_stats(self, betas = [], contrast = [], 
+                                sse = None, df = None, design_var = None, pval_1sided = True):
 
-            elif pvalue == 'twoside':
-                # take the absolute by np.abs(t)
-                p_val = t.sf(np.abs(t_val), df) * 2 # multiply by two to create a two-tailed p-value
+        """Calculates stats for a given contrast and beta values
+        
+        Parameters
+        ----------
+        betas : arr
+            array of beta values
+        contrast: arr/list
+            contrast vector       
+        sse: float
+            sum of squared errors between model prediction and data
+        df: int
+            degrees of freedom (timepoints - predictores)   
+        design_var: float
+            design variance 
+        pval_1sided: bool
+            if we want one or two sided p-value
 
-                # z-score corresponding to certain p-value
-                z_score = norm.isf(np.clip(p_val/2, 1.e-300, 1. - 1.e-16)) # deal with inf values of scipy
+        """
+        # t statistic for vertex
+        t_val = contrast.dot(betas) / np.sqrt((sse/df) * design_var)
+
+        if pval_1sided == True:
+            # compute the p-value (right-tailed)
+            p_val = scipy.stats.t.sf(t_val, df) 
+
+            # z-score corresponding to certain p-value
+            z_score = scipy.stats.norm.isf(np.clip(p_val, 1.e-300, 1. - 1.e-16)) # deal with inf values of scipy
+        else:
+            # take the absolute by np.abs(t)
+            p_val = scipy.stats.t.sf(np.abs(t_val), df) * 2 # multiply by two to create a two-tailed p-value
+
+            # z-score corresponding to certain p-value
+            z_score = scipy.stats.norm.isf(np.clip(p_val/2, 1.e-300, 1. - 1.e-16)) # deal with inf values of scipy
 
         return t_val,p_val,z_score
 
@@ -1869,53 +1813,6 @@ class MRIUtils(Utils):
         return avg_onset
 
 
-
-    def get_bar_overlap_dm(bar_arr):
-        
-        """
-        get DM of spatial positions where bars overlap
-
-        Parameters
-        ----------
-        bar_arr: arr
-            4D array with [bars,x,y,t]
-
-        """ 
-        
-        if len(bar_arr.shape) != 4:
-            raise ValueError('Input array must be 4D')
-            
-        # sum over bars, and set locations of overlap as 1, else 0
-        overlap_dm = np.sum(bar_arr, axis = 0)
-        overlap_dm[overlap_dm <= 1] = 0
-        overlap_dm[overlap_dm > 1] = 1
-        
-        return overlap_dm
-
-
-    def sum_bar_dms(stacked_dms, overlap_dm = None, overlap_weight = 1):
-
-        """
-        sum visual dms of both bars
-        and set value of overlap if given
-
-        Parameters
-        ----------
-        stacked_dms: arr
-            4D array with [bars,x,y,t]. Assumes dms we're already weighted (if such is the case)
-        overlap_dm: arr
-            if not None, excepts binary array of [x,y,t] with overlap positions in time
-        overlap_weight: int/float
-            weight to give overlap area
-
-        """ 
-
-        final_dm = np.sum(stacked_dms, axis=0) 
-        
-        if overlap_dm is not None:
-            final_dm[overlap_dm == 1] = overlap_weight
-        
-        return final_dm
 
 
 

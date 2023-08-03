@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import yaml
-import utils
 
 import ptitprince as pt # raincloud plots
 import matplotlib.patches as mpatches
@@ -17,16 +16,18 @@ import cortex
 
 import subprocess
 
-from FAM.utils import mri as mri_utils
-from FAM.utils import plot as plot_utils
-from FAM.processing import preproc_behdata
-from FAM.visualize import click_viewer
+# from FAM.utils import mri as mri_utils
+# from FAM.utils import plot as plot_utils
+# from FAM.processing import preproc_behdata
+# from FAM.visualize import click_viewer
+
+from FAM.visualize.viewer import Viewer
 
 from PIL import Image, ImageDraw
 
-class pRFViewer:
+class pRFViewer(Viewer):
 
-    def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, pysub = 'hcp_999999', use_sub_rois = True, use_atlas_rois = True, combine_ses = True):
+    def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, pysub = 'hcp_999999'):
         
         """__init__
         constructor for class 
@@ -41,55 +42,18 @@ class pRFViewer:
             path to save plots
         pysub: str
             basename of pycortex subject folder, where we drew all ROIs. 
-        use_sub_rois: bool
-            if True, will try to find 'hcp_999999_sub-X' by default, if doesnt exist then uses 'hcp_999999'
-        use_atlas: bool
-            if we want to use the glasser atlas ROIs instead (this is, from the keys conglomerate defined in the params yml)
-        combine_ses: bool
-            if we want to combine runs from different sessions (relevant for fitting of average across runs)
         """
 
-        # set data object to use later on
-        self.MRIObj = MRIObj
+        # need to initialize parent class (Model), indicating output infos
+        super().__init__(MRIObj, pysub = pysub, outputdir = outputdir)
 
-        # if output dir not defined, then make it in derivatives
-        if outputdir is None:
-            self.outputdir = op.join(self.MRIObj.derivatives_pth,'plots')
-        else:
-            self.outputdir = outputdir
+        ## output path to save plots
+        self.figures_pth = op.join(self.outputdir)
+        os.makedirs(self.figures_pth, exist_ok=True)
 
         # Load pRF model object
         self.pRFModelObj = pRFModelObj
             
-        # number of participants to plot
-        self.nr_pp = len(self.MRIObj.sj_num)
-
-        # get dict of pycortex subject names to use per participant
-        self.pysub = self.get_pycortex_sub_dict(participant_list = self.MRIObj.sj_num, pysub = pysub, use_sub_rois = use_sub_rois)
-        
-        ## if we want to use atlas roi or not
-        self.use_atlas_rois = use_atlas_rois
-
-        ## load participant ROIs and color codes
-        self.group_ROIs, self.group_roi_verts, self.group_color_codes = plot_utils.get_rois4plotting(self.MRIObj.params, 
-                                                                                                    sub_id = self.MRIObj.sj_num,
-                                                                                                    pysub = self.pysub, 
-                                                                                                    use_atlas = use_atlas_rois, 
-                                                                                                    atlas_pth = op.join(self.MRIObj.derivatives_pth,
-                                                                                                                        'glasser_atlas','59k_mesh'), 
-                                                                                                    space = self.MRIObj.sj_space)
-        ## set ROI key names to use in plots
-        # doing this to guarantee same order in all plots 
-        if self.use_atlas_rois:
-            self.ROI_keys = list(self.MRIObj.params['plotting']['ROIs']['glasser_atlas'].keys())
-        else:
-            self.ROI_keys = self.MRIObj.params['plotting']['ROIs'][self.MRIObj.sj_space]
-
-        ## load participant models
-        # which also will load DM and mask it according to participants behavior
-        self.pp_prf_models = self.pRFModelObj.set_models(participant_list = self.MRIObj.sj_num, 
-                                                    mask_DM = True, combine_ses = combine_ses)
-
 
     def get_pycortex_sub_dict(self, participant_list = [], pysub = 'hcp_999999', use_sub_rois = True):
 
@@ -1421,7 +1385,7 @@ class pRFViewer:
 class FAViewer(pRFViewer):
 
 
-    def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, FAModelObj = None, pysub = 'hcp_999999', use_sub_rois = True, use_atlas_rois = True, combine_ses = True):
+    def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, FAModelObj = None, pysub = 'hcp_999999'):
         
         """__init__
         constructor for class 
@@ -1436,19 +1400,62 @@ class FAViewer(pRFViewer):
             path to save plots
         pysub: str
             basename of pycortex subject folder, where we drew all ROIs. 
-        use_sub_rois: bool
-            if True, will try to find 'hcp_999999_sub-X' by default, if doesnt exist then uses 'hcp_999999'
-        use_atlas: bool
-            if we want to use the glasser atlas ROIs instead (this is, from the keys conglomerate defined in the params yml)
-        combine_ses: bool
-            if we want to combine runs from different sessions (relevant for fitting of average across runs)
         """
 
         # need to initialize parent class (Model), indicating output infos
-        super().__init__(MRIObj = MRIObj, outputdir = outputdir, pRFModelObj = pRFModelObj, pysub = pysub, 
-                            use_sub_rois = use_sub_rois, use_atlas_rois = use_atlas_rois, combine_ses = combine_ses)
+        super().__init__(MRIObj = MRIObj, outputdir = outputdir, pRFModelObj = pRFModelObj, pysub = pysub)
 
         self.FAModelObj = FAModelObj
+
+    def plot_spcorrelations(self, participant):
+
+        """
+        Plot split half correlations used in GLM single fit
+        to make noise mask 
+        """
+
+        ## path to files
+        fitpath = op.join(self.FAModelObj.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant))
+
+    def plot_glmsingle_estimates(self, participant, model_type = ['A','D']):
+
+        """
+        Plot split half correlations used in GLM single fit
+        to make noise mask 
+        """
+
+        ## output path to save plots
+        output_pth = op.join(self.figures_pth, 'glmsingle_estimates', 'sub-{sj}'.format(sj = participant))
+        os.makedirs(output_pth, exist_ok=True)
+
+        for name in model_type:
+            ## load estimates dict
+            estimates_dict = self.FAModelObj.load_estimates(participant, model_type = name)
+
+            ## plot R2 on flatmap surface ##
+            r2 = estimates_dict['onoffR2'] if name == 'A' else estimates_dict['R2']
+
+            fig_name = op.join(output_pth,
+                            'R2_Model-{m}_flatmap_sub-{sj}_acq-{acq}.png'.format(sj = participant, 
+                                                                                m = name,
+                                                                                acq=self.MRIObj.sj_space))
+            self.plot_utils.plot_flatmap(r2, 
+                                        pysub = self.pysub, cmap='hot', 
+                                        vmin1 = 0, vmax1 = 50, 
+                                        fig_abs_name = fig_name)
+            
+            ## plot average betas
+            avg_betas = estimates_dict['betasmd'][...,0] if name == 'A' else np.mean(estimates_dict['betasmd'], axis = -1)
+
+            fig_name = op.join(output_pth,
+                            'Betas_Model-{m}_flatmap_sub-{sj}_acq-{acq}.png'.format(sj = participant, 
+                                                                                m = name,
+                                                                                acq=self.MRIObj.sj_space))
+            self.plot_utils.plot_flatmap(avg_betas, 
+                                        pysub = self.pysub, cmap='RdBu_r', 
+                                        vmin1 = -2, vmax1 = 2, 
+                                        fig_abs_name = fig_name)
+
 
 
     def plot_singlevert_FA(self, participant, 

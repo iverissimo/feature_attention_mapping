@@ -8,7 +8,10 @@ from FAM.processing import load_exp_settings, preproc_mridata, preproc_behdata
 from FAM.visualize.preproc_viewer import MRIViewer
 from FAM.visualize.beh_viewer import BehViewer
 
-from FAM.fitting import prf_model, feature_model
+from FAM.fitting.prf_model import pRF_model
+from FAM.fitting.glm_single_model import GLMsingle_Model
+from FAM.fitting.feature_model import Gain_model, GLM_model, FullStim_model
+
 from FAM.visualize.fitting_viewer import pRFViewer, FAViewer
 
 # load settings from yaml
@@ -17,108 +20,123 @@ with open('exp_params.yml', 'r') as f_in:
 
 ## to get inputs 
 parser = argparse.ArgumentParser()
-parser.add_argument("--subject", help="Subject number (ex: 001, or 'group'/'all')", required=True)
-parser.add_argument("--task", type = str, help="On which task to fit model (pRF/FA)", required=True)
-parser.add_argument("--viz", type = str.lower, help="What we want to vizualize: flatmaps, click, single_vert, etc...", required=True)
 
-# optional
-parser.add_argument("--dir", type = str.lower, help="System we are making plots in (local [default] vs lisa)")
+parser.add_argument("--subject",
+                    nargs = "*", # 0 or more values expected => creates a list
+                    type = str,  # any type/callable can be used here
+                    default = [],
+                    required = True,
+                    help = 'Subject number (ex:1). If "all" will run for all participants. If list of subs, will run only those (ex: 1 2 3 4)'
+                    )
+parser.add_argument("--task", 
+                    type = str, 
+                    default = 'pRF',
+                    help = "Task to look at (pRF [default] vs FA)"
+                    )
+parser.add_argument("--cmd", #"--viz",
+                    type = str.lower, 
+                    required = True,
+                    help = "What we want to vizualize: flatmaps, click, single_vert, etc..."
+                    )
+parser.add_argument("--dir", 
+                    type = str.lower, 
+                    default = 'local',
+                    help = "System we are making plots in - local [default] vs slurm (snellius)"
+                    )
+parser.add_argument("--exclude_sj", 
+                    nargs = '*', # 0 or more values expected => creates a list
+                    default = [],
+                    type = int,
+                    help = "List of subs to exclude (ex: 1 2 3 4). Default []"
+                    )
+parser.add_argument("--prf_model_name", 
+                    type = str, 
+                    default = 'gauss',
+                    help="Type of pRF model to fit: gauss [default], css, dn, etc..."
+                    )
+parser.add_argument("--fit_hrf", 
+                    action = 'store_true',
+                    help="if option called, fit hrf on the data"
+                    )
+parser.add_argument("--fa_model_name", 
+                    type = str, 
+                    default = 'glmsingle',
+                    help="Type of FA model to fit: glmsingle [default], gain, glm, etc...]"
+                    )
+parser.add_argument("--ses2fit", 
+                    default = 'mean',
+                    help="Session to fit (if mean [default] then will average both session when that's possible)"
+                    )
+parser.add_argument("--run_type", 
+                    default = 'mean',
+                    help="Type of run to fit (mean of runs [default], 1, loo_r1s1, ...)"
+                    )
+parser.add_argument("--vertex",
+                    nargs = '*', 
+                    default = [],
+                    type = int,
+                    help="list of vertex indice(s) to view or default []"
+                    )
+parser.add_argument("--ROI", 
+                    type = str,
+                    help="ROI name to view or None [default]")
+parser.add_argument("--atlas", 
+                    type = str, 
+                    default = None,
+                    help = "If we want to use atlas ROIs (ex: glasser, wang) or not [default]."
+                    )
+parser.add_argument("--fit_now", 
+                    action = 'store_true',
+                    help="if option called, fit the data now"
+                    )
 
-# only relevant for pRF fitting
-parser.add_argument("--prf_model_name", type = str, help="Type of pRF model to fit: gauss [default], css, dn, etc...")
-parser.add_argument("--fit_hrf", type = int, help="1/0 - if we want to fit hrf on the data or not [default]")
-
-# only relevant for FA fitting
-parser.add_argument("--fa_model_name", type = str, help="Type of FA model to fit: gain [default], glm, etc...")
-
-# data arguments
-parser.add_argument("--ses2fit", type = str, help="Session to fit (if ses-mean [default] then will average both session when that's possible)")
-parser.add_argument("--run_type", help="Type of run to fit (mean of runs [default], median, 1, loo_1, ...)")
-
-#parser.add_argument("--vertex", nargs='+', type=int, help="Vertex index to fit, or list of indexes or None [default]", default =[])
-## mostly relevant for single vertex plots 
-parser.add_argument("--vertex", type = str, help="Vertex index to view, or list of indexes or None [default]")
-parser.add_argument("--ROI",type = str, help="ROI name to fit")
-
-# if we want to use atlas for ROI definition
-parser.add_argument("--atlas_bool", type = int, help="1/0 - if we want to use atlas ROI [default] or sub specific roi")
-
-# only relevant if single voxel viewer
-parser.add_argument("--fit_now", type = int, help="1/0 - if we want to fit the data now [default] or load when possible")
-
-#  only relevant if subject == group/all
-parser.add_argument("--exclude_sj", nargs='+', help="List of subjects to exclude, define as --exclude_sj 0 1 ...", default=[])
-
-
-# set variables 
+# parse the command line
 args = parser.parse_args()
 
-sj = str(args.subject).zfill(3) # subject
-viz = args.viz # what step of pipeline we want to run
-task = args.task # type of task 
-#
-#
-system_dir = args.dir if args.dir is not None else "local" # system location
-#
-#
-# type of session and run to use, depending on task
-if task == 'pRF':
-    ses = args.ses2fit if args.ses2fit is not None else 'ses-mean'
-    combine_ses = True if ses == 'ses-mean' else False # if we want to combine sessions
-    run_type = args.run_type if args.run_type is not None else 'mean'
-
-elif task == 'FA':
-    prf_ses = 'ses-mean'
-    combine_ses = True
-    prf_run_type = 'mean'
-    ses = args.ses2fit if args.ses2fit is not None else 1
-    run_type = args.run_type if args.run_type is not None else 'loo_r1s1'
-#
-#
-# prf model name and options
-prf_model_name = args.prf_model_name if args.prf_model_name is not None else "gauss" 
-fit_hrf = bool(args.fit_hrf) if args.fit_hrf is not None else False 
-fit_now = bool(args.fit_now) if args.fit_now is not None else True
-#
-# FA model name
-fa_model_name = args.fa_model_name if args.fa_model_name is not None else 'gain'
-#
-#
-# vertex, chunk_num, ROI
-#vertex = str(args.vertex).strip('][').split(', ')
-vertex = ast.literal_eval(str(args.vertex)) if args.vertex is not None else None
-ROI = args.ROI 
-#
-atlas_bool = bool(args.atlas_bool) if args.atlas_bool is not None else True 
-
+# access parser options
+sj = args.subject[0] if len(args.subject) == 1 else args.subject # for situation where 1 sj vs list
+py_cmd = args.cmd # what step of pipeline we want to run
+system_dir = args.dir
 exclude_sj = args.exclude_sj # list of excluded subjects
-if len(exclude_sj)>0:
-    exclude_sj = [val.zfill(3) for val in exclude_sj]
-    print('Excluding participants {expp}'.format(expp = exclude_sj))
-else:
-    exclude_sj = []
+task = args.task
+use_atlas = args.atlas
+prf_model_name = args.prf_model_name
+fit_hrf = args.fit_hrf
+fit_now = args.fit_now
+run_type = args.run_type
+ses2fit = args.ses2fit 
+fa_model_name = args.fa_model_name
 
-## Load data object
-print("Loading data for subject {sj}!".format(sj=sj))
+# vertex list
+if len(args.vertex)>0:
+    vertex = [int(val) for val in args.vertex]
+
+# ROI name
+ROI = args.ROI
+
+## Load data object --> as relevant paths, variables and utility functions
+print("\Loading data for subject {sj}!".format(sj=sj))
 
 FAM_data = load_exp_settings.MRIData(params, sj, 
                                     repo_pth = op.split(load_exp_settings.__file__)[0], 
-                                    base_dir=system_dir, exclude_sj = exclude_sj)
+                                    base_dir = system_dir, exclude_sj = exclude_sj)
 
-print('Subject list to vizualize is {l}'.format(l=str(FAM_data.sj_num)))
+print('Subject list to vizualize is {l}\n'.format(l=str(FAM_data.sj_num)))
 
-## Load preprocessing class for each data type
-FAM_mri_preprocess = preproc_mridata.PreprocMRI(FAM_data)
+## Load preprocessing class for each data type ###
 
-print('Setting pRF {mn} model\n'.format(mn = prf_model_name))
-print('fit HRF params set to {op}'.format(op = fit_hrf))
+# get behavioral info 
+FAM_beh = preproc_behdata.PreprocBeh(FAM_data)
+# and mri info
+FAM_mri = preproc_mridata.PreprocMRI(FAM_data)
 
 ## load pRF model class
-FAM_pRF = prf_model.pRF_model(FAM_data)
+FAM_pRF = pRF_model(FAM_data, use_atlas = use_atlas)
 
 # set specific params
 FAM_pRF.model_type['pRF'] = prf_model_name
 FAM_pRF.fit_hrf = fit_hrf
+
 
 ## run specific steps ##
 match task:
@@ -129,14 +147,13 @@ match task:
 
         ## get file extension for post fmriprep
         # processed files
-        file_ext = FAM_mri_preprocess.get_mrifile_ext()['pRF']
+        file_ext = FAM_mri.get_mrifile_ext()['pRF']
 
         ## load plotter class
-        plotter = pRFViewer(FAM_data, pRFModelObj = FAM_pRF, combine_ses = combine_ses, use_atlas_rois = atlas_bool,
-                                pysub = FAM_data.params['plotting']['pycortex_sub'], use_sub_rois = FAM_data.params['plotting']['use_sub_rois'])
+        plotter = pRFViewer(FAM_data, pRFModelObj = FAM_pRF)
 
         ## run specific vizualizer
-        match viz:
+        match py_cmd:
 
             case 'single_vertex':
                 plotter.plot_singlevert_pRF(sj, vertex = vertex, file_ext = file_ext, 
@@ -145,7 +162,7 @@ match task:
 
             case 'click':
                 plotter.open_click_viewer(sj, task2viz = 'pRF',
-                                        ses = ses, run_type = run_type,
+                                        ses = ses2fit, run_type = run_type,
                                         prf_model_name = prf_model_name, file_ext = file_ext)
 
             case 'prf_estimates':
@@ -159,7 +176,7 @@ match task:
                 sub_name = FAM_data.sj_num if len(FAM_data.sj_num) > 1 else sj
 
                 plotter.save_estimates4drawing(sub_name, task2draw = 'pRF',
-                                                ses = ses, run_type = run_type,
+                                                ses = ses2fit, run_type = run_type,
                                                 prf_model_name = prf_model_name, file_ext = file_ext)
 
             case 'prf_rsq':
@@ -181,7 +198,7 @@ match task:
                     model_list.append(mod_2)
 
                 plotter.compare_pRF_model_rsq(participant_list = FAM_data.sj_num,
-                                            ses = ses, run_type = run_type,
+                                            ses = ses2fit, run_type = run_type,
                                             prf_model_list = model_list,
                                             rsq_threshold = FAM_data.params['plotting']['rsq_threshold'])
 
@@ -192,40 +209,44 @@ match task:
 
         ## get file extension for post fmriprep
         # processed files
-        file_ext = FAM_mri_preprocess.get_mrifile_ext()['FA']
+        file_ext = FAM_mri.get_mrifile_ext()['FA']
 
         ## load FA model class
         match fa_model_name:
 
+            case 'glmsingle':
+                FAM_FA = GLMsingle_Model(FAM_data, use_atlas = use_atlas)
+
             case 'full_stim':   
-                FAM_FA = feature_model.FullStim_model(FAM_data)
+                FAM_FA = FullStim_model(FAM_data)
             case 'gain':
-                FAM_FA = feature_model.Gain_model(FAM_data)
+                FAM_FA = Gain_model(FAM_data)
             case 'glm':
-                FAM_FA = feature_model.GLM_model(FAM_data)
-
-        # if we want to fit hrf
-        FAM_FA.fit_hrf = FAM_pRF.fit_hrf
-
+                FAM_FA = GLM_model(FAM_data)
+            
         ## load plotter class
-        plotter = FAViewer(FAM_data, pRFModelObj = FAM_pRF, FAModelObj = FAM_FA,
-                                combine_ses = combine_ses, use_atlas_rois = atlas_bool,
-                                pysub = FAM_data.params['plotting']['pycortex_sub'], use_sub_rois = FAM_data.params['plotting']['use_sub_rois'])
+        plotter = FAViewer(FAM_data, pRFModelObj = FAM_pRF, FAModelObj = FAM_FA)
 
         ## run specific vizualizer
-        match viz:
+        match py_cmd:
+
+            case 'model_outputs':
+                plotter.plot_glmsingle_estimates(FAM_data.sj_num[0], model_type = ['A','D'])
+            
+            case 'sp_correlations':
+                print('To be done for GLM single correlations')
 
             case 'single_vertex':
                 plotter.plot_singlevert_FA(sj, vertex = vertex, file_ext = file_ext, 
-                                        ses = ses, run_type = run_type, prf_ses = prf_ses, prf_run_type = prf_run_type,
+                                        ses = ses2fit, run_type = run_type, prf_ses = 'mean', prf_run_type = 'mean',
                                         fit_now = fit_now, prf_model_name = prf_model_name, fa_model_name = fa_model_name)
 
             case 'click':
                 plotter.open_click_viewer(sj, task2viz = 'FA',
-                                        prf_ses = prf_ses, prf_run_type = prf_run_type, 
-                                        fa_ses = ses, fa_run_type = run_type,
+                                        prf_ses = 'mean', prf_run_type = 'mean', 
+                                        fa_ses = ses2fit, fa_run_type = run_type,
                                         prf_model_name = prf_model_name, fa_model_name = fa_model_name,
-                                        fa_file_ext = file_ext, prf_file_ext = FAM_mri_preprocess.get_mrifile_ext()['pRF'])
+                                        fa_file_ext = file_ext, prf_file_ext = FAM_mri.get_mrifile_ext()['pRF'])
 
 
 

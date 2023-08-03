@@ -350,7 +350,36 @@ class GLMsingle_Model(Model):
         
         return hrf_final/np.max(hrf_final)
 
-    def get_singletrial_avg_estimates(self, estimate_arr = [], single_trl_DM = [], return_std = True):
+    def subselect_trial_combinations(self, att_bar_xy = [], unatt_bar_xy = [], orientation_bars = None):
+
+        """
+        subselect trial combinations according to (un)attended bar position
+        or bar orientations, and obtain dataframe with possible trials
+        """
+
+        try:
+            self.single_trial_reference_df
+        except AttributeError:
+            self.get_single_trial_reference_df()
+
+        # get reference df
+        ref_df = self.single_trial_reference_df.copy()
+
+        if len(att_bar_xy) > 1: # if provided specific coordinates for attended bar
+            ref_df = ref_df[(ref_df['AttBar_coord_x'].isin([att_bar_xy[0]])) &\
+                             (ref_df['AttBar_coord_y'].isin([att_bar_xy[-1]]))]
+        
+        if len(unatt_bar_xy) > 1: # if provided specific coordinates for unattended bar
+            ref_df = ref_df[(ref_df['UnattBar_coord_x'].isin([unatt_bar_xy[0]])) &\
+                            (ref_df['UnattBar_coord_y'].isin([unatt_bar_xy[-1]]))]
+            
+        if orientation_bars is not None:
+            ref_df = ref_df[ref_df['orientation_bars'] == orientation_bars]
+
+        return ref_df
+
+    def get_singletrial_avg_estimates(self, estimate_arr = [], single_trl_DM = [], return_std = True,
+                                            att_bar_xy = [], unatt_bar_xy = [], average_betas = True):
 
         """
         Helper function that takes in an estimate array from glmsingle
@@ -360,20 +389,26 @@ class GLMsingle_Model(Model):
         [vertex, average_estimate4trialtype]
 
         """
-        
-        ## subselect task TRs indices
-        task_indices = np.where((self.condition_per_TR) == 'task')[0]
-        
+
+        # get reference df
+        ref_df = self.subselect_trial_combinations(att_bar_xy = att_bar_xy, unatt_bar_xy = unatt_bar_xy)
+            
+        # get single trial indices to extract betas from
+        single_trial_ind = ref_df.ind.values.astype(int)
+
         ## now append the estimate for that vertex for the same trial type (and std if we also want that)
         avg_all = []
         std_all = []
 
-        for i in range(len(task_indices)):
+        for i in single_trial_ind:
 
             ## indices select for task on TRs (trials)
-            cond_ind = np.where((np.hstack(single_trl_DM[:,task_indices, i])) == 1)[0]
+            cond_ind = np.where(np.hstack(single_trl_DM[:, self.condition_per_TR == 'task', i] == 1))[0]
             
-            avg_all.append(np.mean(estimate_arr[...,cond_ind], axis = -1))
+            if average_betas:
+                avg_all.append(np.mean(estimate_arr[...,cond_ind], axis = -1))
+            else:
+                avg_all.append(estimate_arr[...,cond_ind])
             if return_std:
                 std_all.append(np.std(estimate_arr[...,cond_ind], axis = -1))
             
@@ -381,7 +416,62 @@ class GLMsingle_Model(Model):
             return np.stack(avg_all), np.stack(std_all)
         else:
             return np.stack(avg_all)
+        
+    def get_single_trial_reference_df(self):
 
+        """
+        make reference dataframe of bar positions
+        to facilitate getting single-trials estimates from DM
+        """
+
+        ## get all possible trial combinations
+        try:
+            self.trial_combinations_df
+        except AttributeError:
+            self.get_single_trial_combinations()
+
+        single_trial_reference_df = pd.DataFrame({'ind': [], 'AttBar_coord_x': [], 'AttBar_coord_y': [], 
+                                                'UnattBar_coord_x': [], 'UnattBar_coord_y': [], 'orientation_bars': []})
+
+        for ind, row in self.trial_combinations_df.iterrows():
+            
+            # save relevant coordinates
+            att_bar_xy = row['AttBar_bar_midpoint']
+            unatt_bar_xy = row['UnattBar_bar_midpoint']
+                
+            # save bar orientations just for ease later on
+            if (row['AttBar_bar_pass_direction'] == 'vertical' and row['UnattBar_bar_pass_direction'] == 'vertical'):
+                
+                orientation_bars = 'parallel_horizontal'
+                
+            elif (row['AttBar_bar_pass_direction'] == 'horizontal' and row['UnattBar_bar_pass_direction'] == 'horizontal'):
+                
+                orientation_bars = 'parallel_vertical'
+                
+            else:
+                orientation_bars = 'crossed'
+                
+            # and replace not relevant coord with nan, for bookeeping
+            if row['AttBar_bar_pass_direction'] == 'horizontal':
+                att_bar_xy[-1] = np.nan 
+            else:
+                att_bar_xy[0] = np.nan 
+                
+            if row['UnattBar_bar_pass_direction'] == 'horizontal':
+                unatt_bar_xy[-1] = np.nan 
+            else:
+                unatt_bar_xy[0] = np.nan 
+                
+            # append in df
+            single_trial_reference_df = pd.concat((single_trial_reference_df,
+                                                pd.DataFrame({'ind': [ind], 
+                                                                'AttBar_coord_x': [att_bar_xy[0]], 
+                                                                'AttBar_coord_y': [att_bar_xy[-1]], 
+                                                                'UnattBar_coord_x': [unatt_bar_xy[0]], 
+                                                                'UnattBar_coord_y': [unatt_bar_xy[-1]], 
+                                                                'orientation_bars': [orientation_bars]})))
+            
+        self.single_trial_reference_df = single_trial_reference_df
 
     def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', 
                         smooth_nm = True, perc_thresh_nm = 95, n_jobs = 8,

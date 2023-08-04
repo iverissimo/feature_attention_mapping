@@ -251,7 +251,36 @@ class MRIUtils(Utils):
             output_dict[rname] = self.get_roi_vert(allROI_df, roi_list = rlabels_dict[rname], 
                                                    hemi = hemisphere)
             
-        return output_dict            
+        return output_dict       
+
+    def get_estimates_roi_df(self, participant, estimates_pp = {}, ROIs_dict = {}, est_key = 'r2', model = 'gauss'):
+
+        """
+        Helper function to get estimates dataframe values for each ROI
+        will select values based on est key param 
+        """
+
+        ## save rsq values in dataframe, for plotting
+        df_est = pd.DataFrame({'sj': [], 'index': [], 'ROI': [], 'value': [], 'model': []})
+
+        for roi_name in ROIs_dict.keys():
+
+            # mask estimates
+            print('masking sub-{s} estimates for ROI {r}'.format(s = participant, r = roi_name))
+
+            if isinstance(estimates_pp, dict):
+                roi_arr = estimates_pp[est_key][ROIs_dict[roi_name]]
+            else:
+                roi_arr = estimates_pp[ROIs_dict[roi_name]]
+
+            df_est = pd.concat((df_est,
+                                pd.DataFrame({'sj': np.tile('sub-{sj}'.format(sj = participant), len(roi_arr)), 
+                                            'index': ROIs_dict[roi_name], 
+                                            'ROI': np.tile(roi_name, len(roi_arr)), 
+                                            'value': roi_arr,
+                                            'model': np.tile(model, len(roi_arr))})
+                            ))
+        return df_est     
 
     def get_tsnr(self, input_file, return_mean=True, affine=[], hdr=[], filename=None):
         

@@ -27,7 +27,7 @@ from FAM.visualize.viewer import Viewer
 
 class MRIViewer(Viewer):
 
-    def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_999999'):
+    def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_999999', use_atlas = None):
         
         """__init__
         constructor for class 
@@ -42,7 +42,7 @@ class MRIViewer(Viewer):
         """
 
         # need to initialize parent class (Model), indicating output infos
-        super().__init__(MRIObj, pysub = pysub, outputdir = outputdir)
+        super().__init__(MRIObj, pysub = pysub, outputdir = outputdir, use_atlas = use_atlas)
 
         ## output path to save plots
         self.figures_pth = op.join(self.outputdir)
@@ -152,7 +152,7 @@ freeview -v \
 
     def compare_nordic2standard(self, participant_list = [], input_pth = None, 
                                 file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'},
-                                use_atlas_rois = None, acq_keys = ['standard', 'nordic'], plot_group = True):
+                                acq_keys = ['standard', 'nordic'], plot_group = True):
 
         """
         Make nordic vs standard comparison plots
@@ -167,9 +167,6 @@ freeview -v \
             path to look for files, if None then will get them from derivatives/freesurfer/sub-X folder
         file_ext: dict
             file extension to use (for each task)
-        use_atlas_rois: str
-            if we want to use atlas rois (glasser, wang) or not (then will default to hand-drawn)
-        
         """ 
         
         ## set output path where we want to save plots
@@ -188,22 +185,15 @@ freeview -v \
         ## if no participant list set, then run all
         if len(participant_list) == 0:
             participant_list = self.MRIObj.sj_num
-
-        if use_atlas_rois is None:
-            plot_key = self.MRIObj.sj_space 
-            annot_filename = ''
-        else:
-            plot_key = use_atlas_rois
-            annot_filename = self.MRIObj.atlas_annot[plot_key]
        
         ## loop over participants
         for pp_ind, pp in enumerate(participant_list):
 
-            if (use_atlas_rois is None) or (pp_ind == 0):
+            if (self.use_atlas is None) or (pp_ind == 0):
                 ## get vertices for each relevant ROI
-                ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = pp, pysub = self.pysub, use_atlas = use_atlas_rois, 
-                                                                annot_filename = annot_filename, hemisphere = 'BH',
-                                                                ROI_labels = self.MRIObj.params['plotting']['ROIs'][plot_key])
+                ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = pp, pysub = self.pysub, use_atlas = self.use_atlas, 
+                                                                annot_filename = self.annot_filename, hemisphere = 'BH',
+                                                                ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
 
             outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp))
             # if output path doesn't exist, create it
@@ -460,7 +450,7 @@ freeview -v \
 
         #return tsnr_df, corr_df, surf_avg_corr
                                           
-    def plot_tsnr(self, participant_list = [], input_pth = None, use_atlas_rois = None,
+    def plot_tsnr(self, participant_list = [], input_pth = None,
               file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'}):
 
         """
@@ -476,8 +466,6 @@ freeview -v \
             path to look for files, if None then will get them from derivatives/freesurfer/sub-X folder
         file_ext: dict
             file extension to use (for each task)
-        use_atlas_rois: str
-            if we want to use atlas rois (glasser, wang) or not (then will default to hand-drawn)
         """ 
 
         ## output path to save plots
@@ -493,22 +481,15 @@ freeview -v \
         ## if no participant list set, then run all
         if len(participant_list) == 0:
             participant_list = self.MRIObj.sj_num
-
-        if use_atlas_rois is None:
-            plot_key = self.MRIObj.sj_space 
-            annot_filename = ''
-        else:
-            plot_key = use_atlas_rois
-            annot_filename = self.MRIObj.atlas_annot[plot_key]
         
         ## loop over participants
         for pp_ind, pp in enumerate(participant_list):
 
-            if (use_atlas_rois is None) or (pp_ind == 0):
+            if (self.use_atlas is None) or (pp_ind == 0):
                 ## get vertices for each relevant ROI
-                ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = pp, pysub = self.pysub, use_atlas = use_atlas_rois, 
-                                                                annot_filename = annot_filename, hemisphere = 'BH',
-                                                                ROI_labels = self.MRIObj.params['plotting']['ROIs'][plot_key])
+                ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = pp, pysub = self.pysub, use_atlas = self.use_atlas, 
+                                                                annot_filename = self.annot_filename, hemisphere = 'BH',
+                                                                ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
 
             outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp))
             # if output path doesn't exist, create it
@@ -647,7 +628,7 @@ freeview -v \
                                             fig_abs_name = fig_name)
 
     def plot_bold_on_surface(self, participant_list = [], input_pth = None, run_num = 'mean', ses_num = 1,
-                             task = 'pRF', stim_on_screen = None, use_atlas_rois = None,
+                             task = 'pRF', stim_on_screen = None,
                          file_ext = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_confound_psc.npy'}):
 
         """
@@ -682,21 +663,14 @@ freeview -v \
         if len(participant_list) == 0:
             participant_list = self.MRIObj.sj_num
 
-        if use_atlas_rois is None:
-            plot_key = self.MRIObj.sj_space 
-            annot_filename = ''
-        else:
-            plot_key = use_atlas_rois
-            annot_filename = self.MRIObj.atlas_annot[plot_key]
-
         ## loop over participants
         for pp_ind, pp in enumerate(participant_list):
 
             ## get vertices for each relevant ROI
-            if (use_atlas_rois is None) or (pp_ind == 0):
-                ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = pp, pysub = self.pysub, use_atlas = use_atlas_rois, 
-                                                                annot_filename = annot_filename, hemisphere = 'BH',
-                                                                ROI_labels = self.MRIObj.params['plotting']['ROIs'][plot_key])
+            if (self.use_atlas is None) or (pp_ind == 0):
+                ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = pp, pysub = self.pysub, use_atlas = self.use_atlas, 
+                                                                annot_filename = self.annot_filename, hemisphere = 'BH',
+                                                                ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
 
             outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp))
             # if output path doesn't exist, create it

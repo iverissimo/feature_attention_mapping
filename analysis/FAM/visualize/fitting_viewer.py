@@ -27,7 +27,7 @@ from PIL import Image, ImageDraw
 
 class pRFViewer(Viewer):
 
-    def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, pysub = 'hcp_999999'):
+    def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, pysub = 'hcp_999999', use_atlas = None):
         
         """__init__
         constructor for class 
@@ -45,7 +45,7 @@ class pRFViewer(Viewer):
         """
 
         # need to initialize parent class (Model), indicating output infos
-        super().__init__(MRIObj, pysub = pysub, outputdir = outputdir)
+        super().__init__(MRIObj, pysub = pysub, outputdir = outputdir, use_atlas = use_atlas)
 
         ## output path to save plots
         self.figures_pth = op.join(self.outputdir)
@@ -587,155 +587,59 @@ class pRFViewer(Viewer):
         plt.show()
 
     
-    def plot_prf_results(self, participant_list = [], 
-                                ses = 'ses-mean', run_type = 'mean', prf_model_name = 'gauss', max_ecc_ext = 5,
-                                mask_arr = True, rsq_threshold = .1, iterative = True, figures_pth = None):
+    def plot_prf_results(self, participant_list = [], mask_bool_df = None, stim_on_screen = [],
+                                ses = 'mean', run_type = 'mean', prf_model_name = 'gauss',
+                                mask_arr = True, iterative = True):
 
 
-        ## stores estimates for all participants in dict, for ease of access
-        group_estimates = {}
-  
-        for pp in participant_list:
+        ## load estimates for all participants 
+        # store in dict, for ease of access
+        print('Loading iterative estimates')
+        group_estimates, group_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant_list = participant_list,
+                                                                    ses = ses, run_type = run_type, 
+                                                                    model_name = prf_model_name, 
+                                                                    iterative = iterative,
+                                                                    mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
+                                                                    fit_hrf = self.pRFModelObj.fit_hrf)
 
-            #max_ecc_ext = self.pp_prf_models['sub-{sj}'.format(sj = pp)][ses]['prf_stim'].screen_size_degrees/2
-            
-            ## load estimates
-            print('Loading iterative estimates')
-            estimates_dict, _ = self.pRFModelObj.load_pRF_model_estimates(pp,
-                                                                        ses = ses, run_type = run_type, 
-                                                                        model_name = prf_model_name, 
-                                                                        iterative = iterative,
-                                                                        fit_hrf = self.pRFModelObj.fit_hrf)
+        ## mask the estimates, if such is the case
+        if mask_arr:
+            print('masking estimates')
 
-            ## mask the estimates, if such is the case
-            if mask_arr:
-                print('masking estimates')
+            # get estimate keys
+            keys = self.pRFModelObj.get_prf_estimate_keys(prf_model_name = prf_model_name)
 
-                # get estimate keys
-                keys = self.pRFModelObj.get_prf_estimate_keys(prf_model_name = prf_model_name)
+            # get screen lim for all participants
+            max_ecc_ext = {'sub-{sj}'.format(sj = pp): group_prf_models['sub-{sj}'.format(sj = pp)]['ses-{s}'.format(s = ses)]['prf_stim'].screen_size_degrees/2 for pp in participant_list}
 
-                group_estimates['sub-{sj}'.format(sj = pp)] = self.pRFModelObj.mask_pRF_model_estimates(estimates_dict, 
-                                                                            ROI = None,
-                                                                            estimate_keys = keys,
-                                                                            x_ecc_lim = [- max_ecc_ext, max_ecc_ext],
-                                                                            y_ecc_lim = [- max_ecc_ext, max_ecc_ext],
-                                                                            rsq_threshold = rsq_threshold,
-                                                                            pysub = self.pysub['sub-{pp}'.format(pp = pp)]
-                                                                            )
-            else:
-                group_estimates['sub-{sj}'.format(sj = pp)] = estimates_dict
-
+            final_estimates = {'sub-{sj}'.format(sj = pp): self.pRFModelObj.mask_pRF_model_estimates(group_estimates['sub-{sj}'.format(sj = pp)], 
+                                                                                estimate_keys = keys,
+                                                                                x_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
+                                                                                y_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
+                                                                                rsq_threshold = self.rsq_threshold_plot) for pp in participant_list}
+        else:
+            final_estimates = group_estimates
 
         ## Now actually plot results
         # 
         ### RSQ ###
-        self.plot_rsq(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
-                                            model_name = prf_model_name, figures_pth = figures_pth)
+        self.plot_rsq(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+                                            model_name = prf_model_name, fit_hrf = self.pRFModelObj.fit_hrf, vmin1 = 0, vmax1 = .8,
+                                            figures_pth = op.join(self.figures_pth, 'rsq', self.pRFModelObj.fitfolder['pRF']))
 
-        ### ECC and SIZE ###
-        self.plot_ecc_size(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
-                                            model_name = prf_model_name, figures_pth = figures_pth)
+        # ### ECC and SIZE ###
+        # self.plot_ecc_size(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+        #                                     model_name = prf_model_name)
 
-        ### EXPONENT ###
-        if prf_model_name == 'css':
-            self.plot_exponent(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
-                                            model_name = prf_model_name, figures_pth = figures_pth)
+        # ### EXPONENT ###
+        # if prf_model_name == 'css':
+        #     self.plot_exponent(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+        #                                     model_name = prf_model_name)
 
-        ### POLAR ANGLE ####
-        self.plot_pa(participant_list = participant_list, group_estimates = group_estimates, ses = ses, run_type = run_type,
-                                        model_name = prf_model_name, figures_pth = figures_pth, 
-                                        n_bins_colors = 256, max_x_lim = max_ecc_ext, angle_thresh = 3*np.pi/4)
-
-
-    def plot_rsq(self, participant_list = [], group_estimates = {}, ses = 'ses-mean',  run_type = 'mean',
-                        figures_pth = None, model_name = 'gauss'):
-        
-        # make output folder for figures
-        if figures_pth is None:
-            figures_pth = op.join(self.outputdir, 'rsq', self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'])
-
-        # save values per roi in dataframe
-        avg_roi_df = pd.DataFrame()
-        
-        ## loop over participants in list
-        for pp in participant_list:
-            
-            # make path to save sub-specific figures
-            sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
-            os.makedirs(sub_figures_pth, exist_ok=True)
-
-            #### plot flatmap ###
-            flatmap = plot_utils.get_flatmaps(group_estimates['sub-{sj}'.format(sj = pp)]['r2'], 
-                                                        vmin1 = 0, vmax1 = .8,
-                                                        pysub = self.pysub['sub-{pp}'.format(pp = pp)], 
-                                                        cmap = 'hot')
-            
-            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_RSQ.png'.format(sj = pp,
-                                                                                                                                        acq = self.MRIObj.acq,
-                                                                                                                                        space = self.MRIObj.sj_space,
-                                                                                                                                        run = run_type, 
-                                                                                                                                        model = model_name))
-            # if we fitted hrf, then add that to fig name
-            if self.pRFModelObj.fit_hrf:
-                fig_name = fig_name.replace('.png','_withHRF.png') 
-
-            print('saving %s' %fig_name)
-            _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
-            ## get estimates per ROI
-            pp_roi_df = plot_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)], 
-                                                ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
-                                                roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
-                                                est_key = 'r2')
-
-            #### plot distribution ###
-            fig, axis = plt.subplots(1, figsize=(10,5), dpi=100, facecolor='w', edgecolor='k')
-
-            v1 = sns.violinplot(data = pp_roi_df, x = 'ROI', y = 'value', 
-                                order = self.ROI_keys,
-                                cut=0, inner='box', palette = self.group_color_codes['sub-{sj}'.format(sj = pp)], linewidth=1.8, ax = axis) 
-
-            v1.set(xlabel=None)
-            v1.set(ylabel=None)
-            plt.margins(y=0.025)
-            #sns.swarmplot(x='ecc', y='cs', data=crwd_df4plot,color=".25",alpha=0.5)
-            plt.xticks(fontsize = 10)
-            plt.yticks(fontsize = 10)
-
-            plt.xlabel('ROI',fontsize = 15,labelpad=18)
-            plt.ylabel('RSQ',fontsize = 15,labelpad=18)
-            plt.ylim(0, 1)
-
-            fig.savefig(fig_name.replace('flatmap','violinplot'))
-
-            ## concatenate average per participant, to make group plot
-            avg_roi_df = pd.concat((avg_roi_df,
-                                    pp_roi_df.groupby(['sj', 'ROI'])['value'].median().reset_index()))
-
-        # if we provided several participants, make group plot
-        if len(participant_list) > 1:
-
-            fig, axis = plt.subplots(1, figsize=(10,5), dpi=100, facecolor='w', edgecolor='k')
-
-            v1 = sns.violinplot(data = avg_roi_df, x = 'ROI', y = 'value', 
-                                order = self.ROI_keys,
-                                cut=0, inner='box', palette = self.group_color_codes['sub-{sj}'.format(sj = pp)], 
-                                linewidth=1.8, ax = axis)
-
-            v1.set(xlabel=None)
-            v1.set(ylabel=None)
-            plt.margins(y=0.025)
-            sns.stripplot(data = avg_roi_df, x = 'ROI', y = 'value', 
-                            order = self.ROI_keys,
-                            color="white", alpha=0.5)
-            plt.xticks(fontsize = 10)
-            plt.yticks(fontsize = 10)
-
-            plt.xlabel('ROI',fontsize = 15,labelpad=18)
-            plt.ylabel('RSQ',fontsize = 15,labelpad=18)
-            plt.ylim(0, 1)
-
-            fig.savefig(op.join(figures_pth, op.split(fig_name)[-1].replace('flatmap','violinplot').replace('sub-{sj}'.format(sj = pp),'sub-GROUP')))
+        # ### POLAR ANGLE ####
+        # self.plot_pa(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+        #                                 model_name = prf_model_name, 
+        #                                 n_bins_colors = 256, max_x_lim = max_ecc_ext, angle_thresh = 3*np.pi/4)
 
     
     def compare_pRF_model_rsq(self, participant_list = [], ses = 'ses-mean', run_type = 'mean', 
@@ -1385,7 +1289,7 @@ class pRFViewer(Viewer):
 class FAViewer(pRFViewer):
 
 
-    def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, FAModelObj = None, pysub = 'hcp_999999'):
+    def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, FAModelObj = None, pysub = 'hcp_999999', use_atlas = None):
         
         """__init__
         constructor for class 
@@ -1403,7 +1307,7 @@ class FAViewer(pRFViewer):
         """
 
         # need to initialize parent class (Model), indicating output infos
-        super().__init__(MRIObj = MRIObj, outputdir = outputdir, pRFModelObj = pRFModelObj, pysub = pysub)
+        super().__init__(MRIObj = MRIObj, outputdir = outputdir, pRFModelObj = pRFModelObj, pysub = pysub, use_atlas = use_atlas)
 
         self.FAModelObj = FAModelObj
 
@@ -1455,8 +1359,6 @@ class FAViewer(pRFViewer):
                                         pysub = self.pysub, cmap='RdBu_r', 
                                         vmin1 = -2, vmax1 = 2, 
                                         fig_abs_name = fig_name)
-
-
 
     def plot_singlevert_FA(self, participant, 
                                 ses = 1, run_type = '1', vertex = None, ROI = None,

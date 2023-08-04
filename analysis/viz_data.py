@@ -92,7 +92,7 @@ match data_type:
     case 'mri':
         
         ## initialize plotter object
-        plotter = MRIViewer(FAM_data)
+        plotter = MRIViewer(FAM_data, use_atlas=use_atlas)
 
         ## run specific vizualizer
         match py_cmd:
@@ -113,7 +113,6 @@ match data_type:
                 print('Comparing NORDIC to standard runs')
 
                 plotter.compare_nordic2standard(participant_list = FAM_data.sj_num, 
-                                                use_atlas_rois = use_atlas,
                                                 file_ext = FAM_mri.get_mrifile_ext())
 
             case 'tsnr':
@@ -121,7 +120,6 @@ match data_type:
                 print('Plotting tSNR')
 
                 plotter.plot_tsnr(participant_list = FAM_data.sj_num, 
-                                use_atlas_rois = use_atlas,
                                 file_ext = FAM_mri.get_mrifile_ext())
 
             case 'vasculature':
@@ -155,7 +153,6 @@ match data_type:
                                             stim_on_screen = FAM_beh.get_stim_on_screen(task = task, 
                                                                                         crop_nr = FAM_data.task_nr_cropTR[task], 
                                                                                         shift = FAM_data.shift_TRs_num),
-                                            use_atlas_rois = use_atlas,
                                             file_ext = FAM_mri.get_mrifile_ext())
 
             case 'click':

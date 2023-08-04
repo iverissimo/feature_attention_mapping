@@ -5,8 +5,6 @@ import ast
 
 import yaml
 from FAM.processing import load_exp_settings, preproc_mridata, preproc_behdata
-from FAM.visualize.preproc_viewer import MRIViewer
-from FAM.visualize.beh_viewer import BehViewer
 
 from FAM.fitting.prf_model import pRF_model
 from FAM.fitting.glm_single_model import GLMsingle_Model
@@ -137,7 +135,6 @@ FAM_pRF = pRF_model(FAM_data, use_atlas = use_atlas)
 FAM_pRF.model_type['pRF'] = prf_model_name
 FAM_pRF.fit_hrf = fit_hrf
 
-
 ## run specific steps ##
 match task:
 
@@ -150,7 +147,7 @@ match task:
         file_ext = FAM_mri.get_mrifile_ext()['pRF']
 
         ## load plotter class
-        plotter = pRFViewer(FAM_data, pRFModelObj = FAM_pRF)
+        plotter = pRFViewer(FAM_data, pRFModelObj = FAM_pRF, use_atlas = use_atlas)
 
         ## run specific vizualizer
         match py_cmd:
@@ -167,8 +164,14 @@ match task:
 
             case 'prf_estimates':
                 plotter.plot_prf_results(participant_list = FAM_data.sj_num,
-                                        prf_model_name = prf_model_name, 
-                                        rsq_threshold = FAM_data.params['plotting']['rsq_threshold'])
+                                        prf_model_name = prf_model_name, ses = ses2fit, run_type = run_type,
+                                        mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                                                crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
+                                        stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                                                    crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                    shift = FAM_data.shift_TRs_num)
+                                        )
 
             case 'draw_roi':
 
@@ -225,7 +228,7 @@ match task:
                 FAM_FA = GLM_model(FAM_data)
             
         ## load plotter class
-        plotter = FAViewer(FAM_data, pRFModelObj = FAM_pRF, FAModelObj = FAM_FA)
+        plotter = FAViewer(FAM_data, pRFModelObj = FAM_pRF, FAModelObj = FAM_FA, use_atlas = use_atlas)
 
         ## run specific vizualizer
         match py_cmd:

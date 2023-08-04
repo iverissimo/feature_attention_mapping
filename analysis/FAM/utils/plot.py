@@ -730,41 +730,7 @@ class PlotUtils(Utils):
         return mean_x, mean_x_std, mean_y, mean_y_std
 
 
-    def get_estimates_roi_df(participant, estimates_pp, ROIs = None, roi_verts = None, est_key = 'r2', model = 'gauss'):
-
-        """
-
-        Helper function to get estimates dataframe values for each ROI
-        will select values based on est key param 
-
-        """
-
-        ## save rsq values in dataframe, for plotting
-        df_est = pd.DataFrame({'sj': [], 'index': [], 'ROI': [], 'value': [], 'model': []})
-
-        for idx,rois_ks in enumerate(ROIs): 
-            
-            # mask estimates
-            print('masking estimates for ROI %s'%rois_ks)
-
-            if len(roi_verts[rois_ks]) > 0:
-                if isinstance(estimates_pp, dict):
-                    roi_arr = estimates_pp[est_key][roi_verts[rois_ks]]
-                else:
-                    roi_arr = estimates_pp[roi_verts[rois_ks]]
-            else:
-                print('No vertices found for ROI')
-                roi_arr = [np.nan]
-
-            df_est = pd.concat((df_est,
-                                pd.DataFrame({'sj': np.tile('sub-{sj}'.format(sj = participant), len(roi_arr)), 
-                                            'index': roi_verts[rois_ks], 
-                                            'ROI': np.tile(rois_ks, len(roi_arr)), 
-                                            'value': roi_arr,
-                                            'model': np.tile(model, len(roi_arr))})
-                            ))
-
-        return df_est
+    
 
 
 

@@ -1144,23 +1144,19 @@ class pRF_model(Model):
         
         return CV_rsq
 
-
-
-
-
-    def mask_pRF_model_estimates(self, estimates, ROI = None, x_ecc_lim = [-6,6], y_ecc_lim = [-6,6],
-                                rsq_threshold = .1, pysub = None, estimate_keys = ['x','y','size','betas','baseline','r2'], return_ind = False):
+    def mask_pRF_model_estimates(self, estimates, vertex = [], x_ecc_lim = [-6,6], y_ecc_lim = [-6,6],
+                                rsq_threshold = .1, estimate_keys = ['x','y','size','betas','baseline','r2']):
     
         """ 
         mask estimates, to be positive RF, within screen limits
-        and for a certain ROI (if the case)
+        and for a certain vertex list (if the case)
 
         Parameters
         ----------
         estimates : dict
             dict with estimates key-value pairs
-        ROI : str
-            roi to mask estimates (eg. 'V1', default None)
+        vertex : list
+            list of vertices to mask estimates 
         estimate_keys: list/arr
             list or array of strings with keys of estimates to mask
         
@@ -1168,11 +1164,8 @@ class pRF_model(Model):
         -------
         masked_estimates : npz 
             numpy array of masked estimates
-        
         """
-        if pysub is None:
-            pysub = self.pysub
-        
+
         # make new variables that are masked 
         masked_dict = {}
         
@@ -1180,10 +1173,8 @@ class pRF_model(Model):
             masked_dict[k] = np.zeros(estimates[k].shape)
             masked_dict[k][:] = np.nan
 
-        
         # set limits for xx and yy, forcing it to be within the screen boundaries
         # also for positive pRFs
-
         indices = np.where((~np.isnan(estimates['r2']))& \
                             (estimates['r2']>= rsq_threshold)& \
                         (estimates['x'] <= np.max(x_ecc_lim))& \
@@ -1197,20 +1188,12 @@ class pRF_model(Model):
         for k in estimate_keys:
             masked_dict[k][indices] = estimates[k][indices]
 
-        # if we want to subselect for an ROI
-        if ROI:
-            roi_ind = cortex.get_roi_verts(pysub, ROI) # get indices for that ROI
-            
-            # mask for roi
+        # if we want to subselect for specifc vertices
+        if len(vertex) > 0:
             for k in estimate_keys:
-                masked_dict[k] = masked_dict[k][roi_ind[ROI]]
+                masked_dict[k] = masked_dict[k][vertex]
         
-        if return_ind:
-            return masked_dict, indices
-        else:
-            return masked_dict
-
-
+        return masked_dict
     
     def get_prf_estimate_keys(self, prf_model_name = 'gauss'):
 
@@ -1231,6 +1214,8 @@ class pRF_model(Model):
             keys = keys[:-1]+self.MRIObj.params['mri']['fitting']['pRF']['estimate_keys']['hrf']+['r2']
 
         return keys
+    
+    
     
     def get_eccentricity(self, xx = [], yy = [], rsq = []):
 

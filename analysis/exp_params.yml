@@ -315,7 +315,7 @@ plotting:
                 }
         }
 
-  rsq_threshold: .25 #.15 #.25 
+  rsq_threshold: .2 #.15 #.25 
 
 
 

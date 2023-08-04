@@ -116,10 +116,13 @@ class Viewer:
             #### plot distribution ###
             fig, ax1 = plt.subplots(1,1, figsize=(20,7.5), dpi=100, facecolor='w', edgecolor='k')
 
-            v1 = sns.violinplot(data = pp_roi_df, x = 'ROI', y = 'value', 
-                                order = self.ROIs_dict.keys(),
-                                cut=0, inner='box', palette = self.ROI_pallete, 
-                                linewidth=2.7,saturation = 1, ax = ax1) 
+            v1 = pt.RainCloud(data = pp_roi_df, move = .2, alpha = .9,
+                        x = 'ROI', y = 'value', pointplot = False, hue = 'ROI',
+                        palette = self.ROI_pallete, ax = ax1)
+            
+            # quick fix for legen
+            handles = [mpatches.Patch(color = self.ROI_pallete[k], label = k) for k in self.ROIs_dict.keys()]
+            ax1.legend(loc = 'upper right',fontsize=8, handles = handles, title="ROIs")#, fancybox=True)
 
             v1.set(xlabel=None)
             v1.set(ylabel=None)

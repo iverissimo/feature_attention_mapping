@@ -136,24 +136,24 @@ class Viewer:
             fig.savefig(fig_name.replace('flatmap','violinplot'))
 
             ## concatenate average per participant, to make group plot
-            avg_roi_df = pd.concat((avg_roi_df,
-                                    pp_roi_df.groupby(['sj', 'ROI'])['value'].median().reset_index()))
+            avg_roi_df = pd.concat((avg_roi_df, pp_roi_df))
 
         # if we provided several participants, make group plot
         if len(participant_list) > 1:
 
             fig, ax1 = plt.subplots(1,1, figsize=(15,5), dpi=100, facecolor='w', edgecolor='k')
 
-            v1 = sns.violinplot(data = avg_roi_df, x = 'ROI', y = 'value', 
-                                order = self.ROIs_dict.keys(),
-                                cut=0, inner='box', palette = self.ROI_pallete, 
-                                linewidth=2.7,saturation = 1, ax = ax1) 
+            v1 = sns.pointplot(data = avg_roi_df.groupby(['sj', 'ROI'])['value'].mean().reset_index(),
+                                x = 'ROI', y = 'value', color = 'k', markers = 'D', #scale = 1, 
+                                palette = self.ROI_pallete, order = self.ROIs_dict.keys(), 
+                                dodge = False, join = False, ci=68, ax = ax1)
             v1.set(xlabel=None)
             v1.set(ylabel=None)
             plt.margins(y=0.025)
-            sns.stripplot(data = avg_roi_df, x = 'ROI', y = 'value', 
+            sns.stripplot(data = avg_roi_df.groupby(['sj', 'ROI'])['value'].mean().reset_index(), 
+                          x = 'ROI', y = 'value', #hue = 'sj', palette = sns.color_palette("husl", len(participant_list)),
                             order = self.ROIs_dict.keys(),
-                            color="gray", alpha=0.5)
+                            color="gray", alpha=0.5, ax=ax1)
             plt.xticks(fontsize = 18)
             plt.yticks(fontsize = 18)
 

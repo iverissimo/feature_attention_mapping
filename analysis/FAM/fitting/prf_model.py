@@ -1215,8 +1215,6 @@ class pRF_model(Model):
 
         return keys
     
-    
-    
     def get_eccentricity(self, xx = [], yy = [], rsq = []):
 
         """
@@ -1350,7 +1348,6 @@ class pRF_model(Model):
         half_max = np.max(profile, axis=0)/2
         fwhmax = np.abs(2*x[np.argmin(np.abs(profile-half_max), axis=0)])
 
-
         if 'dog' in model or 'dn' in model:
 
             min_profile = np.min(profile, axis=0)
@@ -1358,7 +1355,7 @@ class pRF_model(Model):
 
             result = fwhmax, fwatmin
         else:
-            result = fwhmax
+            result = fwhmax, np.nan
 
         if return_profiles:
             return result, profile.T

@@ -376,6 +376,39 @@ class Utils:
         
         return overlap_dm
 
+    def get_weighted_bins(self, data_df, x_key = 'ecc', y_key = 'size', weight_key = 'rsq', sort_key = 'ecc', n_bins = 10):
+
+        """ 
+        
+        Get weighted bins from dataframe, sorted by one of the variables
+
+        """
+        
+        # sort values by eccentricity
+        data_df = data_df.sort_values(by=[sort_key])
+
+        #divide in equally sized bins
+        df_batches = np.array_split(data_df, n_bins)
+        print('Bin size is %i'%int(len(data_df)/n_bins))
+        
+        mean_x = []
+        mean_x_std = []
+        mean_y = []
+        mean_y_std = []
+        
+        # for each bin calculate rsq-weighted means and errors of binned ecc/gain 
+        for j in np.arange(len(df_batches)):
+            mean_x.append(weightstats.DescrStatsW(df_batches[j][x_key],
+                                                weights = df_batches[j][weight_key]).mean)
+            mean_x_std.append(weightstats.DescrStatsW(df_batches[j][x_key],
+                                                    weights = df_batches[j][weight_key]).std_mean)
+
+            mean_y.append(weightstats.DescrStatsW(df_batches[j][y_key],
+                                                weights = df_batches[j][weight_key]).mean)
+            mean_y_std.append(weightstats.DescrStatsW(df_batches[j][y_key],
+                                                    weights = df_batches[j][weight_key]).std_mean)
+
+        return mean_x, mean_x_std, mean_y, mean_y_std
 
     def sum_bar_dms(self, stacked_dms, overlap_dm = None, overlap_weight = 1):
 

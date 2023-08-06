@@ -627,21 +627,21 @@ class pRFViewer(Viewer):
                                             model_name = prf_model_name, fit_hrf = self.pRFModelObj.fit_hrf, vmin1 = 0, vmax1 = .8,
                                             figures_pth = op.join(self.figures_pth, 'rsq', self.pRFModelObj.fitfolder['pRF']))
 
-        # ### ECC and SIZE ###
-        # self.plot_ecc_size(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
-        #                                     model_name = prf_model_name)
+        ### ECC and SIZE ###
+        self.plot_ecc_size(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+                                            model_name = prf_model_name, n_bins_dist = 8, 
+                                            vmin1 = {'ecc': 0, 'size': 0}, vmax1 = {'ecc': 5.5, 'size': 15})
 
-        # ### EXPONENT ###
-        # if prf_model_name == 'css':
-        #     self.plot_exponent(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
-        #                                     model_name = prf_model_name)
+        ### EXPONENT ###
+        if prf_model_name == 'css':
+            self.plot_exponent(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+                                            model_name = prf_model_name, vmin1 = 0, vmax1 = 1)
 
         # ### POLAR ANGLE ####
         # self.plot_pa(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
         #                                 model_name = prf_model_name, 
         #                                 n_bins_colors = 256, max_x_lim = max_ecc_ext, angle_thresh = 3*np.pi/4)
 
-    
     def compare_pRF_model_rsq(self, participant_list = [], ses = 'mean', run_type = 'mean', 
                                 prf_model_list = ['gauss', 'css'], mask_bool_df = None, stim_on_screen = [],
                                 mask_arr = True, figures_pth = None, vmin1 = -0.1, vmax1 = 0.1):
@@ -767,102 +767,73 @@ class pRFViewer(Viewer):
             plt.ylim(0,1)
             fig.savefig(op.join(figures_pth, op.split(fig_name)[-1].replace('flatmap','violinplot').replace('sub-{sj}'.format(sj = pp),'sub-GROUP')))
             
-
-    def plot_ecc_size(self, participant_list = [], group_estimates = {}, ses = 'ses-mean',  run_type = 'mean',
-                        figures_pth = None, model_name = 'gauss', n_bins_colors = 256, n_bins_dist = 8, 
-                        max_ecc_ext = 5, max_size_ext = 14):
+    def plot_ecc_size(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean',
+                        figures_pth = None, model_name = 'gauss', n_bins_dist = 8, 
+                        vmin1 = {'ecc': 0, 'size': 0}, vmax1 = {'ecc': 5.5, 'size': 15}):
         
-        ### make output folder for figures
+        ## make output folder for figures
         if figures_pth is None:
-            figures_pth = op.join(self.outputdir, 'ecc_size', self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'])
+            figures_pth = op.join(self.figures_pth, 'ecc_size', self.pRFModelObj.fitfolder['pRF'])
             
-        ## make costum ECC color map
-        ecc_cmap = plot_utils.make_colormap(colormap = ['#dd3933','#f3eb53','#7cb956','#82cbdb','#3d549f'],
-                                            bins = n_bins_colors, cmap_name = 'ECC_mackey_costum', 
-                                            discrete = False, add_alpha = False, return_cmap = True)
-        
+        # dataframe to store binned values
         avg_bin_df = pd.DataFrame()
         
         ## loop over participants in list
         for pp in participant_list:
 
-            ## make sub specific folder
-            sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
+            # make path to save sub-specific figures
+            sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp))
             os.makedirs(sub_figures_pth, exist_ok=True)
                 
             ## use RSQ as alpha level for flatmaps
             r2 = group_estimates['sub-{sj}'.format(sj = pp)]['r2']
-            alpha_level = mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
+            alpha_level = self.MRIObj.mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
                 
             ## get ECCENTRICITY estimates
-            complex_location = group_estimates['sub-{sj}'.format(sj = pp)]['x'] + group_estimates['sub-{sj}'.format(sj = pp)]['y'] * 1j # calculate eccentricity values
-            eccentricity = np.abs(complex_location)
-
-            #### plot flatmap ###
-            flatmap =  plot_utils.make_raw_vertex_image(eccentricity, 
-                                                        cmap = ecc_cmap, 
-                                                        vmin = 0, vmax = 6, 
-                                                        data2 = alpha_level, 
-                                                        vmin2 = 0, vmax2 = 1, 
-                                                        subject = self.pysub['sub-{pp}'.format(pp = pp)], 
-                                                        data2D = True)
+            eccentricity = self.pRFModelObj.get_eccentricity(xx = group_estimates['sub-{sj}'.format(sj = pp)]['x'],
+                                                             yy = group_estimates['sub-{sj}'.format(sj = pp)]['y'],
+                                                             rsq = r2)
             
-            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_ECC.png'.format(sj = pp,
-                                                                                                                                        acq = self.MRIObj.acq,
-                                                                                                                                        space = self.MRIObj.sj_space,
-                                                                                                                                        run = run_type, 
-                                                                                                                                        model = model_name))
+            ## plot rsq values on flatmap surface ##
+            fig_name = op.join(sub_figures_pth,
+                            'sub-{sj}_task-{tsk}_acq-{acq}_space-{space}_ses-{ses}_run-{run}_model-{model}_flatmap_ECC.png'.format(sj=pp, tsk = 'pRF',
+                                                                                                            acq = self.MRIObj.acq, space = self.MRIObj.sj_space,
+                                                                                                            ses=ses, run = run_type, model = model_name))
+
             # if we fitted hrf, then add that to fig name
             if self.pRFModelObj.fit_hrf:
                 fig_name = fig_name.replace('.png','_withHRF.png') 
 
-            print('saving %s' %fig_name)
-            _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
+            self.plot_utils.plot_flatmap(eccentricity, 
+                                        pysub = self.pysub, cmap = 'viridis', 
+                                        vmin1 = vmin1['ecc'], vmax1 = vmax1['ecc'],
+                                        est_arr2 = alpha_level,
+                                        vmin2 = 0, vmax2 = 1, 
+                                        fig_abs_name = fig_name)
             
-            ## get SIZE estimates
-            if model_name in ['dn', 'dog']:
-                size_fwhmax, fwatmin = plot_utils.fwhmax_fwatmin(model_name, 
-                                                                 group_estimates['sub-{sj}'.format(sj = pp)])
-            else: 
-                size_fwhmax = plot_utils.fwhmax_fwatmin(model_name, 
-                                                        group_estimates['sub-{sj}'.format(sj = pp)])
-                
-            #### plot flatmap ###
-            flatmap =  plot_utils.make_raw_vertex_image(size_fwhmax, 
-                                                        cmap = 'hot', 
-                                                        vmin = 0, vmax = 7, 
-                                                        data2 = alpha_level, 
-                                                        vmin2 = 0, vmax2 = 1, 
-                                                        subject = self.pysub['sub-{pp}'.format(pp = pp)], 
-                                                        data2D = True)
+            ## get SIZE estimates 
+            size_fwhmaxmin = self.pRFModelObj.fwhmax_fwatmin(model_name, 
+                                                                group_estimates['sub-{sj}'.format(sj = pp)])
             
-            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_SIZE-fwhmax.png'.format(sj = pp,
-                                                                                                                                        acq = self.MRIObj.acq,
-                                                                                                                                        space = self.MRIObj.sj_space,
-                                                                                                                                        run = run_type, 
-                                                                                                                                        model = model_name))
-            if self.pRFModelObj.fit_hrf:
-                fig_name = fig_name.replace('.png','_withHRF.png') 
-
-            print('saving %s' %fig_name)
-            _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
+            self.plot_utils.plot_flatmap(size_fwhmaxmin[0], 
+                                        pysub = self.pysub, cmap = 'cubehelix', 
+                                        vmin1 = vmin1['size'], vmax1 = vmax1['size'],
+                                        est_arr2 = alpha_level,
+                                        vmin2 = 0, vmax2 = 1, 
+                                        fig_abs_name = fig_name.replace('ECC', 'SIZE-fwhmax'))
+            
             ## GET values per ROI ##
-            ecc_pp_roi_df = plot_utils.get_estimates_roi_df(pp, eccentricity, 
-                                                ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
-                                                roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
-                                                model = model_name)
+            ecc_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, eccentricity, 
+                                                                    ROIs_dict = self.ROIs_dict, 
+                                                                    model = model_name)
+    
+            size_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, size_fwhmaxmin[0], 
+                                                                    ROIs_dict = self.ROIs_dict, 
+                                                                    model = model_name)
             
-            size_pp_roi_df = plot_utils.get_estimates_roi_df(pp, size_fwhmax, 
-                                                ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
-                                                roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
-                                                model = model_name)
-            
-            rsq_pp_roi_df = plot_utils.get_estimates_roi_df(pp, r2, 
-                                                ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
-                                                roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
-                                                model = model_name)
+            rsq_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, r2, 
+                                                                    ROIs_dict = self.ROIs_dict, 
+                                                                    model = model_name)
 
             # merge them into one
             df_ecc_siz = pd.merge(ecc_pp_roi_df.rename(columns={'value': 'ecc'}),
@@ -877,13 +848,13 @@ class pRFViewer(Viewer):
             sns.set_style("ticks")
 
             g = sns.lmplot(x="ecc", y="size", hue = 'ROI', data = df_ecc_siz, scatter_kws={'alpha':0.05},
-                        scatter=True, palette = self.group_color_codes['sub-{sj}'.format(sj = pp)]) #, markers=['^', 's', 'o', 'v', 'D', 'h', 'P', '.', ','])
+                        scatter=True, palette = self.ROI_pallete) #, markers=['^', 's', 'o', 'v', 'D', 'h', 'P', '.', ','])
 
             ax = plt.gca()
             plt.xticks(fontsize = 18)
             plt.yticks(fontsize = 18)
-            ax.axes.set_xlim(0, max_ecc_ext)
-            ax.axes.set_ylim(0.5, max_size_ext)
+            ax.axes.set_xlim(vmin1['ecc'], vmax1['ecc'])
+            ax.axes.set_ylim(vmin1['size'], vmax1['size'])
             ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
             ax.set_ylabel('pRF size FWHMax [deg]', fontsize = 20, labelpad = 15)
             sns.despine(offset=15)
@@ -892,24 +863,15 @@ class pRFViewer(Viewer):
                 lh.set_alpha(1)
             fig2 = plt.gcf()
 
-            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_ecc_vs_size_UNbinned.png'.format(sj = pp,
-                                                                                                                                        acq = self.MRIObj.acq,
-                                                                                                                                        space = self.MRIObj.sj_space,
-                                                                                                                                        run = run_type, 
-                                                                                                                                        model = model_name))
-            
-            # if we fitted hrf, then add that to fig name
-            if self.pRFModelObj.fit_hrf:
-                fig_name = fig_name.replace('.png','_withHRF.png') 
-
+            fig_name = fig_name.replace('ECC', 'ECCvsSIZE_UNbinned')
             fig2.savefig(fig_name, dpi=100,bbox_inches = 'tight')
 
             ## bin it, for cleaner plot
-            for r_name in self.group_ROIs['sub-{sj}'.format(sj = pp)]:
+            for r_name in self.ROIs_dict.keys()   :
 
-                mean_x, _, mean_y, _ = plot_utils.get_weighted_bins(df_ecc_siz.loc[(df_ecc_siz['ROI'] == r_name) & \
-                                                                                     (df_ecc_siz['rsq'].notna())],
-                                                                                    x_key = 'ecc', y_key = 'size', weight_key = 'rsq', n_bins = n_bins_dist)
+                mean_x, _, mean_y, _ = self.MRIObj.mri_utils.get_weighted_bins (df_ecc_siz.loc[(df_ecc_siz['ROI'] == r_name)],
+                                                                                x_key = 'ecc', y_key = 'size', 
+                                                                                weight_key = 'rsq', sort_key = 'ecc', n_bins = n_bins_dist)
 
                 avg_bin_df = pd.concat((avg_bin_df,
                                         pd.DataFrame({ 'sj': np.tile('sub-{sj}'.format(sj = pp), len(mean_x)),
@@ -922,14 +884,14 @@ class pRFViewer(Viewer):
             sns.set(font_scale=1.3)
             sns.set_style("ticks")
 
-            g = sns.lmplot(x="ecc", y="size", hue = 'ROI', data = avg_bin_df.loc[avg_bin_df['sj'] == 'sub-{sj}'.format(sj = pp)], scatter_kws={'alpha':0.15},
-                        scatter=True, palette = self.group_color_codes['sub-{sj}'.format(sj = pp)]) #, markers=['^', 's', 'o', 'v', 'D', 'h', 'P', '.', ','])
+            g = sns.lmplot(x="ecc", y="size", hue = 'ROI', data = avg_bin_df.loc[avg_bin_df['sj'] == 'sub-{sj}'.format(sj = pp)], 
+                           scatter_kws={'alpha':0.15}, scatter=True, palette = self.ROI_pallete) #, markers=['^', 's', 'o', 'v', 'D', 'h', 'P', '.', ','])
 
             ax = plt.gca()
             plt.xticks(fontsize = 18)
             plt.yticks(fontsize = 18)
-            ax.axes.set_xlim(0, max_ecc_ext)
-            ax.axes.set_ylim(0.5, max_size_ext)
+            ax.axes.set_xlim(vmin1['ecc'], vmax1['ecc'])
+            ax.axes.set_ylim(vmin1['size'], vmax1['size'])
             ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
             ax.set_ylabel('pRF size FWHMax [deg]', fontsize = 20, labelpad = 15)
             sns.despine(offset=15)
@@ -938,15 +900,7 @@ class pRFViewer(Viewer):
                 lh.set_alpha(1)
             fig2 = plt.gcf()
 
-            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_ecc_vs_size_binned.png'.format(sj = pp,
-                                                                                                                                        acq = self.MRIObj.acq,
-                                                                                                                                        space = self.MRIObj.sj_space,
-                                                                                                                                        run = run_type, 
-                                                                                                                                        model = model_name))
-            # if we fitted hrf, then add that to fig name
-            if self.pRFModelObj.fit_hrf:
-                fig_name = fig_name.replace('.png','_withHRF.png') 
-
+            fig_name = fig_name.replace('_UNbinned', '_binned')
             fig2.savefig(fig_name, dpi=100,bbox_inches = 'tight')
 
         if len(participant_list) > 1:
@@ -956,14 +910,14 @@ class pRFViewer(Viewer):
             sns.set_style("ticks")
 
             g = sns.lmplot(x="ecc", y="size", hue = 'ROI', data = avg_bin_df, 
-                        scatter=True, palette = self.group_color_codes['sub-{sj}'.format(sj = pp)],  
+                        scatter=True, palette = self.ROI_pallete,  
                         x_bins = n_bins_dist) #, markers=['^', 's', 'o', 'v', 'D', 'h', 'P', '.', ','])
 
             ax = plt.gca()
             plt.xticks(fontsize = 18)
             plt.yticks(fontsize = 18)
-            ax.axes.set_xlim(0, max_ecc_ext)
-            ax.axes.set_ylim(0.5, max_size_ext)
+            ax.axes.set_xlim(vmin1['ecc'], vmax1['ecc'])
+            ax.axes.set_ylim(vmin1['size'], vmax1['size'])
             ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
             ax.set_ylabel('pRF size FWHMax [deg]', fontsize = 20, labelpad = 15)
             sns.despine(offset=15)
@@ -972,126 +926,112 @@ class pRFViewer(Viewer):
                 lh.set_alpha(1)
             fig2 = plt.gcf()
 
-            fig_name = op.join(figures_pth,'sub-GROUP_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_ecc_vs_size_binned.png'.format(acq = self.MRIObj.acq,
-                                                                                                                                        space = self.MRIObj.sj_space,
-                                                                                                                                        run = run_type, 
-                                                                                                                                        model = model_name))
-            # if we fitted hrf, then add that to fig name
-            if self.pRFModelObj.fit_hrf:
-                fig_name = fig_name.replace('.png','_withHRF.png') 
+            fig2.savefig(op.join(figures_pth, op.split(fig_name)[-1].replace('sub-{sj}'.format(sj = pp),'sub-GROUP')),
+                            dpi=100,bbox_inches = 'tight')
 
-            fig2.savefig(fig_name, dpi=100,bbox_inches = 'tight')
-
-
-    def plot_exponent(self, participant_list = [], group_estimates = {}, ses = 'ses-mean',  run_type = 'mean',
-                        figures_pth = None, model_name = 'gauss'):
+    def plot_exponent(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean',
+                        figures_pth = None, model_name = 'gauss', vmin1 = 0, vmax1 = 1):
         
-        ### make output folder for figures
+        ## make output folder for figures
         if figures_pth is None:
-            figures_pth = op.join(self.outputdir, 'exponent', self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'])
+            figures_pth = op.join(self.figures_pth, 'exponent', self.pRFModelObj.fitfolder['pRF'])
             
-        
-        avg_df = pd.DataFrame()
+        # save values per roi in dataframe
+        avg_roi_df = pd.DataFrame()
         
         ## loop over participants in list
         for pp in participant_list:
 
-            ## make sub specific folder
-            sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
+            # make path to save sub-specific figures
+            sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp))
             os.makedirs(sub_figures_pth, exist_ok=True)
-                
-            ## use RSQ as alpha level for flatmaps
-            r2 = group_estimates['sub-{sj}'.format(sj = pp)]['r2']
-            alpha_level = mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
-                
-            #### plot flatmap ###
-            flatmap =  plot_utils.make_raw_vertex_image(group_estimates['sub-{sj}'.format(sj = pp)]['ns'], 
-                                                        cmap = 'plasma', 
-                                                        vmin = 0, vmax = 1, 
-                                                        data2 = alpha_level, 
-                                                        vmin2 = 0, vmax2 = 1, 
-                                                        subject = self.pysub['sub-{pp}'.format(pp = pp)], 
-                                                        data2D = True)
-            
-            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_N.png'.format(sj = pp,
-                                                                                                                                        acq = self.MRIObj.acq,
-                                                                                                                                        space = self.MRIObj.sj_space,
-                                                                                                                                        run = run_type, 
-                                                                                                                                        model = model_name))
+
+            ## plot rsq values on flatmap surface ##
+            fig_name = op.join(sub_figures_pth,
+                            'sub-{sj}_task-{tsk}_acq-{acq}_space-{space}_ses-{ses}_run-{run}_model-{model}_flatmap_Exponent.png'.format(sj=pp, tsk = 'pRF',
+                                                                                                            acq = self.MRIObj.acq, space = self.MRIObj.sj_space,
+                                                                                                            ses=ses, run = run_type, model = model_name))
+
+            # if we fitted hrf, then add that to fig name
             if self.pRFModelObj.fit_hrf:
                 fig_name = fig_name.replace('.png','_withHRF.png') 
 
-            print('saving %s' %fig_name)
-            _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+            ## use RSQ as alpha level for flatmaps
+            r2 = group_estimates['sub-{sj}'.format(sj = pp)]['r2']
+            alpha_level = self.MRIObj.mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
 
+            self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['ns'], 
+                                        pysub = self.pysub, cmap = 'magma', 
+                                        vmin1 = vmin1, vmax1 = vmax1, 
+                                        est_arr2 = alpha_level,
+                                        vmin2 = 0, vmax2 = 1, 
+                                        fig_abs_name = fig_name)
             
             ## GET values per ROI ##
-            ns_pp_roi_df = plot_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)]['ns'], 
-                                                ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
-                                                roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
-                                                model = model_name)
-            
-            rsq_pp_roi_df = plot_utils.get_estimates_roi_df(pp, r2, 
-                                                ROIs = self.group_ROIs['sub-{sj}'.format(sj = pp)], 
-                                                roi_verts = self.group_roi_verts['sub-{sj}'.format(sj = pp)], 
-                                                model = model_name)
+            ns_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)]['ns'], 
+                                                                    ROIs_dict = self.ROIs_dict, 
+                                                                    model = model_name)
+    
+            rsq_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, r2, 
+                                                                    ROIs_dict = self.ROIs_dict, 
+                                                                    model = model_name)
 
             # merge them into one
             df_ns = pd.merge(ns_pp_roi_df.rename(columns={'value': 'exponent'}),
-                                rsq_pp_roi_df.rename(columns={'value': 'rsq'}))
+                            rsq_pp_roi_df.rename(columns={'value': 'rsq'}))
 
             ## drop the nans
             df_ns = df_ns[~np.isnan(df_ns.rsq)]
 
             #### plot distribution ###
-            fig, axis = plt.subplots(1, figsize=(10,5), dpi=100, facecolor='w', edgecolor='k')
+            fig, ax1 = plt.subplots(1,1, figsize=(20,7.5), dpi=100, facecolor='w', edgecolor='k')
 
-            v1 = sns.violinplot(data = df_ns, x = 'ROI', y = 'exponent', 
-                                cut=0, inner='box', palette = self.group_color_codes['sub-{sj}'.format(sj = pp)], linewidth=1.8, ax = axis) 
+            v1 = pt.RainCloud(data = df_ns, move = .2, alpha = .9,
+                        x = 'ROI', y = 'exponent', pointplot = False, hue = 'ROI',
+                        palette = self.ROI_pallete, ax = ax1)
+            
+            # quick fix for legen
+            handles = [mpatches.Patch(color = self.ROI_pallete[k], label = k) for k in self.ROIs_dict.keys()]
+            ax1.legend(loc = 'upper right',fontsize=8, handles = handles, title="ROIs")#, fancybox=True)
 
             v1.set(xlabel=None)
             v1.set(ylabel=None)
             plt.margins(y=0.025)
-            #sns.swarmplot(x='ecc', y='cs', data=crwd_df4plot,color=".25",alpha=0.5)
-            plt.xticks(fontsize = 10)
-            plt.yticks(fontsize = 10)
+            plt.xticks(fontsize = 18)
+            plt.yticks(fontsize = 18)
 
-            plt.xlabel('ROI',fontsize = 15,labelpad=18)
-            plt.ylabel('Exponent',fontsize = 15,labelpad=18)
-            plt.ylim(0, 1)
-
+            plt.xlabel('ROI',fontsize = 20,labelpad=18)
+            plt.ylabel('Exponent',fontsize = 20,labelpad=18)
+            plt.ylim(0,1)
             fig.savefig(fig_name.replace('flatmap','violinplot'))
-            
-            
+
             ## concatenate average per participant, to make group plot
-            avg_df = pd.concat((avg_df,
-                                    df_ns.groupby(['sj', 'ROI'])['exponent'].median().reset_index()))
+            avg_roi_df = pd.concat((avg_roi_df, df_ns))
             
-            
+        # if we provided several participants, make group plot
         if len(participant_list) > 1:
 
-            fig, axis = plt.subplots(1, figsize=(10,5), dpi=100, facecolor='w', edgecolor='k')
+            fig, ax1 = plt.subplots(1,1, figsize=(15,5), dpi=100, facecolor='w', edgecolor='k')
 
-            v1 = sns.violinplot(data = avg_df, x = 'ROI', y = 'exponent', 
-                                order = self.ROI_keys,
-                                cut=0, inner='box', palette = self.group_color_codes['sub-{sj}'.format(sj = pp)], 
-                                linewidth=1.8, ax = axis)
-
+            v1 = sns.pointplot(data = avg_roi_df.groupby(['sj', 'ROI'])['exponent'].mean().reset_index(),
+                                x = 'ROI', y = 'exponent', color = 'k', markers = 'D', #scale = 1, 
+                                palette = self.ROI_pallete, order = self.ROIs_dict.keys(), 
+                                dodge = False, join = False, ci=68, ax = ax1)
             v1.set(xlabel=None)
             v1.set(ylabel=None)
             plt.margins(y=0.025)
-            sns.stripplot(data = avg_df, x = 'ROI', y = 'exponent', 
-                            order = self.ROI_keys,
-                            color="white", alpha=0.5)
-            plt.xticks(fontsize = 10)
-            plt.yticks(fontsize = 10)
+            sns.stripplot(data = avg_roi_df.groupby(['sj', 'ROI'])['exponent'].mean().reset_index(), 
+                          x = 'ROI', y = 'exponent', #hue = 'sj', palette = sns.color_palette("husl", len(participant_list)),
+                            order = self.ROIs_dict.keys(),
+                            color="gray", alpha=0.5, ax=ax1)
+            plt.xticks(fontsize = 18)
+            plt.yticks(fontsize = 18)
 
-            plt.xlabel('ROI',fontsize = 15,labelpad=18)
-            plt.ylabel('Exponent',fontsize = 15,labelpad=18)
-            plt.ylim(0, 1)
+            plt.xlabel('ROI',fontsize = 20,labelpad=18)
+            plt.ylabel('Exponent',fontsize = 20,labelpad=18)
+            plt.ylim(0,1)
 
             fig.savefig(op.join(figures_pth, op.split(fig_name)[-1].replace('flatmap','violinplot').replace('sub-{sj}'.format(sj = pp),'sub-GROUP')))
-
 
     def plot_pa(self, participant_list = [], group_estimates = {}, ses = 'ses-mean',  run_type = 'mean',
                         figures_pth = None, model_name = 'gauss', n_bins_colors = 256, max_x_lim = 5, angle_thresh = 3*np.pi/4):

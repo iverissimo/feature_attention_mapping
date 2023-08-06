@@ -695,40 +695,6 @@ class PlotUtils(Utils):
         return axis
 
 
-    def get_weighted_bins(data_df, x_key = 'ecc', y_key = 'size', weight_key = 'rsq', n_bins = 10):
-
-        """ 
-        
-        Get weighted bins from dataframe, sorted by one of the variables
-
-        """
-        
-        # sort values by eccentricity
-        data_df = data_df.sort_values(by=[x_key])
-
-        #divide in equally sized bins
-        bin_size = int(len(data_df)/n_bins) 
-        
-        mean_x = []
-        mean_x_std = []
-        mean_y = []
-        mean_y_std = []
-        
-        # for each bin calculate rsq-weighted means and errors of binned ecc/gain 
-        for j in range(n_bins): 
-            
-            mean_x.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][x_key],
-                                                weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).mean)
-            mean_x_std.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][x_key],
-                                                    weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
-
-            mean_y.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][y_key],
-                                                weights = data_df[bin_size * j:bin_size*(j+1)][weight_key]).mean)
-            mean_y_std.append(weightstats.DescrStatsW(data_df[bin_size * j:bin_size * (j+1)][y_key],
-                                                    weights = data_df[bin_size * j:bin_size * (j+1)][weight_key]).std_mean)
-
-        return mean_x, mean_x_std, mean_y, mean_y_std
-
 
     
 

@@ -11,6 +11,7 @@ import yaml
 import ptitprince as pt # raincloud plots
 import matplotlib.patches as mpatches
 from  matplotlib.ticker import FuncFormatter
+from matplotlib.lines import Line2D
 
 import cortex
 
@@ -637,10 +638,14 @@ class pRFViewer(Viewer):
             self.plot_exponent(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
                                             model_name = prf_model_name, vmin1 = 0, vmax1 = 1)
 
-        # ### POLAR ANGLE ####
-        # self.plot_pa(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
-        #                                 model_name = prf_model_name, 
-        #                                 n_bins_colors = 256, max_x_lim = max_ecc_ext, angle_thresh = 3*np.pi/4)
+        ### POLAR ANGLE ####
+        self.plot_pa(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+                                        model_name = prf_model_name, 
+                                        n_bins_colors = 256, max_x_lim = 5.5, angle_thresh = 3*np.pi/4)
+        
+        ### Visual Field coverage ###
+        self.plot_VFcoverage(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+                                        model_name = prf_model_name, max_ecc_ext_dict = max_ecc_ext)
 
     def compare_pRF_model_rsq(self, participant_list = [], ses = 'mean', run_type = 'mean', 
                                 prf_model_list = ['gauss', 'css'], mask_bool_df = None, stim_on_screen = [],
@@ -1033,158 +1038,266 @@ class pRFViewer(Viewer):
 
             fig.savefig(op.join(figures_pth, op.split(fig_name)[-1].replace('flatmap','violinplot').replace('sub-{sj}'.format(sj = pp),'sub-GROUP')))
 
-    def plot_pa(self, participant_list = [], group_estimates = {}, ses = 'ses-mean',  run_type = 'mean',
-                        figures_pth = None, model_name = 'gauss', n_bins_colors = 256, max_x_lim = 5, angle_thresh = 3*np.pi/4):
+    def plot_pa(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean',
+                        figures_pth = None, model_name = 'gauss', n_bins_colors = 256, max_x_lim = 5.5, angle_thresh = 3*np.pi/4,
+                        colormap_list = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb', '#3d549f','#655099','#ad5a9b','#dd3933']):
         
-        # make output folder for figures
+        ## make output folder for figures
         if figures_pth is None:
-            figures_pth = op.join(self.outputdir, 'polar_angle', self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'])
+            figures_pth = op.join(self.figures_pth, 'polar_angle', self.pRFModelObj.fitfolder['pRF'])
+            
+        # get matplotlib color map from segmented colors
+        PA_cmap = self.plot_utils.make_colormap(colormap_list, bins = n_bins_colors, 
+                                                    cmap_name = 'PA_mackey_custom',
+                                                    discrete = False, add_alpha = False, return_cmap = True)
 
         ## loop over participants in list
         for pp in participant_list:
 
-            ## make sub specific folder
-            sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp), ses)
+            # make path to save sub-specific figures
+            sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp))
             os.makedirs(sub_figures_pth, exist_ok=True)
-
+                
             ## use RSQ as alpha level for flatmaps
             r2 = group_estimates['sub-{sj}'.format(sj = pp)]['r2']
-            alpha_level = mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
+            alpha_level = self.MRIObj.mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
             alpha_level[np.where((np.isnan(r2)))[0]] = np.nan
-               
+
             ## position estimates
             xx = group_estimates['sub-{sj}'.format(sj = pp)]['x']
             yy = group_estimates['sub-{sj}'.format(sj = pp)]['y']
 
-            ## calculate polar angle 
-            complex_location = xx + yy * 1j 
+            ## calculate polar angle (normalize PA between 0 and 1)
+            polar_angle_norm = self.pRFModelObj.get_polar_angle(xx = xx, yy = yy, rsq = r2, 
+                                                            pa_transform = 'norm', angle_thresh = None)
+               
+            ## plot rsq values on flatmap surface ##
+            fig_name = op.join(sub_figures_pth,
+                            'sub-{sj}_task-{tsk}_acq-{acq}_space-{space}_ses-{ses}_run-{run}_model-{model}_flatmap_PA.png'.format(sj=pp, tsk = 'pRF',
+                                                                                                            acq = self.MRIObj.acq, space = self.MRIObj.sj_space,
+                                                                                                            ses=ses, run = run_type, model = model_name))
+
+            # if we fitted hrf, then add that to fig name
+            if self.pRFModelObj.fit_hrf:
+                fig_name = fig_name.replace('.png','_withHRF.png') 
+
+            self.plot_utils.plot_flatmap(polar_angle_norm, 
+                                        pysub = self.pysub, cmap = PA_cmap, 
+                                        vmin1 = 0, vmax1 = 1,
+                                        est_arr2 = alpha_level,
+                                        vmin2 = 0, vmax2 = 1, 
+                                        with_colorbar = False,
+                                        fig_abs_name = fig_name)
             
-            polar_angle = np.angle(complex_location)
-            polar_angle_norm = ((polar_angle + np.pi) / (np.pi * 2.0)) # normalize PA between 0 and 1
-            polar_angle_norm[np.where((np.isnan(r2)))[0]] = np.nan
+            ## also plot non-uniform color wheel ##
+            cmap_pa_sns = sns.hls_palette(as_cmap=True, h = 0.01, s=.9, l=.65)
+            pa_transformed = self.pRFModelObj.get_polar_angle(xx = xx, yy = yy, rsq = r2, 
+                                                            pa_transform = 'flip', angle_thresh = angle_thresh)
 
-            # get matplotlib color map from segmented colors
-            PA_cmap = plot_utils.make_colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb',
-                                                        '#3d549f','#655099','#ad5a9b','#dd3933'], bins = n_bins_colors, 
-                                                        cmap_name = 'PA_mackey_costum',
-                                                        discrete = False, add_alpha = False, return_cmap = True)
-
-            #### plot flatmap ###
-            # of PA 
-            flatmap = plot_utils.make_raw_vertex_image(polar_angle_norm, 
-                                                        cmap = PA_cmap, vmin = 0, vmax = 1, 
-                                                        data2 = alpha_level, 
-                                                        vmin2 = 0, vmax2 = 1, 
-                                                        subject = self.pysub['sub-{pp}'.format(pp = pp)], 
-                                                        data2D = True)
-
-            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_PAalpha.png'.format(sj = pp,
-                                                                                                                                        acq = self.MRIObj.acq,
-                                                                                                                                        space = self.MRIObj.sj_space,
-                                                                                                                                        run = run_type, 
-                                                                                                                                        model = model_name))
-            if self.pRFModelObj.fit_hrf:
-                fig_name = fig_name.replace('.png','_withHRF.png') 
-
-            print('saving %s' %fig_name)
-            _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
-            flatmap = plot_utils.make_raw_vertex_image(polar_angle_norm, 
-                                                        cmap = PA_cmap, vmin = 0, vmax = 1, 
-                                                        data2 = np.ones(alpha_level.shape), 
-                                                        vmin2 = 0, vmax2 = 1, 
-                                                        subject = self.pysub['sub-{pp}'.format(pp = pp)], 
-                                                        data2D = True)
-
-            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_PA.png'.format(sj = pp,
-                                                                                                                                        acq = self.MRIObj.acq,
-                                                                                                                                        space = self.MRIObj.sj_space,
-                                                                                                                                        run = run_type, 
-                                                                                                                                        model = model_name))
-            if self.pRFModelObj.fit_hrf:
-                fig_name = fig_name.replace('.png','_withHRF.png') 
-
-            print('saving %s' %fig_name)
-            _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
-            # also plot non-uniform color wheel
-            rgb_pa = plot_utils.get_NONuniform_polar_angle(xx, yy, r2, 
-                                                            angle_thresh = angle_thresh, 
-                                                            rsq_thresh = 0, 
-                                                            pysub = self.pysub['sub-{pp}'.format(pp = pp)])
-
-            # make ones mask,
-            ones_mask = np.ones(r2.shape)
-            ones_mask[np.where((np.isnan(r2)))[0]] = np.nan
-
-            flatmap = cortex.VertexRGB(rgb_pa[:, 0], rgb_pa[:, 1], rgb_pa[:, 2],
-                                            alpha = ones_mask,
-                                            subject = self.pysub['sub-{pp}'.format(pp = pp)])
-
-            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_PAnonUNI.png'.format(sj = pp,
-                                                                                                                                        acq = self.MRIObj.acq,
-                                                                                                                                        space = self.MRIObj.sj_space,
-                                                                                                                                        run = run_type, 
-                                                                                                                                        model = model_name))
-            if self.pRFModelObj.fit_hrf:
-                fig_name = fig_name.replace('.png','_withHRF.png') 
-
-            print('saving %s' %fig_name)
-            _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+            self.plot_utils.plot_flatmap(pa_transformed, 
+                                        pysub = self.pysub, cmap = cmap_pa_sns, 
+                                        vmin1 = -np.pi, vmax1 = np.pi, 
+                                        est_arr2 = alpha_level,
+                                        vmin2 = 0, vmax2 = 1, 
+                                        with_colorbar = False,
+                                        fig_abs_name = fig_name.replace('_PA', '_PAnonUNI'))
 
             # plot x and y separately, for sanity check
-            # x values
-            flatmap = cortex.Vertex2D(xx, alpha_level,
-                                        self.pysub['sub-{pp}'.format(pp = pp)],
-                                        vmin = -max_x_lim, vmax= max_x_lim,
-                                        vmin2 = 0, vmax2= 1,
-                                        cmap='BuBkRd_alpha_2D')
+            # XX
+            self.plot_utils.plot_flatmap(xx, 
+                                        pysub = self.pysub, cmap = 'BuBkRd_alpha_2D', 
+                                        vmin1 = -max_x_lim, vmax1 = max_x_lim, 
+                                        est_arr2 = alpha_level,
+                                        vmin2 = 0, vmax2 = 1, 
+                                        fig_abs_name = fig_name.replace('_PA', '_XX'))
+            # YY
+            self.plot_utils.plot_flatmap(yy, 
+                                        pysub = self.pysub, cmap = 'BuBkRd_alpha_2D', 
+                                        vmin1 = -max_x_lim, vmax1 = max_x_lim, 
+                                        est_arr2 = alpha_level,
+                                        vmin2 = 0, vmax2 = 1, 
+                                        fig_abs_name = fig_name.replace('_PA', '_YY'))
 
-            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_XX.png'.format(sj = pp,
-                                                                                                                                        acq = self.MRIObj.acq,
-                                                                                                                                        space = self.MRIObj.sj_space,
-                                                                                                                                        run = run_type, 
-                                                                                                                                        model = model_name))
-            if self.pRFModelObj.fit_hrf:
-                fig_name = fig_name.replace('.png','_withHRF.png') 
-
-            print('saving %s' %fig_name)
-            _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
-            # y values
-            flatmap = cortex.Vertex2D(yy, alpha_level,
-                                        self.pysub['sub-{pp}'.format(pp = pp)],
-                                        vmin = -max_x_lim, vmax= max_x_lim,
-                                        vmin2 = 0, vmax2= 1,
-                                        cmap='BuBkRd_alpha_2D')
-
-            fig_name = op.join(sub_figures_pth,'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_flatmap_XX.png'.format(sj = pp,
-                                                                                                                                        acq = self.MRIObj.acq,
-                                                                                                                                        space = self.MRIObj.sj_space,
-                                                                                                                                        run = run_type, 
-                                                                                                                                        model = model_name))
-            if self.pRFModelObj.fit_hrf:
-                fig_name = fig_name.replace('.png','_withHRF.png') 
-
-            print('saving %s' %fig_name)
-            _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
-
-            ## plot the colorwheels as figs
+        ## plot the colorwheels as figs
             
-            # non uniform colorwheel
-            plot_utils.plot_pa_colorwheel(resolution=800, angle_thresh = angle_thresh, cmap_name = 'hsv', 
-                                            continuous = True, fig_name = op.join(sub_figures_pth, 'hsv'))
+        # non uniform colorwheel
+        self.plot_utils.plot_pa_colorwheel(resolution=800, angle_thresh = angle_thresh, cmap_name = cmap_pa_sns, 
+                                        continuous = True, fig_name = op.join(figures_pth, 'hsv_seaborn'))
 
-            # uniform colorwheel, continuous
-            plot_utils.plot_pa_colorwheel(resolution=800, angle_thresh = np.pi, 
-                                                    cmap_name = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb','#3d549f','#655099','#ad5a9b','#dd3933'], 
-                                            continuous = True, fig_name = op.join(sub_figures_pth, 'PA_mackey'))
+        # uniform colorwheel, continuous
+        self.plot_utils.plot_pa_colorwheel(resolution=800, angle_thresh = np.pi, 
+                                        cmap_name = colormap_list, 
+                                        continuous = True, fig_name = op.join(figures_pth, 'PA_mackey'))
 
-            # uniform colorwheel, discrete
-            plot_utils.plot_pa_colorwheel(resolution=800, angle_thresh = np.pi, 
-                                                    cmap_name = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb','#3d549f','#655099','#ad5a9b','#dd3933'], 
-                                            continuous = False, fig_name = op.join(sub_figures_pth, 'PA_mackey'))
+        # uniform colorwheel, discrete
+        self.plot_utils.plot_pa_colorwheel(resolution=800, angle_thresh = np.pi, 
+                                        cmap_name = colormap_list, 
+                                        continuous = False, fig_name = op.join(figures_pth, 'PA_mackey'))
+
+    def plot_VFcoverage(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean',
+                        figures_pth = None, model_name = 'gauss', max_ecc_ext_dict = {}):
+
+        """
+        Plot visual field coverage - hexbins for each ROI
+        for all participants in list
+        """
+
+        ## make output folder for figures
+        if figures_pth is None:
+            figures_pth = op.join(self.figures_pth, 'VF_coverage', self.pRFModelObj.fitfolder['pRF'])
+            
+        hemi_labels = ['LH', 'RH']
+
+        ## get vertices for each relevant ROI, per hemisphere
+        ROIs_dict = {}
+        ## LH
+        ROIs_dict['LH'] = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = None, pysub = self.pysub, use_atlas = self.use_atlas, 
+                                                        annot_filename = self.annot_filename, hemisphere = 'LH',
+                                                        ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
+        ROIs_dict['RH']  = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = None, pysub = self.pysub, use_atlas = self.use_atlas, 
+                                                        annot_filename = self.annot_filename, hemisphere = 'RH',
+                                                        ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
+
+        # save values per roi in dataframe
+        df_merge = pd.DataFrame()
+
+        ## loop over participants in list
+        for pp in participant_list:
+
+            # make path to save sub-specific figures
+            sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp))
+            os.makedirs(sub_figures_pth, exist_ok=True)
+
+            df_hemi = pd.DataFrame()
+
+            for hemi in hemi_labels:
+                ## GET values per ROI ##
+                xx_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)]['x'], 
+                                                                        ROIs_dict = ROIs_dict['LH'], 
+                                                                        model = model_name)
+                yy_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)]['y'], 
+                                                                        ROIs_dict = ROIs_dict['LH'], 
+                                                                        model = model_name)
+
+                tmp_df = pd.merge(xx_pp_roi_df.rename(columns={'value': 'xx'}),
+                                  yy_pp_roi_df.rename(columns={'value': 'yy'}))
+                tmp_df['hemisphere'] = hemi
+
+                df_hemi = pd.concat((df_hemi, tmp_df))
+
+            ## save in merged DF
+            df_merge = pd.concat((df_merge, df_hemi))
+
+            ## plot rsq values on flatmap surface ##
+            fig_name = op.join(sub_figures_pth,
+                            'sub-{sj}_task-{tsk}_acq-{acq}_space-{space}_ses-{ses}_run-{run}_model-{model}_VFcoverage.png'.format(sj=pp, tsk = 'pRF',
+                                                                                                            acq = self.MRIObj.acq, space = self.MRIObj.sj_space,
+                                                                                                            ses=ses, run = run_type, model = model_name))
+
+            # if we fitted hrf, then add that to fig name
+            if self.pRFModelObj.fit_hrf:
+                fig_name = fig_name.replace('.png','_withHRF.png') 
+
+            # actually plot hexabins
+            for r_name in self.ROIs_dict.keys():
+
+                f, ss = plt.subplots(1, 1, figsize=(8,4.5))
+
+                ss.hexbin(df_merge[(df_merge['hemisphere'] == 'LH') & \
+                                    (df_merge['ROI'] == r_name) & \
+                                    (df_merge['sj'] == 'sub-{sj}'.format(sj = pp))].xx.values,
+                        df_merge[(df_merge['hemisphere'] == 'LH')& \
+                                    (df_merge['ROI'] == r_name) & \
+                                    (df_merge['sj'] == 'sub-{sj}'.format(sj = pp))].yy.values,
+                    gridsize=15, 
+                    cmap='Greens',
+                    extent= np.array([-1, 1, -1, 1]) * max_ecc_ext_dict['sub-{sj}'.format(sj = pp)],
+                    bins='log',
+                    linewidths=0.0625,
+                    edgecolors='black',
+                    alpha=1)
+
+                ss.hexbin(df_merge[(df_merge['hemisphere'] == 'RH')& \
+                                    (df_merge['ROI'] == r_name) & \
+                                    (df_merge['sj'] == 'sub-{sj}'.format(sj = pp))].xx.values,
+                        df_merge[(df_merge['hemisphere'] == 'RH')& \
+                                    (df_merge['ROI'] == r_name) & \
+                                    (df_merge['sj'] == 'sub-{sj}'.format(sj = pp))].yy.values,
+                    gridsize=15, 
+                    cmap='Reds',
+                    extent= np.array([-1, 1, -1, 1]) * max_ecc_ext_dict['sub-{sj}'.format(sj = pp)],
+                    bins='log',
+                    linewidths=0.0625,
+                    edgecolors='black',
+                    alpha=.5)
+
+                plt.xticks(fontsize = 20)
+                plt.yticks(fontsize = 20)
+                plt.tight_layout()
+                plt.ylim(-max_ecc_ext_dict['sub-{sj}'.format(sj = pp)], max_ecc_ext_dict['sub-{sj}'.format(sj = pp)]) #-6,6)#
+                ss.set_aspect('auto')
+                # set middle lines
+                ss.axvline(0, -max_ecc_ext_dict['sub-{sj}'.format(sj = pp)], max_ecc_ext_dict['sub-{sj}'.format(sj = pp)], lw=0.25, color='w')
+                ss.axhline(0, -max_ecc_ext_dict['sub-{sj}'.format(sj = pp)], max_ecc_ext_dict['sub-{sj}'.format(sj = pp)], lw=0.25, color='w')
+
+                # custom lines only to make labels
+                custom_lines = [Line2D([0], [0], color='g',alpha=0.5, lw=4),
+                                Line2D([0], [0], color='r',alpha=0.5, lw=4)]
+
+                plt.legend(custom_lines, hemi_labels, fontsize = 18)
+                fig_hex = plt.gcf()
+                fig_hex.savefig(fig_name.replace('_VFcoverage','_VFcoverage_{rn}'.format(rn = r_name)))
+        
+
+        if len(participant_list) > 1:
+            
+            fig_name = op.join(figures_pth, op.split(fig_name)[-1].replace('sub-{sj}'.format(sj = pp),'sub-GROUP'))
+
+            # actually plot hexabins
+            for r_name in self.ROIs_dict.keys():
+
+                f, ss = plt.subplots(1, 1, figsize=(8,4.5))
+
+                ss.hexbin(df_merge[(df_merge['hemisphere'] == 'LH') & \
+                                    (df_merge['ROI'] == r_name)].xx.values,
+                        df_merge[(df_merge['hemisphere'] == 'LH')& \
+                                    (df_merge['ROI'] == r_name)].yy.values,
+                    gridsize=15, 
+                    cmap='Greens',
+                    extent= np.array([-1, 1, -1, 1]) * max_ecc_ext_dict['sub-{sj}'.format(sj = pp)],
+                    bins='log',
+                    linewidths=0.0625,
+                    edgecolors='black',
+                    alpha=1)
+
+                ss.hexbin(df_merge[(df_merge['hemisphere'] == 'RH')& \
+                                    (df_merge['ROI'] == r_name)].xx.values,
+                        df_merge[(df_merge['hemisphere'] == 'RH')& \
+                                    (df_merge['ROI'] == r_name)].yy.values,
+                    gridsize=15, 
+                    cmap='Reds',
+                    extent= np.array([-1, 1, -1, 1]) * max_ecc_ext_dict['sub-{sj}'.format(sj = pp)],
+                    bins='log',
+                    linewidths=0.0625,
+                    edgecolors='black',
+                    alpha=.5)
+
+                plt.xticks(fontsize = 20)
+                plt.yticks(fontsize = 20)
+                plt.tight_layout()
+                plt.ylim(-max_ecc_ext_dict['sub-{sj}'.format(sj = pp)], max_ecc_ext_dict['sub-{sj}'.format(sj = pp)]) #-6,6)#
+                ss.set_aspect('auto')
+                # set middle lines
+                ss.axvline(0, -max_ecc_ext_dict['sub-{sj}'.format(sj = pp)], max_ecc_ext_dict['sub-{sj}'.format(sj = pp)], lw=0.25, color='w')
+                ss.axhline(0, -max_ecc_ext_dict['sub-{sj}'.format(sj = pp)], max_ecc_ext_dict['sub-{sj}'.format(sj = pp)], lw=0.25, color='w')
+
+                # custom lines only to make labels
+                custom_lines = [Line2D([0], [0], color='g',alpha=0.5, lw=4),
+                                Line2D([0], [0], color='r',alpha=0.5, lw=4)]
+
+                plt.legend(custom_lines, hemi_labels, fontsize = 18)
+                fig_hex = plt.gcf()
+                fig_hex.savefig(fig_name.replace('_VFcoverage','_VFcoverage_{rn}'.format(rn = r_name)))
 
 
 class FAViewer(pRFViewer):

@@ -589,13 +589,11 @@ class PlotUtils(Utils):
 
         return rgb_angle
 
-    def plot_pa_colorwheel(self, resolution=800, angle_thresh = 3*np.pi/4, cmap_name = 'hsv', 
-                           continuous = True, fig_name = None):
+    def plot_pa_colorwheel(self, resolution=800, angle_thresh = 3*np.pi/4, cmap_name = 'hsv', continuous = True, fig_name = None):
 
         """
         Helper function to create colorwheel image
         for polar angle plots returns 
-
         Parameters
         ----------
         resolution : int
@@ -607,8 +605,6 @@ class PlotUtils(Utils):
             colormap name (if string) or list of colors to use for colormap
         continuous: bool
             if continuous colormap or binned
-        fig_name: str
-            absolute figure name (if we want to save it, default no - None)
         """
 
         ## make circle
@@ -642,6 +638,8 @@ class PlotUtils(Utils):
             cmap = cmap_name
             norm = colors.Normalize(-angle_thresh, angle_thresh) # normalize between the point where we defined our color threshold
 
+        fig = plt.figure(figsize=(5,5))
+
         # non-uniform colorwheel
         if angle_thresh != np.pi:
             
@@ -653,7 +651,7 @@ class PlotUtils(Utils):
             plt.imshow(circle_pa_left, cmap=cmap, norm=norm,origin='lower') # origin lower because imshow flips it vertically, now in right order for VF
             plt.axis('off')
 
-            plt.savefig('{fn}_colorwheel_4LH-RVF.png'.format(fn = fig_name),dpi=100)
+            fig.savefig('{fn}_colorwheel_4LH-RVF.png'.format(fn = fig_name),dpi=100)
 
             ## for RH (LVF)
             circle_pa_right = circle_pa.copy()
@@ -671,9 +669,9 @@ class PlotUtils(Utils):
             plt.axis('off')
 
             if continuous:
-                plt.savefig('{fn}_colorwheel_continuous.png'.format(fn = fig_name),dpi=100)
+                fig.savefig('{fn}_colorwheel_continuous.png'.format(fn = fig_name),dpi=100)
             else:
-                plt.savefig('{fn}_colorwheel_discrete.png'.format(fn = fig_name),dpi=100)
+                fig.savefig('{fn}_colorwheel_discrete.png'.format(fn = fig_name),dpi=100)
 
     def plot_periodogram(self, axis, timecourse = None, TR = 1.6):
 

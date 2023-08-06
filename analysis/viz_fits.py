@@ -190,21 +190,23 @@ match task:
                 mod_1 = ''
                 while mod_1 not in ('gauss','css','dog','dn'):
                     mod_1 = input("First model name to compare RSQ?: ")
-
                 model_list.append(mod_1)
 
                 mod_2 = ''
                 while mod_2 not in ('gauss','css','dog','dn'):
                     mod_2 = input("Second model name to compare RSQ?: ")
-
-                if mod_2 != mod_1:
-                    model_list.append(mod_2)
+                model_list.append(mod_2)
 
                 plotter.compare_pRF_model_rsq(participant_list = FAM_data.sj_num,
                                             ses = ses2fit, run_type = run_type,
                                             prf_model_list = model_list,
-                                            rsq_threshold = FAM_data.params['plotting']['rsq_threshold'])
-
+                                            mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                                                crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
+                                            stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                                                    crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                    shift = FAM_data.shift_TRs_num)
+                                            )
 
     case 'FA':
 

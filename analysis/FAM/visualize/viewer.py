@@ -93,7 +93,7 @@ class Viewer:
             sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp))
             os.makedirs(sub_figures_pth, exist_ok=True)
 
-            ## plot average correlation values on flatmap surface ##
+            ## plot rsq values on flatmap surface ##
             fig_name = op.join(sub_figures_pth,
                             'sub-{sj}_task-{tsk}_acq-{acq}_space-{space}_ses-{ses}_run-{run}_model-{model}_flatmap_RSQ.png'.format(sj=pp, tsk = task,
                                                                                                             acq = self.MRIObj.acq, space = self.MRIObj.sj_space,

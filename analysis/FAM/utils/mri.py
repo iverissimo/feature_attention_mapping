@@ -253,7 +253,7 @@ class MRIUtils(Utils):
             
         return output_dict       
 
-    def get_estimates_roi_df(self, participant, estimates_pp = {}, ROIs_dict = {}, est_key = 'r2', model = 'gauss'):
+    def get_estimates_roi_df(self, participant, estimates_pp = {}, ROIs_dict = {}, est_key = 'r2', model = 'gauss', iterative = True):
 
         """
         Helper function to get estimates dataframe values for each ROI
@@ -278,7 +278,8 @@ class MRIUtils(Utils):
                                             'index': ROIs_dict[roi_name], 
                                             'ROI': np.tile(roi_name, len(roi_arr)), 
                                             'value': roi_arr,
-                                            'model': np.tile(model, len(roi_arr))})
+                                            'model': np.tile(model, len(roi_arr)),
+                                            'iterative': np.tile(iterative, len(roi_arr))})
                             ))
         return df_est     
 

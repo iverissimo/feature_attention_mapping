@@ -511,6 +511,22 @@ class GLMsingle_Model(Model):
         return np.load(op.join(fitpath, self.MRIObj.params['mri']['fitting']['FA']['glmsingle_models'][model_type]),
                        allow_pickle=True).item()
     
+    def load_single_trl_DM(self, participant):
+
+        """
+        Load glm single design matrix
+
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        """
+
+        ## path to files
+        fitpath = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant))
+
+        return np.load(op.join(fitpath, 'single_trl_DM.npy'), allow_pickle=True)
+    
     def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', 
                         smooth_nm = True, perc_thresh_nm = 95, n_jobs = 8,
                         seed_num = 2023, kernel = 3, nr_iter = 3, normalize = False,
@@ -570,7 +586,7 @@ class GLMsingle_Model(Model):
         single_trl_DM = self.make_singletrial_dm(run_num_arr = self.run_num_arr, 
                                                 ses_num_arr = self.ses_num_arr,
                                                 pp_bar_pos_df = pp_bar_pos_df)
-
+        
         print('Fitting {n} files: {f}'.format(n = len(train_file_list), f = str(train_file_list)))
 
         ## get average hrf
@@ -584,8 +600,8 @@ class GLMsingle_Model(Model):
                                                     smooth = smooth_nm, kernel = kernel, nr_iter = nr_iter, 
                                                     normalize = normalize, 
                                                     filename = op.join(outdir, 'spcorrelation_task-pRF.npy'))
-        # also save binary mask, to later check
-        np.save(op.join(outdir, 'binary_mask_spcorrelation_task-pRF.npy'), binary_prf_mask)
+        # load correlation array - glmsingle deletes files in folder, should fix later
+        corr_pRF = np.load(op.join(outdir, 'spcorrelation_task-pRF.npy'), allow_pickle=True)
 
         ## now do the same correlation mask for the FA runs
         binary_fa_mask = self.get_correlation_mask(participant, task = 'FA', ses = 'mean', 
@@ -594,8 +610,8 @@ class GLMsingle_Model(Model):
                                                     smooth = smooth_nm, kernel = kernel, nr_iter = nr_iter, 
                                                     normalize = normalize,
                                                     filename = op.join(outdir, 'spcorrelation_task-FA.npy'))
-        # also save binary mask, to later check
-        np.save(op.join(outdir, 'binary_mask_spcorrelation_task-FA.npy'), binary_prf_mask)
+        # load correlation array - glmsingle deletes files in folder, should fix later
+        corr_FA = np.load(op.join(outdir, 'spcorrelation_task-FA.npy'), allow_pickle=True)
 
         ### final mask is multiplication of the two
         final_mask = binary_fa_mask * binary_prf_mask
@@ -619,7 +635,7 @@ class GLMsingle_Model(Model):
 
         # keep relevant outputs in memory and also save them to the disk
         opt['wantfileoutputs'] = [1,1,1,1]
-        opt['wantmemoryoutputs'] = [1,1,1,1]
+        opt['wantmemoryoutputs'] = [0,0,0,0] #[1,1,1,1]
 
         # running python GLMsingle involves creating a GLM_single object
         # and then running the procedure using the .fit() routine
@@ -656,123 +672,26 @@ class GLMsingle_Model(Model):
             f'{time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}'
         )
 
-        ## for now plot and save a few inspection figures too,
-        # to see get a sense on quality of fit
-
-        ## plot ON OFF R2
-        flatmap = cortex.Vertex(results_glmsingle['typea']['onoffR2'], 
-                  self.pysub,
-                   vmin = 0, vmax = 15, #.7,
-                   cmap='hot')
-
-        fig_name = op.join(outdir, 'modeltypeA_ONOFF_rsq.png')
-        print('saving %s' %fig_name)
-        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
-        ## plot ON OFF betas
-        flatmap = cortex.Vertex(results_glmsingle['typea']['betasmd'][...,0], 
-                  self.pysub,
-                   vmin = -2, vmax = 2, #.7,
-                   cmap='RdBu_r')
-
-        fig_name = op.join(outdir, 'modeltypeA_ONOFF_betas.png')
-        print('saving %s' %fig_name)
-        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-        
-        ## plot Full Model noise pool 
-        flatmap = cortex.Vertex(results_glmsingle['typed']['noisepool'], 
-                        self.pysub,
-                        vmin = 0, vmax = 1, #.7,
-                        cmap='hot')
-
-        fig_name = op.join(outdir, 'modeltypeD_noisepool.png')
-        print('saving %s' %fig_name)
-        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
-        ## plot Full Model RSQ
-        flatmap = cortex.Vertex(results_glmsingle['typed']['R2'], 
-                  self.pysub,
-                   vmin = 0, vmax = 50, #.7,
-                   cmap='hot')
-        
-        fig_name = op.join(outdir, 'modeltypeD_rsq.png')
-        print('saving %s' %fig_name)
-        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
-        ## plot Full Model betas
-        flatmap = cortex.Vertex(np.mean(results_glmsingle['typed']['betasmd'], axis = -1), 
-                  self.pysub,
-                   vmin = -2, vmax = 2, #.7,
-                   cmap='RdBu_r')
-
-        fig_name = op.join(outdir, 'modeltypeD_betas.png')
-        print('saving %s' %fig_name)
-        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
-        ## plot Full Model betas for only high fitting RSQ
-        avg_betas = np.mean(results_glmsingle['typed']['betasmd'], axis = -1)
-        avg_betas[pp_prf_estimates['r2']< self.prf_rsq_threshold] = np.nan
-
-        flatmap = cortex.Vertex(avg_betas, 
-                        self.pysub,
-                        vmin = -2, vmax = 2, #.7,
-                        cmap='RdBu_r')
-
-        fig_name = op.join(outdir, 'modeltypeD_betas_ROIpRF.png')
-        print('saving %s' %fig_name)
-        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
-        ## plot Full Model FracRidge
-        flatmap = cortex.Vertex(results_glmsingle['typed']['FRACvalue'], 
-                  self.pysub,
-                   vmin = 0, vmax = 1, #.7,
-                   cmap='copper')
-
-        fig_name = op.join(outdir, 'modeltypeD_fracridge.png')
-        print('saving %s' %fig_name)
-        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
         ## plot average HRF
         fig, axis = plt.subplots(1,figsize=(8,5),dpi=100)
         axis.plot(getcanonicalhrf(self.MRIObj.FA_bars_phase_dur, self.MRIObj.TR, onset = self.hrf_onset), label = 'canonical_hrf')
         axis.plot(hrf_final, label = 'average_hrf')
         axis.set_xlabel('Time (TR)')
         axis.legend()
-
         plt.savefig(op.join(outdir, 'hrf_avg.png'))
 
-        ## plot pRF binary mask
-        flatmap = cortex.Vertex(binary_prf_mask, 
-                        self.pysub,
-                        vmin = 0, vmax = 1, #.7,
-                        cmap='hot')
-        cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
+        # save DM for ease of use later
+        np.save(op.join(outdir, 'single_trl_DM.npy'), single_trl_DM)
 
-        fig_name = op.join(outdir, 'modeltypeD_pRFmask.png')
-        print('saving %s' %fig_name)
-        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
+        # also save binary mask, to later check
+        np.save(op.join(outdir, 'binary_mask_spcorrelation_task-pRF.npy'), binary_prf_mask)
+        np.save(op.join(outdir, 'binary_mask_spcorrelation_task-FA.npy'), binary_fa_mask)
 
-        ## plot FA binary mask
-        flatmap = cortex.Vertex(binary_fa_mask, 
-                        self.pysub,
-                        vmin = 0, vmax = 1, #.7,
-                        cmap='hot')
-        cortex.quickshow(flatmap, with_curvature=True,with_sulci=True, with_labels=False)
+        # save correlations again
+        np.save(op.join(outdir, 'spcorrelation_task-pRF.npy'), corr_pRF)
+        np.save(op.join(outdir, 'spcorrelation_task-FA.npy'), corr_FA)
 
-        fig_name = op.join(outdir, 'modeltypeD_FAmask.png')
-        print('saving %s' %fig_name)
-        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
 
-        ## plot beta standard deviation, to see how much they vary
-        _, std_surf = self.get_singletrial_estimates(estimate_arr = results_glmsingle['typed']['betasmd'], 
-                                                        single_trl_DM = single_trl_DM, return_std = True)
 
-        flatmap = cortex.Vertex(np.mean(std_surf, axis = 0), 
-                        self.pysub,
-                        vmin = 0, vmax = 2, #.7,
-                        cmap='gnuplot')
 
-        fig_name = op.join(outdir, 'modeltypeD_std_betas.png')
-        print('saving %s' %fig_name)
-        _ = cortex.quickflat.make_png(fig_name, flatmap, recache=False,with_colorbar=True,with_curvature=True,with_sulci=True,with_labels=False)
-
+        

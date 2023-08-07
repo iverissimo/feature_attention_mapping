@@ -1237,7 +1237,8 @@ class pRFViewer(Viewer):
 
         plt.show()
 
-class FAViewer(pRFViewer):
+
+class FAViewer(Viewer):
 
 
     def __init__(self, MRIObj, outputdir = None, pRFModelObj = None, FAModelObj = None, pysub = 'hcp_999999', use_atlas = None):
@@ -1258,11 +1259,17 @@ class FAViewer(pRFViewer):
         """
 
         # need to initialize parent class (Model), indicating output infos
-        super().__init__(MRIObj = MRIObj, outputdir = outputdir, pRFModelObj = pRFModelObj, pysub = pysub, use_atlas = use_atlas)
+        super().__init__(MRIObj, pysub = pysub, outputdir = outputdir, use_atlas = use_atlas)
 
+        ## output path to save plots
+        self.figures_pth = op.join(self.outputdir)
+        os.makedirs(self.figures_pth, exist_ok=True)
+
+        # Load pRF and FA model objects
+        self.pRFModelObj = pRFModelObj
         self.FAModelObj = FAModelObj
 
-    def plot_spcorrelations(self, participant):
+    def plot_spcorrelations(self, participant, fig_basename = None):
 
         """
         Plot split half correlations used in GLM single fit
@@ -1272,44 +1279,130 @@ class FAViewer(pRFViewer):
         ## path to files
         fitpath = op.join(self.FAModelObj.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant))
 
-    def plot_glmsingle_estimates(self, participant, model_type = ['A','D']):
+        ## plot correlations and binary masks
+        for task in self.MRIObj.tasks:
+
+            corr_arr = np.load(op.join(fitpath, 'spcorrelation_task-{tsk}.npy'.format(tsk = task)))
+
+            self.plot_utils.plot_flatmap(corr_arr, 
+                                        pysub = self.pysub, cmap='hot', 
+                                        vmin1 = 0, vmax1 = 1, 
+                                        fig_abs_name = op.join(op.split(fig_basename)[0], 'spcorrelation_task-{tsk}_{bn}'.format(bn = op.split(fig_basename)[-1],
+                                                                                              tsk = task)))
+
+            binary_arr = np.load(op.join(fitpath, 'binary_mask_spcorrelation_task-{tsk}.npy'.format(tsk = task)))
+
+            self.plot_utils.plot_flatmap(binary_arr, 
+                                        pysub = self.pysub, cmap='hot', 
+                                        vmin1 = 0, vmax1 = 1, 
+                                        fig_abs_name = op.join(op.split(fig_basename)[0], 'binary_mask_spcorrelation_task-{tsk}_{bn}'.format(bn = op.split(fig_basename)[-1],
+                                                                                              tsk = task)))
+
+    def plot_glmsingle_estimates(self, participant_list = [], model_type = ['A','D'],
+                                    mask_bool_df = None, stim_on_screen = [], mask_arr = True):
 
         """
         Plot split half correlations used in GLM single fit
         to make noise mask 
         """
 
-        ## output path to save plots
-        output_pth = op.join(self.figures_pth, 'glmsingle_estimates', 'sub-{sj}'.format(sj = participant))
-        os.makedirs(output_pth, exist_ok=True)
+        ## load pRF estimates for all participants 
+        # store in dict, for ease of access
+        print('Loading iterative estimates')
+        group_estimates, group_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant_list = participant_list,
+                                                                    ses = 'mean', run_type = 'mean', 
+                                                                    model_name = self.pRFModelObj.model_type['pRF'], 
+                                                                    iterative = True,
+                                                                    mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
+                                                                    fit_hrf = self.pRFModelObj.fit_hrf)
 
-        for name in model_type:
-            ## load estimates dict
-            estimates_dict = self.FAModelObj.load_estimates(participant, model_type = name)
+        ## mask the estimates, if such is the case
+        if mask_arr:
+            print('masking estimates')
 
-            ## plot R2 on flatmap surface ##
-            r2 = estimates_dict['onoffR2'] if name == 'A' else estimates_dict['R2']
+            # get estimate keys
+            keys = self.pRFModelObj.get_prf_estimate_keys(prf_model_name = self.pRFModelObj.model_type['pRF'])
 
-            fig_name = op.join(output_pth,
-                            'R2_Model-{m}_flatmap_sub-{sj}_acq-{acq}.png'.format(sj = participant, 
-                                                                                m = name,
-                                                                                acq=self.MRIObj.sj_space))
-            self.plot_utils.plot_flatmap(r2, 
-                                        pysub = self.pysub, cmap='hot', 
-                                        vmin1 = 0, vmax1 = 50, 
-                                        fig_abs_name = fig_name)
-            
-            ## plot average betas
-            avg_betas = estimates_dict['betasmd'][...,0] if name == 'A' else np.mean(estimates_dict['betasmd'], axis = -1)
+            # get screen lim for all participants
+            max_ecc_ext = {'sub-{sj}'.format(sj = pp): group_prf_models['sub-{sj}'.format(sj = pp)]['ses-{s}'.format(s = 'mean')]['prf_stim'].screen_size_degrees/2 for pp in participant_list}
 
-            fig_name = op.join(output_pth,
-                            'Betas_Model-{m}_flatmap_sub-{sj}_acq-{acq}.png'.format(sj = participant, 
-                                                                                m = name,
-                                                                                acq=self.MRIObj.sj_space))
-            self.plot_utils.plot_flatmap(avg_betas, 
-                                        pysub = self.pysub, cmap='RdBu_r', 
-                                        vmin1 = -2, vmax1 = 2, 
-                                        fig_abs_name = fig_name)
+            final_estimates = {'sub-{sj}'.format(sj = pp): self.pRFModelObj.mask_pRF_model_estimates(group_estimates['sub-{sj}'.format(sj = pp)], 
+                                                                                estimate_keys = keys,
+                                                                                x_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
+                                                                                y_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
+                                                                                rsq_threshold = self.rsq_threshold_plot) for pp in participant_list}
+        else:
+            final_estimates = group_estimates
+
+        # iterate over participant list
+        for pp in participant_list:
+
+            ## output path to save plots
+            output_pth = op.join(self.figures_pth, 'glmsingle_estimates', 'sub-{sj}'.format(sj = pp))
+            os.makedirs(output_pth, exist_ok=True)
+
+            for name in model_type:
+                ## load estimates dict
+                estimates_dict = self.FAModelObj.load_estimates(pp, model_type = name)
+
+                ## plot R2 on flatmap surface ##
+                r2 = estimates_dict['onoffR2'] if name == 'A' else estimates_dict['R2']
+
+                fig_name = op.join(output_pth,
+                                'R2_Model-{m}_flatmap_sub-{sj}_acq-{acq}.png'.format(sj = pp, 
+                                                                                    m = name,
+                                                                                    acq=self.MRIObj.sj_space))
+                self.plot_utils.plot_flatmap(r2, 
+                                            pysub = self.pysub, cmap='hot', 
+                                            vmin1 = 0, vmax1 = 50, 
+                                            fig_abs_name = fig_name)
+                
+                ## plot average betas
+                avg_betas = estimates_dict['betasmd'][...,0] if name == 'A' else np.mean(estimates_dict['betasmd'], axis = -1)
+
+                self.plot_utils.plot_flatmap(avg_betas, 
+                                            pysub = self.pysub, cmap='RdBu_r', 
+                                            vmin1 = -2, vmax1 = 2, 
+                                            fig_abs_name = fig_name.replace('R2_', 'Betas_'))
+                
+                ## plot betas with pRF threshold
+                avg_betas[np.isnan(final_estimates['sub-{sj}'.format(sj = pp)]['r2'])] = np.nan
+
+                self.plot_utils.plot_flatmap(avg_betas, 
+                                            pysub = self.pysub, cmap='RdBu_r', 
+                                            vmin1 = -2, vmax1 = 2, 
+                                            fig_abs_name = fig_name.replace('R2_', 'Betas_pRF_'))
+                
+                # if not on-off model
+                if name != 'A':
+                    ## plot beta standard deviation, to see how much they vary
+                    _, std_surf = self.FAModelObj.get_singletrial_estimates(estimate_arr = estimates_dict['betasmd'], 
+                                                                            single_trl_DM = self.FAModelObj.load_single_trl_DM(pp), 
+                                                                            return_std = True)
+                    
+                    self.plot_utils.plot_flatmap(np.mean(std_surf, axis = 0), 
+                                            pysub = self.pysub, cmap='gnuplot', 
+                                            vmin1 = 0, vmax1 = 1.5, 
+                                            fig_abs_name = fig_name.replace('R2_', 'Betas_SD_'))
+
+                # if full model    
+                if name == 'D':
+                    ## plot FracRidge
+                    self.plot_utils.plot_flatmap(estimates_dict['FRACvalue'], 
+                                            pysub = self.pysub, cmap='copper', 
+                                            vmin1 = 0, vmax1 = 1, 
+                                            fig_abs_name = fig_name.replace('R2_', 'FRACvalue_'))
+                    
+                    ## plot Noise pool
+                    self.plot_utils.plot_flatmap(estimates_dict['noisepool'], 
+                                            pysub = self.pysub, cmap='hot', 
+                                            vmin1 = 0, vmax1 = 1, 
+                                            fig_abs_name = fig_name.replace('R2_', 'NoisePool_'))
+                    
+                    ## and plot binary masks + correlations used to make noise pool
+                    self.plot_spcorrelations(pp, fig_basename = fig_name.replace('R2_', ''))
+
+
 
     def plot_singlevert_FA(self, participant, 
                                 ses = 1, run_type = '1', vertex = None, ROI = None,
@@ -1522,7 +1615,6 @@ class FAViewer(pRFViewer):
         axis.legend(loc='upper left',fontsize = 10) 
 
         fig.savefig(op.join(figures_pth, fig_name))
-
 
     def open_click_viewer(self, participant, task2viz = 'both',
                     prf_ses = 'ses-mean', prf_run_type = 'mean', 

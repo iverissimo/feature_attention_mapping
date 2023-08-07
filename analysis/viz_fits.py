@@ -152,12 +152,12 @@ match task:
         ## run specific vizualizer
         match py_cmd:
 
-            case 'single_vertex':
+            case 'single_vertex': ## need to review
                 plotter.plot_singlevert_pRF(sj, vertex = vertex, file_ext = file_ext, 
                                         fit_now = fit_now, prf_model_name = prf_model_name)
 
 
-            case 'click':
+            case 'click': ## need to review
                 plotter.open_click_viewer(sj, task2viz = 'pRF',
                                         ses = ses2fit, run_type = run_type,
                                         prf_model_name = prf_model_name, file_ext = file_ext)
@@ -240,11 +240,16 @@ match task:
         ## run specific vizualizer
         match py_cmd:
 
-            case 'model_outputs':
-                plotter.plot_glmsingle_estimates(FAM_data.sj_num[0], model_type = ['A','D'])
-            
-            case 'sp_correlations':
-                print('To be done for GLM single correlations')
+            case 'fa_estimates':
+                plotter.plot_glmsingle_estimates(participant_list = FAM_data.sj_num, 
+                                                 model_type = ['A','D'],
+                                                 mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                                                crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
+                                                 stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                                                    crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                    shift = FAM_data.shift_TRs_num)
+                                                )
 
             case 'single_vertex':
                 plotter.plot_singlevert_FA(sj, vertex = vertex, file_ext = file_ext, 

@@ -175,12 +175,17 @@ match task:
 
             case 'draw_roi':
 
-                # in case we want to average participants
-                sub_name = FAM_data.sj_num if len(FAM_data.sj_num) > 1 else sj
-
-                plotter.save_estimates4drawing(sub_name, task2draw = 'pRF',
+                plotter.save_estimates4drawing(participant_list = FAM_data.sj_num, task2draw = 'pRF',
                                                 ses = ses2fit, run_type = run_type,
-                                                prf_model_name = prf_model_name, file_ext = file_ext)
+                                                prf_model_name = prf_model_name, 
+                                                rsq_threshold = 0,
+                                                mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                                                crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
+                                                stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                                                    crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                    shift = FAM_data.shift_TRs_num)
+                                                )
 
             case 'prf_rsq':
                 ## ask for user input on models to compare

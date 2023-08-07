@@ -54,209 +54,10 @@ class pRFViewer(Viewer):
 
         # Load pRF model object
         self.pRFModelObj = pRFModelObj
-            
-
-    def get_pycortex_sub_dict(self, participant_list = [], pysub = 'hcp_999999', use_sub_rois = True):
-
-        """ 
-        Helper function to get dict with
-        pycortex name per participant in participant list 
-        
-        Parameters
-        ----------
-        participant_list : list
-            list with participant IDs
-        use_sub_rois: bool
-            if True we will try to find sub specific folder, else will just use pysub
-            
-        """
-        pysub_dict = {}
-
-        for pp in participant_list:
-
-            if use_sub_rois:
-                # check if subject pycortex folder exists
-                pysub_folder = '{ps}_sub-{pp}'.format(ps = pysub, pp = pp)
-
-                if op.exists(op.join(cortex.options.config.get('basic', 'filestore'), pysub_folder)):
-                    print('Participant overlay %s in pycortex filestore, assumes we draw ROIs there'%pysub_folder)
-                    pysub_dict['sub-{pp}'.format(pp = pp)] = pysub_folder
-                else:
-                    pysub_dict['sub-{pp}'.format(pp = pp)] = pysub
-            else:
-                pysub_dict['sub-{pp}'.format(pp = pp)] = pysub
-
-        return pysub_dict
-        
-
-    def plot_singlevert_pRF(self, participant, 
-                    ses = 'ses-mean', run_type = 'mean', vertex = None, ROI = None,
-                    prf_model_name = 'gauss', file_ext = '_cropped_dc_psc.npy', 
-                    fit_now = False, figures_pth = None):
-
-        """
-
-        Function to plot single vertex timecourse
-
-        Parameters
-        ----------
-        participant : str
-            subject ID
-        task: str
-            task identifier --> might not be needed if I make this func pRF timecourse specific
-        ses: str
-            session of input data
-        run_type : str
-            type of run of input data (ex: 1/mean)
-        vertex: int
-            vertex index 
-        ROI: str
-            roi name
-        prf_model_name: str
-            name of prf model to/that was fit
-        file_ext: str
-            file extension of the post processed data
-        fit_now: bool
-            if we want to fit the timecourse now
-        figures_pth: str
-            where to save the figures
-
-        """
-            
-        # make output folder for figures
-        if figures_pth is None:
-            figures_pth = op.join(self.outputdir, 'single_vertex', self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'], 'sub-{sj}'.format(sj = participant), ses)
-        
-        os.makedirs(figures_pth, exist_ok=True)
-
-        # if we want to fit it now
-        if fit_now:
-            print('Fitting estimates')
-            estimates_dict, data_arr = self.pRFModelObj.fit_data(participant, self.pp_prf_models, 
-                                                                    vertex = vertex, 
-                                                                    run_type = run_type, ses = ses,
-                                                                    model2fit = prf_model_name, xtol = 1e-2,
-                                                                    file_ext = file_ext)
-
-        else:
-            print('Loading estimates')
-            ## load estimates to make it easier to load later
-            estimates_keys_dict, _ = self.pRFModelObj.load_pRF_model_estimates(participant,
-                                                                        ses = ses, run_type = run_type, 
-                                                                        model_name = prf_model_name, 
-                                                                        iterative = True,
-                                                                        fit_hrf = self.pRFModelObj.fit_hrf)
-
-            # when loading, dict has key-value pairs stored,
-            # need to convert it to make it in same format as when fitting on the spot
-            keys = self.pRFModelObj.get_prf_estimate_keys(prf_model_name = prf_model_name)
-            
-            estimates_dict = {}
-            estimates_dict['it_{name}'.format(name = prf_model_name)] = np.stack((estimates_keys_dict[val][vertex] for val in keys))[np.newaxis,...]
-
-            ## load data array
-            bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
-            data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, task = 'pRF', run_type = run_type, chunk_num = None, vertex = vertex, 
-                                baseline_interval = 'empty_long', ses = ses, return_filenames = False)
-
-        ## if we fitted hrf, need to also get that from params
-        ## and set model array
-        
-        # define spm hrf
-        spm_hrf = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].create_hrf(hrf_params = [1, 1, 0],
-                                                                                                                    onset=self.pRFModelObj.hrf_onset)
-
-        if self.pRFModelObj.fit_hrf:
-            hrf = self.pp_prf_models[ 'sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].create_hrf(hrf_params = [1.0,
-                                                                                                                                estimates_dict['it_{name}'.format(name = prf_model_name)][0][-3],
-                                                                                                                                estimates_dict['it_{name}'.format(name = prf_model_name)][0][-2]],
-                                                                                                                    onset=self.pRFModelObj.hrf_onset)
-        
-            self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].hrf = hrf
-
-            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].return_prediction(*list(estimates_dict['it_{name}'.format(name = prf_model_name)][0, :-3]))
-        
-        else:
-            self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].hrf = spm_hrf
-
-            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].return_prediction(*list(estimates_dict['it_{name}'.format(name = prf_model_name)][0, :-1]))
-        
-        
-        # get array with name of condition per TR, to plot in background
-        ## get behavioral info 
-        mri_beh = preproc_behdata.PreprocBeh(self.MRIObj)
-
-        condition_per_TR = mri_utils.crop_shift_arr(mri_beh.pRF_bar_pass_all, 
-                                        crop_nr = self.pRFModelObj.crop_TRs_num['pRF'], 
-                                        shift = self.pRFModelObj.shift_TRs_num)
-
-        ## actually plot
-
-        # set figure name
-        fig_name = 'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_roi-{roi}_vertex-{vert}.png'.format(sj = participant,
-                                                                                                acq = self.MRIObj.acq,
-                                                                                                space = self.MRIObj.sj_space,
-                                                                                                run = run_type,
-                                                                                                model = prf_model_name,
-                                                                                                roi = str(ROI),
-                                                                                                vert = str(vertex))
-        if not fit_now:
-            fig_name = fig_name.replace('.png', '_loaded.png')
-
-
-        if self.pRFModelObj.fit_hrf:
-
-            fig_name = fig_name.replace('.png','_withHRF.png') 
-
-            ## also plot hrf shapes for comparison
-            fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
-
-            time_sec = np.linspace(0,len(hrf[0]) * self.MRIObj.TR, num = len(hrf[0])) # array in seconds
-
-            axis.plot(time_sec, spm_hrf[0],'grey',label='spm hrf')
-            axis.plot(time_sec, hrf[0],'red',label='fitted hrf')
-            axis.set_xlim(self.pRFModelObj.hrf_onset, 25)
-            axis.legend(loc='upper right',fontsize=10) 
-            axis.set_xlabel('Time (TR)',fontsize=10, labelpad=10)
-            #plt.show()
-            fig.savefig(op.join(figures_pth, 'HRF_model-{model}_roi-{roi}_vertex-{vert}.png'.format(model = prf_model_name,
-                                                                                                    roi = str(ROI), 
-                                                                                                    vert = str(vertex)))) 
-
-        # plot data with model
-        fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
-
-        # plot data with model
-        time_sec = np.linspace(0,len(model_arr[0,...]) * self.MRIObj.TR, num = len(model_arr[0,...])) # array in seconds
-            
-        axis.plot(time_sec, model_arr[0,...], c = 'red', lw = 3, 
-                                            label = 'model R$^2$ = %.2f'%estimates_dict['it_{name}'.format(name = prf_model_name)][0][-1], 
-                                            zorder = 1)
-        #axis.scatter(time_sec, data_reshape[ind_max_rsq,:], marker='v',s=15,c='k',label='data')
-        axis.plot(time_sec, data_arr[0,...],'k--',label='data')
-        
-        axis.set_xlabel('Time (s)',fontsize = 20, labelpad = 5)
-        axis.set_ylabel('BOLD signal change (%)',fontsize = 20, labelpad = 5)
-        axis.set_xlim(0, len(model_arr[0,...]) * self.MRIObj.TR)
-        
-        axis.legend(loc='upper left',fontsize = 10) 
-
-        # plot axis vertical bar on background to indicate stimulus display time
-        for i,cond in enumerate(condition_per_TR):
-
-            if cond in ['L-R','R-L']: # horizontal bar passes will be darker 
-                plt.axvspan(i * self.MRIObj.TR, i * self.MRIObj.TR + self.MRIObj.TR, facecolor = '#8f0000', alpha=0.1)
                 
-            elif cond in ['U-D','D-U']: # vertical bar passes will be lighter 
-                plt.axvspan(i * self.MRIObj.TR, i * self.MRIObj.TR + self.MRIObj.TR, facecolor = '#ff0000', alpha=0.1)
-                
-        #plt.show()
-        fig.savefig(op.join(figures_pth, fig_name))
-
-    
-    def save_estimates4drawing(self, participant, task2draw = 'pRF',
-                                    ses = 'ses-mean', run_type = 'mean', pysub = 'hcp_999999',
-                                    prf_model_name = 'gauss', file_ext = '_cropped_dc_psc.npy', rsq_threshold = .1):
+    def save_estimates4drawing(self, participant_list = [], task2draw = 'pRF',
+                                    ses = 'mean', run_type = 'mean',  mask_bool_df = None, stim_on_screen = [],
+                                    prf_model_name = 'gauss', rsq_threshold = .1, mask_arr = True):
 
         """
         Load estimates into pycortex sub specific overlay, to draw ROIs
@@ -267,8 +68,8 @@ class pRFViewer(Viewer):
 
         Parameters
         ----------
-        participant : str
-            subject ID
+        participant_list : list
+            list of subject ID
         task2draw: str
             task identifier 
         ses: str
@@ -277,317 +78,133 @@ class pRFViewer(Viewer):
             type of run of input data (ex: 1/mean)
         prf_model_name: str
             name of prf model that was fit
-        file_ext: str
-            file extension of the post processed data
         rsq_threshold: float
             minimum RSQ threshold to use for figures
-        pysub: str
-            name of pycortex subject folder, to draw ROIs. 
-            will try to find 'hcp_999999_sub-X' by default, if doesnt exist then throws error
-
         """
 
         # if we provide a list, we want to save average estimates in overlay
-        if isinstance(participant, str): 
-            
-            participant_list = [participant]
-            sub_name = participant
-
-            # check if subject pycortex folder exists
-            pysub_folder = '{ps}_sub-{pp}'.format(ps = pysub, 
-                                                pp = participant)
-
-            if op.exists(op.join(cortex.options.config.get('basic', 'filestore'), pysub_folder)):
-                print('Participant overlay %s in pycortex filestore, assumes we draw ROIs there'%pysub_folder)
-            else:
-                raise NameError('FOLDER %s DOESNT EXIST'%op.join(cortex.options.config.get('basic', 'filestore'), pysub_folder))
-
+        if len(participant_list) == 1:
+            sub_name = 'sub-{sj}'.format(sj = participant_list[0])
         else:
-            participant_list = participant
-            pysub_folder = pysub
-            sub_name = 'group'
+            sub_name = 'sub-group'
 
+        # check if subject pycortex folder exists
+        pysub_folder = '{ps}_{pp}'.format(ps = self.pysub, pp = sub_name)
+
+        if op.exists(op.join(cortex.options.config.get('basic', 'filestore'), pysub_folder)):
+            print('Participant overlay %s in pycortex filestore, assumes we draw ROIs there'%pysub_folder)
+        else:
+            raise NameError('FOLDER %s DOESNT EXIST'%op.join(cortex.options.config.get('basic', 'filestore'), pysub_folder))
+
+        ## load estimates for all participants 
+        # store in dict, for ease of access
+        print('Loading iterative estimates')
+        group_estimates, group_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant_list = participant_list,
+                                                                    ses = ses, run_type = run_type, 
+                                                                    model_name = prf_model_name, 
+                                                                    iterative = True,
+                                                                    mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
+                                                                    fit_hrf = self.pRFModelObj.fit_hrf)
+
+        ## mask the estimates, if such is the case
+        if mask_arr:
+            print('masking estimates')
+
+            # get estimate keys
+            keys = self.pRFModelObj.get_prf_estimate_keys(prf_model_name = prf_model_name)
+
+            # get screen lim for all participants
+            max_ecc_ext = {'sub-{sj}'.format(sj = pp): group_prf_models['sub-{sj}'.format(sj = pp)]['ses-{s}'.format(s = ses)]['prf_stim'].screen_size_degrees/2 for pp in participant_list}
+
+            final_estimates = {'sub-{sj}'.format(sj = pp): self.pRFModelObj.mask_pRF_model_estimates(group_estimates['sub-{sj}'.format(sj = pp)], 
+                                                                                estimate_keys = keys,
+                                                                                x_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
+                                                                                y_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
+                                                                                rsq_threshold = rsq_threshold) for pp in participant_list}
+        else:
+            final_estimates = group_estimates
+        
+        
         ## get estimates for all participants, if applicable 
-        r2_avg = np.array([])
-        xx_avg = np.array([])
-        yy_avg = np.array([])
-
-        for pp in participant_list:
-
-            ## load model and prf estimates for that participant
-            pp_prf_est_dict, _ = self.pRFModelObj.load_pRF_model_estimates(pp, 
-                                                                            ses = ses, run_type = run_type, 
-                                                                            model_name = prf_model_name, iterative = True,
-                                                                            fit_hrf = self.pRFModelObj.fit_hrf)
-            ## STACK
-            r2_avg = np.vstack([r2_avg, pp_prf_est_dict['r2']]) if r2_avg.size else pp_prf_est_dict['r2']
-            xx_avg = np.vstack([xx_avg, pp_prf_est_dict['x'] ]) if xx_avg.size else pp_prf_est_dict['x'] 
-            yy_avg = np.vstack([yy_avg, pp_prf_est_dict['y'] ]) if yy_avg.size else pp_prf_est_dict['y'] 
+        r2_avg = np.stack((final_estimates['sub-{sj}'.format(sj = pp)]['r2'] for pp in participant_list))
+        xx_avg = np.stack((final_estimates['sub-{sj}'.format(sj = pp)]['x'] for pp in participant_list))
+        yy_avg = np.stack((final_estimates['sub-{sj}'.format(sj = pp)]['y'] for pp in participant_list))
 
         ## TAKE MEDIAN
         r2_avg = np.nanmedian(r2_avg, axis = 0)
         xx_avg = np.nanmedian(xx_avg, axis = 0)
         yy_avg = np.nanmedian(yy_avg, axis = 0)
 
-        ## calculate pa + ecc + size
-        nan_mask = np.where((np.isnan(r2_avg)) | (r2_avg < rsq_threshold))[0]
+        ## use RSQ as alpha level for flatmaps
+        alpha_level = self.MRIObj.mri_utils.normalize(np.clip(r2_avg, 0, .6)) # normalize 
+
+        ## get ECCENTRICITY estimates
+        eccentricity = self.pRFModelObj.get_eccentricity(xx = xx_avg,
+                                                        yy = yy_avg,
+                                                        rsq = r2_avg)
         
-        complex_location = xx_avg + yy_avg * 1j # calculate eccentricity values
+        ## calculate polar angle (normalize PA between 0 and 1)
+        polar_angle_norm = self.pRFModelObj.get_polar_angle(xx = xx_avg, yy = yy_avg, rsq = r2_avg, 
+                                                        pa_transform = 'norm', angle_thresh = None)
 
-        polar_angle = np.angle(complex_location)
-        polar_angle_norm = ((polar_angle + np.pi) / (np.pi * 2.0))
-        polar_angle_norm[nan_mask] = np.nan
-
-        eccentricity = np.abs(complex_location)
-        eccentricity[nan_mask] = np.nan
-
-        ## make alpha mask
-        alpha_level = mri_utils.normalize(np.clip(r2_avg, rsq_threshold, .6)) # normalize 
-        alpha_level[nan_mask] = np.nan
+        # get matplotlib color map from segmented colors
+        PA_cmap = self.plot_utils.make_colormap(['#ec9b3f','#f3eb53','#7cb956','#82cbdb', '#3d549f','#655099','#ad5a9b','#dd3933'], 
+                                                bins = 256, cmap_name = 'PA_mackey_custom',
+                                                discrete = False, add_alpha = False, return_cmap = True)
+        
+        ## also plot non-uniform color wheel ##
+        cmap_pa_sns = sns.hls_palette(as_cmap=True, h = 0.01, s=.9, l=.65)
+        pa_transformed = self.pRFModelObj.get_polar_angle(xx = xx_avg, yy = yy_avg, rsq = r2_avg, 
+                                                        pa_transform = 'flip', angle_thresh = 3*np.pi/4)
 
         ## set flatmaps ##
         images = {}
-        n_bins_colors = 256
-
+        
         ## pRF rsq
-        images['pRF_rsq'] = plot_utils.get_flatmaps(r2_avg, 
-                                                    vmin1 = 0, vmax1 = .8,
-                                                    pysub = pysub_folder, 
-                                                    cmap = 'Reds')
-        ## pRF Eccentricity
-
-        # make costum coor map
-        ecc_cmap = plot_utils.make_colormap(colormap = ['#dd3933','#f3eb53','#7cb956','#82cbdb','#3d549f'],
-                                            bins = n_bins_colors, cmap_name = 'ECC_mackey_costum', 
-                                            discrete = False, add_alpha = False, return_cmap = True)
-
-
-        images['ecc'] = plot_utils.make_raw_vertex_image(eccentricity, 
-                                                        cmap = ecc_cmap, 
-                                                        vmin = 0, vmax = 6, 
-                                                        data2 = alpha_level, 
-                                                        vmin2 = 0, vmax2 = 1, 
-                                                        subject = pysub_folder, data2D = True)
-
-        ## pRF Polar Angle
-       
-        # get matplotlib color map from segmented colors
-        PA_cmap = plot_utils.make_colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb',
-                                                    '#3d549f','#655099','#ad5a9b','#dd3933'], bins = n_bins_colors, 
-                                                    cmap_name = 'PA_mackey_costum',
-                                                    discrete = False, add_alpha = False, return_cmap = True)
-
-        images['PA_alpha'] = plot_utils.make_raw_vertex_image(polar_angle_norm, 
-                                                    cmap = PA_cmap, vmin = 0, vmax = 1, 
-                                                    data2 = alpha_level, 
+        images['pRF_rsq'] = self.plot_utils.plot_flatmap(r2_avg, 
+                                                        pysub = self.pysub, cmap = 'hot', 
+                                                        vmin1 = 0, vmax1 = 1, 
+                                                        fig_abs_name = None)
+        
+        images['ECC'] = self.plot_utils.plot_flatmap(eccentricity, 
+                                                    pysub = self.pysub, cmap = 'viridis', 
+                                                    vmin1 = 0, vmax1 = 5.5,
+                                                    est_arr2 = alpha_level,
                                                     vmin2 = 0, vmax2 = 1, 
-                                                    subject = pysub_folder, data2D = True)
+                                                    fig_abs_name = None)
 
-        images['PA'] = plot_utils.make_raw_vertex_image(polar_angle_norm, 
-                                                    cmap = PA_cmap, vmin = 0, vmax = 1, 
-                                                    data2 = np.ones(alpha_level.shape), 
+        images['PA'] = self.plot_utils.plot_flatmap(polar_angle_norm, 
+                                                pysub = self.pysub, cmap = PA_cmap, 
+                                                vmin1 = 0, vmax1 = 1,
+                                                est_arr2 = alpha_level,
+                                                vmin2 = 0, vmax2 = 1, 
+                                                with_colorbar = False,
+                                                fig_abs_name = None)
+        
+        images['PA_nonUNI'] = self.plot_utils.plot_flatmap(pa_transformed, 
+                                                    pysub = self.pysub, cmap = cmap_pa_sns, 
+                                                    vmin1 = -np.pi, vmax1 = np.pi, 
+                                                    est_arr2 = alpha_level,
                                                     vmin2 = 0, vmax2 = 1, 
-                                                    subject = pysub_folder, data2D = True)
-
-        ## also make non uniform color wheel, which helps seeing borders
-        rgb_pa = plot_utils.get_NONuniform_polar_angle(xx_avg, yy_avg, r2_avg, 
-                                                        angle_thresh = 3*np.pi/4, 
-                                                        rsq_thresh = 0, 
-                                                        pysub = pysub_folder)
-
-        # make ones mask, only for high rsq fits
-        ones_mask = np.ones(r2_avg.shape)
-        ones_mask[r2_avg < 0.3] = np.nan
-
-        images['PA_half_hemi'] = cortex.VertexRGB(rgb_pa[:, 0], rgb_pa[:, 1], rgb_pa[:, 2],
-                                           alpha = ones_mask,
-                                           subject = pysub_folder)
-
+                                                    with_colorbar = False,
+                                                    fig_abs_name = None)
+        
         ### ADD TO OVERLAY, TO DRAW BORDERS
-        cortex.utils.add_roi(images['pRF_rsq'], name = 'RSQ_sub-{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = sub_name,
-                                                                                                    run = run_type,
-                                                                                                    model = prf_model_name,
-                                                                                                    hrf_bool = str(self.pRFModelObj.fit_hrf)), 
-                                                                                                    open_inkscape = False, add_path = False)
-        cortex.utils.add_roi(images['ecc'], name = 'ECC_sub-{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = sub_name,
-                                                                                                    run = run_type,
-                                                                                                    model = prf_model_name,
-                                                                                                    hrf_bool = str(self.pRFModelObj.fit_hrf)), 
-                                                                                                    open_inkscape = False, add_path = False)
-        cortex.utils.add_roi(images['PA'], name = 'PA_sub-{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = sub_name,
-                                                                                                    run = run_type,
-                                                                                                    model = prf_model_name,
-                                                                                                    hrf_bool = str(self.pRFModelObj.fit_hrf)), 
-                                                                                                    open_inkscape = False, add_path = False)
-        cortex.utils.add_roi(images['PA_alpha'], name = 'PA_alpha_sub-{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = sub_name,
-                                                                                                    run = run_type,
-                                                                                                    model = prf_model_name,
-                                                                                                    hrf_bool = str(self.pRFModelObj.fit_hrf)), 
-                                                                                                    open_inkscape = False, add_path = False)
-        cortex.utils.add_roi(images['PA_half_hemi'], name = 'PA_half_hemi_sub-{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = sub_name,
-                                                                                                    run = run_type,
-                                                                                                    model = prf_model_name,
-                                                                                                    hrf_bool = str(self.pRFModelObj.fit_hrf)), 
-                                                                                                    open_inkscape = False, add_path = False)
+        self.plot_utils.add_data2overlay(flatmap = images['pRF_rsq'], name = 'RSQ_{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = sub_name,
+                                                                                                                            run = run_type, model = prf_model_name,
+                                                                                                                            hrf_bool = str(self.pRFModelObj.fit_hrf)))
+        self.plot_utils.add_data2overlay(flatmap = images['ECC'], name = 'ECC_{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = sub_name,
+                                                                                                                            run = run_type, model = prf_model_name,
+                                                                                                                            hrf_bool = str(self.pRFModelObj.fit_hrf)))
+        self.plot_utils.add_data2overlay(flatmap = images['PA'], name = 'PA_{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = sub_name,
+                                                                                                                            run = run_type, model = prf_model_name,
+                                                                                                                            hrf_bool = str(self.pRFModelObj.fit_hrf)))
+        self.plot_utils.add_data2overlay(flatmap = images['PA_nonUNI'], name = 'PA_nonUNI_{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = sub_name,
+                                                                                                                            run = run_type, model = prf_model_name,
+                                                                                                                            hrf_bool = str(self.pRFModelObj.fit_hrf)))
 
         print('Done')
 
-
-    def open_click_viewer(self, participant, task2viz = 'pRF',
-                    ses = 'ses-mean', run_type = 'mean',
-                    prf_model_name = 'gauss', file_ext = '_cropped_dc_psc.npy', rsq_threshold = .1):
-
-        """
-
-        Visualize pRF and FA estimates
-        with interactive figure that shows timecourse on click
-
-        Note - requires that we have (at least) pRF estimates saved 
-
-        Parameters
-        ----------
-        participant : str
-            subject ID
-        task2viz: str
-            task identifier 
-        ses: str
-            session of input data
-        run_type : str
-            type of run of input data (ex: 1/mean)
-        prf_model_name: str
-            name of prf model that was fit
-        file_ext: str
-            file extension of the post processed data
-        rsq_threshold: float
-            minimum RSQ threshold to use for figures
-
-        """
-
-        # general 
-        n_bins_colors = 256
-
-        ## load pRF data array
-        bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
-        #print(bold_filelist)
-        pRF_data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, task = 'pRF', run_type = run_type, 
-                                            baseline_interval = 'empty_long', ses = ses, return_filenames = False)
-
-        # FA_data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, task = 'FA', run_type = '1', 
-        #                                     baseline_interval = 'empty', ses = ses, return_filenames = False)
-
-        max_ecc_ext = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].screen_size_degrees/2
-
-        ## Load click viewer plotted object
-        click_plotter = click_viewer.visualize_on_click(self.MRIObj, pRFModelObj = self.pRFModelObj,
-                                                        pRF_data = pRF_data_arr,
-                                                        prf_dm = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].design_matrix,
-                                                        pysub = self.pysub['sub-{pp}'.format(pp = participant)],
-                                                        max_ecc_ext = max_ecc_ext)
-
-        ## set figure, and also load estimates and models
-        click_plotter.set_figure(participant,
-                                        prf_ses = ses, prf_run_type = run_type, pRFmodel_name = prf_model_name,
-                                        task2viz = task2viz)
-
-        ## mask the estimates
-        print('masking estimates')
-
-        # get estimate keys
-        keys = self.pRFModelObj.get_prf_estimate_keys(prf_model_name = prf_model_name)
-
-        click_plotter.pp_prf_est_dict = self.pRFModelObj.mask_pRF_model_estimates(click_plotter.pp_prf_est_dict, 
-                                                                    ROI = None,
-                                                                    estimate_keys = keys,
-                                                                    x_ecc_lim = [- max_ecc_ext, max_ecc_ext],
-                                                                    y_ecc_lim = [- max_ecc_ext, max_ecc_ext],
-                                                                    rsq_threshold = rsq_threshold,
-                                                                    pysub = self.pysub['sub-{pp}'.format(pp = participant)]
-                                                                    )
-
-        ## calculate pa + ecc + size
-        nan_mask = np.where((np.isnan(click_plotter.pp_prf_est_dict['r2'])) | (click_plotter.pp_prf_est_dict['r2'] < rsq_threshold))[0]
-        
-        complex_location = click_plotter.pp_prf_est_dict['x'] + click_plotter.pp_prf_est_dict['y'] * 1j # calculate eccentricity values
-
-        polar_angle = np.angle(complex_location)
-        polar_angle_norm = ((polar_angle + np.pi) / (np.pi * 2.0))
-        polar_angle_norm[nan_mask] = np.nan
-
-        eccentricity = np.abs(complex_location)
-        eccentricity[nan_mask] = np.nan
-
-        if prf_model_name in ['dn', 'dog']:
-            size_fwhmax, fwatmin = plot_utils.fwhmax_fwatmin(prf_model_name, click_plotter.pp_prf_est_dict)
-        else: 
-            size_fwhmax = plot_utils.fwhmax_fwatmin(prf_model_name, click_plotter.pp_prf_est_dict)
-
-        size_fwhmax[nan_mask] = np.nan
-
-        ## make alpha mask
-        alpha_level = mri_utils.normalize(np.clip(click_plotter.pp_prf_est_dict['r2'], rsq_threshold, .6)) # normalize 
-        alpha_level[nan_mask] = np.nan
-
-        ## set flatmaps ##
-
-        ## pRF rsq
-        click_plotter.images['pRF_rsq'] = plot_utils.get_flatmaps(click_plotter.pp_prf_est_dict['r2'], 
-                                                                    vmin1 = 0, vmax1 = .8,
-                                                                    pysub = self.pysub['sub-{pp}'.format(pp = participant)], 
-                                                                    cmap = 'Reds')
-        ## pRF Eccentricity
-
-        # make costum coor map
-        ecc_cmap = plot_utils.make_colormap(colormap = ['#dd3933','#f3eb53','#7cb956','#82cbdb','#3d549f'],
-                                            bins = n_bins_colors, cmap_name = 'ECC_mackey_costum', 
-                                            discrete = False, add_alpha = False, return_cmap = True)
-
-
-        click_plotter.images['ecc'] = plot_utils.make_raw_vertex_image(eccentricity, 
-                                                                            cmap = ecc_cmap, 
-                                                                            vmin = 0, vmax = 6, 
-                                                                            data2 = alpha_level, 
-                                                                            vmin2 = 0, vmax2 = 1, 
-                                                                            subject = self.pysub['sub-{pp}'.format(pp = participant)], data2D = True)
-
-        ## pRF Size
-        click_plotter.images['size_fwhmax'] = plot_utils.make_raw_vertex_image(size_fwhmax, 
-                                                    cmap = 'hot', vmin = 0, vmax = 14, #7, 
-                                                    data2 = alpha_level, 
-                                                    vmin2 = 0, vmax2 = 1, 
-                                                    subject = self.pysub['sub-{pp}'.format(pp = participant)], data2D = True)
-
-        ## pRF Polar Angle
-       
-        # get matplotlib color map from segmented colors
-        PA_cmap = plot_utils.make_colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb',
-                                                    '#3d549f','#655099','#ad5a9b','#dd3933'], bins = n_bins_colors, 
-                                                    cmap_name = 'PA_mackey_costum',
-                                                    discrete = False, add_alpha = False, return_cmap = True)
-
-        click_plotter.images['PA'] = plot_utils.make_raw_vertex_image(polar_angle_norm, 
-                                                    cmap = PA_cmap, vmin = 0, vmax = 1, 
-                                                    data2 = alpha_level, 
-                                                    vmin2 = 0, vmax2 = 1, 
-                                                    subject = self.pysub['sub-{pp}'.format(pp = participant)], data2D = True)
-
-        ## pRF Exponent 
-        if prf_model_name == 'css':
-            click_plotter.images['ns'] = plot_utils.get_flatmaps(click_plotter.pp_prf_est_dict['ns'], 
-                                                                vmin1 = 0, vmax1 = 1,
-                                                                pysub = self.pysub['sub-{pp}'.format(pp = participant)], 
-                                                                cmap = 'plasma')
-
-        
-        cortex.quickshow(click_plotter.images['pRF_rsq'], fig = click_plotter.flatmap_ax,
-                        with_rois = False, with_curvature = True, with_colorbar=False, 
-                        with_sulci = True, with_labels = False)
-
-        click_plotter.full_fig.canvas.mpl_connect('button_press_event', click_plotter.onclick)
-        click_plotter.full_fig.canvas.mpl_connect('key_press_event', click_plotter.onkey)
-
-        plt.show()
-
-    
     def plot_prf_results(self, participant_list = [], mask_bool_df = None, stim_on_screen = [],
                                 ses = 'mean', run_type = 'mean', prf_model_name = 'gauss',
                                 mask_arr = True, iterative = True):
@@ -1173,10 +790,10 @@ class pRFViewer(Viewer):
             for hemi in hemi_labels:
                 ## GET values per ROI ##
                 xx_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)]['x'], 
-                                                                        ROIs_dict = ROIs_dict['LH'], 
+                                                                        ROIs_dict = ROIs_dict[hemi], 
                                                                         model = model_name)
                 yy_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)]['y'], 
-                                                                        ROIs_dict = ROIs_dict['LH'], 
+                                                                        ROIs_dict = ROIs_dict[hemi], 
                                                                         model = model_name)
 
                 tmp_df = pd.merge(xx_pp_roi_df.rename(columns={'value': 'xx'}),
@@ -1234,6 +851,7 @@ class pRFViewer(Viewer):
                 plt.xticks(fontsize = 20)
                 plt.yticks(fontsize = 20)
                 plt.tight_layout()
+                plt.xlim(-max_ecc_ext_dict['sub-{sj}'.format(sj = pp)], max_ecc_ext_dict['sub-{sj}'.format(sj = pp)]) #-6,6)#
                 plt.ylim(-max_ecc_ext_dict['sub-{sj}'.format(sj = pp)], max_ecc_ext_dict['sub-{sj}'.format(sj = pp)]) #-6,6)#
                 ss.set_aspect('auto')
                 # set middle lines
@@ -1285,6 +903,7 @@ class pRFViewer(Viewer):
                 plt.xticks(fontsize = 20)
                 plt.yticks(fontsize = 20)
                 plt.tight_layout()
+                plt.xlim(-max_ecc_ext_dict['sub-{sj}'.format(sj = pp)], max_ecc_ext_dict['sub-{sj}'.format(sj = pp)]) #-6,6)#
                 plt.ylim(-max_ecc_ext_dict['sub-{sj}'.format(sj = pp)], max_ecc_ext_dict['sub-{sj}'.format(sj = pp)]) #-6,6)#
                 ss.set_aspect('auto')
                 # set middle lines
@@ -1299,6 +918,324 @@ class pRFViewer(Viewer):
                 fig_hex = plt.gcf()
                 fig_hex.savefig(fig_name.replace('_VFcoverage','_VFcoverage_{rn}'.format(rn = r_name)))
 
+
+    def plot_singlevert_pRF(self, participant, 
+                    ses = 'ses-mean', run_type = 'mean', vertex = None, ROI = None,
+                    prf_model_name = 'gauss', file_ext = '_cropped_dc_psc.npy', 
+                    fit_now = False, figures_pth = None):
+
+        """
+
+        Function to plot single vertex timecourse
+
+        Parameters
+        ----------
+        participant : str
+            subject ID
+        task: str
+            task identifier --> might not be needed if I make this func pRF timecourse specific
+        ses: str
+            session of input data
+        run_type : str
+            type of run of input data (ex: 1/mean)
+        vertex: int
+            vertex index 
+        ROI: str
+            roi name
+        prf_model_name: str
+            name of prf model to/that was fit
+        file_ext: str
+            file extension of the post processed data
+        fit_now: bool
+            if we want to fit the timecourse now
+        figures_pth: str
+            where to save the figures
+
+        """
+            
+        # make output folder for figures
+        if figures_pth is None:
+            figures_pth = op.join(self.outputdir, 'single_vertex', self.MRIObj.params['mri']['fitting']['pRF']['fit_folder'], 'sub-{sj}'.format(sj = participant), ses)
+        
+        os.makedirs(figures_pth, exist_ok=True)
+
+        # if we want to fit it now
+        if fit_now:
+            print('Fitting estimates')
+            estimates_dict, data_arr = self.pRFModelObj.fit_data(participant, self.pp_prf_models, 
+                                                                    vertex = vertex, 
+                                                                    run_type = run_type, ses = ses,
+                                                                    model2fit = prf_model_name, xtol = 1e-2,
+                                                                    file_ext = file_ext)
+
+        else:
+            print('Loading estimates')
+            ## load estimates to make it easier to load later
+            estimates_keys_dict, _ = self.pRFModelObj.load_pRF_model_estimates(participant,
+                                                                        ses = ses, run_type = run_type, 
+                                                                        model_name = prf_model_name, 
+                                                                        iterative = True,
+                                                                        fit_hrf = self.pRFModelObj.fit_hrf)
+
+            # when loading, dict has key-value pairs stored,
+            # need to convert it to make it in same format as when fitting on the spot
+            keys = self.pRFModelObj.get_prf_estimate_keys(prf_model_name = prf_model_name)
+            
+            estimates_dict = {}
+            estimates_dict['it_{name}'.format(name = prf_model_name)] = np.stack((estimates_keys_dict[val][vertex] for val in keys))[np.newaxis,...]
+
+            ## load data array
+            bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
+            data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, task = 'pRF', run_type = run_type, chunk_num = None, vertex = vertex, 
+                                baseline_interval = 'empty_long', ses = ses, return_filenames = False)
+
+        ## if we fitted hrf, need to also get that from params
+        ## and set model array
+        
+        # define spm hrf
+        spm_hrf = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].create_hrf(hrf_params = [1, 1, 0],
+                                                                                                                    onset=self.pRFModelObj.hrf_onset)
+
+        if self.pRFModelObj.fit_hrf:
+            hrf = self.pp_prf_models[ 'sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].create_hrf(hrf_params = [1.0,
+                                                                                                                                estimates_dict['it_{name}'.format(name = prf_model_name)][0][-3],
+                                                                                                                                estimates_dict['it_{name}'.format(name = prf_model_name)][0][-2]],
+                                                                                                                    onset=self.pRFModelObj.hrf_onset)
+        
+            self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].hrf = hrf
+
+            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].return_prediction(*list(estimates_dict['it_{name}'.format(name = prf_model_name)][0, :-3]))
+        
+        else:
+            self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].hrf = spm_hrf
+
+            model_arr = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['{name}_model'.format(name = prf_model_name)].return_prediction(*list(estimates_dict['it_{name}'.format(name = prf_model_name)][0, :-1]))
+        
+        
+        # get array with name of condition per TR, to plot in background
+        ## get behavioral info 
+        mri_beh = preproc_behdata.PreprocBeh(self.MRIObj)
+
+        condition_per_TR = mri_utils.crop_shift_arr(mri_beh.pRF_bar_pass_all, 
+                                        crop_nr = self.pRFModelObj.crop_TRs_num['pRF'], 
+                                        shift = self.pRFModelObj.shift_TRs_num)
+
+        ## actually plot
+
+        # set figure name
+        fig_name = 'sub-{sj}_task-pRF_acq-{acq}_space-{space}_run-{run}_model-{model}_roi-{roi}_vertex-{vert}.png'.format(sj = participant,
+                                                                                                acq = self.MRIObj.acq,
+                                                                                                space = self.MRIObj.sj_space,
+                                                                                                run = run_type,
+                                                                                                model = prf_model_name,
+                                                                                                roi = str(ROI),
+                                                                                                vert = str(vertex))
+        if not fit_now:
+            fig_name = fig_name.replace('.png', '_loaded.png')
+
+
+        if self.pRFModelObj.fit_hrf:
+
+            fig_name = fig_name.replace('.png','_withHRF.png') 
+
+            ## also plot hrf shapes for comparison
+            fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
+
+            time_sec = np.linspace(0,len(hrf[0]) * self.MRIObj.TR, num = len(hrf[0])) # array in seconds
+
+            axis.plot(time_sec, spm_hrf[0],'grey',label='spm hrf')
+            axis.plot(time_sec, hrf[0],'red',label='fitted hrf')
+            axis.set_xlim(self.pRFModelObj.hrf_onset, 25)
+            axis.legend(loc='upper right',fontsize=10) 
+            axis.set_xlabel('Time (TR)',fontsize=10, labelpad=10)
+            #plt.show()
+            fig.savefig(op.join(figures_pth, 'HRF_model-{model}_roi-{roi}_vertex-{vert}.png'.format(model = prf_model_name,
+                                                                                                    roi = str(ROI), 
+                                                                                                    vert = str(vertex)))) 
+
+        # plot data with model
+        fig, axis = plt.subplots(1,figsize=(12,5),dpi=100)
+
+        # plot data with model
+        time_sec = np.linspace(0,len(model_arr[0,...]) * self.MRIObj.TR, num = len(model_arr[0,...])) # array in seconds
+            
+        axis.plot(time_sec, model_arr[0,...], c = 'red', lw = 3, 
+                                            label = 'model R$^2$ = %.2f'%estimates_dict['it_{name}'.format(name = prf_model_name)][0][-1], 
+                                            zorder = 1)
+        #axis.scatter(time_sec, data_reshape[ind_max_rsq,:], marker='v',s=15,c='k',label='data')
+        axis.plot(time_sec, data_arr[0,...],'k--',label='data')
+        
+        axis.set_xlabel('Time (s)',fontsize = 20, labelpad = 5)
+        axis.set_ylabel('BOLD signal change (%)',fontsize = 20, labelpad = 5)
+        axis.set_xlim(0, len(model_arr[0,...]) * self.MRIObj.TR)
+        
+        axis.legend(loc='upper left',fontsize = 10) 
+
+        # plot axis vertical bar on background to indicate stimulus display time
+        for i,cond in enumerate(condition_per_TR):
+
+            if cond in ['L-R','R-L']: # horizontal bar passes will be darker 
+                plt.axvspan(i * self.MRIObj.TR, i * self.MRIObj.TR + self.MRIObj.TR, facecolor = '#8f0000', alpha=0.1)
+                
+            elif cond in ['U-D','D-U']: # vertical bar passes will be lighter 
+                plt.axvspan(i * self.MRIObj.TR, i * self.MRIObj.TR + self.MRIObj.TR, facecolor = '#ff0000', alpha=0.1)
+                
+        #plt.show()
+        fig.savefig(op.join(figures_pth, fig_name))
+
+    def open_click_viewer(self, participant, task2viz = 'pRF',
+                    ses = 'ses-mean', run_type = 'mean',
+                    prf_model_name = 'gauss', file_ext = '_cropped_dc_psc.npy', rsq_threshold = .1):
+
+        """
+
+        Visualize pRF and FA estimates
+        with interactive figure that shows timecourse on click
+
+        Note - requires that we have (at least) pRF estimates saved 
+
+        Parameters
+        ----------
+        participant : str
+            subject ID
+        task2viz: str
+            task identifier 
+        ses: str
+            session of input data
+        run_type : str
+            type of run of input data (ex: 1/mean)
+        prf_model_name: str
+            name of prf model that was fit
+        file_ext: str
+            file extension of the post processed data
+        rsq_threshold: float
+            minimum RSQ threshold to use for figures
+
+        """
+
+        # general 
+        n_bins_colors = 256
+
+        ## load pRF data array
+        bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
+        #print(bold_filelist)
+        pRF_data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, task = 'pRF', run_type = run_type, 
+                                            baseline_interval = 'empty_long', ses = ses, return_filenames = False)
+
+        # FA_data_arr = self.pRFModelObj.get_data4fitting(bold_filelist, task = 'FA', run_type = '1', 
+        #                                     baseline_interval = 'empty', ses = ses, return_filenames = False)
+
+        max_ecc_ext = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].screen_size_degrees/2
+
+        ## Load click viewer plotted object
+        click_plotter = click_viewer.visualize_on_click(self.MRIObj, pRFModelObj = self.pRFModelObj,
+                                                        pRF_data = pRF_data_arr,
+                                                        prf_dm = self.pp_prf_models['sub-{sj}'.format(sj = participant)][ses]['prf_stim'].design_matrix,
+                                                        pysub = self.pysub['sub-{pp}'.format(pp = participant)],
+                                                        max_ecc_ext = max_ecc_ext)
+
+        ## set figure, and also load estimates and models
+        click_plotter.set_figure(participant,
+                                        prf_ses = ses, prf_run_type = run_type, pRFmodel_name = prf_model_name,
+                                        task2viz = task2viz)
+
+        ## mask the estimates
+        print('masking estimates')
+
+        # get estimate keys
+        keys = self.pRFModelObj.get_prf_estimate_keys(prf_model_name = prf_model_name)
+
+        click_plotter.pp_prf_est_dict = self.pRFModelObj.mask_pRF_model_estimates(click_plotter.pp_prf_est_dict, 
+                                                                    ROI = None,
+                                                                    estimate_keys = keys,
+                                                                    x_ecc_lim = [- max_ecc_ext, max_ecc_ext],
+                                                                    y_ecc_lim = [- max_ecc_ext, max_ecc_ext],
+                                                                    rsq_threshold = rsq_threshold,
+                                                                    pysub = self.pysub['sub-{pp}'.format(pp = participant)]
+                                                                    )
+
+        ## calculate pa + ecc + size
+        nan_mask = np.where((np.isnan(click_plotter.pp_prf_est_dict['r2'])) | (click_plotter.pp_prf_est_dict['r2'] < rsq_threshold))[0]
+        
+        complex_location = click_plotter.pp_prf_est_dict['x'] + click_plotter.pp_prf_est_dict['y'] * 1j # calculate eccentricity values
+
+        polar_angle = np.angle(complex_location)
+        polar_angle_norm = ((polar_angle + np.pi) / (np.pi * 2.0))
+        polar_angle_norm[nan_mask] = np.nan
+
+        eccentricity = np.abs(complex_location)
+        eccentricity[nan_mask] = np.nan
+
+        if prf_model_name in ['dn', 'dog']:
+            size_fwhmax, fwatmin = plot_utils.fwhmax_fwatmin(prf_model_name, click_plotter.pp_prf_est_dict)
+        else: 
+            size_fwhmax = plot_utils.fwhmax_fwatmin(prf_model_name, click_plotter.pp_prf_est_dict)
+
+        size_fwhmax[nan_mask] = np.nan
+
+        ## make alpha mask
+        alpha_level = mri_utils.normalize(np.clip(click_plotter.pp_prf_est_dict['r2'], rsq_threshold, .6)) # normalize 
+        alpha_level[nan_mask] = np.nan
+
+        ## set flatmaps ##
+
+        ## pRF rsq
+        click_plotter.images['pRF_rsq'] = plot_utils.get_flatmaps(click_plotter.pp_prf_est_dict['r2'], 
+                                                                    vmin1 = 0, vmax1 = .8,
+                                                                    pysub = self.pysub['sub-{pp}'.format(pp = participant)], 
+                                                                    cmap = 'Reds')
+        ## pRF Eccentricity
+
+        # make costum coor map
+        ecc_cmap = plot_utils.make_colormap(colormap = ['#dd3933','#f3eb53','#7cb956','#82cbdb','#3d549f'],
+                                            bins = n_bins_colors, cmap_name = 'ECC_mackey_costum', 
+                                            discrete = False, add_alpha = False, return_cmap = True)
+
+
+        click_plotter.images['ecc'] = plot_utils.make_raw_vertex_image(eccentricity, 
+                                                                            cmap = ecc_cmap, 
+                                                                            vmin = 0, vmax = 6, 
+                                                                            data2 = alpha_level, 
+                                                                            vmin2 = 0, vmax2 = 1, 
+                                                                            subject = self.pysub['sub-{pp}'.format(pp = participant)], data2D = True)
+
+        ## pRF Size
+        click_plotter.images['size_fwhmax'] = plot_utils.make_raw_vertex_image(size_fwhmax, 
+                                                    cmap = 'hot', vmin = 0, vmax = 14, #7, 
+                                                    data2 = alpha_level, 
+                                                    vmin2 = 0, vmax2 = 1, 
+                                                    subject = self.pysub['sub-{pp}'.format(pp = participant)], data2D = True)
+
+        ## pRF Polar Angle
+       
+        # get matplotlib color map from segmented colors
+        PA_cmap = plot_utils.make_colormap(colormap = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb',
+                                                    '#3d549f','#655099','#ad5a9b','#dd3933'], bins = n_bins_colors, 
+                                                    cmap_name = 'PA_mackey_costum',
+                                                    discrete = False, add_alpha = False, return_cmap = True)
+
+        click_plotter.images['PA'] = plot_utils.make_raw_vertex_image(polar_angle_norm, 
+                                                    cmap = PA_cmap, vmin = 0, vmax = 1, 
+                                                    data2 = alpha_level, 
+                                                    vmin2 = 0, vmax2 = 1, 
+                                                    subject = self.pysub['sub-{pp}'.format(pp = participant)], data2D = True)
+
+        ## pRF Exponent 
+        if prf_model_name == 'css':
+            click_plotter.images['ns'] = plot_utils.get_flatmaps(click_plotter.pp_prf_est_dict['ns'], 
+                                                                vmin1 = 0, vmax1 = 1,
+                                                                pysub = self.pysub['sub-{pp}'.format(pp = participant)], 
+                                                                cmap = 'plasma')
+
+        
+        cortex.quickshow(click_plotter.images['pRF_rsq'], fig = click_plotter.flatmap_ax,
+                        with_rois = False, with_curvature = True, with_colorbar=False, 
+                        with_sulci = True, with_labels = False)
+
+        click_plotter.full_fig.canvas.mpl_connect('button_press_event', click_plotter.onclick)
+        click_plotter.full_fig.canvas.mpl_connect('key_press_event', click_plotter.onkey)
+
+        plt.show()
 
 class FAViewer(pRFViewer):
 

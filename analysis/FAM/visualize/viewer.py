@@ -163,5 +163,29 @@ class Viewer:
 
             fig.savefig(op.join(figures_pth, op.split(fig_name)[-1].replace('flatmap','violinplot').replace('sub-{sj}'.format(sj = pp),'sub-GROUP')))
 
+    def save_inflated_3Dviews(self, flatmap, viewer_angles_dict = None, base_name = None, unfold_type = 'inflated',
+                                    overlays_visible=['sulci']):
 
+        """
+        Function to make and save inflated 3D views 
+        from different views
+        Note - if running in notebook, will kill kernel
+        """
+
+        if viewer_angles_dict is None:
+            viewer_angles_dict = self.MRIObj.params['plotting']['webview']['angle_params']
+
+        list_angles = list(viewer_angles_dict.items())
+        list_surfaces = [(unfold_type, self.MRIObj.params['plotting']['webview']['unfold_params'][unfold_type]) for i in range(len(viewer_angles_dict))]
+
+        # save inflated 3D screenshots 
+        for i in range(len(viewer_angles_dict)):
+            
+            cortex.export.save_3d_views(flatmap, 
+                        base_name = base_name,
+                        list_angles = [list_angles[i]],
+                        list_surfaces = [list_surfaces[i]],        
+                    viewer_params=dict(labels_visible=[],
+                                        overlays_visible=overlays_visible, recache=True),
+                    size=(1024 * 4, 768 * 4), trim=True, sleep=30)
 

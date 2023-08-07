@@ -692,7 +692,37 @@ class PlotUtils(Utils):
         
         return axis
 
+    def get_pycortex_sub_dict(self, participant_list = [], pysub = 'hcp_999999', use_sub_rois = True):
 
+        """ 
+        Helper function to get dict with
+        pycortex name per participant in participant list 
+        
+        Parameters
+        ----------
+        participant_list : list
+            list with participant IDs
+        use_sub_rois: bool
+            if True we will try to find sub specific folder, else will just use pysub
+            
+        """
+        pysub_dict = {}
+
+        for pp in participant_list:
+
+            if use_sub_rois:
+                # check if subject pycortex folder exists
+                pysub_folder = '{ps}_sub-{pp}'.format(ps = pysub, pp = pp)
+
+                if op.exists(op.join(cortex.options.config.get('basic', 'filestore'), pysub_folder)):
+                    print('Participant overlay %s in pycortex filestore, assumes we draw ROIs there'%pysub_folder)
+                    pysub_dict['sub-{pp}'.format(pp = pp)] = pysub_folder
+                else:
+                    pysub_dict['sub-{pp}'.format(pp = pp)] = pysub
+            else:
+                pysub_dict['sub-{pp}'.format(pp = pp)] = pysub
+
+        return pysub_dict
 
     
 

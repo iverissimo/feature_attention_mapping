@@ -315,6 +315,21 @@ plotting:
                 }
         }
 
+  webview:
+    angle_params: {'lateral_left': {'camera.azimuth': 87, 'camera.altitude': 90, 'camera.radius': 220, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,},
+                    'lateral_right': {'camera.azimuth': 273, 'camera.altitude': 90, 'camera.radius': 220, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,},
+                    'top': {'camera.azimuth': 180, 'camera.altitude': 5, 'camera.radius': 270, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,},
+                    'bottom': {'camera.azimuth': 0, 'camera.altitude': 180, 'camera.radius': 270, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,},
+                    'medial_right': {'camera.azimuth': 87, 'camera.altitude': 100, 'camera.radius': 180, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,'surface.{subject}.left': False,},
+                    'medial_left': {'camera.azimuth': 273, 'camera.altitude': 100, 'camera.radius': 180, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,'surface.{subject}.right': False,}
+                  }
+    unfold_params: {'inflated': {'surface.{subject}.unfold': 0.5,},
+                    'flatmap': {'surface.{subject}.unfold': 1,},
+                    'fiducial': {'surface.{subject}.unfold': 0,},
+                    'inflated_half': {'surface.{subject}.unfold': 0.25,},
+                    'inflated_less': {'surface.{subject}.unfold': 0.35,},
+                    }
+
   rsq_threshold: .2 #.15 #.25 
 
 

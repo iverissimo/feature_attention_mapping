@@ -82,6 +82,64 @@ class Model:
         ## total number of chunks we divide data when fitting
         self.total_chunks = {key:self.MRIObj.params['mri']['fitting'][key]['total_chunks'][self.MRIObj.sj_space] for key in self.MRIObj.tasks}
 
+    def get_run_ses_pp(self, participant, task = 'pRF', run_type = 'mean', ses = 'mean', file_ext = '_cropped.npy'):
+
+        """
+        get data file list
+        and output run and ses number only
+                
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        task: str
+            task name for files in list (default pRF)
+        run_type: string or int
+            type of run to fit - mean (default), median, loo_rXsY (leaving out specific run and session) 
+            or if int/'run-X' will do single run fit
+        ses: int
+            session number, only relevant when loading one specific run number (associated to a session number)
+        """  
+
+        ## get list of files to load
+        file_list = self.MRIObj.mri_utils.get_bold_file_list(participant, task = task, ses = ses, file_ext = file_ext,
+                                                            postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
+                                                            acq_name = self.MRIObj.acq)
+        
+        # if loading specific run
+        if isinstance(run_type, int) or (isinstance(run_type, str) and 'loo_' not in run_type and len(re.findall(r'\d{1,10}', run_type))>0):
+
+            if not isinstance(ses, int) or not (isinstance(ses, str) and len(re.findall(r'\d{1,10}', ses))>0):
+                raise ValueError('Want to run specific run but did not provide session number!')
+            else:
+                run = re.findall(r'\d{1,10}', str(run_type))[0]
+                print('Found run-{r} from ses-{s}'.format(r = run, s = ses))
+
+                file_list = [file for file in file_list if 'run-{r}'.format(r = run) in file and 'ses-{s}'.format(s = ses) in file]
+
+        # if leaving one run out
+        elif 'loo_' in run_type:
+            
+            print('Leave-one out runs ({r})'.format(r = run_type))
+            _, file_list = self.MRIObj.mri_utils.get_loo_filename(file_list, loo_key=run_type)
+
+        ## now actually load data
+        print('Found {x} files of task {t}'.format(x = len(file_list), t = task))
+
+        # loop over files
+        run_num_arr = [] 
+        ses_num_arr = []
+
+        for file in file_list:
+    
+            ## append run number, and ses number in list of ints
+            # useful for when fitting several runs at same time
+            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(file)
+            run_num_arr.append(file_rn)
+            ses_num_arr.append(file_sn)
+
+        return run_num_arr, ses_num_arr
+
     def get_data4fitting(self, file_list, task = 'pRF', run_type = 'mean',
                             chunk_num = None, vertex = None,
                             baseline_interval = 'empty_long', ses = 'mean', return_filenames = False, correct_baseline = None):
@@ -277,7 +335,6 @@ class Model:
             else:
                 return np.sum((timecourse - prediction) ** 2) # calculate residual sum of squared errors
             
-
     def baseline_correction(self, data, condition_per_TR = [], num_baseline_TRs = 6, baseline_interval = 'empty_long', 
                                     avg_type = 'median', only_edges = False, TR2task = 3):
         

@@ -3,6 +3,7 @@ import os, sys
 import os.path as op
 import pandas as pd
 
+import re
 
 class PreprocBeh:
 
@@ -216,6 +217,27 @@ class PreprocBeh:
         
         return bar_pos_df
     
+    def get_run_ses_by_color(self, participant, ses_num = None, ses_type = 'func', run_num = None):
+
+        """
+        Get session and run number for same attended color
+        """
+
+        pp_bar_pos_df = self.load_FA_bar_position(participant, ses_num = ses_num, ses_type = ses_type, run_num = run_num)
+
+        att_color_ses_run = {'color_green': {'ses': [], 'run': []}, 
+                     'color_red': {'ses': [], 'run': []}}
+
+        for ses_key in pp_bar_pos_df.keys():
+            for run_key in pp_bar_pos_df[ses_key]:
+                
+                att_color = pp_bar_pos_df[ses_key][run_key][pp_bar_pos_df[ses_key][run_key]['attend_condition'] == 1].color[0]
+                        
+                att_color_ses_run[att_color]['ses'] += [int(re.findall(r'ses-\d{1,3}', ses_key)[0][4:])]
+                att_color_ses_run[att_color]['run'] += [int(re.findall(r'run-\d{1,3}', run_key)[0][4:])]
+
+        return att_color_ses_run
+        
     def get_pRF_behavioral_results(self, ses_type = 'func'):
         
         """

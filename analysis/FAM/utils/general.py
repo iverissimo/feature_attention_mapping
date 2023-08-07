@@ -191,6 +191,29 @@ class Utils:
 
         return avg_data
     
+    def weighted_mean_std_sem(self, data1, weights=None, norm=False):
+        
+        """
+        Compute (Weighted) standard deviations of mean with statsmodel
+        and weigthed standard error of the mean
+        
+        Parameters
+        ----------
+        data1 : arr
+            numpy array 
+        weights : arr 
+        """ 
+
+        if norm:
+            weights = self.normalize(weights)
+
+        if weights is not None:
+            weights[np.where((np.isinf(weights)) | (np.isnan(weights)) | (weights == 0))] = 0.000000001
+
+        avg_data = weightstats.DescrStatsW(data1,weights=weights).std_mean
+
+        return avg_data, avg_data/np.sqrt(len(data1)) # sem
+    
     def weighted_corr(self, data1, data2, weights=None, norm=False):
 
         """

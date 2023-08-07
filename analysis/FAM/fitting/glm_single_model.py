@@ -387,7 +387,8 @@ class GLMsingle_Model(Model):
         return ref_df
 
     def get_singletrial_estimates(self, estimate_arr = [], single_trl_DM = [], return_std = True,
-                                            att_bar_xy = [], unatt_bar_xy = [], average_betas = True):
+                                        att_bar_xy = [], unatt_bar_xy = [], average_betas = True, att_color_ses_run = None,
+                                        participant = None, file_ext = '_cropped.npy'):
 
         """
         Get beta values for each single trial type (our condition)
@@ -408,6 +409,13 @@ class GLMsingle_Model(Model):
         average_betas: bool
             if we want to average betas across runs
         """
+        
+        # if we provided dict with attended color run/ses keys, then average by color
+        if att_color_ses_run:
+            # get run and ses number in order used in DM 
+            run_num_arr,ses_num_arr = self.get_run_ses_pp(participant, task = 'FA', run_type = 'all', ses = 'all', file_ext = file_ext)
+            print(run_num_arr)
+            print(ses_num_arr)
 
         # get reference df
         ref_df = self.subselect_trial_combinations(att_bar_xy = att_bar_xy, unatt_bar_xy = unatt_bar_xy)
@@ -424,17 +432,30 @@ class GLMsingle_Model(Model):
             ## indices select for task on TRs (trials)
             cond_ind = np.where(np.hstack(single_trl_DM[:, self.condition_per_TR == 'task', i] == 1))[0]
             
-            if average_betas:
-                avg_all.append(np.mean(estimate_arr[...,cond_ind], axis = -1))
+            if average_betas and att_color_ses_run is None: # average across all runs
+               avg_all.append(np.mean(estimate_arr[...,cond_ind], axis = -1))
             else:
                 avg_all.append(estimate_arr[...,cond_ind])
+            
             if return_std:
                 std_all.append(np.std(estimate_arr[...,cond_ind], axis = -1))
-            
-        if return_std:
-            return np.stack(avg_all), np.stack(std_all)
+
+        # assumes we want to average across attended condition (this is, only average runs where same color bar was attended)
+        if att_color_ses_run and average_betas:
+            out_avg = []
+            # get indices for runs of same attended color
+            for col_name in att_color_ses_run.keys():
+                col_indices = np.hstack((np.where(((np.array(run_num_arr) == rn) & (np.array(ses_num_arr) == att_color_ses_run[col_name]['ses'][i])
+                            ))[0] for i, rn in enumerate(att_color_ses_run[col_name]['run'])))
+                out_avg.append(np.mean(np.stack(avg_all)[...,col_indices], axis = -1))
+            out_avg = np.swapaxes(np.swapaxes(np.stack(out_avg),0,1),1,2)
         else:
-            return np.stack(avg_all)
+            out_avg = np.stack(avg_all)
+
+        if return_std:
+            return out_avg, np.stack(std_all)
+        else:
+            return out_avg
         
     def get_single_trial_reference_df(self):
 

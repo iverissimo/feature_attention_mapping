@@ -712,7 +712,62 @@ class GLMsingle_Model(Model):
         np.save(op.join(outdir, 'spcorrelation_task-pRF.npy'), corr_pRF)
         np.save(op.join(outdir, 'spcorrelation_task-FA.npy'), corr_FA)
 
+    def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, 
+                                            file_ext = '_cropped.npy', ROIs_dict = {}, prf_estimates = {}, orientation_bars = 'parallel_vertical'):
 
+        ## save beta values for each ROI
+        # for a specific bar pass
+
+        DF_betas_bar_coord = pd.DataFrame({'sj': [], 'ROI': [], 'betas': [], 
+                                            'prf_x_coord': [], 'prf_y_coord': [], 'attend_color': []})
+
+        ## for bars going left to right (vertical orientation)
+        if orientation_bars == 'parallel_vertical':
+            coord_list = self.bar_x_coords_pix
+
+        elif orientation_bars == 'parallel_horizontal':
+            coord_list = self.bar_y_coords_pix
+
+        else:
+            raise ValueError('Cross sections not implemented yet')
+
+        for ind in range(len(coord_list)):
+
+            UAtt_bar_coord = coord_list[ind] # let's start with unattended bar vertical leftmost, attended bar left to right (5 positions)
+
+            for Att_bar_coord in coord_list:
+
+                if Att_bar_coord != UAtt_bar_coord: ## bars cannot fully overlap
+
+                    att_bar_xy = [Att_bar_coord, np.nan] if orientation_bars == 'parallel_vertical' else [np.nan, Att_bar_coord]
+                    unatt_bar_xy = [UAtt_bar_coord, np.nan] if orientation_bars == 'parallel_vertical' else [np.nan, UAtt_bar_coord]
+
+                    ## get average beta for each trial type
+                    avg_betas = self.get_singletrial_estimates(estimate_arr = betas_arr, 
+                                                                single_trl_DM = single_trl_DM, return_std = False,
+                                                                average_betas = True,
+                                                                att_color_ses_run = att_color_ses_run,
+                                                                participant = participant, file_ext = file_ext,
+                                                                att_bar_xy = att_bar_xy, 
+                                                                unatt_bar_xy = unatt_bar_xy)
+                    # differentiate per color
+                    for c, color_name in enumerate(att_color_ses_run.keys()):
+                    
+                        # iterate over ROIs
+                        for rname in ROIs_dict.keys():
+
+                            DF_betas_bar_coord = pd.concat((DF_betas_bar_coord,
+                                                        pd.DataFrame({'sj': np.tile('sub-{sj}'.format(sj = participant), len(ROIs_dict[rname])), 
+                                                            'ROI': np.tile(rname, len(ROIs_dict[rname])), 
+                                                            'betas': avg_betas[0,:,c][ROIs_dict[rname]], 
+                                                            'attend_color': np.tile(color_name, len(ROIs_dict[rname])),
+                                                            'Att_bar_coord': np.tile(Att_bar_coord, len(ROIs_dict[rname])),
+                                                            'UAtt_bar_coord': np.tile(UAtt_bar_coord, len(ROIs_dict[rname])),
+                                                            'prf_x_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['x'][ROIs_dict[rname]], 
+                                                            'prf_y_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['y'][ROIs_dict[rname]]})
+                                                            )) 
+                            
+        return DF_betas_bar_coord
 
 
         

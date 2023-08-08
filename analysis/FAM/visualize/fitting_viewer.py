@@ -1430,7 +1430,7 @@ class FAViewer(Viewer):
             DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['attend_color'] == bar_color2plot].dropna() # drop nans
         else:
             # average them, if we dont care
-            DF_betas_bar_coord = DF_betas_bar_coord.dropna().groupby(['prf_x_coord', 'prf_y_coord', 'Att_bar_coord', 'UAtt_bar_coord',
+            DF_betas_bar_coord = DF_betas_bar_coord.dropna().groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
                                                                             'ROI', 'sj'])['betas'].mean().reset_index()
 
         ### now plot all combinations (rows - unattended bar pos changes, column, attend bar pos changes)
@@ -1496,6 +1496,126 @@ class FAViewer(Viewer):
                 os.makedirs(op.split(fig_name)[0], exist_ok=True)
                 fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
 
+    def plot_betas_1D(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical',
+                            max_ecc_ext = 5.5, fig_name = None, bar_color2plot = None):
+
+        """
+        Plot model beta values, 
+        binned over 1D coordinates
+        for different ROIs
+        """
+
+        # if no ROI specified, then plot all
+        if len(ROI_list) == 0:
+            ROI_list = DF_betas_bar_coord.ROI.unique()
+
+        ## for bars going left to right (vertical orientation)
+        if orientation_bars == 'parallel_vertical':
+            coord_list = self.FAModelObj.bar_x_coords_pix
+
+        elif orientation_bars == 'parallel_horizontal':
+            coord_list = self.FAModelObj.bar_y_coords_pix
+
+        else:
+            raise ValueError('Cross sections not implemented yet')
+        
+        ## if we want to plot estimates for specific bar color
+        if bar_color2plot:
+            if isinstance(bar_color2plot, str):
+                color_list = [bar_color2plot]
+            else:
+                color_list = bar_color2plot # assumes list, so will plot both
+        else:
+            # average them, if we dont care
+            color_list = [None]
+            
+        DF_betas_bar_coord1D = pd.DataFrame()
+
+        for cn in color_list:
+                ### get betas binned over 1D coordinate
+                DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D,
+                                                  self.FAModelObj.get_betas_binned1D_df(DF_betas_bar_coord = DF_betas_bar_coord, 
+                                                                    ROI_list = ['V1'], orientation_bars = 'parallel_vertical', 
+                                                                    max_ecc_ext = max_ecc_ext, 
+                                                                    bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3), 
+                                                                    bar_color2bin = cn)
+                                                  ))
+
+        ### now plot all combinations (rows - unattended bar pos changes, column, attend bar pos changes)
+        for roi_name in ROI_list:
+        
+            fig, axs = plt.subplots(nrows= len(coord_list), ncols=len(coord_list)-1, figsize=(4 * (len(coord_list)-1),4 * len(coord_list)), sharex=True, sharey=True)
+            row_ind = 0
+            for UAtt_bar_coord in coord_list: 
+                
+                col_ind = 0
+                for Att_bar_coord in coord_list:
+                    
+                    if Att_bar_coord != UAtt_bar_coord: ## bars cannot fully overlap
+                        
+                        df2plot = DF_betas_bar_coord1D[(DF_betas_bar_coord1D['ROI'] == roi_name) &\
+                                                    (DF_betas_bar_coord1D['Att_bar_coord'] == Att_bar_coord) &\
+                                                    (DF_betas_bar_coord1D['UAtt_bar_coord'] == UAtt_bar_coord)]
+                        df2plot.sort_values('prf_x_coord')
+
+                        if len(color_list) > 1:
+                            df1 = df2plot[df2plot['attend_color'] == color_list[0]]
+                            df1.sort_values('prf_x_coord')
+                            axs[row_ind][col_ind].scatter(df1['prf_x_coord'], df1['betas'], c = 'blue')
+                            axs[row_ind][col_ind].plot(df1['prf_x_coord'], df1['betas'], c = 'blue')
+
+                            df2 = df2plot[df2plot['attend_color'] == color_list[1]]
+                            df2.sort_values('prf_x_coord')
+                            axs[row_ind][col_ind].scatter(df2['prf_x_coord'], df2['betas'], c = 'red')
+                            axs[row_ind][col_ind].plot(df2['prf_x_coord'], df2['betas'], c = 'red')
+                        else:
+                            axs[row_ind][col_ind].scatter(df2plot['prf_x_coord'], df2plot['betas'])
+                            #axs[row_ind][col_ind].errorbar(df2plot['prf_x_coord'], df2plot['betas'], df2plot['sem'], linestyle='dotted')
+                            axs[row_ind][col_ind].plot(df2plot['prf_x_coord'], df2plot['betas'])
+                            
+                        axs[row_ind][col_ind].set_xlim(np.array([- 1, 1]) * max_ecc_ext)
+
+                        axs[row_ind][col_ind].axhline(y=0, c="0", lw=.3)
+                        axs[row_ind][col_ind].axvline(x=0, c="0", lw=.3)
+                        plt.gcf().tight_layout()
+                        #g.set(xlabel=None)
+                        #g.set(ylabel=None)
+                        axs[row_ind][col_ind].tick_params(axis='both', labelsize=14)
+
+                        # Create a Rectangle patch
+                        # for unattended bar
+                        unatt_rect = mpatches.Rectangle((self.convert_pix2dva(UAtt_bar_coord - self.FAModelObj.bar_width_pix[0]/2), 
+                                                -3), 
+                                                self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]), 
+                                                6, 
+                                                linewidth=1, edgecolor='r', facecolor='k', alpha = .1, zorder = 10)
+                        axs[row_ind][col_ind].add_patch(unatt_rect) # Add the patch to the Axes
+
+                        # for attended bar
+                        att_rect = mpatches.Rectangle((self.convert_pix2dva(Att_bar_coord - self.FAModelObj.bar_width_pix[0]/2), 
+                                                -3), 
+                                                self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]), 
+                                                6, 
+                                                linewidth=1, edgecolor='r', facecolor='green', alpha = .1, zorder = 10)
+                        axs[row_ind][col_ind].add_patch(att_rect) # Add the patch to the Axes
+                        
+                        col_ind+=1
+
+                # add colorbar
+                norm = plt.Normalize(-2, 2)
+                sm = plt.cm.ScalarMappable(cmap="coolwarm", norm=norm)
+                sm.set_array([])
+                plt.gcf().tight_layout()
+
+                cb_ax = fig.add_axes([1,.124,.01,.754])
+                cb_ax.tick_params(labelsize=15) 
+                fig.colorbar(sm, orientation='vertical', cax = cb_ax)
+                
+                row_ind += 1
+
+            if fig_name:
+                os.makedirs(op.split(fig_name)[0], exist_ok=True)
+                fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
 
     def plot_singlevert_FA(self, participant, 
                                 ses = 1, run_type = '1', vertex = None, ROI = None,

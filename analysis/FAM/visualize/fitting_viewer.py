@@ -1535,7 +1535,7 @@ class FAViewer(Viewer):
                 ### get betas binned over 1D coordinate
                 DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D,
                                                   self.FAModelObj.get_betas_binned1D_df(DF_betas_bar_coord = DF_betas_bar_coord, 
-                                                                    ROI_list = ['V1'], orientation_bars = 'parallel_vertical', 
+                                                                    ROI_list = ROI_list, orientation_bars = 'parallel_vertical', 
                                                                     max_ecc_ext = max_ecc_ext, 
                                                                     bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3), 
                                                                     bar_color2bin = cn)
@@ -1562,17 +1562,18 @@ class FAViewer(Viewer):
                             df1 = df2plot[df2plot['attend_color'] == color_list[0]]
                             df1.sort_values('prf_x_coord')
                             axs[row_ind][col_ind].scatter(df1['prf_x_coord'], df1['betas'], c = 'blue')
-                            axs[row_ind][col_ind].plot(df1['prf_x_coord'], df1['betas'], c = 'blue')
+                            axs[row_ind][col_ind].plot(df1['prf_x_coord'], df1['betas'], c = 'blue', label = color_list[0])
 
                             df2 = df2plot[df2plot['attend_color'] == color_list[1]]
                             df2.sort_values('prf_x_coord')
                             axs[row_ind][col_ind].scatter(df2['prf_x_coord'], df2['betas'], c = 'red')
-                            axs[row_ind][col_ind].plot(df2['prf_x_coord'], df2['betas'], c = 'red')
+                            axs[row_ind][col_ind].plot(df2['prf_x_coord'], df2['betas'], c = 'red', label = color_list[1])
+                            axs[row_ind][col_ind].legend()
                         else:
                             axs[row_ind][col_ind].scatter(df2plot['prf_x_coord'], df2plot['betas'])
                             #axs[row_ind][col_ind].errorbar(df2plot['prf_x_coord'], df2plot['betas'], df2plot['sem'], linestyle='dotted')
                             axs[row_ind][col_ind].plot(df2plot['prf_x_coord'], df2plot['betas'])
-                            
+
                         axs[row_ind][col_ind].set_xlim(np.array([- 1, 1]) * max_ecc_ext)
 
                         axs[row_ind][col_ind].axhline(y=0, c="0", lw=.3)
@@ -1616,6 +1617,139 @@ class FAViewer(Viewer):
             if fig_name:
                 os.makedirs(op.split(fig_name)[0], exist_ok=True)
                 fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+
+    def plot_betas_coord(self, participant_list = [], model_type = 'D', mask_bool_df = None, stim_on_screen = [], mask_arr = True, rsq_threshold = .1,
+                                att_color_ses_run_dict = {}, file_ext = '_cropped.npy', orientation_bars = 'parallel_vertical', ROI_list = ['V1']):
+
+        """
+        Plot beta estimates relative to pRF coordinates
+
+        """
+
+        output_pth = op.join(self.figures_pth, 'glmsing_betas_coord')
+
+        ## load pRF estimates for all participants 
+        # store in dict, for ease of access
+        print('Loading iterative estimates')
+        group_estimates, group_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant_list = participant_list,
+                                                                    ses = 'mean', run_type = 'mean', 
+                                                                    model_name = self.pRFModelObj.model_type['pRF'], 
+                                                                    iterative = True,
+                                                                    mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
+                                                                    fit_hrf = self.pRFModelObj.fit_hrf)
+
+        ## mask the estimates, if such is the case
+        if mask_arr:
+            print('masking estimates')
+
+            # get estimate keys
+            keys = self.pRFModelObj.get_prf_estimate_keys(prf_model_name = self.pRFModelObj.model_type['pRF'])
+
+            # get screen lim for all participants
+            max_ecc_ext = {'sub-{sj}'.format(sj = pp): group_prf_models['sub-{sj}'.format(sj = pp)]['ses-{s}'.format(s = 'mean')]['prf_stim'].screen_size_degrees/2 for pp in participant_list}
+
+            prf_estimates = {'sub-{sj}'.format(sj = pp): self.pRFModelObj.mask_pRF_model_estimates(group_estimates['sub-{sj}'.format(sj = pp)], 
+                                                                                estimate_keys = keys,
+                                                                                x_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
+                                                                                y_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
+                                                                                rsq_threshold = rsq_threshold) for pp in participant_list}
+        else:
+            prf_estimates = group_estimates
+
+        # iterate over participant list
+        for pp in participant_list:
+
+            ## output path to save plots
+            sub_figures_pth = op.join(output_pth, 'sub-{sj}'.format(sj = pp))
+            os.makedirs(sub_figures_pth, exist_ok=True)
+
+            ## load estimates dict
+            estimates_dict = self.FAModelObj.load_estimates(pp, model_type = model_type)
+
+            ## load single trial DM
+            single_trl_DM = self.FAModelObj.load_single_trl_DM(pp)
+
+            ## get DF with betas and coordinates
+            # for vertical parallel bar positions
+            DF_betas_bar_coord = self.FAModelObj.get_betas_coord_df(pp, betas_arr = estimates_dict['betasmd'], 
+                                                                single_trl_DM = single_trl_DM, 
+                                                                att_color_ses_run = att_color_ses_run_dict['sub-{sj}'.format(sj = pp)], 
+                                                                file_ext = file_ext, ROIs_dict = self.ROIs_dict, 
+                                                                prf_estimates = prf_estimates, 
+                                                                orientation_bars = orientation_bars)
+
+            ## 2D plot betas for each attended bar color separately + averaged
+            for cn in ['color_red', 'color_green', None]:
+
+                ## plot rsq values on flatmap surface ##
+                fig_name = op.join(sub_figures_pth,
+                            'sub-{sj}_acq-{acq}_space-{space}_model-{model}_bar_orientation-{ori}_betas2D.png'.format(sj=pp, acq = self.MRIObj.acq, space = self.MRIObj.sj_space,
+                                                                                                            model = model_type, ori = orientation_bars))
+                
+                if cn is not None:
+                    fig_name = fig_name.replace('.png', '_attend-{cn}.png'.format(cn = cn))
+                
+                self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
+                                    orientation_bars = orientation_bars,
+                                    max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    fig_name = fig_name) 
+            
+            ## plot betas binned over 1D coordinates
+            for cn in [['color_red', 'color_green'], None]:
+                
+                ## plot rsq values on flatmap surface ##
+                fig_name = op.join(sub_figures_pth,
+                            'sub-{sj}_acq-{acq}_space-{space}_model-{model}_bar_orientation-{ori}_betas1D_binned.png'.format(sj=pp, acq = self.MRIObj.acq, space = self.MRIObj.sj_space,
+                                                                                                            model = model_type, ori = orientation_bars))
+                if cn is not None:
+                    fig_name = fig_name.replace('.png', '_attend-{cn}.png'.format(cn = cn))
+
+                self.plot_betas_1D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
+                                    orientation_bars = orientation_bars,
+                                    max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    fig_name = fig_name) 
+                
+            ## get attentional modulation df 
+            # subtract each condition by flipped condition (where attending other bar) --> not sure if correct, might change
+            attention_coord_df = self.FAModelObj.get_attention_coord_df(DF_betas_bar_coord = DF_betas_bar_coord, 
+                                                               ROI_list = ROI_list, orientation_bars = orientation_bars,
+                                                               average = False)
+            
+            ## 2D plot attentional modulation for each attended bar color separately + averaged
+            for cn in ['color_red', 'color_green', None]:
+
+                ## plot rsq values on flatmap surface ##
+                fig_name = op.join(sub_figures_pth,
+                            'sub-{sj}_acq-{acq}_space-{space}_model-{model}_bar_orientation-{ori}_AttentionalModulation2D.png'.format(sj=pp, acq = self.MRIObj.acq, space = self.MRIObj.sj_space,
+                                                                                                            model = model_type, ori = orientation_bars))
+                
+                if cn is not None:
+                    fig_name = fig_name.replace('.png', '_attend-{cn}.png'.format(cn = cn))
+                
+                self.plot_betas_2D(DF_betas_bar_coord = attention_coord_df, ROI_list = ROI_list, 
+                                    orientation_bars = orientation_bars,
+                                    max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    fig_name = fig_name) 
+            
+            ## plot betas binned over 1D coordinates
+            for cn in [['color_red', 'color_green'], None]:
+                
+                ## plot rsq values on flatmap surface ##
+                fig_name = op.join(sub_figures_pth,
+                            'sub-{sj}_acq-{acq}_space-{space}_model-{model}_bar_orientation-{ori}_AttentionalModulation1D_binned.png'.format(sj=pp, acq = self.MRIObj.acq, space = self.MRIObj.sj_space,
+                                                                                                            model = model_type, ori = orientation_bars))
+                if cn is not None:
+                    fig_name = fig_name.replace('.png', '_attend-{cn}.png'.format(cn = cn))
+
+                self.plot_betas_1D(DF_betas_bar_coord = attention_coord_df, ROI_list = ROI_list, 
+                                    orientation_bars = orientation_bars,
+                                    max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    fig_name = fig_name) 
+
+
+
+
+
 
     def plot_singlevert_FA(self, participant, 
                                 ses = 1, run_type = '1', vertex = None, ROI = None,

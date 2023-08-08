@@ -433,7 +433,7 @@ class GLMsingle_Model(Model):
             cond_ind = np.where(np.hstack(single_trl_DM[:, self.condition_per_TR == 'task', i] == 1))[0]
             
             if average_betas and att_color_ses_run is None: # average across all runs
-               avg_all.append(np.mean(estimate_arr[...,cond_ind], axis = -1))
+               avg_all.append(np.nanmean(estimate_arr[...,cond_ind], axis = -1))
             else:
                 avg_all.append(estimate_arr[...,cond_ind])
             
@@ -447,7 +447,7 @@ class GLMsingle_Model(Model):
             for col_name in att_color_ses_run.keys():
                 col_indices = np.hstack((np.where(((np.array(run_num_arr) == rn) & (np.array(ses_num_arr) == att_color_ses_run[col_name]['ses'][i])
                             ))[0] for i, rn in enumerate(att_color_ses_run[col_name]['run'])))
-                out_avg.append(np.mean(np.stack(avg_all)[...,col_indices], axis = -1))
+                out_avg.append(np.nanmean(np.stack(avg_all)[...,col_indices], axis = -1))
             out_avg = np.swapaxes(np.swapaxes(np.stack(out_avg),0,1),1,2)
         else:
             out_avg = np.stack(avg_all)
@@ -731,9 +731,7 @@ class GLMsingle_Model(Model):
         else:
             raise ValueError('Cross sections not implemented yet')
 
-        for ind in range(len(coord_list)):
-
-            UAtt_bar_coord = coord_list[ind] # let's start with unattended bar vertical leftmost, attended bar left to right (5 positions)
+        for UAtt_bar_coord in coord_list: # let's start with unattended bar vertical leftmost, attended bar left to right (5 positions)
 
             for Att_bar_coord in coord_list:
 
@@ -836,9 +834,9 @@ class GLMsingle_Model(Model):
                                                                             'std': [[self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
                                                                                                                                     weights = bin_df.prf_rsq_coord.values, 
                                                                                                                                     norm = True)][0][0]],
-                                                                            'prf_rsq_coord': [np.mean(bin_df.prf_rsq_coord.values)],
-                                                                            'prf_x_coord': [np.mean(bins_arr[b:b+1])], 
-                                                                            'prf_y_coord': [np.mean(bins_arr[b:b+1])],
+                                                                            'prf_rsq_coord': [np.nanmean(bin_df.prf_rsq_coord.values)],
+                                                                            'prf_x_coord': [np.nanmean(bins_arr[b:b+1])], 
+                                                                            'prf_y_coord': [np.nanmean(bins_arr[b:b+1])],
                                                                             'Att_bar_coord': [Att_bar_coord],
                                                                             'UAtt_bar_coord':[UAtt_bar_coord]})))
         if bar_color2bin:

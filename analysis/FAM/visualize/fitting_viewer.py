@@ -1561,18 +1561,24 @@ class FAViewer(Viewer):
                         if len(color_list) > 1:
                             df1 = df2plot[df2plot['attend_color'] == color_list[0]]
                             df1.sort_values('prf_x_coord')
-                            axs[row_ind][col_ind].scatter(df1['prf_x_coord'], df1['betas'], c = 'blue')
-                            axs[row_ind][col_ind].plot(df1['prf_x_coord'], df1['betas'], c = 'blue', label = color_list[0])
+                            axs[row_ind][col_ind].scatter(df1['prf_x_coord'], df1['betas'], 
+                                                          c = self.MRIObj.params['plotting']['cond_colors'][color_list[0]])
+                            axs[row_ind][col_ind].plot(df1['prf_x_coord'], df1['betas'], 
+                                                       c = self.MRIObj.params['plotting']['cond_colors'][color_list[0]], 
+                                                       label = color_list[0])
 
                             df2 = df2plot[df2plot['attend_color'] == color_list[1]]
                             df2.sort_values('prf_x_coord')
-                            axs[row_ind][col_ind].scatter(df2['prf_x_coord'], df2['betas'], c = 'red')
-                            axs[row_ind][col_ind].plot(df2['prf_x_coord'], df2['betas'], c = 'red', label = color_list[1])
+                            axs[row_ind][col_ind].scatter(df2['prf_x_coord'], df2['betas'], 
+                                                          c = self.MRIObj.params['plotting']['cond_colors'][color_list[1]])
+                            axs[row_ind][col_ind].plot(df2['prf_x_coord'], df2['betas'], 
+                                                       c = self.MRIObj.params['plotting']['cond_colors'][color_list[1]], 
+                                                       label = color_list[1])
                             axs[row_ind][col_ind].legend()
                         else:
-                            axs[row_ind][col_ind].scatter(df2plot['prf_x_coord'], df2plot['betas'])
+                            axs[row_ind][col_ind].scatter(df2plot['prf_x_coord'], df2plot['betas'], c = '#598a9e')
                             #axs[row_ind][col_ind].errorbar(df2plot['prf_x_coord'], df2plot['betas'], df2plot['sem'], linestyle='dotted')
-                            axs[row_ind][col_ind].plot(df2plot['prf_x_coord'], df2plot['betas'])
+                            axs[row_ind][col_ind].plot(df2plot['prf_x_coord'], df2plot['betas'], c = '#598a9e')
 
                         axs[row_ind][col_ind].set_xlim(np.array([- 1, 1]) * max_ecc_ext)
 
@@ -1589,16 +1595,18 @@ class FAViewer(Viewer):
                                                 -3), 
                                                 self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]), 
                                                 6, 
-                                                linewidth=1, edgecolor='r', facecolor='k', alpha = .1, zorder = 10)
+                                                linewidth=1, edgecolor='k', facecolor='#969696', alpha = .15, zorder = 10)
                         axs[row_ind][col_ind].add_patch(unatt_rect) # Add the patch to the Axes
+                        axs[row_ind][col_ind].patches[-1].set_hatch('///')
 
                         # for attended bar
                         att_rect = mpatches.Rectangle((self.convert_pix2dva(Att_bar_coord - self.FAModelObj.bar_width_pix[0]/2), 
                                                 -3), 
                                                 self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]), 
                                                 6, 
-                                                linewidth=1, edgecolor='r', facecolor='green', alpha = .1, zorder = 10)
+                                                linewidth=1, edgecolor='k', facecolor='#8d9e59', alpha = .15, zorder = 10)
                         axs[row_ind][col_ind].add_patch(att_rect) # Add the patch to the Axes
+                        #axs[row_ind][col_ind].patches[-1].set_hatch('*')
                         
                         col_ind+=1
 

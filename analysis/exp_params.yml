@@ -253,7 +253,7 @@ keys: # keys to press, valid for laptop, scanner and behav lab
   
 
 plotting:
-  # define costum palette
+  # define custom palette
   cond_colors : 
     color_red: [0.61960784, 0.00784314, 0.00784314]
     color_green: [0.00784314, 0.61960784, 0.03921569]

@@ -844,7 +844,7 @@ class GLMsingle_Model(Model):
 
         return DF_betas_bar_coord1D
 
-    def get_attention_coord_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', 
+    def get_attention_coord_flipped_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', 
                                     colA = ['color_red', 'color_green'], colB = ['color_green', 'color_red'], average = True):
 
         """
@@ -908,3 +908,139 @@ class GLMsingle_Model(Model):
                                                                                 'ROI', 'sj'])['betas'].mean().reset_index()
 
         return attention_coord_df
+    
+    def get_attention_coord_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', 
+                                    color_name = ['color_red', 'color_green'], average = True):
+
+        """
+        make df of attention modulation for all bar positions of a given orientation
+        by subtracting average bar position from each trial type
+        """
+
+        # if no ROI specified, then plot all
+        if len(ROI_list) == 0:
+            ROI_list = DF_betas_bar_coord.ROI.unique()
+
+        ## for bars going left to right (vertical orientation)
+        if orientation_bars == 'parallel_vertical':
+            coord_list = self.bar_x_coords_pix
+        elif orientation_bars == 'parallel_horizontal':
+            coord_list = self.bar_y_coords_pix
+        else:
+            raise ValueError('Cross sections not implemented yet')
+        
+        attention_coord_df = pd.DataFrame()
+
+        # per bar color
+        for col_name in color_name: 
+
+            ## iterate over ROIs
+            for roi_name in ROI_list:
+                
+                # for each unattended bar position
+                for UAtt_bar_coord in coord_list: 
+                    
+                    # filter df for trials where unattended bar in the same position
+                    coords_trials = DF_betas_bar_coord[(DF_betas_bar_coord['ROI'] == roi_name) &\
+                                        (DF_betas_bar_coord['Att_bar_coord'] != UAtt_bar_coord) &\
+                                        (DF_betas_bar_coord['UAtt_bar_coord'] == UAtt_bar_coord) &\
+                                        (DF_betas_bar_coord['attend_color'] == col_name)].dropna()
+
+                    ## and average them
+                    average_bar_loc_df = coords_trials.groupby(['sj', 'ROI', 'attend_color',
+                                                                'prf_x_coord', 'prf_y_coord','prf_rsq_coord'])['betas'].mean().reset_index()
+
+                    ## finally subtract average from each trial
+                    for Att_bar_coord in coord_list:
+                        
+                        if Att_bar_coord != UAtt_bar_coord: ## bars cannot fully overlap
+                            
+                            ## actually subtract
+                            trial_df =  DF_betas_bar_coord[(DF_betas_bar_coord['ROI'] == roi_name) &\
+                                                            (DF_betas_bar_coord['Att_bar_coord'] == Att_bar_coord) &\
+                                                            (DF_betas_bar_coord['UAtt_bar_coord'] == UAtt_bar_coord) &\
+                                                            (DF_betas_bar_coord['attend_color'] == col_name)].dropna()
+                            subtracted_df = trial_df.set_index(['sj', 'ROI', 'attend_color',
+                                                                'prf_x_coord', 'prf_y_coord','prf_rsq_coord'])['betas'].sub(average_bar_loc_df.set_index(['sj', 'ROI', 'attend_color',
+                                                                                                                                                'prf_x_coord', 'prf_y_coord',
+                                                                                                                                                'prf_rsq_coord'])['betas']).reset_index()
+                            subtracted_df['Att_bar_coord'] = Att_bar_coord
+                            subtracted_df['UAtt_bar_coord'] = UAtt_bar_coord
+                            
+                            ## append
+                            attention_coord_df = pd.concat((attention_coord_df, subtracted_df))
+
+        # if we want to average
+        if average:
+            attention_coord_df = attention_coord_df.dropna().groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
+                                                                                'ROI', 'sj'])['betas'].mean().reset_index()
+
+        return attention_coord_df
+    
+    def get_distractor_coord_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', 
+                                    color_name = ['color_red', 'color_green'], average = True):
+
+        """
+        make df of distractor bar modulation for all bar positions of a given orientation
+        by subtracting average bar position from each trial type
+        """
+
+        # if no ROI specified, then plot all
+        if len(ROI_list) == 0:
+            ROI_list = DF_betas_bar_coord.ROI.unique()
+
+        ## for bars going left to right (vertical orientation)
+        if orientation_bars == 'parallel_vertical':
+            coord_list = self.bar_x_coords_pix
+        elif orientation_bars == 'parallel_horizontal':
+            coord_list = self.bar_y_coords_pix
+        else:
+            raise ValueError('Cross sections not implemented yet')
+        
+        distractor_coord_df = pd.DataFrame()
+
+        # per bar color
+        for col_name in color_name: 
+
+            ## iterate over ROIs
+            for roi_name in ROI_list:
+                
+                # for each attended bar position
+                for Att_bar_coord in coord_list: 
+                    
+                    # filter df for trials where unattended bar in the same position
+                    coords_trials = DF_betas_bar_coord[(DF_betas_bar_coord['ROI'] == roi_name) &\
+                                        (DF_betas_bar_coord['Att_bar_coord'] == Att_bar_coord) &\
+                                        (DF_betas_bar_coord['UAtt_bar_coord'] != Att_bar_coord) &\
+                                        (DF_betas_bar_coord['attend_color'] == col_name)].dropna()
+
+                    ## and average them
+                    average_bar_loc_df = coords_trials.groupby(['sj', 'ROI', 'attend_color',
+                                                                'prf_x_coord', 'prf_y_coord','prf_rsq_coord'])['betas'].mean().reset_index()
+
+                    ## finally subtract average from each trial
+                    for UAtt_bar_coord in coord_list:
+                        
+                        if UAtt_bar_coord != Att_bar_coord: ## bars cannot fully overlap
+                            
+                            ## actually subtract
+                            trial_df =  DF_betas_bar_coord[(DF_betas_bar_coord['ROI'] == roi_name) &\
+                                                            (DF_betas_bar_coord['Att_bar_coord'] == Att_bar_coord) &\
+                                                            (DF_betas_bar_coord['UAtt_bar_coord'] == UAtt_bar_coord) &\
+                                                            (DF_betas_bar_coord['attend_color'] == col_name)].dropna()
+                            subtracted_df = trial_df.set_index(['sj', 'ROI', 'attend_color',
+                                                                'prf_x_coord', 'prf_y_coord','prf_rsq_coord'])['betas'].sub(average_bar_loc_df.set_index(['sj', 'ROI', 'attend_color',
+                                                                                                                                                'prf_x_coord', 'prf_y_coord',
+                                                                                                                                                'prf_rsq_coord'])['betas']).reset_index()
+                            subtracted_df['Att_bar_coord'] = Att_bar_coord
+                            subtracted_df['UAtt_bar_coord'] = UAtt_bar_coord
+                            
+                            ## append
+                            distractor_coord_df = pd.concat((distractor_coord_df, subtracted_df))
+
+        # if we want to average
+        if average:
+            distractor_coord_df = distractor_coord_df.dropna().groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
+                                                                                'ROI', 'sj'])['betas'].mean().reset_index()
+
+        return distractor_coord_df

@@ -715,8 +715,29 @@ class GLMsingle_Model(Model):
     def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, 
                                             file_ext = '_cropped.npy', ROIs_dict = {}, prf_estimates = {}, orientation_bars = 'parallel_vertical'):
 
-        ## save beta values for each ROI
-        # for a specific bar pass
+        """
+        make dataframe with beta values, with info on prf location, attended color, ROI vertices belong to,
+        for trials with a specific bar oriantation (parallel - vert/hor -, or crossed)
+
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        betas_arr : list/arr
+            array with beta values for 
+        single_trl_DM: arr
+            glm single design matrix
+        att_color_ses_run_dict: dict
+            dict with info for each participant, indicating session and run number for same attended color
+        file_ext: str
+            file extent of FA data
+        ROIs_dict: dict/df
+            vertex index and ROI labels, to use when parsing data array
+        prf_estimates : dict
+            dict with participant prf estimates
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        """
 
         DF_betas_bar_coord = pd.DataFrame({'sj': [], 'ROI': [], 'betas': [], 'prf_rsq_coord': [],
                                             'prf_x_coord': [], 'prf_y_coord': [], 'attend_color': []})
@@ -772,8 +793,23 @@ class GLMsingle_Model(Model):
                                     max_ecc_ext = 5.5, bin_size = .5, bar_color2bin = None):
 
         """
-        transform betas over 2D coordinates
-        into 1D binned average
+        Transform model beta values (according to pRF x,y coordinates) into 1D binned average
+        for different ROIs
+
+        Parameters
+        ----------
+        DF_betas_bar_coord: dataframe
+            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        ROI_list: list/arr
+            list with ROI names 
+        max_ecc_ext: float
+            eccentricity limit (screen)
+        bin_size: float
+            size of bin (in dva)
+        bar_color2bin: str
+            attended bar color. if given, will bin betas for that bar color, else will average across colors
         """
 
         ## bins array (1/3 of bar width, equally spaced across x/y coordinates of screen)
@@ -848,8 +884,23 @@ class GLMsingle_Model(Model):
                                     colA = ['color_red', 'color_green'], colB = ['color_green', 'color_red'], average = True):
 
         """
-        make df subtracted by flipped attentional modulation
-        will return attention modulation for all bar positions of give orientation
+        Make attention modulation df, calculated from GLMsingle beta estimates, relative to pRF coordinates.
+        Involves subtracting flipped trials, to isolate attentional effect
+
+        Parameters
+        ----------
+        DF_betas_bar_coord: dataframe
+            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        ROI_list: list/arr
+            list with ROI names
+        colA: list
+            list with color names
+        colB: list
+            list with color names, reversed of A
+        average: bool
+            if we want to average across attended colors or not
         """
 
         # if no ROI specified, then plot all
@@ -913,8 +964,21 @@ class GLMsingle_Model(Model):
                                     color_name = ['color_red', 'color_green'], average = True):
 
         """
-        make df of attention modulation for all bar positions of a given orientation
-        by subtracting average bar position from each trial type
+        Make attention modulation df, calculated from GLMsingle beta estimates, relative to pRF coordinates.
+        Involves subtracting average bar position from each trial type, to isolate attentional effect
+
+        Parameters
+        ----------
+        DF_betas_bar_coord: dataframe
+            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        ROI_list: list/arr
+            list with ROI names
+        color_name: list
+            list with color names
+        average: bool
+            if we want to average across attended colors or not
         """
 
         # if no ROI specified, then plot all
@@ -981,8 +1045,21 @@ class GLMsingle_Model(Model):
                                     color_name = ['color_red', 'color_green'], average = True):
 
         """
-        make df of distractor bar modulation for all bar positions of a given orientation
-        by subtracting average bar position from each trial type
+        Make distractor bar modulation df, calculated from GLMsingle beta estimates, relative to pRF coordinates.
+        Involves subtracting average bar position from each trial type, to isolate attentional effect
+
+        Parameters
+        ----------
+        DF_betas_bar_coord: dataframe
+            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        ROI_list: list/arr
+            list with ROI names
+        color_name: list
+            list with color names
+        average: bool
+            if we want to average across attended colors or not
         """
 
         # if no ROI specified, then plot all

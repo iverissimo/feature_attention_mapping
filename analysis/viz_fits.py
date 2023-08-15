@@ -309,6 +309,36 @@ match task:
                                                                                     crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                                     shift = FAM_data.shift_TRs_num)
                                                 )
+                
+            case 'bar_dist':
+
+                ## ask for user input on models to compare
+                print('plotting GLMsingle mean beta vs bar distance...')
+                orientation_bars = {0: 'parallel_vertical', 1: 'parallel_horizontal', 2: 'crossed'}
+                
+                choice = None
+                while choice not in (0,1,2):
+                    choice = int(input("Which trial type?\n0) parallel vertical\n1) parallel horizontal\n2) crossed\nNumber picked: "))
+
+                # get participant run number and session number
+                # by attended bar
+                group_att_color_ses_run = {'sub-{sj}'.format(sj = pp): FAM_beh.get_run_ses_by_color(pp, ses_num = None, 
+                                                                                                    ses_type = 'func', 
+                                                                                                    run_num = None) for pp in FAM_data.sj_num}
+
+                plotter.plot_betas_bar_dist(participant_list = FAM_data.sj_num, 
+                                            model_type = 'D',
+                                            file_ext = '_cropped.npy', 
+                                            orientation_bars = orientation_bars[choice], 
+                                            ROI_list = ['V1', 'V2', 'V3'],
+                                            att_color_ses_run_dict = group_att_color_ses_run,
+                                            mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                                        crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                        shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
+                                            stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                                            crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                            shift = FAM_data.shift_TRs_num)
+                                        )
 
             case 'single_vertex':
                 plotter.plot_singlevert_FA(sj, vertex = vertex, file_ext = file_ext, 

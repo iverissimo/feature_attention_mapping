@@ -381,7 +381,14 @@ class Model:
 
         return data - avg_baseline[...,np.newaxis]
             
+    def convert_pix2dva(self, val_pix):
 
+        """
+        Convert pixel value to dva
+        """
+        return val_pix * self.MRIObj.mri_utils.dva_per_pix(height_cm = self.MRIObj.params['monitor']['height'], 
+                                                        distance_cm = self.MRIObj.params['monitor']['distance'], 
+                                                        vert_res_pix = self.MRIObj.screen_res[1])
 
                     
 

@@ -1726,14 +1726,14 @@ class FAViewer(Viewer):
                             x = 'dist_bars', y = 'betas', hue = 'bar_type', jitter = False,
                             palette = {'target': '#8d9e59', 'distractor': '#969696'}, #dodge = .1,
                             alpha=0.4, ax=axs[row_ind])
-                axs[row_ind].set_xticks(np.arange(-5,6)) 
-                axs[row_ind].set_xticklabels(np.arange(-5,6))
-                #plt.xticks(fontsize = 18)
-                #plt.yticks(fontsize = 18)
+                #axs[row_ind].set_xticks(np.arange(-5,6)) 
+                #axs[row_ind].set_xticklabels(np.arange(-5,6))
+                plt.xticks(fontsize = 18)
+                plt.yticks(fontsize = 18)
 
                 axs[row_ind].set_xlabel('Distractor distance relative to target',fontsize = 16,labelpad=18)
                 axs[row_ind].set_ylabel('Average beta within bar',fontsize = 16,labelpad=18)
-                axs[row_ind].set_ylim(-2.5, 2.5)
+                axs[row_ind].set_ylim(-1, 3)
 
                 axs[row_ind].set_title('Attended bar x = {val} pix'.format(val = Att_bar_coord), fontsize = 20)
 
@@ -1770,7 +1770,7 @@ class FAViewer(Viewer):
 
             plt.xlabel('Distractor distance relative to target',fontsize = 16,labelpad=18)
             plt.ylabel('Average beta within bar',fontsize = 16,labelpad=18)
-            plt.ylim(-2.5, 2.5) #(0.5, 2.5)
+            plt.ylim(-1, 3) #(0.5, 2.5)
 
             # quick fix for legen
             handles = [mpatches.Patch(color = val, label = key) for key, val in {'target': '#779e00', 'distractor': '#969696'}.items()]

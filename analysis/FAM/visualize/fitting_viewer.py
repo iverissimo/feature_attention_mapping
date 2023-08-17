@@ -183,7 +183,7 @@ class pRFViewer(Viewer):
         
         images['PA_nonUNI'] = self.plot_utils.plot_flatmap(pa_transformed, 
                                                     pysub = self.pysub, cmap = cmap_pa_sns, 
-                                                    vmin1 = -np.pi, vmax1 = np.pi, 
+                                                    vmin1 = -angle_thresh, vmax1 = angle_thresh, 
                                                     est_arr2 = alpha_level,
                                                     vmin2 = 0, vmax2 = 1, 
                                                     with_colorbar = False,
@@ -713,7 +713,7 @@ class pRFViewer(Viewer):
 
             self.plot_utils.plot_flatmap(pa_transformed, 
                                         pysub = self.pysub, cmap = cmap_pa_sns, 
-                                        vmin1 = -np.pi, vmax1 = np.pi, 
+                                        vmin1 = -angle_thresh, vmax1 = angle_thresh, 
                                         est_arr2 = alpha_level,
                                         vmin2 = 0, vmax2 = 1, 
                                         with_colorbar = False,
@@ -1714,25 +1714,21 @@ class FAViewer(Viewer):
                                             (DF_betas_bar_avg1D['Att_bar_coord'] == Att_bar_coord)]
                 df2plot.sort_values('dist_bars')
 
-                v1 = sns.pointplot(data = df2plot, 
+                v1 = sns.lineplot(data = df2plot.reset_index(drop=True), 
                                 x = 'dist_bars', y = 'betas', hue = 'bar_type',
-                            palette = {'target': '#779e00', 'distractor': '#969696'},
-                            markers = 'D', dodge = False, join = True, ci=68, ax = axs[row_ind], n_boot=5000)
+                            palette = {'target': '#779e00', 'distractor': '#969696'}, ax = axs[row_ind])
+                v2 = sns.scatterplot(data = df2plot.reset_index(drop=True), 
+                                x = 'dist_bars', y = 'betas', hue = 'bar_type', markers = 'D',
+                            palette = {'target': '#779e00', 'distractor': '#969696'}, ax = axs[row_ind])
 
                 v1.set(xlabel=None)
                 v1.set(ylabel=None)
-                plt.margins(y=0.025)
-                sns.stripplot(data = df2plot, 
-                            x = 'dist_bars', y = 'betas', hue = 'bar_type', jitter = False,
-                            palette = {'target': '#8d9e59', 'distractor': '#969696'}, #dodge = .1,
-                            alpha=0.4, ax=axs[row_ind])
-                #axs[row_ind].set_xticks(np.arange(-5,6)) 
-                #axs[row_ind].set_xticklabels(np.arange(-5,6))
-                plt.xticks(fontsize = 18)
-                plt.yticks(fontsize = 18)
+                axs[row_ind].set_xticks(np.arange(-5,6)) 
+                axs[row_ind].set_xticklabels(np.arange(-5,6))
+                axs[row_ind].tick_params(axis='both', labelsize=12)
 
-                axs[row_ind].set_xlabel('Distractor distance relative to target',fontsize = 16,labelpad=18)
-                axs[row_ind].set_ylabel('Average beta within bar',fontsize = 16,labelpad=18)
+                axs[row_ind].set_xlabel('Distractor distance relative to target',fontsize = 16) #,labelpad=18)
+                axs[row_ind].set_ylabel('Average beta within bar',fontsize = 16) #,labelpad=18)
                 axs[row_ind].set_ylim(-1, 3)
 
                 axs[row_ind].set_title('Attended bar x = {val} pix'.format(val = Att_bar_coord), fontsize = 20)
@@ -1770,7 +1766,7 @@ class FAViewer(Viewer):
 
             plt.xlabel('Distractor distance relative to target',fontsize = 16,labelpad=18)
             plt.ylabel('Average beta within bar',fontsize = 16,labelpad=18)
-            plt.ylim(-1, 3) #(0.5, 2.5)
+            plt.ylim(0, 2.75) #(0.5, 2.5)
 
             # quick fix for legen
             handles = [mpatches.Patch(color = val, label = key) for key, val in {'target': '#779e00', 'distractor': '#969696'}.items()]
@@ -1779,6 +1775,40 @@ class FAViewer(Viewer):
             if fig_name:
                 os.makedirs(op.split(fig_name)[0], exist_ok=True)
                 fig.savefig(fig_name.replace('.png', '_combined_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+
+            ## also plot it grouped for absolute distance (ignore side of distactor bar)
+            fig, ax1 = plt.subplots(1,1, figsize=(18, 7.5))
+
+            df2plot = DF_betas_bar_avg1D[(DF_betas_bar_avg1D['ROI'] == roi_name)]
+            df2plot['dist_bars'] = np.absolute(df2plot.dist_bars.values)
+            df2plot.sort_values('dist_bars')
+
+            v1 = sns.pointplot(data = df2plot, 
+                            x = 'dist_bars', y = 'betas', hue = 'bar_type',
+                        palette = {'target': '#779e00', 'distractor': '#969696'},
+                        markers = 'D', dodge = .2, join = False, ci=68, ax = ax1, n_boot=5000)
+
+            v1.set(xlabel=None)
+            v1.set(ylabel=None)
+            plt.margins(y=0.025)
+            sns.stripplot(data = df2plot, 
+                        x = 'dist_bars', y = 'betas', hue = 'bar_type', jitter = False,
+                        palette = {'target': '#8d9e59', 'distractor': '#969696'}, dodge = .2,
+                        alpha=0.4, ax=ax1)
+            plt.xticks(fontsize = 18)
+            plt.yticks(fontsize = 18)
+
+            plt.xlabel('Absolute Distractor distance relative to target',fontsize = 16,labelpad=18)
+            plt.ylabel('Average beta within bar',fontsize = 16,labelpad=18)
+            plt.ylim(0, 2.75) #(0.5, 2.5)
+
+            # quick fix for legen
+            handles = [mpatches.Patch(color = val, label = key) for key, val in {'target': '#779e00', 'distractor': '#969696'}.items()]
+            ax1.legend(loc = 'upper right',fontsize=12, handles = handles, title="Bar")#, fancybox=True)
+
+            if fig_name:
+                os.makedirs(op.split(fig_name)[0], exist_ok=True)
+                fig.savefig(fig_name.replace('.png', '_collapsed_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
 
     def plot_betas_coord(self, participant_list = [], model_type = 'D', mask_bool_df = None, stim_on_screen = [], mask_arr = True, rsq_threshold = .1,
                                 att_color_ses_run_dict = {}, file_ext = '_cropped.npy', orientation_bars = 'parallel_vertical', ROI_list = ['V1']):

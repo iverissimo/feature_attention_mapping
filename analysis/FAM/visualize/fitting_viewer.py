@@ -135,7 +135,7 @@ class pRFViewer(Viewer):
         size_avg = np.nanmedian(size_avg, axis = 0)
 
         ## use RSQ as alpha level for flatmaps
-        alpha_level = self.MRIObj.mri_utils.normalize(np.clip(r2_avg, 0, .6)) # normalize 
+        alpha_level = np.ones(r2_avg.shape[0]) #self.MRIObj.mri_utils.normalize(np.clip(r2_avg, 0, .6)) # normalize 
 
         ## get ECCENTRICITY estimates
         eccentricity = self.pRFModelObj.get_eccentricity(xx = xx_avg,
@@ -404,7 +404,7 @@ class pRFViewer(Viewer):
             
     def plot_ecc_size(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean',
                         figures_pth = None, model_name = 'gauss', n_bins_dist = 8, 
-                        vmin1 = {'ecc': 0, 'size': 0}, vmax1 = {'ecc': 5.5, 'size': 15}):
+                        vmin1 = {'ecc': 0, 'size': 0}, vmax1 = {'ecc': 5.5, 'size': 17}):
         
         ## make output folder for figures
         if figures_pth is None:
@@ -425,7 +425,8 @@ class pRFViewer(Viewer):
                 
             ## use RSQ as alpha level for flatmaps
             r2 = group_estimates['sub-{sj}'.format(sj = pp)]['r2']
-            alpha_level = self.MRIObj.mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
+            alpha_level = np.ones(r2.shape[0]) #self.MRIObj.mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
+            alpha_level[np.where((np.isnan(r2)))[0]] = np.nan
                 
             ## get ECCENTRICITY estimates
             eccentricity = self.pRFModelObj.get_eccentricity(xx = group_estimates['sub-{sj}'.format(sj = pp)]['x'],
@@ -460,12 +461,24 @@ class pRFViewer(Viewer):
                                         vmin2 = 0, vmax2 = 1, 
                                         fig_abs_name = fig_name.replace('ECC', 'SIZE-fwhmax'))
             
+            # also plot just size estimate
+            self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['size'], 
+                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'cubehelix', 
+                                        vmin1 = 0, vmax1 = 6,
+                                        est_arr2 = alpha_level,
+                                        vmin2 = 0, vmax2 = 1, 
+                                        fig_abs_name = fig_name.replace('ECC', 'SIZE'))
+            
             ## GET values per ROI ##
             ecc_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, eccentricity, 
                                                                     ROIs_dict = pp_ROI_dict, 
                                                                     model = model_name)
     
-            size_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, size_fwhmaxmin[0], 
+            size_fwhm_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, size_fwhmaxmin[0], 
+                                                                    ROIs_dict = pp_ROI_dict, 
+                                                                    model = model_name)
+            
+            size_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)]['size'], 
                                                                     ROIs_dict = pp_ROI_dict, 
                                                                     model = model_name)
             
@@ -477,15 +490,39 @@ class pRFViewer(Viewer):
             df_ecc_siz = pd.merge(ecc_pp_roi_df.rename(columns={'value': 'ecc'}),
                                 size_pp_roi_df.rename(columns={'value': 'size'}))
             df_ecc_siz = pd.merge(df_ecc_siz, rsq_pp_roi_df.rename(columns={'value': 'rsq'}))
+            df_ecc_siz = pd.merge(df_ecc_siz, size_fwhm_pp_roi_df.rename(columns={'value': 'size_fwhm'}))
 
             ## drop the nans
             df_ecc_siz = df_ecc_siz[~np.isnan(df_ecc_siz.rsq)]
 
-            ##### plot unbinned df #########
+            ##### plot unbinned df - SIZE #########
             sns.set(font_scale=1.3)
             sns.set_style("ticks")
 
             g = sns.lmplot(x="ecc", y="size", hue = 'ROI', data = df_ecc_siz, scatter_kws={'alpha':0.05},
+                        scatter=True, palette = self.ROI_pallete) #, markers=['^', 's', 'o', 'v', 'D', 'h', 'P', '.', ','])
+
+            ax = plt.gca()
+            plt.xticks(fontsize = 18)
+            plt.yticks(fontsize = 18)
+            ax.axes.set_xlim(vmin1['ecc'], vmax1['ecc'])
+            ax.axes.set_ylim(vmin1['size'], 6)
+            ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
+            ax.set_ylabel('pRF size [deg]', fontsize = 20, labelpad = 15)
+            sns.despine(offset=15)
+            # to make legend full alpha
+            for lh in g._legend.legendHandles: 
+                lh.set_alpha(1)
+            fig2 = plt.gcf()
+
+            fig_name = fig_name.replace('ECC', 'ECCvsSIZE_UNbinned')
+            fig2.savefig(fig_name, dpi=100,bbox_inches = 'tight')
+
+            ##### plot unbinned df - SIZE FWHM #########
+            sns.set(font_scale=1.3)
+            sns.set_style("ticks")
+
+            g = sns.lmplot(x="ecc", y="size_fwhm", hue = 'ROI', data = df_ecc_siz, scatter_kws={'alpha':0.05},
                         scatter=True, palette = self.ROI_pallete) #, markers=['^', 's', 'o', 'v', 'D', 'h', 'P', '.', ','])
 
             ax = plt.gca()
@@ -501,28 +538,28 @@ class pRFViewer(Viewer):
                 lh.set_alpha(1)
             fig2 = plt.gcf()
 
-            fig_name = fig_name.replace('ECC', 'ECCvsSIZE_UNbinned')
+            fig_name = fig_name.replace('SIZE', 'SIZE_FWHM')
             fig2.savefig(fig_name, dpi=100,bbox_inches = 'tight')
 
             ## bin it, for cleaner plot
             for r_name in pp_ROI_dict.keys()   :
 
                 mean_x, _, mean_y, _ = self.MRIObj.mri_utils.get_weighted_bins (df_ecc_siz.loc[(df_ecc_siz['ROI'] == r_name)],
-                                                                                x_key = 'ecc', y_key = 'size', 
+                                                                                x_key = 'ecc', y_key = 'size_fwhm', 
                                                                                 weight_key = 'rsq', sort_key = 'ecc', n_bins = n_bins_dist)
 
                 avg_bin_df = pd.concat((avg_bin_df,
                                         pd.DataFrame({ 'sj': np.tile('sub-{sj}'.format(sj = pp), len(mean_x)),
                                                     'ROI': np.tile(r_name, len(mean_x)),
                                                     'ecc': mean_x,
-                                                    'size': mean_y
+                                                    'size_fwhm': mean_y
                                         })))
 
             ##### plot binned df #########
             sns.set(font_scale=1.3)
             sns.set_style("ticks")
 
-            g = sns.lmplot(x="ecc", y="size", hue = 'ROI', data = avg_bin_df.loc[avg_bin_df['sj'] == 'sub-{sj}'.format(sj = pp)], 
+            g = sns.lmplot(x="ecc", y="size_fwhm", hue = 'ROI', data = avg_bin_df.loc[avg_bin_df['sj'] == 'sub-{sj}'.format(sj = pp)], 
                            scatter_kws={'alpha':0.15}, scatter=True, palette = self.ROI_pallete) #, markers=['^', 's', 'o', 'v', 'D', 'h', 'P', '.', ','])
 
             ax = plt.gca()
@@ -547,7 +584,7 @@ class pRFViewer(Viewer):
             sns.set(font_scale=1.3)
             sns.set_style("ticks")
 
-            g = sns.lmplot(x="ecc", y="size", hue = 'ROI', data = avg_bin_df, 
+            g = sns.lmplot(x="ecc", y="size_fwhm", hue = 'ROI', data = avg_bin_df, 
                         scatter=True, palette = self.ROI_pallete,  
                         x_bins = n_bins_dist) #, markers=['^', 's', 'o', 'v', 'D', 'h', 'P', '.', ','])
 
@@ -599,7 +636,8 @@ class pRFViewer(Viewer):
 
             ## use RSQ as alpha level for flatmaps
             r2 = group_estimates['sub-{sj}'.format(sj = pp)]['r2']
-            alpha_level = self.MRIObj.mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
+            alpha_level = np.ones(r2.shape[0]) #self.MRIObj.mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
+            alpha_level[np.where((np.isnan(r2)))[0]] = np.nan
 
             self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['ns'], 
                                         pysub = self.get_pysub_name(sub_id = pp), cmap = 'magma', 
@@ -696,7 +734,7 @@ class pRFViewer(Viewer):
                 
             ## use RSQ as alpha level for flatmaps
             r2 = group_estimates['sub-{sj}'.format(sj = pp)]['r2']
-            alpha_level = self.MRIObj.mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
+            alpha_level = np.ones(r2.shape[0]) #self.MRIObj.mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
             alpha_level[np.where((np.isnan(r2)))[0]] = np.nan
 
             ## position estimates

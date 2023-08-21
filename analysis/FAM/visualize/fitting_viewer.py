@@ -1497,15 +1497,23 @@ class FAViewer(Viewer):
             DF_betas_bar_coord = DF_betas_bar_coord.dropna().groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
                                                                             'ROI', 'sj'])['betas'].mean().reset_index()
 
-        ### now plot all combinations (rows - unattended bar pos changes, column, attend bar pos changes)
+        ### now plot all combinations
         for roi_name in ROI_list:
         
-            fig, axs = plt.subplots(nrows= len(coord_list), ncols=len(coord_list)-1, figsize=(4 * (len(coord_list)-1),4 * len(coord_list)), sharex=True, sharey=True)
+            fig, axs = plt.subplots(nrows = len(coord_list), ncols=len(coord_list), figsize=(4 * len(coord_list),4 * len(coord_list)), sharex=True, sharey=True)
+            # indices for diagonals, to skip
+            diag_ind_list = [(ind_c,ind_c) for ind_c in np.arange(len(coord_list))] 
+            # counter
             row_ind = 0
+
             for UAtt_bar_coord in coord_list: 
                 
                 col_ind = 0
                 for Att_bar_coord in coord_list:
+                    
+                    # skip diagonals when plotting
+                    if diag_ind_list[row_ind][0] == col_ind and diag_ind_list[row_ind][-1] == row_ind:
+                        col_ind += 1
                     
                     if Att_bar_coord != UAtt_bar_coord: ## bars cannot fully overlap
                         
@@ -1629,12 +1637,20 @@ class FAViewer(Viewer):
         ### now plot all combinations (rows - unattended bar pos changes, column, attend bar pos changes)
         for roi_name in ROI_list:
         
-            fig, axs = plt.subplots(nrows= len(coord_list), ncols=len(coord_list)-1, figsize=(4 * (len(coord_list)-1),4 * len(coord_list)), sharex=True, sharey=True)
+            fig, axs = plt.subplots(nrows= len(coord_list), ncols=len(coord_list), figsize=(4 * len(coord_list), 4 * len(coord_list)), sharex=True, sharey=True)
+            # indices for diagonals, to skip
+            diag_ind_list = [(ind_c,ind_c) for ind_c in np.arange(len(coord_list))] 
+            # counter
             row_ind = 0
+
             for UAtt_bar_coord in coord_list: 
                 
                 col_ind = 0
                 for Att_bar_coord in coord_list:
+
+                    # skip diagonals when plotting
+                    if diag_ind_list[row_ind][0] == col_ind and diag_ind_list[row_ind][-1] == row_ind:
+                        col_ind += 1
                     
                     if Att_bar_coord != UAtt_bar_coord: ## bars cannot fully overlap
                         
@@ -1664,6 +1680,11 @@ class FAViewer(Viewer):
                             axs[row_ind][col_ind].scatter(df2plot['prf_x_coord'], df2plot['betas'], c = '#598a9e')
                             #axs[row_ind][col_ind].errorbar(df2plot['prf_x_coord'], df2plot['betas'], df2plot['sem'], linestyle='dotted')
                             axs[row_ind][col_ind].plot(df2plot['prf_x_coord'], df2plot['betas'], c = '#598a9e')
+                            
+                            # add legend
+                            handleA = mpatches.Patch(facecolor = '#8d9e59', edgecolor = 'k', label = 'target')
+                            handleB= mpatches.Patch( facecolor = '#969696', edgecolor = 'k', label = 'distractor', hatch = '///')
+                            leg = axs[row_ind][col_ind].legend(handles = [handleA,handleB], loc = 'upper right')
 
                         axs[row_ind][col_ind].set_xlim(np.array([- 1, 1]) * max_ecc_ext)
 
@@ -1695,15 +1716,15 @@ class FAViewer(Viewer):
                         
                         col_ind+=1
 
-                # add colorbar
-                norm = plt.Normalize(-2, 2)
-                sm = plt.cm.ScalarMappable(cmap="coolwarm", norm=norm)
-                sm.set_array([])
-                plt.gcf().tight_layout()
+                # # add colorbar
+                # norm = plt.Normalize(-2, 2)
+                # sm = plt.cm.ScalarMappable(cmap="coolwarm", norm=norm)
+                # sm.set_array([])
+                # plt.gcf().tight_layout()
 
-                cb_ax = fig.add_axes([1,.124,.01,.754])
-                cb_ax.tick_params(labelsize=15) 
-                fig.colorbar(sm, orientation='vertical', cax = cb_ax)
+                # cb_ax = fig.add_axes([1,.124,.01,.754])
+                # cb_ax.tick_params(labelsize=15) 
+                # fig.colorbar(sm, orientation='vertical', cax = cb_ax)
                 
                 row_ind += 1
 

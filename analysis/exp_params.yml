@@ -306,12 +306,17 @@ plotting:
                 'V3AB': ['V3A', 'V3B'],
                 'LO': ['LO1', 'LO2'],
                 'hV4': ['hV4'],
+                'TO': ['TO1', 'TO2'],
+                'VO': ['VO1', 'VO2'],
+                'PHC': ['PHC1', 'PHC2'],
                 'IPS0': ['IPS0'],
                 'IPS1': ['IPS1'], 
-                'IPS2': ['IPS2'] 
-                #'IPS3': 'IPS3', 
-                #'IPS4': 'IPS4', 
-                #'IPS5': 'IPS5'
+                'IPS2': ['IPS2'],
+                'IPS3': ['IPS3'], 
+                'IPS4': ['IPS4'], 
+                'IPS5': ['IPS5'],
+                'SPL1': ['SPL1'],
+                'FEF': ['FEF']
                 }
         }
 
@@ -330,7 +335,7 @@ plotting:
                     'inflated_less': {'surface.{subject}.unfold': 0.35,},
                     }
 
-  rsq_threshold: .2 #.15 #.25 
+  rsq_threshold: .1 #.15 #.25 
 
 
 

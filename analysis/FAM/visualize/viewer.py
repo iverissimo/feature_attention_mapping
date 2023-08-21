@@ -60,10 +60,12 @@ class Viewer:
         
         self.use_atlas = use_atlas
 
+        ## get vertices for each relevant ROI
+        self.ROIs_dict = {}
+
         # if we are using atlas ROIs, then can already load here and avoid further reloading
         if isinstance(self.use_atlas, str):
-            ## get vertices for each relevant ROI
-            self.ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = None, pysub = self.pysub, use_atlas = self.use_atlas, 
+            self.ROIs_dict[self.use_atlas] = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = None, pysub = self.pysub, use_atlas = self.use_atlas, 
                                                             annot_filename = self.annot_filename, hemisphere = 'BH',
                                                             ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
 
@@ -75,9 +77,71 @@ class Viewer:
         # initialize utilities class
         self.plot_utils = PlotUtils() 
 
+    def load_ROIs_dict(self, sub_id = None, hemisphere = 'BH'):
+
+        """
+        Load ROIs dict, for the participant
+        Wrapper to avoid unnecessary repeating code
+
+        Parameters
+        ----------
+        sub_id : str
+            participant ID
+        """
+
+        if isinstance(self.use_atlas, str): # if we are using atlas ROIs
+            pp_ROI_dict = self.ROIs_dict[self.use_atlas]
+        else: 
+            if 'sub-{sj}'.format(sj = sub_id) not in list(self.ROIs_dict.keys()): # if using participant specifc ROIs, load them if not loaded yet
+                self.ROIs_dict['sub-{sj}'.format(sj = sub_id)] = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = sub_id, pysub = self.pysub, use_atlas = self.use_atlas, 
+                                                                                            annot_filename = self.annot_filename, hemisphere = hemisphere,
+                                                                                            ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
+            pp_ROI_dict = self.ROIs_dict['sub-{sj}'.format(sj = sub_id)]
+
+        if hemisphere == 'BH':
+            return pp_ROI_dict
+        else:
+            # number of vertices in one hemisphere (for bookeeping) 
+            hemi_vert_num = cortex.db.get_surfinfo(self.pysub).left.shape[0] 
+
+            # iterate over rois and get vertices
+            hemi_pp_ROI_dict = {Rkey: (verts[np.where(verts < hemi_vert_num)[0]] if hemisphere == 'LH' else verts[np.where(verts >= hemi_vert_num)[0]]) for Rkey, verts in pp_ROI_dict.items()}
+
+            return hemi_pp_ROI_dict
+
+    def get_pysub_name(self, sub_id = None):
+
+        """
+        Get pysubject folder name to use when plotting
+        depends on usage of atlas vs sub-specific ROIs
+
+        Parameters
+        ----------
+        sub_id : str
+            participant ID
+        """
+        if isinstance(self.use_atlas, str):
+            sub_pysub = self.pysub
+        else:
+            # subject pycortex folder
+            sub_pysub = 'sub-{pp}_{ps}'.format(ps = self.pysub, pp = sub_id)
+        
+        return sub_pysub
+
     def plot_rsq(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean',
                         model_name = 'gauss', task = 'pRF', figures_pth = None, vmin1 = 0, vmax1 = .8,
                         fit_hrf = True):
+        
+        """
+        plot R2 estimates of model fit (for either task)
+
+        Parameters
+        ----------
+        participant_list: list
+            list with participant ID 
+        group_estimates: dict
+            estimates for all participants
+        """
         
         # make output folder for figures
         if figures_pth is None:
@@ -88,6 +152,9 @@ class Viewer:
         
         ## loop over participants in list
         for pp in participant_list:
+            
+            ## load ROI dict for participant
+            pp_ROI_dict = self.load_ROIs_dict(sub_id = pp)
 
             # make path to save sub-specific figures
             sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp))
@@ -104,13 +171,13 @@ class Viewer:
                 fig_name = fig_name.replace('.png','_withHRF.png') 
 
             self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['r2'], 
-                                        pysub = self.pysub, cmap = 'hot', 
+                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'hot', 
                                         vmin1 = vmin1, vmax1 = vmax1, 
                                         fig_abs_name = fig_name)
 
             ## get estimates per ROI
             pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, estimates_pp = group_estimates['sub-{sj}'.format(sj = pp)], 
-                                                ROIs_dict = self.ROIs_dict, 
+                                                ROIs_dict = pp_ROI_dict, 
                                                 est_key = 'r2', model = model_name)
 
             #### plot distribution ###
@@ -121,7 +188,7 @@ class Viewer:
                         palette = self.ROI_pallete, ax = ax1)
             
             # quick fix for legen
-            handles = [mpatches.Patch(color = self.ROI_pallete[k], label = k) for k in self.ROIs_dict.keys()]
+            handles = [mpatches.Patch(color = self.ROI_pallete[k], label = k) for k in pp_ROI_dict.keys()]
             ax1.legend(loc = 'upper right',fontsize=8, handles = handles, title="ROIs")#, fancybox=True)
 
             v1.set(xlabel=None)
@@ -145,14 +212,14 @@ class Viewer:
 
             v1 = sns.pointplot(data = avg_roi_df.groupby(['sj', 'ROI'])['value'].mean().reset_index(),
                                 x = 'ROI', y = 'value', color = 'k', markers = 'D', #scale = 1, 
-                                palette = self.ROI_pallete, order = self.ROIs_dict.keys(), 
+                                palette = self.ROI_pallete, order = pp_ROI_dict.keys(), 
                                 dodge = False, join = False, ci=68, ax = ax1)
             v1.set(xlabel=None)
             v1.set(ylabel=None)
             plt.margins(y=0.025)
             sns.stripplot(data = avg_roi_df.groupby(['sj', 'ROI'])['value'].mean().reset_index(), 
                           x = 'ROI', y = 'value', #hue = 'sj', palette = sns.color_palette("husl", len(participant_list)),
-                            order = self.ROIs_dict.keys(),
+                            order = pp_ROI_dict.keys(),
                             color="gray", alpha=0.5, ax=ax1)
             plt.xticks(fontsize = 18)
             plt.yticks(fontsize = 18)

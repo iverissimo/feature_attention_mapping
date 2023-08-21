@@ -293,8 +293,8 @@ class pRF_model(Model):
                 
         Parameters
         ----------
-        participant_list: list
-            list with participant ID
+        participant: str
+            participant ID
         input_pth: str or None
             path to look for files, if None then will get them from derivatives/postfmriprep/<space>/sub-X folder
         run_type: string or int

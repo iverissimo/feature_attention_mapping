@@ -329,6 +329,9 @@ class pRFViewer(Viewer):
         ## loop over participants in list
         for pp in participant_list:
 
+            ## load ROI dict for participant
+            pp_ROI_dict = self.load_ROIs_dict(sub_id = pp)
+
             # make path to save sub-specific figures
             sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp))
             os.makedirs(sub_figures_pth, exist_ok=True)
@@ -345,7 +348,7 @@ class pRFViewer(Viewer):
                 fig_name = fig_name.replace('.png','_withHRF.png') 
 
             self.plot_utils.plot_flatmap(final_estimates[prf_model_list[0]][it_key[0]]['sub-{sj}'.format(sj = pp)]['r2'] - final_estimates[prf_model_list[1]][it_key[1]]['sub-{sj}'.format(sj = pp)]['r2'], 
-                                        pysub = self.pysub, cmap = 'BuBkRd', 
+                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'BuBkRd', 
                                         vmin1 = vmin1, vmax1 = vmax1, 
                                         fig_abs_name = fig_name)
             
@@ -355,7 +358,7 @@ class pRFViewer(Viewer):
                 ## concatenate estimates per ROI per participant, to make group plot
                 avg_roi_df = pd.concat((avg_roi_df,
                                         self.MRIObj.mri_utils.get_estimates_roi_df(pp, estimates_pp = final_estimates[mod_name][it_key[ind]]['sub-{sj}'.format(sj = pp)], 
-                                                                            ROIs_dict = self.ROIs_dict, 
+                                                                            ROIs_dict = pp_ROI_dict, 
                                                                             est_key = 'r2', model = mod_name,
                                                                             iterative = it_bool[ind])
                                         ))
@@ -364,7 +367,7 @@ class pRFViewer(Viewer):
 
             v1 = sns.violinplot(data = avg_roi_df[avg_roi_df['sj'] == 'sub-{sj}'.format(sj = pp)], 
                                 x = 'ROI', y = 'value', hue = plot_hue,
-                                order = self.ROIs_dict.keys(),
+                                order = pp_ROI_dict.keys(),
                                 cut=0, inner='box',
                                 linewidth=2.7, saturation = 1, ax = ax1) 
             v1.set(xlabel=None)
@@ -385,7 +388,7 @@ class pRFViewer(Viewer):
 
             v1 = sns.violinplot(data = avg_roi_df.groupby(['sj', 'ROI', 'model', 'iterative']).mean().reset_index(),
                                 x = 'ROI', y = 'value', 
-                                order = self.ROIs_dict.keys(),
+                                order = pp_ROI_dict.keys(),
                                 cut=0, inner='box', hue = plot_hue, 
                                 linewidth=2.7,saturation = 1, ax = ax1) 
             v1.set(xlabel=None)
@@ -413,6 +416,9 @@ class pRFViewer(Viewer):
         ## loop over participants in list
         for pp in participant_list:
 
+            ## load ROI dict for participant
+            pp_ROI_dict = self.load_ROIs_dict(sub_id = pp)
+
             # make path to save sub-specific figures
             sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp))
             os.makedirs(sub_figures_pth, exist_ok=True)
@@ -437,7 +443,7 @@ class pRFViewer(Viewer):
                 fig_name = fig_name.replace('.png','_withHRF.png') 
 
             self.plot_utils.plot_flatmap(eccentricity, 
-                                        pysub = self.pysub, cmap = 'viridis', 
+                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'viridis', 
                                         vmin1 = vmin1['ecc'], vmax1 = vmax1['ecc'],
                                         est_arr2 = alpha_level,
                                         vmin2 = 0, vmax2 = 1, 
@@ -448,7 +454,7 @@ class pRFViewer(Viewer):
                                                                 group_estimates['sub-{sj}'.format(sj = pp)])
             
             self.plot_utils.plot_flatmap(size_fwhmaxmin[0], 
-                                        pysub = self.pysub, cmap = 'cubehelix', 
+                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'cubehelix', 
                                         vmin1 = vmin1['size'], vmax1 = vmax1['size'],
                                         est_arr2 = alpha_level,
                                         vmin2 = 0, vmax2 = 1, 
@@ -456,15 +462,15 @@ class pRFViewer(Viewer):
             
             ## GET values per ROI ##
             ecc_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, eccentricity, 
-                                                                    ROIs_dict = self.ROIs_dict, 
+                                                                    ROIs_dict = pp_ROI_dict, 
                                                                     model = model_name)
     
             size_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, size_fwhmaxmin[0], 
-                                                                    ROIs_dict = self.ROIs_dict, 
+                                                                    ROIs_dict = pp_ROI_dict, 
                                                                     model = model_name)
             
             rsq_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, r2, 
-                                                                    ROIs_dict = self.ROIs_dict, 
+                                                                    ROIs_dict = pp_ROI_dict, 
                                                                     model = model_name)
 
             # merge them into one
@@ -499,7 +505,7 @@ class pRFViewer(Viewer):
             fig2.savefig(fig_name, dpi=100,bbox_inches = 'tight')
 
             ## bin it, for cleaner plot
-            for r_name in self.ROIs_dict.keys()   :
+            for r_name in pp_ROI_dict.keys()   :
 
                 mean_x, _, mean_y, _ = self.MRIObj.mri_utils.get_weighted_bins (df_ecc_siz.loc[(df_ecc_siz['ROI'] == r_name)],
                                                                                 x_key = 'ecc', y_key = 'size', 
@@ -574,6 +580,9 @@ class pRFViewer(Viewer):
         ## loop over participants in list
         for pp in participant_list:
 
+            ## load ROI dict for participant
+            pp_ROI_dict = self.load_ROIs_dict(sub_id = pp)
+
             # make path to save sub-specific figures
             sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp))
             os.makedirs(sub_figures_pth, exist_ok=True)
@@ -593,7 +602,7 @@ class pRFViewer(Viewer):
             alpha_level = self.MRIObj.mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
 
             self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['ns'], 
-                                        pysub = self.pysub, cmap = 'magma', 
+                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'magma', 
                                         vmin1 = vmin1, vmax1 = vmax1, 
                                         est_arr2 = alpha_level,
                                         vmin2 = 0, vmax2 = 1, 
@@ -601,11 +610,11 @@ class pRFViewer(Viewer):
             
             ## GET values per ROI ##
             ns_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)]['ns'], 
-                                                                    ROIs_dict = self.ROIs_dict, 
+                                                                    ROIs_dict = pp_ROI_dict, 
                                                                     model = model_name)
     
             rsq_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, r2, 
-                                                                    ROIs_dict = self.ROIs_dict, 
+                                                                    ROIs_dict = pp_ROI_dict, 
                                                                     model = model_name)
 
             # merge them into one
@@ -623,7 +632,7 @@ class pRFViewer(Viewer):
                         palette = self.ROI_pallete, ax = ax1)
             
             # quick fix for legen
-            handles = [mpatches.Patch(color = self.ROI_pallete[k], label = k) for k in self.ROIs_dict.keys()]
+            handles = [mpatches.Patch(color = self.ROI_pallete[k], label = k) for k in pp_ROI_dict.keys()]
             ax1.legend(loc = 'upper right',fontsize=8, handles = handles, title="ROIs")#, fancybox=True)
 
             v1.set(xlabel=None)
@@ -647,14 +656,14 @@ class pRFViewer(Viewer):
 
             v1 = sns.pointplot(data = avg_roi_df.groupby(['sj', 'ROI'])['exponent'].mean().reset_index(),
                                 x = 'ROI', y = 'exponent', color = 'k', markers = 'D', #scale = 1, 
-                                palette = self.ROI_pallete, order = self.ROIs_dict.keys(), 
+                                palette = self.ROI_pallete, order = pp_ROI_dict.keys(), 
                                 dodge = False, join = False, ci=68, ax = ax1)
             v1.set(xlabel=None)
             v1.set(ylabel=None)
             plt.margins(y=0.025)
             sns.stripplot(data = avg_roi_df.groupby(['sj', 'ROI'])['exponent'].mean().reset_index(), 
                           x = 'ROI', y = 'exponent', #hue = 'sj', palette = sns.color_palette("husl", len(participant_list)),
-                            order = self.ROIs_dict.keys(),
+                            order = pp_ROI_dict.keys(),
                             color="gray", alpha=0.5, ax=ax1)
             plt.xticks(fontsize = 18)
             plt.yticks(fontsize = 18)
@@ -709,7 +718,7 @@ class pRFViewer(Viewer):
                 fig_name = fig_name.replace('.png','_withHRF.png') 
 
             self.plot_utils.plot_flatmap(polar_angle_norm, 
-                                        pysub = self.pysub, cmap = PA_cmap, 
+                                        pysub = self.get_pysub_name(sub_id = pp), cmap = PA_cmap, 
                                         vmin1 = 0, vmax1 = 1,
                                         est_arr2 = alpha_level,
                                         vmin2 = 0, vmax2 = 1, 
@@ -722,7 +731,7 @@ class pRFViewer(Viewer):
                                                             pa_transform = 'flip', angle_thresh = angle_thresh)
 
             self.plot_utils.plot_flatmap(pa_transformed, 
-                                        pysub = self.pysub, cmap = cmap_pa_sns, 
+                                        pysub = self.get_pysub_name(sub_id = pp), cmap = cmap_pa_sns, 
                                         vmin1 = -angle_thresh, vmax1 = angle_thresh, 
                                         est_arr2 = alpha_level,
                                         vmin2 = 0, vmax2 = 1, 
@@ -732,14 +741,14 @@ class pRFViewer(Viewer):
             # plot x and y separately, for sanity check
             # XX
             self.plot_utils.plot_flatmap(xx, 
-                                        pysub = self.pysub, cmap = 'BuBkRd_alpha_2D', 
+                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'BuBkRd_alpha_2D', 
                                         vmin1 = -max_x_lim, vmax1 = max_x_lim, 
                                         est_arr2 = alpha_level,
                                         vmin2 = 0, vmax2 = 1, 
                                         fig_abs_name = fig_name.replace('_PA', '_XX'))
             # YY
             self.plot_utils.plot_flatmap(yy, 
-                                        pysub = self.pysub, cmap = 'BuBkRd_alpha_2D', 
+                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'BuBkRd_alpha_2D', 
                                         vmin1 = -max_x_lim, vmax1 = max_x_lim, 
                                         est_arr2 = alpha_level,
                                         vmin2 = 0, vmax2 = 1, 
@@ -775,21 +784,16 @@ class pRFViewer(Viewer):
             
         hemi_labels = ['LH', 'RH']
 
-        ## get vertices for each relevant ROI, per hemisphere
-        ROIs_dict = {}
-        ## LH
-        ROIs_dict['LH'] = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = None, pysub = self.pysub, use_atlas = self.use_atlas, 
-                                                        annot_filename = self.annot_filename, hemisphere = 'LH',
-                                                        ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
-        ROIs_dict['RH']  = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = None, pysub = self.pysub, use_atlas = self.use_atlas, 
-                                                        annot_filename = self.annot_filename, hemisphere = 'RH',
-                                                        ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
-
         # save values per roi in dataframe
         df_merge = pd.DataFrame()
 
         ## loop over participants in list
         for pp in participant_list:
+
+            ## load ROI dict for participant, for each hemisphere
+            pp_ROI_dict = {}
+            pp_ROI_dict['LH'] = self.load_ROIs_dict(sub_id = pp, hemisphere = 'LH')
+            pp_ROI_dict['RH'] = self.load_ROIs_dict(sub_id = pp, hemisphere = 'RH')
 
             # make path to save sub-specific figures
             sub_figures_pth = op.join(figures_pth, 'sub-{sj}'.format(sj = pp))
@@ -800,10 +804,10 @@ class pRFViewer(Viewer):
             for hemi in hemi_labels:
                 ## GET values per ROI ##
                 xx_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)]['x'], 
-                                                                        ROIs_dict = ROIs_dict[hemi], 
+                                                                        ROIs_dict = pp_ROI_dict[hemi], 
                                                                         model = model_name)
                 yy_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)]['y'], 
-                                                                        ROIs_dict = ROIs_dict[hemi], 
+                                                                        ROIs_dict = pp_ROI_dict[hemi], 
                                                                         model = model_name)
 
                 tmp_df = pd.merge(xx_pp_roi_df.rename(columns={'value': 'xx'}),
@@ -826,7 +830,7 @@ class pRFViewer(Viewer):
                 fig_name = fig_name.replace('.png','_withHRF.png') 
 
             # actually plot hexabins
-            for r_name in self.ROIs_dict.keys():
+            for r_name in pp_ROI_dict[hemi].keys():
 
                 f, ss = plt.subplots(1, 1, figsize=(8,4.5))
 
@@ -882,7 +886,7 @@ class pRFViewer(Viewer):
             fig_name = op.join(figures_pth, op.split(fig_name)[-1].replace('sub-{sj}'.format(sj = pp),'sub-GROUP'))
 
             # actually plot hexabins
-            for r_name in self.ROIs_dict.keys():
+            for r_name in pp_ROI_dict[hemi].keys():
 
                 f, ss = plt.subplots(1, 1, figsize=(8,4.5))
 
@@ -1295,7 +1299,7 @@ class FAViewer(Viewer):
             corr_arr = np.load(op.join(fitpath, 'spcorrelation_task-{tsk}.npy'.format(tsk = task)))
 
             self.plot_utils.plot_flatmap(corr_arr, 
-                                        pysub = self.pysub, cmap='hot', 
+                                        pysub = self.get_pysub_name(sub_id = participant), cmap='hot', 
                                         vmin1 = 0, vmax1 = 1, 
                                         fig_abs_name = op.join(op.split(fig_basename)[0], 'spcorrelation_task-{tsk}_{bn}'.format(bn = op.split(fig_basename)[-1],
                                                                                               tsk = task)))
@@ -1303,7 +1307,7 @@ class FAViewer(Viewer):
             binary_arr = np.load(op.join(fitpath, 'binary_mask_spcorrelation_task-{tsk}.npy'.format(tsk = task)))
 
             self.plot_utils.plot_flatmap(binary_arr, 
-                                        pysub = self.pysub, cmap='hot', 
+                                        pysub = self.get_pysub_name(sub_id = participant), cmap='hot', 
                                         vmin1 = 0, vmax1 = 1, 
                                         fig_abs_name = op.join(op.split(fig_basename)[0], 'binary_mask_spcorrelation_task-{tsk}_{bn}'.format(bn = op.split(fig_basename)[-1],
                                                                                               tsk = task)))
@@ -1363,7 +1367,7 @@ class FAViewer(Viewer):
                                                                                     m = name,
                                                                                     acq=self.MRIObj.sj_space))
                 self.plot_utils.plot_flatmap(r2, 
-                                            pysub = self.pysub, cmap='hot', 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap='hot', 
                                             vmin1 = 0, vmax1 = 50, 
                                             fig_abs_name = fig_name)
                 
@@ -1371,7 +1375,7 @@ class FAViewer(Viewer):
                 avg_betas = estimates_dict['betasmd'][...,0] if name == 'A' else np.mean(estimates_dict['betasmd'], axis = -1)
 
                 self.plot_utils.plot_flatmap(avg_betas, 
-                                            pysub = self.pysub, cmap='RdBu_r', 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap='RdBu_r', 
                                             vmin1 = -2, vmax1 = 2, 
                                             fig_abs_name = fig_name.replace('R2_', 'Betas_'))
                 
@@ -1379,7 +1383,7 @@ class FAViewer(Viewer):
                 avg_betas[np.isnan(final_estimates['sub-{sj}'.format(sj = pp)]['r2'])] = np.nan
 
                 self.plot_utils.plot_flatmap(avg_betas, 
-                                            pysub = self.pysub, cmap='RdBu_r', 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap='RdBu_r', 
                                             vmin1 = -2, vmax1 = 2, 
                                             fig_abs_name = fig_name.replace('R2_', 'Betas_pRF_'))
                 
@@ -1391,7 +1395,7 @@ class FAViewer(Viewer):
                                                                             return_std = True)
                     
                     self.plot_utils.plot_flatmap(np.mean(std_surf, axis = 0), 
-                                            pysub = self.pysub, cmap='gnuplot', 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap='gnuplot', 
                                             vmin1 = 0, vmax1 = 1.5, 
                                             fig_abs_name = fig_name.replace('R2_', 'Betas_SD_'))
 
@@ -1399,13 +1403,13 @@ class FAViewer(Viewer):
                 if name == 'D':
                     ## plot FracRidge
                     self.plot_utils.plot_flatmap(estimates_dict['FRACvalue'], 
-                                            pysub = self.pysub, cmap='copper', 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap='copper', 
                                             vmin1 = 0, vmax1 = 1, 
                                             fig_abs_name = fig_name.replace('R2_', 'FRACvalue_'))
                     
                     ## plot Noise pool
                     self.plot_utils.plot_flatmap(estimates_dict['noisepool'], 
-                                            pysub = self.pysub, cmap='hot', 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap='hot', 
                                             vmin1 = 0, vmax1 = 1, 
                                             fig_abs_name = fig_name.replace('R2_', 'NoisePool_'))
                     
@@ -1885,6 +1889,9 @@ class FAViewer(Viewer):
         # iterate over participant list
         for pp in participant_list:
 
+            ## load ROI dict for participant
+            pp_ROI_dict = self.load_ROIs_dict(sub_id = pp)
+
             ## output path to save plots for participants
             sub_figures_pth = op.join(output_pth, 'sub-{sj}'.format(sj = pp))
             os.makedirs(sub_figures_pth, exist_ok=True)
@@ -1900,7 +1907,7 @@ class FAViewer(Viewer):
             DF_betas_bar_coord = self.FAModelObj.get_betas_coord_df(pp, betas_arr = GLMsing_estimates_dict['betasmd'], 
                                                                 single_trl_DM = single_trl_DM, 
                                                                 att_color_ses_run = att_color_ses_run_dict['sub-{sj}'.format(sj = pp)], 
-                                                                file_ext = file_ext, ROIs_dict = self.ROIs_dict, 
+                                                                file_ext = file_ext, ROIs_dict = pp_ROI_dict, 
                                                                 prf_estimates = prf_estimates, 
                                                                 orientation_bars = orientation_bars)
 
@@ -2002,6 +2009,9 @@ class FAViewer(Viewer):
         # iterate over participant list
         for pp in participant_list:
 
+            ## load ROI dict for participant
+            pp_ROI_dict = self.load_ROIs_dict(sub_id = pp)
+
             ## output path to save plots
             sub_figures_pth = op.join(output_pth, 'sub-{sj}'.format(sj = pp))
             os.makedirs(sub_figures_pth, exist_ok=True)
@@ -2017,7 +2027,7 @@ class FAViewer(Viewer):
             DF_betas_bar_coord = self.FAModelObj.get_betas_coord_df(pp, betas_arr = GLMsing_estimates_dict['betasmd'], 
                                                                 single_trl_DM = single_trl_DM, 
                                                                 att_color_ses_run = att_color_ses_run_dict['sub-{sj}'.format(sj = pp)], 
-                                                                file_ext = file_ext, ROIs_dict = self.ROIs_dict, 
+                                                                file_ext = file_ext, ROIs_dict = pp_ROI_dict, 
                                                                 prf_estimates = prf_estimates, 
                                                                 orientation_bars = orientation_bars)
                 
@@ -2142,6 +2152,9 @@ class FAViewer(Viewer):
         # iterate over participant list
         for pp in participant_list:
 
+            ## load ROI dict for participant
+            pp_ROI_dict = self.load_ROIs_dict(sub_id = pp)
+
             ## output path to save plots for participants
             sub_figures_pth = op.join(output_pth, 'sub-{sj}'.format(sj = pp))
             os.makedirs(sub_figures_pth, exist_ok=True)
@@ -2157,7 +2170,7 @@ class FAViewer(Viewer):
             DF_betas_bar_coord = self.FAModelObj.get_betas_coord_df(pp, betas_arr = GLMsing_estimates_dict['betasmd'], 
                                                                 single_trl_DM = single_trl_DM, 
                                                                 att_color_ses_run = att_color_ses_run_dict['sub-{sj}'.format(sj = pp)], 
-                                                                file_ext = file_ext, ROIs_dict = self.ROIs_dict, 
+                                                                file_ext = file_ext, ROIs_dict = pp_ROI_dict, 
                                                                 prf_estimates = prf_estimates, 
                                                                 orientation_bars = orientation_bars)
             

@@ -131,8 +131,7 @@ class MRIUtils(Utils):
                 
         return atlas_df
     
-    def create_sjROI_df(self, sub_id = None, pysub = 'hcp_999999', 
-                        ROIs = ['V1', 'V2', 'V3', 'hV4', 'LO', 'V3AB']):
+    def create_sjROI_df(self, sub_id = None, pysub = 'hcp_999999', ROI_list = ['V1', 'V2', 'V3', 'hV4', 'LO', 'V3AB']):
         
         """ Function to create pycortex subject dataframe
         with ROI names and vertex indices
@@ -143,20 +142,23 @@ class MRIUtils(Utils):
             subject ID
         pysub: str
             pycortex subject
-        ROIs: list/array
+        ROI_list: list/array
             relevant roi names
         """
+
+        # subject pycortex folder
+        sub_pysub = 'sub-{pp}_{ps}'.format(ps = pysub, pp = sub_id)
         
         # number of vertices in one hemisphere (for bookeeping) 
-        hemi_vert_num = cortex.db.get_surfinfo(pysub).left.shape[0] 
+        hemi_vert_num = cortex.db.get_surfinfo(sub_pysub).left.shape[0] 
         
         ## make subject ROI data frame
         sjROI_df = pd.DataFrame({'ROI': [], 'hemi_vertex': [], 'merge_vertex': [], 'hemisphere': []})
 
-        for roi_name in ROIs:
+        for roi_name in ROI_list:
 
             # get vertex indices for whole surface 
-            merge_vert = cortex.get_roi_verts(pysub, roi = roi_name)[roi_name]
+            merge_vert = cortex.get_roi_verts(sub_pysub, roi = roi_name)[roi_name]
 
             # hemisphere
             hemi_arr = np.tile('R', len(merge_vert))
@@ -203,7 +205,7 @@ class MRIUtils(Utils):
                                         (allROI_df['hemisphere'] == hemi[0])].merge_vertex.values.astype(int))
 
         return np.array(roi_vert)
-
+    
     def get_ROIs_dict(self, sub_id = None, pysub = 'hcp_999999', use_atlas = None, 
                             annot_filename = '', hemisphere = 'BH',
                             ROI_labels = {'V1': ['V1v', 'V1d'], 'V2': ['V2v', 'V2d'],'V3': ['V3v', 'V3d'],
@@ -242,7 +244,7 @@ class MRIUtils(Utils):
         else:
             # if not, load subject hand-drawn rois
             tmp_arr = sorted({x for v in rlabels_dict.values() for x in v})
-            allROI_df = self.create_sjROI_df(sub_id = sub_id, pysub = pysub, ROIs = tmp_arr)
+            allROI_df = self.create_sjROI_df(sub_id = sub_id, pysub = pysub, ROI_list = tmp_arr)
 
         # iterate over rois and get vertices
         output_dict = {}

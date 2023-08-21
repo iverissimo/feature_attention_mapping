@@ -55,23 +55,20 @@ class pRFViewer(Viewer):
         # Load pRF model object
         self.pRFModelObj = pRFModelObj
                 
-    def save_estimates4drawing(self, participant_list = [], task2draw = 'pRF',
+    def save_estimates4drawing(self, participant_list = [],
                                     ses = 'mean', run_type = 'mean',  mask_bool_df = None, stim_on_screen = [],
-                                    prf_model_name = 'gauss', rsq_threshold = .1, mask_arr = True):
+                                    prf_model_name = 'gauss', rsq_threshold = .1, mask_arr = True,
+                                    colormap_list = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb', '#3d549f','#655099','#ad5a9b','#dd3933'],
+                                    n_bins_colors = 256, angle_thresh = 3*np.pi/4):
 
         """
-        Load estimates into pycortex sub specific overlay, to draw ROIs
-        - pRF estimates : will load polar angle (with and without alpha level) and eccentricity
-        - FA estimates : not implemented yet
-
-        Note - requires that we have (at least) pRF estimates saved 
+        Load pRF estimates into pycortex sub specific overlay, to draw ROIs
+        Will load polar angle (with and without alpha level) + eccentricity +  size +  r2
 
         Parameters
         ----------
         participant_list : list
             list of subject ID
-        task2draw: str
-            task identifier 
         ses: str
             session of input data
         run_type : str
@@ -89,7 +86,7 @@ class pRFViewer(Viewer):
             sub_name = 'sub-group'
 
         # check if subject pycortex folder exists
-        pysub_folder = '{ps}_{pp}'.format(ps = self.pysub, pp = sub_name)
+        pysub_folder = '{pp}_{ps}'.format(ps = self.pysub, pp = sub_name)
 
         if op.exists(op.join(cortex.options.config.get('basic', 'filestore'), pysub_folder)):
             print('Participant overlay %s in pycortex filestore, assumes we draw ROIs there'%pysub_folder)
@@ -129,11 +126,13 @@ class pRFViewer(Viewer):
         r2_avg = np.stack((final_estimates['sub-{sj}'.format(sj = pp)]['r2'] for pp in participant_list))
         xx_avg = np.stack((final_estimates['sub-{sj}'.format(sj = pp)]['x'] for pp in participant_list))
         yy_avg = np.stack((final_estimates['sub-{sj}'.format(sj = pp)]['y'] for pp in participant_list))
+        size_avg = np.stack((final_estimates['sub-{sj}'.format(sj = pp)]['size'] for pp in participant_list))
 
         ## TAKE MEDIAN
         r2_avg = np.nanmedian(r2_avg, axis = 0)
         xx_avg = np.nanmedian(xx_avg, axis = 0)
         yy_avg = np.nanmedian(yy_avg, axis = 0)
+        size_avg = np.nanmedian(size_avg, axis = 0)
 
         ## use RSQ as alpha level for flatmaps
         alpha_level = self.MRIObj.mri_utils.normalize(np.clip(r2_avg, 0, .6)) # normalize 
@@ -144,37 +143,45 @@ class pRFViewer(Viewer):
                                                         rsq = r2_avg)
         
         ## calculate polar angle (normalize PA between 0 and 1)
-        polar_angle_norm = self.pRFModelObj.get_polar_angle(xx = xx_avg, yy = yy_avg, rsq = r2_avg, 
+        polar_angle_norm = self.pRFModelObj.get_polar_angle(xx = xx_avg, yy = yy_avg, rsq = r2_avg,
                                                         pa_transform = 'norm', angle_thresh = None)
-
+            
         # get matplotlib color map from segmented colors
-        PA_cmap = self.plot_utils.make_colormap(['#ec9b3f','#f3eb53','#7cb956','#82cbdb', '#3d549f','#655099','#ad5a9b','#dd3933'], 
-                                                bins = 256, cmap_name = 'PA_mackey_custom',
-                                                discrete = False, add_alpha = False, return_cmap = True)
+        PA_cmap = self.plot_utils.make_colormap(colormap_list, bins = n_bins_colors, 
+                                                    cmap_name = 'PA_mackey_custom',
+                                                    discrete = False, add_alpha = False, return_cmap = True)
         
-        ## also plot non-uniform color wheel ##
+         ## also plot non-uniform color wheel ##
         cmap_pa_sns = sns.hls_palette(as_cmap=True, h = 0.01, s=.9, l=.65)
-        pa_transformed = self.pRFModelObj.get_polar_angle(xx = xx_avg, yy = yy_avg, rsq = r2_avg, 
-                                                        pa_transform = 'flip', angle_thresh = 3*np.pi/4)
+        pa_transformed = self.pRFModelObj.get_polar_angle(xx = xx_avg, yy = yy_avg, rsq = r2_avg,
+                                                        pa_transform = 'flip', angle_thresh = angle_thresh)
+
 
         ## set flatmaps ##
         images = {}
         
         ## pRF rsq
         images['pRF_rsq'] = self.plot_utils.plot_flatmap(r2_avg, 
-                                                        pysub = self.pysub, cmap = 'hot', 
+                                                        pysub = pysub_folder, cmap = 'hot', 
                                                         vmin1 = 0, vmax1 = 1, 
                                                         fig_abs_name = None)
         
         images['ECC'] = self.plot_utils.plot_flatmap(eccentricity, 
-                                                    pysub = self.pysub, cmap = 'viridis', 
+                                                    pysub = pysub_folder, cmap = 'viridis', 
                                                     vmin1 = 0, vmax1 = 5.5,
+                                                    est_arr2 = alpha_level,
+                                                    vmin2 = 0, vmax2 = 1, 
+                                                    fig_abs_name = None)
+        
+        images['Size'] = self.plot_utils.plot_flatmap(size_avg, 
+                                                    pysub = pysub_folder, cmap = 'cubehelix', 
+                                                    vmin1 = 0, vmax1 = 10,
                                                     est_arr2 = alpha_level,
                                                     vmin2 = 0, vmax2 = 1, 
                                                     fig_abs_name = None)
 
         images['PA'] = self.plot_utils.plot_flatmap(polar_angle_norm, 
-                                                pysub = self.pysub, cmap = PA_cmap, 
+                                                pysub = pysub_folder, cmap = PA_cmap, 
                                                 vmin1 = 0, vmax1 = 1,
                                                 est_arr2 = alpha_level,
                                                 vmin2 = 0, vmax2 = 1, 
@@ -182,7 +189,7 @@ class pRFViewer(Viewer):
                                                 fig_abs_name = None)
         
         images['PA_nonUNI'] = self.plot_utils.plot_flatmap(pa_transformed, 
-                                                    pysub = self.pysub, cmap = cmap_pa_sns, 
+                                                    pysub = pysub_folder, cmap = cmap_pa_sns, 
                                                     vmin1 = -angle_thresh, vmax1 = angle_thresh, 
                                                     est_arr2 = alpha_level,
                                                     vmin2 = 0, vmax2 = 1, 
@@ -194,6 +201,9 @@ class pRFViewer(Viewer):
                                                                                                                             run = run_type, model = prf_model_name,
                                                                                                                             hrf_bool = str(self.pRFModelObj.fit_hrf)))
         self.plot_utils.add_data2overlay(flatmap = images['ECC'], name = 'ECC_{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = sub_name,
+                                                                                                                            run = run_type, model = prf_model_name,
+                                                                                                                            hrf_bool = str(self.pRFModelObj.fit_hrf)))
+        self.plot_utils.add_data2overlay(flatmap = images['Size'], name = 'Size_{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = sub_name,
                                                                                                                             run = run_type, model = prf_model_name,
                                                                                                                             hrf_bool = str(self.pRFModelObj.fit_hrf)))
         self.plot_utils.add_data2overlay(flatmap = images['PA'], name = 'PA_{sj}_task-pRF_run-{run}_model-{model}_withHRF-{hrf_bool}'.format(sj = sub_name,

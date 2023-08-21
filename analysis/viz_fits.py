@@ -175,10 +175,10 @@ match task:
 
             case 'draw_roi':
 
-                plotter.save_estimates4drawing(participant_list = FAM_data.sj_num, task2draw = 'pRF',
+                plotter.save_estimates4drawing(participant_list = FAM_data.sj_num, 
                                                 ses = ses2fit, run_type = run_type,
                                                 prf_model_name = prf_model_name, 
-                                                rsq_threshold = 0,
+                                                rsq_threshold = 0.1,
                                                 mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
                                                                                 crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                                 shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses

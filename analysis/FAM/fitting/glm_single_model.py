@@ -867,14 +867,83 @@ class GLMsingle_Model(Model):
                                                                             'betas': [self.MRIObj.mri_utils.weighted_mean(bin_df.betas.values, 
                                                                                                                         weights = bin_df.prf_rsq_coord.values, 
                                                                                                                         norm = True)], 
-                                                                            'std': [[self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
+                                                                            'std': [self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
                                                                                                                                     weights = bin_df.prf_rsq_coord.values, 
-                                                                                                                                    norm = True)][0][0]],
+                                                                                                                                    norm = True)[0]],
+                                                                            'sem': [self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
+                                                                                                                                    weights = bin_df.prf_rsq_coord.values, 
+                                                                                                                                    norm = True)[-1]],
                                                                             'prf_rsq_coord': [np.nanmean(bin_df.prf_rsq_coord.values)],
                                                                             'prf_x_coord': [np.nanmean(bins_arr[b:b+1])], 
                                                                             'prf_y_coord': [np.nanmean(bins_arr[b:b+1])],
                                                                             'Att_bar_coord': [Att_bar_coord],
                                                                             'UAtt_bar_coord':[UAtt_bar_coord]})))
+        if bar_color2bin:
+            DF_betas_bar_coord1D['attend_color'] = bar_color2bin
+
+        return DF_betas_bar_coord1D
+    
+    def get_betas_1D_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', bar_color2bin = None):
+
+        """
+        Transform model beta values (according to pRF x,y coordinates) into 1D average
+        for different ROIs
+
+        Parameters
+        ----------
+        DF_betas_bar_coord: dataframe
+            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        ROI_list: list/arr
+            list with ROI names 
+        bar_color2bin: str
+            attended bar color. if given, will bin betas for that bar color, else will average across colors
+        """
+
+        # if no ROI specified, then plot all
+        if len(ROI_list) == 0:
+            ROI_list = DF_betas_bar_coord.ROI.unique()
+
+        ## for bars going left to right (vertical orientation)
+        if orientation_bars == 'parallel_vertical':
+            coord_list = self.bar_x_coords_pix
+
+        elif orientation_bars == 'parallel_horizontal':
+            coord_list = self.bar_y_coords_pix
+
+        else:
+            raise ValueError('Cross sections not implemented yet')
+        
+        DF_betas_bar_coord1D = pd.DataFrame({'sj': [], 'ROI': [], 'betas': [], 'std': [], 'prf_rsq_coord': [], 'prf_x_coord': [], 'prf_y_coord': [],
+                                            'attend_color': [], 'Att_bar_coord': [], 'UAtt_bar_coord': []})
+
+        ## iterate over ROIs
+        for roi_name in ROI_list:
+            
+            for UAtt_bar_coord in coord_list: 
+                for Att_bar_coord in coord_list:
+                    
+                    if Att_bar_coord != UAtt_bar_coord: ## bars cannot fully overlap
+
+                        trial_df = DF_betas_bar_coord[(DF_betas_bar_coord['ROI'] == roi_name) &\
+                                            (DF_betas_bar_coord['Att_bar_coord'] == Att_bar_coord) &\
+                                            (DF_betas_bar_coord['UAtt_bar_coord'] == UAtt_bar_coord)]
+                        trial_df = trial_df.dropna()
+
+                        ## if we want to bin estimates for specific bar color
+                        if bar_color2bin:
+                            trial_df = trial_df[trial_df['attend_color'] == bar_color2bin]
+                        else:
+                            # average them, if we dont care
+                            trial_df = trial_df.groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
+                                                                                            'ROI', 'sj'])['betas'].mean().reset_index()
+
+                        # group by x-coordinates, and average
+                        out_df = trial_df.groupby(['sj', 'ROI', 'Att_bar_coord', 'UAtt_bar_coord', 'prf_x_coord']).mean().reset_index()
+
+                        DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D, out_df))
+
         if bar_color2bin:
             DF_betas_bar_coord1D['attend_color'] = bar_color2bin
 
@@ -1122,7 +1191,7 @@ class GLMsingle_Model(Model):
 
         return distractor_coord_df
     
-    def get_betas_bar_avg1D_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', bar_color2bin = None):
+    def get_betas_bar_1D_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', bar_color2bin = None, avg_bool = True):
 
         """
         Average model beta values (according to pRF x,y coordinates) within each bar
@@ -1188,7 +1257,8 @@ class GLMsingle_Model(Model):
                         dist_bars = (UAtt_bar_coord - Att_bar_coord)/ self.bar_width_pix[0]
 
                         ## append df
-                        DF_betas_bar_avg1D = pd.concat((DF_betas_bar_avg1D, 
+                        if avg_bool:
+                            DF_betas_bar_avg1D = pd.concat((DF_betas_bar_avg1D, 
                                                         pd.DataFrame({'sj': Att_bar_bin_df.sj.values[:2], 
                                                                     'ROI': np.tile(roi_name, 2), 
                                                                     'bar_type': ['distractor', 'target'],
@@ -1213,6 +1283,22 @@ class GLMsingle_Model(Model):
                                                                     'Att_bar_coord': np.tile(Att_bar_coord, 2),
                                                                     'UAtt_bar_coord':np.tile(UAtt_bar_coord, 2),
                                                                     'dist_bars': np.tile(dist_bars, 2)})))
+                        else:
+                            DF_betas_bar_avg1D = pd.concat((DF_betas_bar_avg1D, 
+                                                        pd.DataFrame({'sj': np.tile(Att_bar_bin_df.sj.values[:1], 
+                                                                                    int(len(Att_bar_bin_df.betas.values) + len(UAtt_bar_bin_df.betas.values))),
+                                                                    'ROI': np.tile(roi_name, 
+                                                                                    int(len(Att_bar_bin_df.betas.values) + len(UAtt_bar_bin_df.betas.values))),
+                                                                    'bar_type': np.concatenate((np.tile('distractor', len(UAtt_bar_bin_df.betas.values)), 
+                                                                                                np.tile('target', len(Att_bar_bin_df.betas.values))), axis=None),                                                                     
+                                                                    'betas': np.concatenate((UAtt_bar_bin_df.betas.values, 
+                                                                                            Att_bar_bin_df.betas.values), axis=None),
+                                                                    'Att_bar_coord': np.tile(Att_bar_coord, 
+                                                                                            int(len(Att_bar_bin_df.betas.values) + len(UAtt_bar_bin_df.betas.values))),
+                                                                    'UAtt_bar_coord': np.tile(UAtt_bar_coord, 
+                                                                                            int(len(Att_bar_bin_df.betas.values) + len(UAtt_bar_bin_df.betas.values))),
+                                                                    'dist_bars': np.tile(dist_bars, 
+                                                                                        int(len(Att_bar_bin_df.betas.values) + len(UAtt_bar_bin_df.betas.values)))})))
         if bar_color2bin:
             DF_betas_bar_avg1D['attend_color'] = bar_color2bin
 

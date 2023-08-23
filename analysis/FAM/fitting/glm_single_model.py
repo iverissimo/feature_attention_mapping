@@ -1031,7 +1031,6 @@ class GLMsingle_Model(Model):
 
         return attention_coord_df
 
-
     def get_attention_coord_flipped_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', 
                                     colA = ['color_red', 'color_green'], colB = ['color_green', 'color_red'], average = True):
 

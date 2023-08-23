@@ -1576,6 +1576,128 @@ class FAViewer(Viewer):
                 os.makedirs(op.split(fig_name)[0], exist_ok=True)
                 fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
 
+    def plot_betas_2Ddiagonal(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical',
+                            max_ecc_ext = 5.5, fig_name = None, bar_color2plot = None):
+
+        """
+        Plot model beta values (according to pRF x,y coordinates) in visual space
+        for different ROIs
+        Just lower diagonal (useful when plotting attentional modulation or average over visual space)
+
+        Parameters
+        ----------
+        DF_betas_bar_coord: dataframe
+            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        ROI_list: list/arr
+            list with ROI names to plot
+        max_ecc_ext: float
+            eccentricity limit (screen) for plotting
+        fig_name: str
+            if given, will save plot with absolute figure name
+        bar_color2plot: str
+            attended bar color. if given, will plot betas for that bar color, else will average across colors
+        """
+
+        # if no ROI specified, then plot all
+        if len(ROI_list) == 0:
+            ROI_list = DF_betas_bar_coord.ROI.unique()
+
+        ## for bars going left to right (vertical orientation)
+        if orientation_bars == 'parallel_vertical':
+            coord_list = self.FAModelObj.bar_x_coords_pix
+        elif orientation_bars == 'parallel_horizontal':
+            coord_list = self.FAModelObj.bar_y_coords_pix
+        else:
+            raise ValueError('Cross sections not implemented yet')
+        
+        ## if we want to plot estimates for specific bar color
+        if bar_color2plot:
+            DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['attend_color'] == bar_color2plot].dropna() # drop nans
+        else:
+            # average them, if we dont care
+            DF_betas_bar_coord = DF_betas_bar_coord.dropna().groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
+                                                                            'ROI', 'sj'])['betas'].mean().reset_index()
+
+        ### now plot all combinations
+        for roi_name in ROI_list:
+        
+            fig, axs = plt.subplots(nrows = len(coord_list)-1, ncols=len(coord_list)-1, 
+                                    figsize=(4.5 * (len(coord_list)-1), 4.5 * (len(coord_list)-1)), sharex=False, sharey=False)
+            # counter
+            col_ind = 0
+
+            for Att_bar_coord in coord_list:
+    
+                row_ind = 0 + col_ind
+                
+                if col_ind > 0 and col_ind < len(coord_list)-1: # remove upper diagonal empty plots
+                    for i in np.arange(row_ind):
+                        axs[i][col_ind].set_visible(False)
+
+                for UAtt_bar_coord in coord_list: 
+
+                    if Att_bar_coord < UAtt_bar_coord:
+
+                        df2plot = DF_betas_bar_coord[(DF_betas_bar_coord['ROI'] == roi_name) &\
+                                        (DF_betas_bar_coord['Att_bar_coord'] == Att_bar_coord) &\
+                                        (DF_betas_bar_coord['UAtt_bar_coord'] == UAtt_bar_coord)]
+
+                        g = sns.scatterplot(x='prf_x_coord', y='prf_y_coord', hue_norm=(-2, 2),
+                                    hue='betas', palette='coolwarm', s=20, linewidth=.3, legend=False, 
+                                    data = df2plot, ax = axs[row_ind][col_ind])
+                        g.set(xlim = np.array([- 1, 1]) * max_ecc_ext, 
+                            ylim= np.array([- 1, 1]) * max_ecc_ext)
+                        axs[row_ind][col_ind].axhline(y=0, c="0", lw=.3)
+                        axs[row_ind][col_ind].axvline(x=0, c="0", lw=.3)
+                        plt.gcf().tight_layout()
+                        g.set(xlabel = 'x coordinates')
+                        g.set(ylabel = 'y coordinates')
+                        axs[row_ind][col_ind].tick_params(axis='both', labelsize=14)
+
+                        # Create a Rectangle patch
+                        # for unattended bar
+                        unatt_rect = mpatches.Rectangle((self.convert_pix2dva(UAtt_bar_coord - self.FAModelObj.bar_width_pix[0]/2), 
+                                                -self.convert_pix2dva(self.MRIObj.screen_res[1]/2)), 
+                                                self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]), 
+                                                self.convert_pix2dva(self.MRIObj.screen_res[1]), 
+                                                linewidth=1, edgecolor='k', facecolor='#969696', alpha = .15, zorder = 10)
+                        axs[row_ind][col_ind].add_patch(unatt_rect) # Add the patch to the Axes
+                        axs[row_ind][col_ind].patches[-1].set_hatch('///')
+
+                        # for attended bar
+                        att_rect = mpatches.Rectangle((self.convert_pix2dva(Att_bar_coord - self.FAModelObj.bar_width_pix[0]/2), 
+                                                -self.convert_pix2dva(self.MRIObj.screen_res[1]/2)), 
+                                                self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]), 
+                                                self.convert_pix2dva(self.MRIObj.screen_res[1]), 
+                                                linewidth=1, edgecolor='k', facecolor='#8d9e59', alpha = .15, zorder = 10)
+                        axs[row_ind][col_ind].add_patch(att_rect) # Add the patch to the Axes
+                        #axs[row_ind][col_ind].patches[-1].set_hatch('*')
+
+                        # add legend
+                        handleA = mpatches.Patch(facecolor = '#8d9e59', edgecolor = 'k', label = 'target')
+                        handleB= mpatches.Patch( facecolor = '#969696', edgecolor = 'k', label = 'distractor', hatch = '///')
+                        leg = axs[row_ind][col_ind].legend(handles = [handleA,handleB], loc = 'upper right')
+                        
+                        row_ind += 1
+
+                # add colorbar
+                norm = plt.Normalize(-2, 2)
+                sm = plt.cm.ScalarMappable(cmap="coolwarm", norm=norm)
+                sm.set_array([])
+                plt.gcf().tight_layout()
+
+                cb_ax = fig.add_axes([1,.124,.01,.754])
+                cb_ax.tick_params(labelsize=15) 
+                fig.colorbar(sm, orientation='vertical', cax = cb_ax)
+                
+                col_ind+=1
+
+            if fig_name:
+                os.makedirs(op.split(fig_name)[0], exist_ok=True)
+                fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+    
     def plot_betas_1D(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical',
                             max_ecc_ext = 5.5, fig_name = None, bar_color2plot = None, bin_size = None, bin_bool = True, error_type = 'std'):
 
@@ -1741,16 +1863,6 @@ class FAViewer(Viewer):
                         #axs[row_ind][col_ind].patches[-1].set_hatch('*')
                         
                         col_ind+=1
-
-                # # add colorbar
-                # norm = plt.Normalize(-2, 2)
-                # sm = plt.cm.ScalarMappable(cmap="coolwarm", norm=norm)
-                # sm.set_array([])
-                # plt.gcf().tight_layout()
-
-                # cb_ax = fig.add_axes([1,.124,.01,.754])
-                # cb_ax.tick_params(labelsize=15) 
-                # fig.colorbar(sm, orientation='vertical', cax = cb_ax)
                 
                 row_ind += 1
 
@@ -1758,6 +1870,178 @@ class FAViewer(Viewer):
                 os.makedirs(op.split(fig_name)[0], exist_ok=True)
                 fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
 
+    def plot_betas_1Ddiagonal(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical',
+                                    max_ecc_ext = 5.5, fig_name = None, bar_color2plot = None, bin_size = None, bin_bool = True, error_type = 'std'):
+
+        """
+        Plot model beta values (according to pRF x,y coordinates) binned over 1D coordinates
+        for different ROIs
+        Just lower diagonal (useful when plotting attentional modulation or average over visual space)
+
+        Parameters
+        ----------
+        DF_betas_bar_coord: dataframe
+            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        ROI_list: list/arr
+            list with ROI names to plot
+        max_ecc_ext: float
+            eccentricity limit (screen) for plotting
+        fig_name: str
+            if given, will save plot with absolute figure name
+        bar_color2plot: str
+            attended bar color. if given, will plot betas for that bar color, else will average across colors
+        """
+
+        # if no ROI specified, then plot all
+        if len(ROI_list) == 0:
+            ROI_list = DF_betas_bar_coord.ROI.unique()
+
+        ## for bars going left to right (vertical orientation)
+        if orientation_bars == 'parallel_vertical':
+            coord_list = self.FAModelObj.bar_x_coords_pix
+
+        elif orientation_bars == 'parallel_horizontal':
+            coord_list = self.FAModelObj.bar_y_coords_pix
+
+        else:
+            raise ValueError('Cross sections not implemented yet')
+        
+        ## if we want to plot estimates for specific bar color
+        if bar_color2plot:
+            if isinstance(bar_color2plot, str):
+                color_list = [bar_color2plot]
+            else:
+                color_list = bar_color2plot # assumes list, so will plot both
+        else:
+            # average them, if we dont care
+            color_list = [None]
+
+        # if no bin size given, assumes 1/3 of bar width
+        if bin_size is None:
+            bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3)
+            
+        DF_betas_bar_coord1D = pd.DataFrame()
+
+        for cn in color_list:
+                
+                if bin_bool:
+                    ### get betas binned over 1D coordinate
+                    DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D,
+                                                    self.FAModelObj.get_betas_binned1D_df(DF_betas_bar_coord = DF_betas_bar_coord, 
+                                                                        ROI_list = ROI_list, orientation_bars = 'parallel_vertical', 
+                                                                        max_ecc_ext = max_ecc_ext, 
+                                                                        bin_size = bin_size, 
+                                                                        bar_color2bin = cn)
+                                                    ))
+                else:
+                    ### get betas over 1D coordinate (NOT BINNED)
+                    DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D,
+                                                    self.FAModelObj.get_betas_1D_df(DF_betas_bar_coord = DF_betas_bar_coord, 
+                                                                        ROI_list = ROI_list, orientation_bars = 'parallel_vertical', 
+                                                                        bar_color2bin = cn)
+                                                    ))
+
+        ### now plot all combinations (rows - unattended bar pos changes, column, attend bar pos changes)
+        for roi_name in ROI_list:
+        
+            fig, axs = plt.subplots(nrows = len(coord_list)-1, ncols=len(coord_list)-1, 
+                                    figsize=(4.5 * (len(coord_list)-1), 4.5 * (len(coord_list)-1)), sharex=False, sharey=False)
+            # counter
+            col_ind = 0
+
+            for Att_bar_coord in coord_list:
+    
+                row_ind = 0 + col_ind
+                
+                if col_ind > 0 and col_ind < len(coord_list)-1: # remove upper diagonal empty plots
+                    for i in np.arange(row_ind):
+                        axs[i][col_ind].set_visible(False)
+
+                for UAtt_bar_coord in coord_list: 
+
+                    if Att_bar_coord < UAtt_bar_coord:
+                        
+                        df2plot = DF_betas_bar_coord1D[(DF_betas_bar_coord1D['ROI'] == roi_name) &\
+                                                    (DF_betas_bar_coord1D['Att_bar_coord'] == Att_bar_coord) &\
+                                                    (DF_betas_bar_coord1D['UAtt_bar_coord'] == UAtt_bar_coord)]
+                        df2plot.sort_values('prf_x_coord')
+
+                        if len(color_list) > 1:
+                            df1 = df2plot[df2plot['attend_color'] == color_list[0]]
+                            df1.sort_values('prf_x_coord')
+                            axs[row_ind][col_ind].plot(df1['prf_x_coord'], df1['betas'], 
+                                                       c = self.MRIObj.params['plotting']['cond_colors'][color_list[0]], 
+                                                       label = color_list[0])
+
+                            df2 = df2plot[df2plot['attend_color'] == color_list[1]]
+                            df2.sort_values('prf_x_coord')
+                            axs[row_ind][col_ind].plot(df2['prf_x_coord'], df2['betas'], 
+                                                       c = self.MRIObj.params['plotting']['cond_colors'][color_list[1]], 
+                                                       label = color_list[1])
+                            axs[row_ind][col_ind].legend()
+
+                            if bin_bool:
+                                axs[row_ind][col_ind].errorbar(df1['prf_x_coord'], df1['betas'], yerr=df1[error_type], fmt='o',
+                                                               c = self.MRIObj.params['plotting']['cond_colors'][color_list[0]])
+                                axs[row_ind][col_ind].errorbar(df2['prf_x_coord'], df2['betas'], yerr=df2[error_type], fmt='o',
+                                                               c = self.MRIObj.params['plotting']['cond_colors'][color_list[1]])
+                            else:
+                                axs[row_ind][col_ind].scatter(df1['prf_x_coord'], df1['betas'], 
+                                                          c = self.MRIObj.params['plotting']['cond_colors'][color_list[0]])
+                                axs[row_ind][col_ind].scatter(df2['prf_x_coord'], df2['betas'], 
+                                                          c = self.MRIObj.params['plotting']['cond_colors'][color_list[1]])
+
+                        else:
+                            axs[row_ind][col_ind].plot(df2plot['prf_x_coord'], df2plot['betas'], c = '#598a9e')
+                            if bin_bool:
+                                axs[row_ind][col_ind].errorbar(df2plot['prf_x_coord'], df2plot['betas'], yerr=df2plot[error_type], fmt='o', c = '#598a9e')
+                            else:
+                                axs[row_ind][col_ind].scatter(df2plot['prf_x_coord'], df2plot['betas'], c = '#598a9e')
+
+                            # add legend
+                            handleA = mpatches.Patch(facecolor = '#8d9e59', edgecolor = 'k', label = 'target')
+                            handleB= mpatches.Patch( facecolor = '#969696', edgecolor = 'k', label = 'distractor', hatch = '///')
+                            leg = axs[row_ind][col_ind].legend(handles = [handleA,handleB], loc = 'upper right')
+
+                        axs[row_ind][col_ind].set_xlim(np.array([- 1, 1]) * max_ecc_ext)
+                        axs[row_ind][col_ind].set_ylim(np.array([- 1.5, 5.5]))
+
+                        axs[row_ind][col_ind].axhline(y=0, c="0", lw=.3)
+                        axs[row_ind][col_ind].axvline(x=0, c="0", lw=.3)
+                        plt.gcf().tight_layout()
+                        axs[row_ind][col_ind].set_xlabel('x coordinates')
+                        axs[row_ind][col_ind].set_ylabel('beta PSC')
+                        axs[row_ind][col_ind].tick_params(axis='both', labelsize=14)
+
+                        # Create a Rectangle patch
+                        # for unattended bar
+                        unatt_rect = mpatches.Rectangle((self.convert_pix2dva(UAtt_bar_coord - self.FAModelObj.bar_width_pix[0]/2), 
+                                                -10), 
+                                                self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]), 
+                                                20, 
+                                                linewidth=1, edgecolor='k', facecolor='#969696', alpha = .15, zorder = 10)
+                        axs[row_ind][col_ind].add_patch(unatt_rect) # Add the patch to the Axes
+                        axs[row_ind][col_ind].patches[-1].set_hatch('///')
+
+                        # for attended bar
+                        att_rect = mpatches.Rectangle((self.convert_pix2dva(Att_bar_coord - self.FAModelObj.bar_width_pix[0]/2), 
+                                                -10), 
+                                                self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]), 
+                                                20, 
+                                                linewidth=1, edgecolor='k', facecolor='#8d9e59', alpha = .15, zorder = 10)
+                        axs[row_ind][col_ind].add_patch(att_rect) # Add the patch to the Axes
+                        #axs[row_ind][col_ind].patches[-1].set_hatch('*')
+                        
+                        row_ind += 1
+                
+                col_ind += 1
+
+            if fig_name:
+                os.makedirs(op.split(fig_name)[0], exist_ok=True)
+                fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+    
     def plot_betas1D_distance(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical',
                                     fig_name = None, bar_color2plot = None, avg_bool = True):
 
@@ -2028,6 +2312,7 @@ class FAViewer(Viewer):
                 self.plot_betas_1D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
                                     orientation_bars = orientation_bars, bin_bool = False,
                                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    error_type = 'sem', bin_size = None,
                                     fig_name = fig_name) 
 
             ## plot betas binned over 1D coordinates
@@ -2044,8 +2329,26 @@ class FAViewer(Viewer):
                 self.plot_betas_1D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
                                     orientation_bars = orientation_bars, bin_bool = True,
                                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    error_type = 'sem', bin_size = None,
                                     fig_name = fig_name) 
+                
+            ## plot betas binned over 1D coordinates --> in = bar width
+            for cn in [['color_red', 'color_green'], None]:
+                
+                # absolute figure name
+                fig_name = op.join(sub_figures_pth,
+                            'sub-{sj}_acq-{acq}_space-{space}_model-{model}_bar_orientation-{ori}_GLMsingle_betas1D_binned_bar.png'.format(sj=pp, acq = self.MRIObj.acq, 
+                                                                                                                                       space = self.MRIObj.sj_space,
+                                                                                                            model = model_type, ori = orientation_bars))
+                if cn is not None:
+                    fig_name = fig_name.replace('.png', '_per_color.png')
 
+                self.plot_betas_1D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
+                                    orientation_bars = orientation_bars, bin_bool = True,
+                                    max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    error_type = 'sem', bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]),
+                                    fig_name = fig_name) 
+                
     def plot_att_coord(self, participant_list = [], model_type = 'D', mask_bool_df = None, stim_on_screen = [], mask_arr = True, rsq_threshold = .1,
                                 att_color_ses_run_dict = {}, file_ext = '_cropped.npy', orientation_bars = 'parallel_vertical', ROI_list = ['V1']):
 
@@ -2181,12 +2484,14 @@ class FAViewer(Viewer):
                 self.plot_betas_1D(DF_betas_bar_coord = attention_coord_df, ROI_list = ROI_list, 
                                     orientation_bars = orientation_bars, bin_bool = False,
                                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    error_type = 'sem', bin_size = None,
                                     fig_name = fig_name) 
                 
                 ## same for distractor
                 self.plot_betas_1D(DF_betas_bar_coord = distractor_coord_df, ROI_list = ROI_list, 
                                     orientation_bars = orientation_bars, bin_bool = False,
                                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    error_type = 'sem', bin_size = None,
                                     fig_name = fig_name.replace('Attentional', 'Distractor')) 
             
             ## plot betas binned over 1D coordinates
@@ -2204,14 +2509,205 @@ class FAViewer(Viewer):
                 self.plot_betas_1D(DF_betas_bar_coord = attention_coord_df, ROI_list = ROI_list, 
                                     orientation_bars = orientation_bars, bin_bool = True,
                                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    error_type = 'sem', bin_size = None,
                                     fig_name = fig_name) 
                 
                 ## same for distractor
                 self.plot_betas_1D(DF_betas_bar_coord = distractor_coord_df, ROI_list = ROI_list, 
                                     orientation_bars = orientation_bars, bin_bool = True,
                                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    error_type = 'sem', bin_size = None,
                                     fig_name = fig_name.replace('Attentional', 'Distractor')) 
                 
+            ## plot betas binned over 1D coordinates --> bin size = bar width
+            for cn in [['color_red', 'color_green'], None]:
+
+                # absolute figure name
+                fig_name = op.join(sub_figures_pth,
+                            'sub-{sj}_acq-{acq}_space-{space}_model-{model}_bar_orientation-{ori}_GLMsingle_AttentionalModulation1D_binned_bar.png'.format(sj=pp, acq = self.MRIObj.acq, 
+                                                                                                                                       space = self.MRIObj.sj_space,
+                                                                                                                                       model = model_type, ori = orientation_bars))
+                
+                if cn is not None:
+                    fig_name = fig_name.replace('.png', '_per_color.png')
+
+                self.plot_betas_1D(DF_betas_bar_coord = attention_coord_df, ROI_list = ROI_list, 
+                                    orientation_bars = orientation_bars, bin_bool = True,
+                                    max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    error_type = 'sem', bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]),
+                                    fig_name = fig_name) 
+                
+                ## same for distractor
+                self.plot_betas_1D(DF_betas_bar_coord = distractor_coord_df, ROI_list = ROI_list, 
+                                    orientation_bars = orientation_bars, bin_bool = True,
+                                    max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    error_type = 'sem', bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]),
+                                    fig_name = fig_name.replace('Attentional', 'Distractor')) 
+                
+    def plot_att_modulation(self, participant_list = [], model_type = 'D', mask_bool_df = None, stim_on_screen = [], mask_arr = True, rsq_threshold = .1,
+                                att_color_ses_run_dict = {}, file_ext = '_cropped.npy', orientation_bars = 'parallel_vertical', ROI_list = ['V1']):
+
+        """
+        Plot attention modulation, calculated from GLMsingle beta estimates, relative to pRF coordinates
+        in 2D and 1D binned plots --> from case where we subtracted betas from flipped trials
+
+        Parameters
+        ----------
+        participant_list : list
+            list of subject ID
+        model_type: str
+            GLMsingle model type (ex: D)
+        mask_bool_df: dataframe
+            if dataframe given, will be used to mask pRF design matrix (from participant behavioral performance)
+        stim_on_screen: arr
+            boolean array with moments where pRF stim was on screen
+        mask_arr: bool
+            if we want to mask pRF estimates
+        rsq_threshold: float
+            rsq threshold to mask pRF estimates
+        att_color_ses_run_dict: dict
+            dict with info for each participant, indicating session and run number for same attended color
+        file_ext: str
+            file extension for FA files to load
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        ROI_list: list/arr
+            list with ROI names to plot
+        """
+
+        ## path to store plots
+        output_pth = op.join(self.figures_pth, 'attention_flipped_coord')
+
+        ## load pRF estimates for all participants 
+        # store in dict, for ease of access
+        print('Loading iterative estimates')
+        group_prf_estimates, group_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant_list = participant_list,
+                                                                    ses = 'mean', run_type = 'mean', 
+                                                                    model_name = self.pRFModelObj.model_type['pRF'], 
+                                                                    iterative = True,
+                                                                    mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
+                                                                    fit_hrf = self.pRFModelObj.fit_hrf)
+
+        ## mask the estimates, if such is the case
+        if mask_arr:
+            print('masking estimates')
+
+            # get estimate keys
+            keys = self.pRFModelObj.get_prf_estimate_keys(prf_model_name = self.pRFModelObj.model_type['pRF'])
+
+            # get screen lim for all participants
+            max_ecc_ext = {'sub-{sj}'.format(sj = pp): group_prf_models['sub-{sj}'.format(sj = pp)]['ses-{s}'.format(s = 'mean')]['prf_stim'].screen_size_degrees/2 for pp in participant_list}
+
+            prf_estimates = {'sub-{sj}'.format(sj = pp): self.pRFModelObj.mask_pRF_model_estimates(group_prf_estimates['sub-{sj}'.format(sj = pp)], 
+                                                                                estimate_keys = keys,
+                                                                                x_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
+                                                                                y_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
+                                                                                rsq_threshold = rsq_threshold) for pp in participant_list}
+        else:
+            prf_estimates = group_prf_estimates
+
+        # iterate over participant list
+        for pp in participant_list:
+
+            ## load ROI dict for participant
+            pp_ROI_dict = self.load_ROIs_dict(sub_id = pp)
+
+            ## output path to save plots
+            sub_figures_pth = op.join(output_pth, 'sub-{sj}'.format(sj = pp))
+            os.makedirs(sub_figures_pth, exist_ok=True)
+
+            ## load GLMsingle estimates dict
+            GLMsing_estimates_dict = self.FAModelObj.load_estimates(pp, model_type = model_type)
+
+            ## load single trial DM
+            single_trl_DM = self.FAModelObj.load_single_trl_DM(pp)
+
+            ## get DF with betas and coordinates
+            # for vertical parallel bar positions
+            DF_betas_bar_coord = self.FAModelObj.get_betas_coord_df(pp, betas_arr = GLMsing_estimates_dict['betasmd'], 
+                                                                single_trl_DM = single_trl_DM, 
+                                                                att_color_ses_run = att_color_ses_run_dict['sub-{sj}'.format(sj = pp)], 
+                                                                file_ext = file_ext, ROIs_dict = pp_ROI_dict, 
+                                                                prf_estimates = prf_estimates, 
+                                                                orientation_bars = orientation_bars)
+                
+            ## get attentional modulation df 
+            # subtract average bar position from each trial type
+            attention_mod_df = self.FAModelObj.get_betas_subtract_reverse_df(DF_betas_bar_coord = DF_betas_bar_coord, 
+                                                               ROI_list = ROI_list, orientation_bars = orientation_bars,
+                                                               average = False)
+            
+            ## 2D plot attentional modulation for each attended bar color separately + averaged
+            for cn in ['color_red', 'color_green', None]:
+
+                # absolute figure name
+                fig_name = op.join(sub_figures_pth,
+                            'sub-{sj}_acq-{acq}_space-{space}_model-{model}_bar_orientation-{ori}_GLMsingle_BetasSubtractReverse2D.png'.format(sj=pp, acq = self.MRIObj.acq, 
+                                                                                                                                space = self.MRIObj.sj_space,
+                                                                                                            model = model_type, ori = orientation_bars))
+                
+                if cn is not None:
+                    fig_name = fig_name.replace('.png', '_attend-{cn}.png'.format(cn = cn))
+                
+                self.plot_betas_2Ddiagonal(DF_betas_bar_coord = attention_mod_df, ROI_list = ROI_list, 
+                                            orientation_bars = orientation_bars,
+                                            max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                            fig_name = fig_name) 
+                
+            ## plot betas over 1D coordinates
+            for cn in [['color_red', 'color_green'], None]:
+
+                # absolute figure name
+                fig_name = op.join(sub_figures_pth,
+                            'sub-{sj}_acq-{acq}_space-{space}_model-{model}_bar_orientation-{ori}_GLMsingle_BetasSubtractReverse1D.png'.format(sj=pp, acq = self.MRIObj.acq, 
+                                                                                                                                       space = self.MRIObj.sj_space,
+                                                                                                                                       model = model_type, ori = orientation_bars))
+                
+                if cn is not None:
+                    fig_name = fig_name.replace('.png', '_per_color.png')
+
+                self.plot_betas_1Ddiagonal(DF_betas_bar_coord = attention_mod_df, ROI_list = ROI_list, 
+                                            orientation_bars = orientation_bars, bin_bool = False,
+                                            max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                            error_type = 'sem', bin_size = None,
+                                            fig_name = fig_name) 
+            
+            ## plot betas binned over 1D coordinates
+            for cn in [['color_red', 'color_green'], None]:
+
+                # absolute figure name
+                fig_name = op.join(sub_figures_pth,
+                            'sub-{sj}_acq-{acq}_space-{space}_model-{model}_bar_orientation-{ori}_GLMsingle_BetasSubtractReverse1D_binned.png'.format(sj=pp, acq = self.MRIObj.acq, 
+                                                                                                                                       space = self.MRIObj.sj_space,
+                                                                                                                                       model = model_type, ori = orientation_bars))
+                
+                if cn is not None:
+                    fig_name = fig_name.replace('.png', '_per_color.png')
+
+                self.plot_betas_1Ddiagonal(DF_betas_bar_coord = attention_mod_df, ROI_list = ROI_list, 
+                                            orientation_bars = orientation_bars, bin_bool = True,
+                                            max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                            error_type = 'sem', bin_size = None,
+                                            fig_name = fig_name) 
+                
+            ## plot betas binned over 1D coordinates --> bin == bar width
+            for cn in [['color_red', 'color_green'], None]:
+
+                # absolute figure name
+                fig_name = op.join(sub_figures_pth,
+                            'sub-{sj}_acq-{acq}_space-{space}_model-{model}_bar_orientation-{ori}_GLMsingle_BetasSubtractReverse1D_binned_bar.png'.format(sj=pp, acq = self.MRIObj.acq, 
+                                                                                                                                       space = self.MRIObj.sj_space,
+                                                                                                                                       model = model_type, ori = orientation_bars))
+                
+                if cn is not None:
+                    fig_name = fig_name.replace('.png', '_per_color.png')
+
+                self.plot_betas_1Ddiagonal(DF_betas_bar_coord = attention_mod_df, ROI_list = ROI_list, 
+                                            orientation_bars = orientation_bars, bin_bool = True,
+                                            max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                            error_type = 'sem', bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]),
+                                            fig_name = fig_name) 
+    
     def plot_betas_bar_dist(self, participant_list = [], model_type = 'D', mask_bool_df = None, stim_on_screen = [], mask_arr = True, rsq_threshold = .1,
                                 att_color_ses_run_dict = {}, file_ext = '_cropped.npy', orientation_bars = 'parallel_vertical', ROI_list = ['V1']):
 

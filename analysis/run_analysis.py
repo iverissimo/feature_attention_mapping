@@ -227,7 +227,7 @@ match task:
                         _ = FAM_FA.fit_data(pp, pp_prf_estimates['sub-{sj}'.format(sj = pp)], 
                                             pp_prf_models['sub-{sj}'.format(sj = pp)]['ses-mean']['{mname}_model'.format(mname = prf_model_name)],  
                                             file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 99, 
-                                            file_extent_nm = FAM_mri.get_mrifile_ext(),
+                                            file_extent_nm = FAM_mri.get_mrifile_ext(), fit_hrf = False,
                                             pp_bar_pos_df = pp_bar_pos_df) 
                         
                 case 'gain':

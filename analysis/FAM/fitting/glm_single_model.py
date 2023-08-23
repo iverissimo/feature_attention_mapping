@@ -551,7 +551,7 @@ class GLMsingle_Model(Model):
     def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', 
                         smooth_nm = True, perc_thresh_nm = 95, n_jobs = 8,
                         seed_num = 2023, kernel = 3, nr_iter = 3, normalize = False,
-                        pp_bar_pos_df = {},
+                        pp_bar_pos_df = {}, fit_hrf = False,
                         file_extent_nm = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_LinDetrend_psc.npy'}):
 
         """
@@ -641,11 +641,16 @@ class GLMsingle_Model(Model):
         opt = dict()
 
         # set important fields for completeness (but these would be enabled by default)
-        opt['wantlibrary'] = 0
         opt['wantglmdenoise'] = 1
         opt['wantfracridge'] = 1
+
+        if fit_hrf:
+            opt['wantlibrary'] = 1
+        else:
+            opt['wantlibrary'] = 0
+            opt['hrftoassume'] = hrf_final
         opt['hrfonset'] = 0 # already setting onset in hrf
-        opt['hrftoassume'] = hrf_final
+
         opt['brainexclude'] = final_mask.astype(int)
         opt['sessionindicator'] = self.ses_num_arr 
         opt['brainthresh'] = [99, 0] # which allows all voxels to pass the intensity threshold --> we use surface data

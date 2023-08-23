@@ -506,7 +506,7 @@ class pRFViewer(Viewer):
             plt.xticks(fontsize = 18)
             plt.yticks(fontsize = 18)
             ax.axes.set_xlim(vmin1['ecc'], vmax1['ecc'])
-            ax.axes.set_ylim(vmin1['size'], 6)
+            #ax.axes.set_ylim(vmin1['size'], 6)
             ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
             ax.set_ylabel('pRF size [deg]', fontsize = 20, labelpad = 15)
             sns.despine(offset=15)
@@ -529,7 +529,7 @@ class pRFViewer(Viewer):
             plt.xticks(fontsize = 18)
             plt.yticks(fontsize = 18)
             ax.axes.set_xlim(vmin1['ecc'], vmax1['ecc'])
-            ax.axes.set_ylim(vmin1['size'], vmax1['size'])
+            #ax.axes.set_ylim(vmin1['size'], vmax1['size'])
             ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
             ax.set_ylabel('pRF size FWHMax [deg]', fontsize = 20, labelpad = 15)
             sns.despine(offset=15)
@@ -1858,7 +1858,7 @@ class FAViewer(Viewer):
             v1.set(ylabel=None)
             plt.margins(y=0.025)
             sns.stripplot(data = df2plot, 
-                        x = 'dist_bars', y = 'betas', hue = 'bar_type', jitter = False,
+                        x = 'dist_bars', y = 'betas', hue = 'bar_type', jitter = True,
                         palette = {'target': '#8d9e59', 'distractor': '#969696'}, dodge = .2,
                         alpha=0.4, ax=ax1)
             plt.xticks(fontsize = 18)
@@ -1892,7 +1892,7 @@ class FAViewer(Viewer):
             v1.set(ylabel=None)
             plt.margins(y=0.025)
             sns.stripplot(data = df2plot, 
-                        x = 'dist_bars', y = 'betas', hue = 'bar_type', jitter = False,
+                        x = 'dist_bars', y = 'betas', hue = 'bar_type', jitter = True,
                         palette = {'target': '#8d9e59', 'distractor': '#969696'}, dodge = .2,
                         alpha=0.4, ax=ax1)
             plt.xticks(fontsize = 18)
@@ -2313,7 +2313,7 @@ class FAViewer(Viewer):
                 self.plot_betas1D_distance(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
                                             orientation_bars = orientation_bars,
                                             bar_color2plot = cn, 
-                                            avg_bool = True,
+                                            avg_bool = False,
                                             fig_name = fig_name) 
 
 

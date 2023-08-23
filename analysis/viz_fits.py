@@ -305,19 +305,19 @@ match task:
                                                                                     shift = FAM_data.shift_TRs_num)
                                                 )
 
-                # plotter.plot_att_coord(participant_list = FAM_data.sj_num, 
-                #                                  model_type = 'D',
-                #                                  file_ext = '_cropped.npy', 
-                #                                  orientation_bars = orientation_bars[choice], 
-                #                                  ROI_list = ['V1', 'V2', 'V3'],
-                #                                  att_color_ses_run_dict = group_att_color_ses_run,
-                #                                  mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
-                #                                                                 crop_nr = FAM_data.task_nr_cropTR['pRF'], 
-                #                                                                 shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
-                #                                  stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
-                #                                                                     crop_nr = FAM_data.task_nr_cropTR['pRF'], 
-                #                                                                     shift = FAM_data.shift_TRs_num)
-                #                                 )
+                plotter.plot_att_coord(participant_list = FAM_data.sj_num, 
+                                                 model_type = 'D',
+                                                 file_ext = '_cropped.npy', 
+                                                 orientation_bars = orientation_bars[choice], 
+                                                 ROI_list = ['V1', 'V2', 'V3'],
+                                                 att_color_ses_run_dict = group_att_color_ses_run,
+                                                 mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                                                crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
+                                                 stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                                                    crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                    shift = FAM_data.shift_TRs_num)
+                                                )
                 
             case 'bar_dist':
 

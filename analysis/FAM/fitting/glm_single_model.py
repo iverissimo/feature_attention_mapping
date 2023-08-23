@@ -1031,12 +1031,12 @@ class GLMsingle_Model(Model):
 
         return attention_coord_df
 
-    def get_attention_coord_flipped_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', 
-                                    colA = ['color_red', 'color_green'], colB = ['color_green', 'color_red'], average = True):
+    def get_attention_coord_flipped_df(self, DF_A = {}, DF_B = {}, ROI_list = [], orientation_bars = 'parallel_vertical', 
+                                    color_name = ['color_red', 'color_green'], average = True):
 
         """
         Make attention modulation df, calculated from GLMsingle beta estimates, relative to pRF coordinates.
-        Involves subtracting flipped trials, to isolate attentional effect
+        Involves subtracting two dataframes, where for the 2nd we flip trials (where target and distactor bars are in reversed postion), to isolate attentional effect
 
         Parameters
         ----------
@@ -1046,64 +1046,64 @@ class GLMsingle_Model(Model):
             string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
         ROI_list: list/arr
             list with ROI names
-        colA: list
+        color_name: list
             list with color names
-        colB: list
-            list with color names, reversed of A
         average: bool
             if we want to average across attended colors or not
         """
 
         # if no ROI specified, then plot all
         if len(ROI_list) == 0:
-            ROI_list = DF_betas_bar_coord.ROI.unique()
+            ROI_list = DF_A.ROI.unique()
 
         ## for bars going left to right (vertical orientation)
         if orientation_bars == 'parallel_vertical':
             coord_list = self.bar_x_coords_pix
-
         elif orientation_bars == 'parallel_horizontal':
             coord_list = self.bar_y_coords_pix
-
         else:
             raise ValueError('Cross sections not implemented yet')
         
+        ## reverse distractor dataframe
+        # flipped over diagonal
+        reverse_DF_B = DF_B.rename(columns={'Att_bar_coord': 'UAtt_bar_coord', 
+                                            'UAtt_bar_coord': 'Att_bar_coord'})
+        
         attention_coord_df = pd.DataFrame()
 
-        for col_ind in range(len(colA)):
+        # per bar color
+        for col_name in color_name: 
+
             ## iterate over ROIs
             for roi_name in ROI_list:
-                
-                for UAtt_bar_coord in coord_list: 
-                    for Att_bar_coord in coord_list:
-                        
-                        if Att_bar_coord != UAtt_bar_coord: ## bars cannot fully overlap
 
-                            coords_colA = DF_betas_bar_coord[(DF_betas_bar_coord['ROI'] == roi_name) &\
-                                                (DF_betas_bar_coord['Att_bar_coord'] == Att_bar_coord) &\
-                                                (DF_betas_bar_coord['UAtt_bar_coord'] == UAtt_bar_coord) &\
-                                                (DF_betas_bar_coord['attend_color'] == colA[col_ind])]
-                            coords_colA = coords_colA.dropna()
+                for Att_bar_coord in coord_list:
+                    for UAtt_bar_coord in coord_list: 
+                            
+                        trial_DF_A =  DF_A[(DF_A['ROI'] == roi_name) &\
+                                            (DF_A['Att_bar_coord'] == Att_bar_coord) &\
+                                            (DF_A['UAtt_bar_coord'] == UAtt_bar_coord) &\
+                                            (DF_A['attend_color'] == col_name)].dropna()
 
-                            ## swap attended color and bar location,
-                            # for subtraction
-                            coords_colB = DF_betas_bar_coord[(DF_betas_bar_coord['ROI'] == roi_name) &\
-                                                (DF_betas_bar_coord['Att_bar_coord'] == UAtt_bar_coord) &\
-                                                (DF_betas_bar_coord['UAtt_bar_coord'] == Att_bar_coord) &\
-                                                (DF_betas_bar_coord['attend_color'] == colB[col_ind])]
-                            coords_colB = coords_colB.dropna()
+                        ## swapped target and distractor bar location, for subtraction
+                        trial_DF_B =  reverse_DF_B[(reverse_DF_B['ROI'] == roi_name) &\
+                                                    (reverse_DF_B['Att_bar_coord'] == Att_bar_coord) &\
+                                                    (reverse_DF_B['UAtt_bar_coord'] == UAtt_bar_coord) &\
+                                                    (reverse_DF_B['attend_color'] == col_name)].dropna()
 
+                        if not trial_DF_A.empty:   
                             ## actually subtract
-                            subtracted_df = coords_colA.set_index(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord',
-                                                'ROI', 'sj'])['betas'].sub(coords_colB.set_index(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord',
-                                                                                                        'ROI', 'sj'])['betas']).reset_index()
+                            subtracted_df = trial_DF_A.set_index(['sj', 'ROI', 'attend_color',
+                                                                'prf_x_coord', 'prf_y_coord',
+                                                                'prf_rsq_coord'])['betas'].sub(trial_DF_B.set_index(['sj', 'ROI', 'attend_color',
+                                                                                                                    'prf_x_coord', 'prf_y_coord',
+                                                                                                                    'prf_rsq_coord'])['betas']).reset_index()
                             subtracted_df['Att_bar_coord'] = Att_bar_coord
                             subtracted_df['UAtt_bar_coord'] = UAtt_bar_coord
-                            subtracted_df['attend_color'] = colA[col_ind]
                             
                             ## append
                             attention_coord_df = pd.concat((attention_coord_df, subtracted_df))
-        
+
         # if we want to average
         if average:
             attention_coord_df = attention_coord_df.dropna().groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',

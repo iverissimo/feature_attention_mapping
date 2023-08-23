@@ -2453,6 +2453,12 @@ class FAViewer(Viewer):
                                                                ROI_list = ROI_list, orientation_bars = orientation_bars,
                                                                average = False)
             
+            ## subtraction of both
+            subtract_coord_df = self.FAModelObj.get_attention_coord_flipped_df(DF_A = attention_coord_df, 
+                                                                            DF_B = distractor_coord_df,
+                                                                ROI_list = ROI_list, orientation_bars = orientation_bars,
+                                                                average = False)
+            
             ## 2D plot attentional modulation for each attended bar color separately + averaged
             for cn in ['color_red', 'color_green', None]:
 
@@ -2532,13 +2538,22 @@ class FAViewer(Viewer):
                                     transpose_fig = False,
                                     fig_name = fig_name.replace('Target', 'Distractor')) 
                 
-                ## and for distractor transposed
+                ## and for distractor transposed --> to check
                 self.plot_betas_1D(DF_betas_bar_coord = distractor_coord_df, ROI_list = ROI_list, 
                                     orientation_bars = orientation_bars, bin_bool = True,
                                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
                                     error_type = 'sem', bin_size = None,
                                     transpose_fig = True,
                                     fig_name = fig_name.replace('Target', 'DistractorTransposed')) 
+
+                ## also for subtraction of both
+                self.plot_betas_1D(DF_betas_bar_coord = subtract_coord_df, ROI_list = ROI_list, 
+                                    orientation_bars = orientation_bars, bin_bool = True,
+                                    max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    error_type = 'sem', bin_size = None,
+                                    transpose_fig = False,
+                                    fig_name = fig_name.replace('Target', 'TargetMinusDistractor')) 
+
                 
             ## plot betas binned over 1D coordinates --> bin size = bar width
             for cn in [['color_red', 'color_green'], None]:
@@ -2566,6 +2581,23 @@ class FAViewer(Viewer):
                                     error_type = 'sem', bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]),
                                     transpose_fig = False,
                                     fig_name = fig_name.replace('Target', 'Distractor')) 
+                
+                ## and for distractor transposed --> to check
+                self.plot_betas_1D(DF_betas_bar_coord = distractor_coord_df, ROI_list = ROI_list, 
+                                    orientation_bars = orientation_bars, bin_bool = True,
+                                    max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    error_type = 'sem', bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]),
+                                    transpose_fig = True,
+                                    fig_name = fig_name.replace('Target', 'DistractorTransposed')) 
+                
+                ## also for subtraction of both
+                self.plot_betas_1D(DF_betas_bar_coord = subtract_coord_df, ROI_list = ROI_list, 
+                                    orientation_bars = orientation_bars, bin_bool = True,
+                                    max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                    error_type = 'sem', bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]),
+                                    transpose_fig = False,
+                                    fig_name = fig_name.replace('Target', 'TargetMinusDistractor')) 
+                
                 
     def plot_att_modulation(self, participant_list = [], model_type = 'D', mask_bool_df = None, stim_on_screen = [], mask_arr = True, rsq_threshold = .1,
                                 att_color_ses_run_dict = {}, file_ext = '_cropped.npy', orientation_bars = 'parallel_vertical', ROI_list = ['V1']):

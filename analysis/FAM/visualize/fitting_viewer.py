@@ -2619,22 +2619,172 @@ class FAViewer(Viewer):
                                                                 prf_estimates = prf_estimates, 
                                                                 orientation_bars = orientation_bars)
             
+            ## shift prf x coordinates relative to attended bar position (converted to dva)
+            # to make plots align to center of bar
+            shifted_DF_betas_bar_coord = DF_betas_bar_coord.copy()
+            shifted_DF_betas_bar_coord['prf_x_coord'] -= self.convert_pix2dva(DF_betas_bar_coord.Att_bar_coord.values)
+
+            ## also take absolute distance from attended bar 
+            # for now keeping it as separate df, but might integrate with previous
+            # (we dont necessarily care if its left or right, and then we can collapse more trial types for binning)
+            abs_shifted_DF_betas_bar_coord = shifted_DF_betas_bar_coord.copy()
+            abs_shifted_DF_betas_bar_coord['prf_x_coord'] = np.absolute(shifted_DF_betas_bar_coord['prf_x_coord'])
+
             ## plot betas binned over 1D coordinates
-            for cn in ['color_red', 'color_green', None]:
+            for cn in [None]: #['color_red', 'color_green', None]:
                 
                 # absolute figure name
                 fig_name = op.join(sub_figures_pth,
-                            'sub-{sj}_acq-{acq}_space-{space}_model-{model}_bar_orientation-{ori}_GLMsingle_average_betas_dist.png'.format(sj=pp, acq = self.MRIObj.acq, 
+                            'sub-{sj}_acq-{acq}_space-{space}_model-{model}_bar_orientation-{ori}_GLMsingle_Betas_InterBarDistance.png'.format(sj=pp, acq = self.MRIObj.acq, 
                                                                                                                                        space = self.MRIObj.sj_space,
                                                                                                             model = model_type, ori = orientation_bars))
                 if cn is not None:
                     fig_name = fig_name.replace('.png', '_attend-{cn}.png'.format(cn = cn))
 
-                self.plot_betas1D_distance(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
+                ## now get betas binned over 1D coordinate
+                binned_shifted_df = self.FAModelObj.get_betas_binned1D_df(DF_betas_bar_coord = shifted_DF_betas_bar_coord, 
+                                                        ROI_list = ROI_list, orientation_bars = orientation_bars, 
+                                                        max_ecc_ext = 13, 
+                                                        bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3), 
+                                                        bar_color2bin = cn,
+                                                        center_bin = True)
+                
+                self.plot_betas1D_distanceECC(binned_df = binned_shifted_df, ROI_list = ROI_list, 
                                             orientation_bars = orientation_bars,
                                             bar_color2plot = cn, 
-                                            avg_bool = False,
+                                            collapsed_data = False,
                                             fig_name = fig_name) 
+                
+                ### also plot absolute (collapsed)
+                binned_abs_shifted_df = self.FAModelObj.get_betas_binned1D_df(DF_betas_bar_coord = abs_shifted_DF_betas_bar_coord, 
+                                                        ROI_list = ROI_list, orientation_bars = orientation_bars, 
+                                                        max_ecc_ext = 13, 
+                                                        bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3), 
+                                                        bar_color2bin = cn,
+                                                        center_bin = True)
+                
+                self.plot_betas1D_distanceECC(binned_df = binned_abs_shifted_df, ROI_list = ROI_list, 
+                                            orientation_bars = orientation_bars,
+                                            bar_color2plot = cn, 
+                                            collapsed_data = True,
+                                            fig_name = fig_name.replace('.png', '_collapsed.png')) 
+                
+
+                # self.plot_betas1D_distance(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
+                #                             orientation_bars = orientation_bars,
+                #                             bar_color2plot = cn, 
+                #                             avg_bool = False,
+                #                             fig_name = fig_name) 
+
+    def plot_betas1D_distanceECC(self, binned_df = {}, ROI_list = [], orientation_bars = 'parallel_vertical',
+                                    fig_name = None, bar_color2plot = None, collapsed_data = True):
+
+        """
+        Quick func to plot 1D binned betas for each inter bar distance, while showing ecc of target bar.
+
+        Parameters
+        ----------
+        DF_betas_bar_coord: dataframe
+            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        ROI_list: list/arr
+            list with ROI names to plot
+        fig_name: str
+            if given, will save plot with absolute figure name
+        bar_color2plot: str
+            attended bar color. if given, will plot betas for that bar color, else will average across colors
+        """
+
+        # if no ROI specified, then plot all
+        if len(ROI_list) == 0:
+            ROI_list = binned_df.ROI.unique()
+
+        ## for bars going left to right (vertical orientation)
+        if orientation_bars == 'parallel_vertical':
+            coord_list = self.FAModelObj.bar_x_coords_pix
+        elif orientation_bars == 'parallel_horizontal':
+            coord_list = self.FAModelObj.bar_y_coords_pix
+        else:
+            raise ValueError('Cross sections not implemented yet')
+        
+        ## if we want to plot estimates for specific bar color
+        if bar_color2plot:
+            binned_df = binned_df[binned_df['attend_color'] == bar_color2plot]#.dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas']) # drop nans
+        
+        ### now plot values for different attended bar positions
+        for roi_name in ROI_list:
+        
+            ## plot distances 
+            distances2plot = np.unique(np.absolute(binned_df.inter_bar_dist.values))
+            distances2plot.sort()
+
+            fig, axs = plt.subplots(nrows= len(distances2plot),    
+                                    ncols=1, figsize=(18, 7.5 * len(distances2plot)), sharex=False, sharey=False)
+
+            for ind in range(len(distances2plot)):
+                    
+                distDF2plot = binned_df[(binned_df['ROI'] == roi_name) &\
+                                    ((binned_df['inter_bar_dist'] == distances2plot[ind]) |\
+                                    (binned_df['inter_bar_dist'] == -1*distances2plot[ind]))]
+
+        
+                # add extra label for eccentricity of attended bar
+                ecc_label = [key for pos in distDF2plot.Att_bar_coord.values for key, val in self.MRIObj.params['plotting']['bar_ecc_label'].items() if val == np.absolute(pos)]
+                distDF2plot['ecc_label'] = ecc_label
+                
+                sns.scatterplot(data = distDF2plot.reset_index(drop=True),
+                            x = 'prf_x_coord', y = 'betas', hue = 'ecc_label', 
+                            palette = self.MRIObj.params['plotting']['bar_ecc_pal'], 
+                                markers = 'D', alpha = .20, ax = axs[ind], legend = False,
+                )
+                sns.lineplot(data = distDF2plot.reset_index(drop=True),
+                            x = 'prf_x_coord', y = 'betas', hue = 'ecc_label', 
+                            palette = self.MRIObj.params['plotting']['bar_ecc_pal'],
+                            n_boot = 1000, err_style = 'bars', ax = axs[ind]
+                )
+                
+                # Create a Rectangle patch
+                # for unattended bar
+                unatt_rect = mpatches.Rectangle((self.convert_pix2dva((self.FAModelObj.bar_width_pix[0]/2) +\
+                                                                        (self.FAModelObj.bar_width_pix[0]*ind)), 
+                                        -10), 
+                                        self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]), 
+                                        20, 
+                                        linewidth=1, edgecolor='k', facecolor='#969696', alpha = .15, zorder = 10)
+                axs[ind].add_patch(unatt_rect) # Add the patch to the Axes
+                axs[ind].patches[-1].set_hatch('///')
+
+                ## extra stuff
+                axs[ind].set_ylim(np.array([-.8, 3.1]))
+
+                if collapsed_data:
+                    axs[ind].set_xlim([-.1, 9.5])
+                else:
+                    unatt_rect = mpatches.Rectangle((-1*self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]) - self.convert_pix2dva((self.FAModelObj.bar_width_pix[0]/2) +\
+                                                                                                                    (self.FAModelObj.bar_width_pix[0]*ind)), 
+                                            -10), 
+                                            self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]), 
+                                            20, 
+                                            linewidth=1, edgecolor='k', facecolor='#969696', alpha = .15, zorder = 10)
+                    axs[ind].add_patch(unatt_rect) # Add the patch to the Axes
+                    axs[ind].patches[-1].set_hatch('///')
+                    axs[ind].set_xlim([-9.5, 9.5])
+
+                axs[ind].axhline(y=0, c="0", lw=.3)
+                plt.gcf().tight_layout()
+                axs[ind].set_xlabel('pRF distance to center of Target bar (dva)', fontsize = 16)
+                axs[ind].set_ylabel('Beta PSC', fontsize = 16)
+                axs[ind].tick_params(axis='both', labelsize=14)
+                axs[ind].set_title('Inter-bar distance = %i'%ind, fontsize = 20)
+
+                # quick fix for legen
+                handles = [mpatches.Patch(color = val, label = key) for key, val in self.MRIObj.params['plotting']['bar_ecc_pal'].items()]
+                axs[ind].legend(loc = 'upper right',fontsize=12, handles = handles, title="Target Bar ecc")#, fancybox=True)
+
+            if fig_name:
+                os.makedirs(op.split(fig_name)[0], exist_ok=True)
+                fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
 
 
     def plot_singlevert_FA(self, participant, 

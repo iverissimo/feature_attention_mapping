@@ -288,6 +288,15 @@ plotting:
     sIPS: [0.83058824, 0.06117647, 0.1254902]
     sPCS: [0.88221453, 0.83252595, 0.91109573]
     iPCS: [0.87320261, 0.13071895, 0.47320261]
+
+  bar_ecc_pal:
+    near: '#278B9A'
+    middle: '#E75B64'
+    far: '#D8AF39'
+  bar_ecc_label:
+    near: 67.5
+    middle: 202.5
+    far: 337.5
   
   ROIs: {'fsaverage': ['V1','V2','V3','V3AB','hV4','LO','IPS0','IPS1','IPS2+','sPCS','iPCS'], 
         'fsLR_den-170k': ['V1','V2','V3','V3AB','LO','TO', 'hV4', 'VO', 'IPS', 'sIPS'], 

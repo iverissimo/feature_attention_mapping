@@ -1986,7 +1986,8 @@ class FAViewer(Viewer):
             DF_betas_bar_coord = self.FAModelObj.get_betas_coord_df(pp, betas_arr = GLMsing_estimates_dict['betasmd'], 
                                                                 single_trl_DM = single_trl_DM, 
                                                                 att_color_ses_run = att_color_ses_run_dict['sub-{sj}'.format(sj = pp)], 
-                                                                file_ext = file_ext, ROIs_dict = pp_ROI_dict, 
+                                                                file_ext = file_ext, 
+                                                                ROIs_dict = pp_ROI_dict, 
                                                                 prf_estimates = prf_estimates, 
                                                                 orientation_bars = orientation_bars)
 
@@ -2005,10 +2006,11 @@ class FAViewer(Viewer):
                 self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
                                     orientation_bars = orientation_bars,
                                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], 
-                                    bar_color2plot = cn, transpose_fig = False,
+                                    bar_color2plot = cn, 
+                                    transpose_fig = False,
                                     fig_name = fig_name) 
             
-            ## plot betas over 1D coordinates
+            ## plot betas over 1D coordinates --> all values (messy, might remove later)
             for cn in [['color_red', 'color_green'], None]:
                 
                 # absolute figure name
@@ -2020,13 +2022,13 @@ class FAViewer(Viewer):
                     fig_name = fig_name.replace('.png', '_per_color.png')
 
                 self.plot_betas_1D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
-                                    orientation_bars = orientation_bars, bin_bool = False,
+                                    orientation_bars = orientation_bars, 
                                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
-                                    error_type = 'sem', bin_size = None,
+                                    error_type = 'sem', bin_size = None, bin_bool = False,
                                     transpose_fig = False,
                                     fig_name = fig_name) 
 
-            ## plot betas binned over 1D coordinates
+            ## plot betas over 1D coordinates --> BINNED
             for cn in [['color_red', 'color_green'], None]:
                 
                 # absolute figure name
@@ -2038,29 +2040,19 @@ class FAViewer(Viewer):
                     fig_name = fig_name.replace('.png', '_per_color.png')
 
                 self.plot_betas_1D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
-                                    orientation_bars = orientation_bars, bin_bool = True,
+                                    orientation_bars = orientation_bars,
                                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
-                                    error_type = 'sem', bin_size = None,
+                                    error_type = 'sem', bin_size = None, bin_bool = True,
                                     transpose_fig = False,
                                     fig_name = fig_name) 
                 
-            ## plot betas binned over 1D coordinates --> in = bar width
-            for cn in [['color_red', 'color_green'], None]:
-                
-                # absolute figure name
-                fig_name = op.join(sub_figures_pth,
-                            'sub-{sj}_acq-{acq}_space-{space}_model-{model}_bar_orientation-{ori}_GLMsingle_betas1D_binned_bar.png'.format(sj=pp, acq = self.MRIObj.acq, 
-                                                                                                                                       space = self.MRIObj.sj_space,
-                                                                                                            model = model_type, ori = orientation_bars))
-                if cn is not None:
-                    fig_name = fig_name.replace('.png', '_per_color.png')
-
+                ## do same but when bin == BAR WIDTH
                 self.plot_betas_1D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
-                                    orientation_bars = orientation_bars, bin_bool = True,
+                                    orientation_bars = orientation_bars,
                                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
-                                    error_type = 'sem', bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]),
+                                    error_type = 'sem', bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]), bin_bool = True,
                                     transpose_fig = False,
-                                    fig_name = fig_name) 
+                                    fig_name = fig_name.replace('binned', 'binned_bar')) 
                 
     
     def plot_att_coord(self, participant_list = [], model_type = 'D', mask_bool_df = None, stim_on_screen = [], mask_arr = True, rsq_threshold = .1,

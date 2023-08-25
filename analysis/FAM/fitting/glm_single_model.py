@@ -774,6 +774,15 @@ class GLMsingle_Model(Model):
                                                                 participant = participant, file_ext = file_ext,
                                                                 att_bar_xy = att_bar_xy, 
                                                                 unatt_bar_xy = unatt_bar_xy)
+                    
+                    ## get inter-bar distance 
+                    if orientation_bars == 'crossed':
+                        inter_bar_dist = np.nan
+                        contralateral_bool = np.nan
+                    else:
+                        inter_bar_dist = (UAtt_bar_coord - Att_bar_coord)/ self.bar_width_pix[0]
+                        contralateral_bool = np.sign(Att_bar_coord) != np.sign(UAtt_bar_coord)
+
                     # differentiate per color
                     for c, color_name in enumerate(att_color_ses_run.keys()):
                     
@@ -787,12 +796,14 @@ class GLMsingle_Model(Model):
                                                             'attend_color': np.tile(color_name, len(ROIs_dict[rname])),
                                                             'Att_bar_coord': np.tile(Att_bar_coord, len(ROIs_dict[rname])),
                                                             'UAtt_bar_coord': np.tile(UAtt_bar_coord, len(ROIs_dict[rname])),
+                                                            'inter_bar_dist': np.tile(inter_bar_dist, len(ROIs_dict[rname])),
+                                                            'contralateral': np.tile(contralateral_bool, len(ROIs_dict[rname])),
                                                             'prf_rsq_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['r2'][ROIs_dict[rname]],
                                                             'prf_x_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['x'][ROIs_dict[rname]], 
                                                             'prf_y_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['y'][ROIs_dict[rname]]})
                                                             )) 
                             
-        return DF_betas_bar_coord
+        return DF_betas_bar_coord.dropna(subset=['prf_rsq_coord', 'prf_x_coord', 'prf_y_coord'])
 
     def get_betas_binned1D_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', 
                                     max_ecc_ext = 5.5, bin_size = .5, bar_color2bin = None):

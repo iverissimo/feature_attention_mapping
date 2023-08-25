@@ -1491,10 +1491,10 @@ class FAViewer(Viewer):
         
         ## if we want to plot estimates for specific bar color
         if bar_color2plot:
-            DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['attend_color'] == bar_color2plot].dropna() # drop nans
+            DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['attend_color'] == bar_color2plot].dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas']) # drop nans
         else:
             # average them, if we dont care
-            DF_betas_bar_coord = DF_betas_bar_coord.dropna().groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
+            DF_betas_bar_coord = DF_betas_bar_coord.dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas']).groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
                                                                             'ROI', 'sj'])['betas'].mean().reset_index()
 
         ### now plot all combinations
@@ -1614,11 +1614,12 @@ class FAViewer(Viewer):
         
         ## if we want to plot estimates for specific bar color
         if bar_color2plot:
-            DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['attend_color'] == bar_color2plot].dropna() # drop nans
+            DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['attend_color'] == bar_color2plot].dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas']) # drop nans
         else:
             # average them, if we dont care
-            DF_betas_bar_coord = DF_betas_bar_coord.dropna().groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
-                                                                            'ROI', 'sj'])['betas'].mean().reset_index()
+            DF_betas_bar_coord = DF_betas_bar_coord.dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas']).groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 
+                                                                                                                    'Att_bar_coord', 'UAtt_bar_coord',
+                                                                                                                    'ROI', 'sj'])['betas'].mean().reset_index()
 
         ### now plot all combinations
         for roi_name in ROI_list:
@@ -2080,7 +2081,7 @@ class FAViewer(Viewer):
         
         ## if we want to plot estimates for specific bar color
         if bar_color2plot:
-            DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['attend_color'] == bar_color2plot].dropna() # drop nans
+            DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['attend_color'] == bar_color2plot].dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas']) # drop nans
         
         ## get df with average beta per position
         DF_betas_bar_avg1D = self.FAModelObj.get_betas_bar_1D_df(DF_betas_bar_coord = DF_betas_bar_coord, 
@@ -2690,7 +2691,7 @@ class FAViewer(Viewer):
             # subtract average bar position from each trial type
             attention_mod_df = self.FAModelObj.get_betas_subtract_reverse_df(DF_betas_bar_coord = DF_betas_bar_coord, 
                                                                ROI_list = ROI_list, orientation_bars = orientation_bars,
-                                                               average = False)
+                                                               bar_color = None)
             
             ## 2D plot attentional modulation for each attended bar color separately + averaged
             for cn in ['color_red', 'color_green', None]:

@@ -1394,7 +1394,7 @@ class GLMsingle_Model(Model):
         return DF_betas_bar_avg1D
     
 
-    def subtract_avg_betas(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', 
+    def demean_betas_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', 
                                     bar_color = None):
 
         """

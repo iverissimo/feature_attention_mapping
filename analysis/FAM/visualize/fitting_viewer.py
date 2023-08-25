@@ -2299,8 +2299,8 @@ class FAViewer(Viewer):
                 
                 self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
                                     orientation_bars = orientation_bars,
-                                    max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
-                                    transpose_fig = False,
+                                    max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], 
+                                    bar_color2plot = cn, transpose_fig = False,
                                     fig_name = fig_name) 
             
             ## plot betas over 1D coordinates
@@ -2357,6 +2357,7 @@ class FAViewer(Viewer):
                                     transpose_fig = False,
                                     fig_name = fig_name) 
                 
+    
     def plot_att_coord(self, participant_list = [], model_type = 'D', mask_bool_df = None, stim_on_screen = [], mask_arr = True, rsq_threshold = .1,
                                 att_color_ses_run_dict = {}, file_ext = '_cropped.npy', orientation_bars = 'parallel_vertical', ROI_list = ['V1']):
 
@@ -2689,9 +2690,19 @@ class FAViewer(Viewer):
                 
             ## get attentional modulation df 
             # subtract average bar position from each trial type
-            attention_mod_df = self.FAModelObj.get_betas_subtract_reverse_df(DF_betas_bar_coord = DF_betas_bar_coord, 
+            attention_mod_df = pd.DataFrame()
+
+            for cn in ['color_red', 'color_green', None]:
+                attention_mod_df = pd.concat((attention_mod_df,
+                                              self.FAModelObj.get_betas_subtract_reverse_df(DF_betas_bar_coord = DF_betas_bar_coord, 
                                                                ROI_list = ROI_list, orientation_bars = orientation_bars,
-                                                               bar_color = None)
+                                                               bar_color = cn)
+                                              ))
+                
+                if cn is None: ## to check demeaned case
+                    demean_attention_mod_df = self.FAModelObj.demean_betas_df(DF_betas_bar_coord = attention_mod_df[attention_mod_df['attend_color'].isna()],
+                                                                ROI_list = ROI_list, orientation_bars = orientation_bars,
+                                                                bar_color = cn)
             
             ## 2D plot attentional modulation for each attended bar color separately + averaged
             for cn in ['color_red', 'color_green', None]:
@@ -2704,11 +2715,18 @@ class FAViewer(Viewer):
                 
                 if cn is not None:
                     fig_name = fig_name.replace('.png', '_attend-{cn}.png'.format(cn = cn))
+
+                ## select df for appropriate input -> should implement in function later
+                if cn is None:
+                    input_df = attention_mod_df[attention_mod_df['attend_color'].isna()]
+                else:
+                    input_df = attention_mod_df.dropna(subset=['attend_color'])
                 
-                self.plot_betas_2D(DF_betas_bar_coord = attention_mod_df, ROI_list = ROI_list, 
+                ## actually plot
+                self.plot_betas_2D(DF_betas_bar_coord = input_df, ROI_list = ROI_list, 
                                             orientation_bars = orientation_bars,
-                                            max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
-                                            transpose_fig=False,
+                                            max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], 
+                                            bar_color2plot = cn, transpose_fig=False,
                                             fig_name = fig_name) 
                 
             ## plot betas over 1D coordinates
@@ -2723,12 +2741,28 @@ class FAViewer(Viewer):
                 if cn is not None:
                     fig_name = fig_name.replace('.png', '_per_color.png')
 
-                self.plot_betas_1D(DF_betas_bar_coord = attention_mod_df, ROI_list = ROI_list, 
+                ## select df for appropriate input -> should implement in function later
+                if cn is None:
+                    input_df = attention_mod_df[attention_mod_df['attend_color'].isna()]
+                else:
+                    input_df = attention_mod_df.dropna(subset=['attend_color'])
+                
+                ## actually plot
+                self.plot_betas_1D(DF_betas_bar_coord = input_df, ROI_list = ROI_list, 
                                             orientation_bars = orientation_bars, bin_bool = False,
                                             max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
                                             error_type = 'sem', bin_size = None,
                                             transpose_fig=False,
                                             fig_name = fig_name) 
+                
+                if cn is None: ## also plot demeaned plot, to check
+                    self.plot_betas_1D(DF_betas_bar_coord = demean_attention_mod_df,
+                                       ROI_list = ROI_list, 
+                                        orientation_bars = orientation_bars, bin_bool = False,
+                                        max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                        error_type = 'sem', bin_size = None,
+                                        transpose_fig=False,
+                                        fig_name = fig_name.replace('.png', '_demean.png')) 
             
             ## plot betas binned over 1D coordinates
             for cn in [['color_red', 'color_green'], None]:
@@ -2742,12 +2776,28 @@ class FAViewer(Viewer):
                 if cn is not None:
                     fig_name = fig_name.replace('.png', '_per_color.png')
 
-                self.plot_betas_1D(DF_betas_bar_coord = attention_mod_df, ROI_list = ROI_list, 
+                 ## select df for appropriate input -> should implement in function later
+                if cn is None:
+                    input_df = attention_mod_df[attention_mod_df['attend_color'].isna()]
+                else:
+                    input_df = attention_mod_df.dropna(subset=['attend_color'])
+                
+                ## actually plot
+                self.plot_betas_1D(DF_betas_bar_coord = input_df, ROI_list = ROI_list, 
                                             orientation_bars = orientation_bars, bin_bool = True,
                                             max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
                                             error_type = 'sem', bin_size = None,
                                             transpose_fig=False,
                                             fig_name = fig_name) 
+
+                if cn is None: ## also plot demeaned plot, to check
+                    self.plot_betas_1D(DF_betas_bar_coord = demean_attention_mod_df,
+                                       ROI_list = ROI_list, 
+                                        orientation_bars = orientation_bars, bin_bool = True,
+                                        max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                        error_type = 'sem', bin_size = None,
+                                        transpose_fig=False,
+                                        fig_name = fig_name.replace('.png', '_demean.png')) 
                 
             ## plot betas binned over 1D coordinates --> bin == bar width
             for cn in [['color_red', 'color_green'], None]:
@@ -2761,12 +2811,28 @@ class FAViewer(Viewer):
                 if cn is not None:
                     fig_name = fig_name.replace('.png', '_per_color.png')
 
+                 ## select df for appropriate input -> should implement in function later
+                if cn is None:
+                    input_df = attention_mod_df[attention_mod_df['attend_color'].isna()]
+                else:
+                    input_df = attention_mod_df.dropna(subset=['attend_color'])
+                
+                ## actually plot
                 self.plot_betas_1D(DF_betas_bar_coord = attention_mod_df, ROI_list = ROI_list, 
                                             orientation_bars = orientation_bars, bin_bool = True,
                                             max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
                                             error_type = 'sem', bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]),
                                             transpose_fig=False,
                                             fig_name = fig_name) 
+                
+                if cn is None: ## also plot demeaned plot, to check
+                    self.plot_betas_1D(DF_betas_bar_coord = demean_attention_mod_df,
+                                       ROI_list = ROI_list, 
+                                        orientation_bars = orientation_bars, bin_bool = True,
+                                        max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], bar_color2plot = cn, 
+                                        error_type = 'sem', bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]),
+                                        transpose_fig=False,
+                                        fig_name = fig_name.replace('.png', '_demean.png')) 
     
     def plot_betas_bar_dist(self, participant_list = [], model_type = 'D', mask_bool_df = None, stim_on_screen = [], mask_arr = True, rsq_threshold = .1,
                                 att_color_ses_run_dict = {}, file_ext = '_cropped.npy', orientation_bars = 'parallel_vertical', ROI_list = ['V1']):

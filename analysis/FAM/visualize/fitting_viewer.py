@@ -1491,11 +1491,11 @@ class FAViewer(Viewer):
         
         ## if we want to plot estimates for specific bar color
         if bar_color2plot:
-            DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['attend_color'] == bar_color2plot].dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas']) # drop nans
+            DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['attend_color'] == bar_color2plot]#.dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas']) # drop nans
         else:
             # average them, if we dont care
-            DF_betas_bar_coord = DF_betas_bar_coord.dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas']).groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
-                                                                            'ROI', 'sj'])['betas'].mean().reset_index()
+            df_column_names = [str(name) for name in list(DF_betas_bar_coord.columns) if name not in ['attend_color', 'betas']]
+            DF_betas_bar_coord = DF_betas_bar_coord.groupby(df_column_names).mean().reset_index()
 
         ### now plot all combinations
         for roi_name in ROI_list:
@@ -1786,7 +1786,7 @@ class FAViewer(Viewer):
         
         ## if we want to plot estimates for specific bar color
         if bar_color2plot:
-            DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['attend_color'] == bar_color2plot].dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas']) # drop nans
+            DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['attend_color'] == bar_color2plot]#.dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas']) # drop nans
         
         ## get df with average beta per position
         DF_betas_bar_avg1D = self.FAModelObj.get_betas_bar_1D_df(DF_betas_bar_coord = DF_betas_bar_coord, 
@@ -2614,7 +2614,8 @@ class FAViewer(Viewer):
             DF_betas_bar_coord = self.FAModelObj.get_betas_coord_df(pp, betas_arr = GLMsing_estimates_dict['betasmd'], 
                                                                 single_trl_DM = single_trl_DM, 
                                                                 att_color_ses_run = att_color_ses_run_dict['sub-{sj}'.format(sj = pp)], 
-                                                                file_ext = file_ext, ROIs_dict = pp_ROI_dict, 
+                                                                file_ext = file_ext, 
+                                                                ROIs_dict = pp_ROI_dict, 
                                                                 prf_estimates = prf_estimates, 
                                                                 orientation_bars = orientation_bars)
             

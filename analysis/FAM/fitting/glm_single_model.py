@@ -806,7 +806,7 @@ class GLMsingle_Model(Model):
         return DF_betas_bar_coord.dropna(subset=['prf_rsq_coord', 'prf_x_coord', 'prf_y_coord'])
 
     def get_betas_binned1D_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', 
-                                    max_ecc_ext = 5.5, bin_size = .5, bar_color2bin = None):
+                                    max_ecc_ext = 5.5, bin_size = .5, bar_color2bin = None, center_bin = False):
 
         """
         Transform model beta values (according to pRF x,y coordinates) into 1D binned average
@@ -826,11 +826,18 @@ class GLMsingle_Model(Model):
             size of bin (in dva)
         bar_color2bin: str
             attended bar color. if given, will bin betas for that bar color, else will average across colors
+        center_bin: bool
+            if we want to center the bin distribution around 0
         """
 
         ## bins array (1/3 of bar width, equally spaced across x/y coordinates of screen)
-        bins_arr = np.arange(0, max_ecc_ext + bin_size, bin_size)
-        bins_arr = np.concatenate((bins_arr[1:]*-1, bins_arr))
+        # if we want to have the bins centered around 0 
+        if center_bin:
+            bins_arr = np.arange(bin_size/2, max_ecc_ext + bin_size, bin_size)
+            bins_arr = np.concatenate((bins_arr*-1, bins_arr))
+        else:
+            bins_arr = np.arange(0, max_ecc_ext + bin_size, bin_size)
+            bins_arr = np.concatenate((bins_arr[1:]*-1, bins_arr))
         bins_arr.sort()
 
         # if no ROI specified, then plot all
@@ -847,8 +854,7 @@ class GLMsingle_Model(Model):
         else:
             raise ValueError('Cross sections not implemented yet')
         
-        DF_betas_bar_coord1D = pd.DataFrame({'sj': [], 'ROI': [], 'betas': [], 'std': [], 'prf_rsq_coord': [], 'prf_x_coord': [], 'prf_y_coord': [],
-                                            'attend_color': [], 'Att_bar_coord': [], 'UAtt_bar_coord': []})
+        DF_betas_bar_coord1D = pd.DataFrame()
 
         ## iterate over ROIs
         for roi_name in ROI_list:
@@ -867,8 +873,8 @@ class GLMsingle_Model(Model):
                             trial_df = trial_df[trial_df['attend_color'] == bar_color2bin]
                         else:
                             # average them, if we dont care
-                            trial_df = trial_df.groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
-                                                                                            'ROI', 'sj'])['betas'].mean().reset_index()
+                            df_column_names = [str(name) for name in list(trial_df.columns) if name not in ['attend_color', 'betas']]
+                            trial_df = trial_df.groupby(df_column_names).mean().reset_index()
 
                         for b in range(len(bins_arr)-1):
 
@@ -891,6 +897,8 @@ class GLMsingle_Model(Model):
                                                                             'prf_rsq_coord': [np.nanmean(bin_df.prf_rsq_coord.values)],
                                                                             'prf_x_coord': [np.nanmean(bins_arr[b:b+2])], 
                                                                             'prf_y_coord': [np.nanmean(bins_arr[b:b+2])],
+                                                                            'inter_bar_dist': bin_df.inter_bar_dist.values[:1], 
+                                                                            'contralateral': bin_df.contralateral.values[:1], 
                                                                             'Att_bar_coord': [Att_bar_coord],
                                                                             'UAtt_bar_coord':[UAtt_bar_coord]})))
         if bar_color2bin:
@@ -932,8 +940,7 @@ class GLMsingle_Model(Model):
         else:
             raise ValueError('Cross sections not implemented yet')
         
-        DF_betas_bar_coord1D = pd.DataFrame({'sj': [], 'ROI': [], 'betas': [], 'std': [], 'prf_rsq_coord': [], 'prf_x_coord': [], 'prf_y_coord': [],
-                                            'attend_color': [], 'Att_bar_coord': [], 'UAtt_bar_coord': []})
+        DF_betas_bar_coord1D = pd.DataFrame()
 
         ## iterate over ROIs
         for roi_name in ROI_list:
@@ -952,8 +959,8 @@ class GLMsingle_Model(Model):
                             trial_df = trial_df[trial_df['attend_color'] == bar_color2bin]
                         else:
                             # average them, if we dont care
-                            trial_df = trial_df.groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
-                                                                                            'ROI', 'sj'])['betas'].mean().reset_index()
+                            df_column_names = [str(name) for name in list(trial_df.columns) if name not in ['attend_color', 'betas']]
+                            trial_df = trial_df.groupby(df_column_names).mean().reset_index()
 
                         # group by x-coordinates, and average
                         out_df = trial_df.groupby(['sj', 'ROI', 'Att_bar_coord', 'UAtt_bar_coord', 'prf_x_coord']).mean().reset_index()
@@ -1024,11 +1031,9 @@ class GLMsingle_Model(Model):
                                 denominator = denominator[denominator['attend_color'] == bar_color]
                             else:
                                 # average them, if we dont care
-                                numerator = numerator.groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
-                                                                                                'ROI', 'sj'])['betas'].mean().reset_index()
-                                # average them, if we dont care
-                                denominator = denominator.groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
-                                                                                                'ROI', 'sj'])['betas'].mean().reset_index()
+                                df_column_names = [str(name) for name in list(numerator.columns) if name not in ['attend_color', 'betas']]
+                                numerator = numerator.groupby(df_column_names).mean().reset_index()
+                                denominator = denominator.groupby(df_column_names).mean().reset_index()
                         
                             ## actually subtract
                             subtracted_df = numerator.set_index(['sj', 'ROI',
@@ -1342,8 +1347,8 @@ class GLMsingle_Model(Model):
                             trial_df = trial_df[trial_df['attend_color'] == bar_color2bin]
                         else:
                             # average them, if we dont care
-                            trial_df = trial_df.groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
-                                                                                            'ROI', 'sj'])['betas'].mean().reset_index()
+                            df_column_names = [str(name) for name in list(trial_df.columns) if name not in ['attend_color', 'betas']]
+                            trial_df = trial_df.groupby(df_column_names).mean().reset_index()
 
                         ## filter df for each bar position
                         UAtt_bar_bin_df = trial_df[(trial_df['prf_x_coord'] >= self.convert_pix2dva(UAtt_bar_coord - self.bar_width_pix[0]/2)) &\
@@ -1444,8 +1449,8 @@ class GLMsingle_Model(Model):
                             trial_df = trial_df[trial_df['attend_color'] == bar_color]
                         else:
                             # average them, if we dont care
-                            trial_df = trial_df.groupby(['prf_x_coord', 'prf_y_coord', 'prf_rsq_coord', 'Att_bar_coord', 'UAtt_bar_coord',
-                                                                                            'ROI', 'sj'])['betas'].mean().reset_index()
+                            df_column_names = [str(name) for name in list(trial_df.columns) if name not in ['attend_color', 'betas']]
+                            trial_df = trial_df.groupby(df_column_names).mean().reset_index()
 
                         ## get average across betas and subtract
                         trial_df['betas'] -= np.mean(trial_df['betas'])

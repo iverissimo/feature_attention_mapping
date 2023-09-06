@@ -744,7 +744,7 @@ class GLMsingle_Model(Model):
             string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
         """
 
-        DF_betas_bar_coord = pd.DataFrame({'sj': [], 'ROI': [], 'betas': [], 'prf_rsq_coord': [],
+        DF_betas_bar_coord = pd.DataFrame({'sj': [], 'ROI': [], 'betas': [], 'prf_rsq_coord': [], 'prf_index_coord': [],
                                             'prf_x_coord': [], 'prf_y_coord': [], 'attend_color': []})
 
         ## for bars going left to right (vertical orientation)
@@ -797,7 +797,9 @@ class GLMsingle_Model(Model):
                                                             'Att_bar_coord': np.tile(Att_bar_coord, len(ROIs_dict[rname])),
                                                             'UAtt_bar_coord': np.tile(UAtt_bar_coord, len(ROIs_dict[rname])),
                                                             'inter_bar_dist': np.tile(inter_bar_dist, len(ROIs_dict[rname])),
+                                                            'abs_inter_bar_dist': np.tile(np.absolute(inter_bar_dist), len(ROIs_dict[rname])),
                                                             'contralateral': np.tile(contralateral_bool, len(ROIs_dict[rname])),
+                                                            'prf_index_coord': ROIs_dict[rname],
                                                             'prf_rsq_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['r2'][ROIs_dict[rname]],
                                                             'prf_x_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['x'][ROIs_dict[rname]], 
                                                             'prf_y_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['y'][ROIs_dict[rname]]})
@@ -1394,6 +1396,10 @@ class GLMsingle_Model(Model):
                                                                                     int(len(Att_bar_bin_df.betas.values) + len(UAtt_bar_bin_df.betas.values))),
                                                                     'ROI': np.tile(roi_name, 
                                                                                     int(len(Att_bar_bin_df.betas.values) + len(UAtt_bar_bin_df.betas.values))),
+                                                                    'prf_index_coord': np.concatenate((UAtt_bar_bin_df.prf_index_coord.values, 
+                                                                                            Att_bar_bin_df.prf_index_coord.values), axis=None),
+                                                                    'contralateral': np.concatenate((UAtt_bar_bin_df.contralateral.values, 
+                                                                                            Att_bar_bin_df.contralateral.values), axis=None),
                                                                     'bar_type': np.concatenate((np.tile('distractor', len(UAtt_bar_bin_df.betas.values)), 
                                                                                                 np.tile('target', len(Att_bar_bin_df.betas.values))), axis=None),                                                                     
                                                                     'betas': np.concatenate((UAtt_bar_bin_df.betas.values, 

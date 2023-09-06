@@ -1323,13 +1323,14 @@ class GLMsingle_Model(Model):
         ## for bars going left to right (vertical orientation)
         if orientation_bars == 'parallel_vertical':
             coord_list = self.bar_x_coords_pix
+            key2bin = 'prf_x_coord' # column name to bin values
         elif orientation_bars == 'parallel_horizontal':
             coord_list = self.bar_y_coords_pix
+            key2bin = 'prf_y_coord'
         else:
             raise ValueError('Cross sections not implemented yet')
         
-        DF_betas_bar_avg1D = pd.DataFrame({'sj': [], 'ROI': [], 'bar_type': [], 'betas': [], 'std': [], 'sem': [], 'attend_color': [], 'Att_bar_coord': [], 'UAtt_bar_coord': [],
-                                            'dist_bars': []})
+        DF_betas_bar_avg1D = pd.DataFrame()
 
         ## iterate over ROIs
         for roi_name in ROI_list:
@@ -1337,12 +1338,11 @@ class GLMsingle_Model(Model):
             for UAtt_bar_coord in coord_list: 
                 for Att_bar_coord in coord_list:
                     
-                    if Att_bar_coord != UAtt_bar_coord: ## bars cannot fully overlap
+                    trial_df = DF_betas_bar_coord[(DF_betas_bar_coord['ROI'] == roi_name) &\
+                                        (DF_betas_bar_coord['Att_bar_coord'] == Att_bar_coord) &\
+                                        (DF_betas_bar_coord['UAtt_bar_coord'] == UAtt_bar_coord)].dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas'])
 
-                        trial_df = DF_betas_bar_coord[(DF_betas_bar_coord['ROI'] == roi_name) &\
-                                            (DF_betas_bar_coord['Att_bar_coord'] == Att_bar_coord) &\
-                                            (DF_betas_bar_coord['UAtt_bar_coord'] == UAtt_bar_coord)]
-                        trial_df = trial_df.dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas'])
+                    if not trial_df.empty: # if df not empty (which might happend when we averaged across trial types etc)
 
                         ## if we want to bin estimates for specific bar color
                         if bar_color2bin:
@@ -1353,63 +1353,54 @@ class GLMsingle_Model(Model):
                             trial_df = trial_df.groupby(df_column_names).mean().reset_index()
 
                         ## filter df for each bar position
-                        UAtt_bar_bin_df = trial_df[(trial_df['prf_x_coord'] >= self.convert_pix2dva(UAtt_bar_coord - self.bar_width_pix[0]/2)) &\
-                                                    (trial_df['prf_x_coord'] <= self.convert_pix2dva(UAtt_bar_coord + self.bar_width_pix[0]/2))]
+                        UAtt_bar_bin_df = trial_df[(trial_df[key2bin] >= self.convert_pix2dva(UAtt_bar_coord - self.bar_width_pix[0]/2)) &\
+                                                    (trial_df[key2bin] <= self.convert_pix2dva(UAtt_bar_coord + self.bar_width_pix[0]/2))]
 
-                        Att_bar_bin_df = trial_df[(trial_df['prf_x_coord'] >= self.convert_pix2dva(Att_bar_coord - self.bar_width_pix[0]/2)) &\
-                                                 (trial_df['prf_x_coord'] <= self.convert_pix2dva(Att_bar_coord + self.bar_width_pix[0]/2))]
+                        Att_bar_bin_df = trial_df[(trial_df[key2bin] >= self.convert_pix2dva(Att_bar_coord - self.bar_width_pix[0]/2)) &\
+                                                    (trial_df[key2bin] <= self.convert_pix2dva(Att_bar_coord + self.bar_width_pix[0]/2))]
                         
-                        ## and calculate distance between bars
-                        # (of distractor bar, relative to attended bar)
-                        dist_bars = (UAtt_bar_coord - Att_bar_coord)/ self.bar_width_pix[0]
-
-                        ## append df
+                        ## combine both binned dfs
+                        trial_binned_df = pd.concat((UAtt_bar_bin_df, Att_bar_bin_df))
+                        trial_binned_df['bar_type'] = np.concatenate((np.tile('distractor', len(UAtt_bar_bin_df.betas.values)), 
+                                                                      np.tile('target', len(Att_bar_bin_df.betas.values))), axis=None)
+                        
                         if avg_bool:
-                            DF_betas_bar_avg1D = pd.concat((DF_betas_bar_avg1D, 
-                                                        pd.DataFrame({'sj': Att_bar_bin_df.sj.values[:2], 
-                                                                    'ROI': np.tile(roi_name, 2), 
-                                                                    'bar_type': ['distractor', 'target'],
-                                                                    'betas': [self.MRIObj.mri_utils.weighted_mean(UAtt_bar_bin_df.betas.values, 
-                                                                                                                weights = UAtt_bar_bin_df.prf_rsq_coord.values, 
-                                                                                                                norm = True),
-                                                                            self.MRIObj.mri_utils.weighted_mean(Att_bar_bin_df.betas.values, 
-                                                                                                                weights = Att_bar_bin_df.prf_rsq_coord.values, 
-                                                                                                                norm = True)], 
-                                                                    'std': [self.MRIObj.mri_utils.weighted_mean_std_sem(UAtt_bar_bin_df.betas.values, 
-                                                                                                                weights = UAtt_bar_bin_df.prf_rsq_coord.values, 
-                                                                                                                norm = True)[0],
-                                                                            self.MRIObj.mri_utils.weighted_mean_std_sem(Att_bar_bin_df.betas.values, 
-                                                                                                                weights = Att_bar_bin_df.prf_rsq_coord.values, 
-                                                                                                                norm = True)[0]],
-                                                                    'sem': [self.MRIObj.mri_utils.weighted_mean_std_sem(UAtt_bar_bin_df.betas.values, 
-                                                                                                                weights = UAtt_bar_bin_df.prf_rsq_coord.values, 
-                                                                                                                norm = True)[-1],
-                                                                            self.MRIObj.mri_utils.weighted_mean_std_sem(Att_bar_bin_df.betas.values, 
-                                                                                                                weights = Att_bar_bin_df.prf_rsq_coord.values, 
-                                                                                                                norm = True)[-1]],
-                                                                    'Att_bar_coord': np.tile(Att_bar_coord, 2),
-                                                                    'UAtt_bar_coord':np.tile(UAtt_bar_coord, 2),
-                                                                    'dist_bars': np.tile(dist_bars, 2)})))
+                            avg_Att_df = pd.DataFrame(np.hstack((trial_binned_df[trial_binned_df['bar_type'] == 'target'].select_dtypes(exclude=np.number)[:1].values,
+                                                                trial_binned_df[trial_binned_df['bar_type'] == 'target'].select_dtypes(include=np.number).mean().to_frame().T.values)),
+                                                    columns = np.hstack((trial_binned_df[trial_binned_df['bar_type'] == 'target'].select_dtypes(exclude=np.number)[:1].columns,
+                                                                trial_binned_df[trial_binned_df['bar_type'] == 'target'].select_dtypes(include=np.number).mean().to_frame().T.columns)))
+                            
+                            avg_Att_df['betas'] = self.MRIObj.mri_utils.weighted_mean(trial_binned_df[trial_binned_df['bar_type'] == 'target'].betas.values, 
+                                                                                    weights = trial_binned_df[trial_binned_df['bar_type'] == 'target'].prf_rsq_coord.values, 
+                                                                                    norm = True)
+                            avg_Att_df['std'] = self.MRIObj.mri_utils.weighted_mean_std_sem(trial_binned_df[trial_binned_df['bar_type'] == 'target'].betas.values, 
+                                                                                    weights = trial_binned_df[trial_binned_df['bar_type'] == 'target'].prf_rsq_coord.values, 
+                                                                                    norm = True)[0]
+                            avg_Att_df['sem'] = self.MRIObj.mri_utils.weighted_mean_std_sem(trial_binned_df[trial_binned_df['bar_type'] == 'target'].betas.values, 
+                                                                                    weights = trial_binned_df[trial_binned_df['bar_type'] == 'target'].prf_rsq_coord.values, 
+                                                                                    norm = True)[-1]
+                            
+                            avg_UAtt_df = pd.DataFrame(np.hstack((trial_binned_df[trial_binned_df['bar_type'] == 'distractor'].select_dtypes(exclude=np.number)[:1].values,
+                                                                trial_binned_df[trial_binned_df['bar_type'] == 'distractor'].select_dtypes(include=np.number).mean().to_frame().T.values)),
+                                                    columns = np.hstack((trial_binned_df[trial_binned_df['bar_type'] == 'distractor'].select_dtypes(exclude=np.number)[:1].columns,
+                                                                trial_binned_df[trial_binned_df['bar_type'] == 'distractor'].select_dtypes(include=np.number).mean().to_frame().T.columns)))
+                            
+                            avg_UAtt_df['betas'] = self.MRIObj.mri_utils.weighted_mean(trial_binned_df[trial_binned_df['bar_type'] == 'distractor'].betas.values, 
+                                                                                    weights = trial_binned_df[trial_binned_df['bar_type'] == 'distractor'].prf_rsq_coord.values, 
+                                                                                    norm = True)
+                            avg_UAtt_df['std'] = self.MRIObj.mri_utils.weighted_mean_std_sem(trial_binned_df[trial_binned_df['bar_type'] == 'distractor'].betas.values, 
+                                                                                    weights = trial_binned_df[trial_binned_df['bar_type'] == 'distractor'].prf_rsq_coord.values, 
+                                                                                    norm = True)[0]
+                            avg_UAtt_df['sem'] = self.MRIObj.mri_utils.weighted_mean_std_sem(trial_binned_df[trial_binned_df['bar_type'] == 'distractor'].betas.values, 
+                                                                                    weights = trial_binned_df[trial_binned_df['bar_type'] == 'distractor'].prf_rsq_coord.values, 
+                                                                                    norm = True)[-1]
+
+                            DF_betas_bar_avg1D = pd.concat((DF_betas_bar_avg1D, pd.concat((avg_UAtt_df, avg_Att_df))))
+
                         else:
-                            DF_betas_bar_avg1D = pd.concat((DF_betas_bar_avg1D, 
-                                                        pd.DataFrame({'sj': np.tile(Att_bar_bin_df.sj.values[:1], 
-                                                                                    int(len(Att_bar_bin_df.betas.values) + len(UAtt_bar_bin_df.betas.values))),
-                                                                    'ROI': np.tile(roi_name, 
-                                                                                    int(len(Att_bar_bin_df.betas.values) + len(UAtt_bar_bin_df.betas.values))),
-                                                                    'prf_index_coord': np.concatenate((UAtt_bar_bin_df.prf_index_coord.values, 
-                                                                                            Att_bar_bin_df.prf_index_coord.values), axis=None),
-                                                                    'contralateral': np.concatenate((UAtt_bar_bin_df.contralateral.values, 
-                                                                                            Att_bar_bin_df.contralateral.values), axis=None),
-                                                                    'bar_type': np.concatenate((np.tile('distractor', len(UAtt_bar_bin_df.betas.values)), 
-                                                                                                np.tile('target', len(Att_bar_bin_df.betas.values))), axis=None),                                                                     
-                                                                    'betas': np.concatenate((UAtt_bar_bin_df.betas.values, 
-                                                                                            Att_bar_bin_df.betas.values), axis=None),
-                                                                    'Att_bar_coord': np.tile(Att_bar_coord, 
-                                                                                            int(len(Att_bar_bin_df.betas.values) + len(UAtt_bar_bin_df.betas.values))),
-                                                                    'UAtt_bar_coord': np.tile(UAtt_bar_coord, 
-                                                                                            int(len(Att_bar_bin_df.betas.values) + len(UAtt_bar_bin_df.betas.values))),
-                                                                    'dist_bars': np.tile(dist_bars, 
-                                                                                        int(len(Att_bar_bin_df.betas.values) + len(UAtt_bar_bin_df.betas.values)))})))
+                            DF_betas_bar_avg1D = pd.concat((DF_betas_bar_avg1D, trial_binned_df))
+
+                        
         if bar_color2bin:
             DF_betas_bar_avg1D['attend_color'] = bar_color2bin
 

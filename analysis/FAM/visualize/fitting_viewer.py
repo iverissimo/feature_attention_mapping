@@ -1752,7 +1752,7 @@ class FAViewer(Viewer):
                 fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
     
     def plot_betas1D_distance(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical',
-                                    fig_name = None, bar_color2plot = None, avg_bool = True):
+                                    fig_name = None, bar_color2plot = None, avg_bool = False):
 
         """
         Plot model beta values (according to pRF x,y coordinates) averaged within each bar position,
@@ -1775,18 +1775,10 @@ class FAViewer(Viewer):
         # if no ROI specified, then plot all
         if len(ROI_list) == 0:
             ROI_list = DF_betas_bar_coord.ROI.unique()
-
-        ## for bars going left to right (vertical orientation)
-        if orientation_bars == 'parallel_vertical':
-            coord_list = self.FAModelObj.bar_x_coords_pix
-        elif orientation_bars == 'parallel_horizontal':
-            coord_list = self.FAModelObj.bar_y_coords_pix
-        else:
-            raise ValueError('Cross sections not implemented yet')
         
         ## if we want to plot estimates for specific bar color
         if bar_color2plot:
-            DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['attend_color'] == bar_color2plot]#.dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas']) # drop nans
+            DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['attend_color'] == bar_color2plot]
         
         ## get df with average beta per position
         DF_betas_bar_avg1D = self.FAModelObj.get_betas_bar_1D_df(DF_betas_bar_coord = DF_betas_bar_coord, 
@@ -1795,55 +1787,16 @@ class FAViewer(Viewer):
                                                                     bar_color2bin = bar_color2plot,
                                                                     avg_bool = avg_bool)
 
-        ### now plot values for different attended bar positions
+        ### now plot values for different attended bar distances (absolute dist)
         for roi_name in ROI_list:
         
-            fig, axs = plt.subplots(nrows= len(coord_list), ncols=1, figsize=(18, 7.5 * len(coord_list)), sharex=False, sharey=False)
-            row_ind = 0
-
-            for Att_bar_coord in coord_list:
-                    
-                df2plot = DF_betas_bar_avg1D[(DF_betas_bar_avg1D['ROI'] == roi_name) &\
-                                            (DF_betas_bar_avg1D['Att_bar_coord'] == Att_bar_coord)]
-                df2plot.sort_values('dist_bars')
-
-                v1 = sns.lineplot(data = df2plot.reset_index(drop=True), 
-                                x = 'dist_bars', y = 'betas', hue = 'bar_type',
-                            palette = {'target': '#779e00', 'distractor': '#969696'}, ax = axs[row_ind])
-                v2 = sns.scatterplot(data = df2plot.reset_index(drop=True), 
-                                x = 'dist_bars', y = 'betas', hue = 'bar_type', markers = 'D',
-                            palette = {'target': '#779e00', 'distractor': '#969696'}, ax = axs[row_ind])
-
-                v1.set(xlabel=None)
-                v1.set(ylabel=None)
-                axs[row_ind].set_xticks(np.arange(-5,6)) 
-                axs[row_ind].set_xticklabels(np.arange(-5,6))
-                axs[row_ind].tick_params(axis='both', labelsize=12)
-
-                axs[row_ind].set_xlabel('Distractor distance relative to target',fontsize = 16) #,labelpad=18)
-                axs[row_ind].set_ylabel('Average beta within bar',fontsize = 16) #,labelpad=18)
-                axs[row_ind].set_ylim(-1, 3)
-
-                axs[row_ind].set_title('Attended bar x = {val} pix'.format(val = Att_bar_coord), fontsize = 20)
-
-                # quick fix for legen
-                handles = [mpatches.Patch(color = val, label = key) for key, val in {'target': '#779e00', 'distractor': '#969696'}.items()]
-                axs[row_ind].legend(loc = 'upper right',fontsize=12, handles = handles, title="Bar")#, fancybox=True)
-
-                row_ind += 1
-
-            if fig_name:
-                os.makedirs(op.split(fig_name)[0], exist_ok=True)
-                fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
-
-            ## also plot it grouped (so only distance, ignore bar position)
             fig, ax1 = plt.subplots(1,1, figsize=(18, 7.5))
 
             df2plot = DF_betas_bar_avg1D[(DF_betas_bar_avg1D['ROI'] == roi_name)]
-            df2plot.sort_values('dist_bars')
+            df2plot.sort_values('abs_inter_bar_dist')
 
             v1 = sns.pointplot(data = df2plot, 
-                            x = 'dist_bars', y = 'betas', hue = 'bar_type',
+                            x = 'abs_inter_bar_dist', y = 'betas', hue = 'bar_type',
                         palette = {'target': '#779e00', 'distractor': '#969696'},
                         markers = 'D', dodge = .2, join = False, ci=68, ax = ax1, n_boot=5000)
 
@@ -1851,41 +1804,7 @@ class FAViewer(Viewer):
             v1.set(ylabel=None)
             plt.margins(y=0.025)
             sns.stripplot(data = df2plot, 
-                        x = 'dist_bars', y = 'betas', hue = 'bar_type', jitter = True,
-                        palette = {'target': '#8d9e59', 'distractor': '#969696'}, dodge = .2,
-                        alpha=0.4, ax=ax1)
-            plt.xticks(fontsize = 18)
-            plt.yticks(fontsize = 18)
-
-            plt.xlabel('Distractor distance relative to target',fontsize = 16,labelpad=18)
-            plt.ylabel('Average beta within bar',fontsize = 16,labelpad=18)
-            plt.ylim(0, 2.75) #(0.5, 2.5)
-
-            # quick fix for legen
-            handles = [mpatches.Patch(color = val, label = key) for key, val in {'target': '#779e00', 'distractor': '#969696'}.items()]
-            ax1.legend(loc = 'upper right',fontsize=12, handles = handles, title="Bar")#, fancybox=True)
-
-            if fig_name:
-                os.makedirs(op.split(fig_name)[0], exist_ok=True)
-                fig.savefig(fig_name.replace('.png', '_combined_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
-
-            ## also plot it grouped for absolute distance (ignore side of distactor bar)
-            fig, ax1 = plt.subplots(1,1, figsize=(18, 7.5))
-
-            df2plot = DF_betas_bar_avg1D[(DF_betas_bar_avg1D['ROI'] == roi_name)]
-            df2plot['dist_bars'] = np.absolute(df2plot.dist_bars.values)
-            df2plot.sort_values('dist_bars')
-
-            v1 = sns.pointplot(data = df2plot, 
-                            x = 'dist_bars', y = 'betas', hue = 'bar_type',
-                        palette = {'target': '#779e00', 'distractor': '#969696'},
-                        markers = 'D', dodge = .2, join = False, ci=68, ax = ax1, n_boot=5000)
-
-            v1.set(xlabel=None)
-            v1.set(ylabel=None)
-            plt.margins(y=0.025)
-            sns.stripplot(data = df2plot, 
-                        x = 'dist_bars', y = 'betas', hue = 'bar_type', jitter = True,
+                        x = 'abs_inter_bar_dist', y = 'betas', hue = 'bar_type', jitter = True,
                         palette = {'target': '#8d9e59', 'distractor': '#969696'}, dodge = .2,
                         alpha=0.4, ax=ax1)
             plt.xticks(fontsize = 18)
@@ -1901,7 +1820,67 @@ class FAViewer(Viewer):
 
             if fig_name:
                 os.makedirs(op.split(fig_name)[0], exist_ok=True)
-                fig.savefig(fig_name.replace('.png', '_collapsed_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+                fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+
+            ## make same plot, but while connecting swarmplot (so values for same vertices per bar configuration)
+            ## possible trial pairs
+            trial_pairs = [(x,y) for x in df2plot.Att_bar_coord.unique() for y in df2plot.Att_bar_coord.unique() if x<y]
+            contralateral = None
+
+            fig, axs = plt.subplots(1,len(df2plot.abs_inter_bar_dist.unique()), figsize=(14, 5), sharey = True, constrained_layout = True)
+
+            for ind in range(len(df2plot.abs_inter_bar_dist.unique())):
+    
+                ## subplot shows each distance val
+                dist = ind+1
+                
+                # if we want to only look at values when bars were in contralateral hemifields
+                if contralateral is not None:
+                    dist_df = df2plot[(df2plot['abs_inter_bar_dist'] == dist) &\
+                                    (df2plot['contralateral'] == contralateral)].copy()
+                else:
+                    dist_df = df2plot[(df2plot['abs_inter_bar_dist'] == dist)].copy()
+                dist_df['plot_xpos'] = [dist - .2 if val == 'distractor' else dist + .1 for val in dist_df.bar_type.values]
+                
+                # plot scatter connected for pairs
+                for tp in trial_pairs:
+                
+                    tmp_df = dist_df[(((dist_df['Att_bar_coord'] == tp[0]) & (dist_df['UAtt_bar_coord'] == tp[1])) |\
+                                ((dist_df['UAtt_bar_coord'] == tp[0]) & (dist_df['Att_bar_coord'] == tp[1])))]
+
+                    if not tmp_df.empty:
+                        for vert in tmp_df.prf_index_coord.unique():
+                            # add jitter to plot
+                            jit = np.random.uniform(low = 0, high=.1)
+
+                            axs[ind].plot(tmp_df[(tmp_df['prf_index_coord'] == vert)].plot_xpos.values + jit,
+                                        tmp_df[tmp_df['prf_index_coord'] == vert].betas.values, '-o', c = '#9fb8fc', alpha = .1)
+                # add average value for distractor
+                axs[ind].errorbar(dist - .15, 
+                            dist_df[dist_df['bar_type'] == 'distractor'].betas.mean(), 
+                            dist_df[dist_df['bar_type'] == 'distractor'].betas.sem(), linestyle='None', fmt='-o', c = '#969696',
+                            linewidth = 1, capsize=20, elinewidth=3)
+                # add average value for target
+                axs[ind].errorbar(dist + .15, 
+                            dist_df[dist_df['bar_type'] == 'target'].betas.mean(), 
+                            dist_df[dist_df['bar_type'] == 'target'].betas.sem(), linestyle='None', fmt='-o', c = '#8d9e59',
+                            linewidth = 1, capsize=20, elinewidth=3)
+
+                axs[ind].set_xticks([dist])
+                axs[ind].set_ylim(0, 2.75) #(0.5, 2.5)
+                axs[ind].tick_params(axis='both', which='major', labelsize=18)
+
+            axs[0].set_ylabel('Average beta within bar',fontsize = 22,labelpad=18)
+
+            # quick fix for legen
+            handles = [mpatches.Patch(color = val, label = key) for key, val in {'target': '#779e00', 'distractor': '#969696'}.items()]
+            axs[ind].legend(loc = 'upper right',fontsize=12, handles = handles, title="Bar")#, fancybox=True)
+
+            fig.text(0.5,-0.1, 'Absolute Distractor distance relative to target', fontsize = 22, ha="center", va="center")
+
+            if fig_name:
+                os.makedirs(op.split(fig_name)[0], exist_ok=True)
+                fig.savefig(fig_name.replace('.png', '_pairs_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
 
     def plot_betas_coord(self, participant_list = [], model_type = 'D', mask_bool_df = None, stim_on_screen = [], mask_arr = True, rsq_threshold = .1,
                                 att_color_ses_run_dict = {}, file_ext = '_cropped.npy', orientation_bars = 'parallel_vertical', ROI_list = ['V1']):
@@ -2669,12 +2648,13 @@ class FAViewer(Viewer):
                                             collapsed_data = True,
                                             fig_name = fig_name.replace('.png', '_collapsed.png')) 
                 
-
-                # self.plot_betas1D_distance(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
-                #                             orientation_bars = orientation_bars,
-                #                             bar_color2plot = cn, 
-                #                             avg_bool = False,
-                #                             fig_name = fig_name) 
+                ## plot swarmplot of distance
+                self.plot_betas1D_distance(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
+                                            orientation_bars = orientation_bars,
+                                            bar_color2plot = cn, 
+                                            avg_bool = False,
+                                            fig_name = fig_name.replace('Betas_', 'BetasBars_')) 
+                
 
     def plot_betas1D_distanceECC(self, binned_df = {}, ROI_list = [], orientation_bars = 'parallel_vertical',
                                     fig_name = None, bar_color2plot = None, collapsed_data = True):

@@ -849,10 +849,10 @@ class GLMsingle_Model(Model):
         ## for bars going left to right (vertical orientation)
         if orientation_bars == 'parallel_vertical':
             coord_list = self.bar_x_coords_pix
-
+            key2bin = 'prf_x_coord' # column name to bin values
         elif orientation_bars == 'parallel_horizontal':
             coord_list = self.bar_y_coords_pix
-
+            key2bin = 'prf_y_coord'
         else:
             raise ValueError('Cross sections not implemented yet')
         
@@ -880,29 +880,28 @@ class GLMsingle_Model(Model):
 
                         for b in range(len(bins_arr)-1):
 
-                            bin_df = trial_df[(trial_df['prf_x_coord'] >= bins_arr[b]) &\
-                                            (trial_df['prf_x_coord'] <= bins_arr[b+1])]
+                            bin_df = trial_df[(trial_df[key2bin] >= bins_arr[b]) &\
+                                            (trial_df[key2bin] <= bins_arr[b+1])]
 
                             if not bin_df.empty:
-                                DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D, 
-                                                                pd.DataFrame({'sj': bin_df.sj.values[:1], 
-                                                                            'ROI': [roi_name], 
-                                                                            'betas': [self.MRIObj.mri_utils.weighted_mean(bin_df.betas.values, 
-                                                                                                                        weights = bin_df.prf_rsq_coord.values, 
-                                                                                                                        norm = True)], 
-                                                                            'std': [self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
-                                                                                                                                    weights = bin_df.prf_rsq_coord.values, 
-                                                                                                                                    norm = True)[0]],
-                                                                            'sem': [self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
-                                                                                                                                    weights = bin_df.prf_rsq_coord.values, 
-                                                                                                                                    norm = True)[-1]],
-                                                                            'prf_rsq_coord': [np.nanmean(bin_df.prf_rsq_coord.values)],
-                                                                            'prf_x_coord': [np.nanmean(bins_arr[b:b+2])], 
-                                                                            'prf_y_coord': [np.nanmean(bins_arr[b:b+2])],
-                                                                            'inter_bar_dist': bin_df.inter_bar_dist.values[:1], 
-                                                                            'contralateral': bin_df.contralateral.values[:1], 
-                                                                            'Att_bar_coord': [Att_bar_coord],
-                                                                            'UAtt_bar_coord':[UAtt_bar_coord]})))
+                                avg_bin_df = pd.DataFrame(np.hstack((bin_df.select_dtypes(exclude=np.number)[:1].values,
+                                                                    bin_df.select_dtypes(include=np.number).mean().to_frame().T.values)),
+                                                    columns = np.hstack((bin_df.select_dtypes(exclude=np.number)[:1].columns,
+                                                                        bin_df.select_dtypes(include=np.number).mean().to_frame().T.columns)))
+                                avg_bin_df['betas'] = self.MRIObj.mri_utils.weighted_mean(bin_df.betas.values, 
+                                                                                        weights = bin_df.prf_rsq_coord.values, 
+                                                                                        norm = True)
+                                avg_bin_df['std'] = self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
+                                                                                        weights = bin_df.prf_rsq_coord.values, 
+                                                                                        norm = True)[0]
+                                avg_bin_df['sem'] = self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
+                                                                                        weights = bin_df.prf_rsq_coord.values, 
+                                                                                        norm = True)[-1]
+                                avg_bin_df['prf_x_coord'] = np.nanmean(bins_arr[b:b+2])
+                                avg_bin_df['prf_y_coord'] = np.nanmean(bins_arr[b:b+2])
+
+                                DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D, avg_bin_df))
+
         if bar_color2bin:
             DF_betas_bar_coord1D['attend_color'] = bar_color2bin
         else:

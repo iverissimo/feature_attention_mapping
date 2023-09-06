@@ -763,6 +763,9 @@ class GLMsingle_Model(Model):
 
                 if Att_bar_coord != UAtt_bar_coord: ## bars cannot fully overlap
 
+                    # get eccentricity label of attended bar
+                    ecc_label = [key for key, val in self.MRIObj.params['plotting']['bar_ecc_label'].items() if val == np.absolute(Att_bar_coord)]
+
                     att_bar_xy = [Att_bar_coord, np.nan] if orientation_bars == 'parallel_vertical' else [np.nan, Att_bar_coord]
                     unatt_bar_xy = [UAtt_bar_coord, np.nan] if orientation_bars == 'parallel_vertical' else [np.nan, UAtt_bar_coord]
 
@@ -799,6 +802,7 @@ class GLMsingle_Model(Model):
                                                             'inter_bar_dist': np.tile(inter_bar_dist, len(ROIs_dict[rname])),
                                                             'abs_inter_bar_dist': np.tile(np.absolute(inter_bar_dist), len(ROIs_dict[rname])),
                                                             'contralateral': np.tile(contralateral_bool, len(ROIs_dict[rname])),
+                                                            'Att_ecc_label': np.tile(ecc_label, len(ROIs_dict[rname])),
                                                             'prf_index_coord': ROIs_dict[rname],
                                                             'prf_rsq_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['r2'][ROIs_dict[rname]],
                                                             'prf_x_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['x'][ROIs_dict[rname]], 
@@ -808,7 +812,7 @@ class GLMsingle_Model(Model):
         return DF_betas_bar_coord.dropna(subset=['prf_rsq_coord', 'prf_x_coord', 'prf_y_coord'])
 
     def get_betas_binned1D_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', 
-                                    max_ecc_ext = 5.5, bin_size = .5, bar_color2bin = None, center_bin = False):
+                                    max_ecc_ext = 5.5, bin_size = .5, bar_color2bin = None, center_bin = False, avg_bool = True):
 
         """
         Transform model beta values (according to pRF x,y coordinates) into 1D binned average
@@ -884,23 +888,30 @@ class GLMsingle_Model(Model):
                                             (trial_df[key2bin] <= bins_arr[b+1])]
 
                             if not bin_df.empty:
-                                avg_bin_df = pd.DataFrame(np.hstack((bin_df.select_dtypes(exclude=np.number)[:1].values,
-                                                                    bin_df.select_dtypes(include=np.number).mean().to_frame().T.values)),
-                                                    columns = np.hstack((bin_df.select_dtypes(exclude=np.number)[:1].columns,
-                                                                        bin_df.select_dtypes(include=np.number).mean().to_frame().T.columns)))
-                                avg_bin_df['betas'] = self.MRIObj.mri_utils.weighted_mean(bin_df.betas.values, 
-                                                                                        weights = bin_df.prf_rsq_coord.values, 
-                                                                                        norm = True)
-                                avg_bin_df['std'] = self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
-                                                                                        weights = bin_df.prf_rsq_coord.values, 
-                                                                                        norm = True)[0]
-                                avg_bin_df['sem'] = self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
-                                                                                        weights = bin_df.prf_rsq_coord.values, 
-                                                                                        norm = True)[-1]
-                                avg_bin_df['prf_x_coord'] = np.nanmean(bins_arr[b:b+2])
-                                avg_bin_df['prf_y_coord'] = np.nanmean(bins_arr[b:b+2])
+                                if avg_bool:
+                                    avg_bin_df = pd.DataFrame(np.hstack((bin_df.select_dtypes(exclude=np.number)[:1].values,
+                                                                        bin_df.select_dtypes(include=np.number).mean().to_frame().T.values)),
+                                                        columns = np.hstack((bin_df.select_dtypes(exclude=np.number)[:1].columns,
+                                                                            bin_df.select_dtypes(include=np.number).mean().to_frame().T.columns)))
+                                    avg_bin_df['betas'] = self.MRIObj.mri_utils.weighted_mean(bin_df.betas.values, 
+                                                                                            weights = bin_df.prf_rsq_coord.values, 
+                                                                                            norm = True)
+                                    avg_bin_df['std'] = self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
+                                                                                            weights = bin_df.prf_rsq_coord.values, 
+                                                                                            norm = True)[0]
+                                    avg_bin_df['sem'] = self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
+                                                                                            weights = bin_df.prf_rsq_coord.values, 
+                                                                                            norm = True)[-1]
+                                    avg_bin_df['prf_x_coord'] = np.nanmean(bins_arr[b:b+2])
+                                    avg_bin_df['prf_y_coord'] = np.nanmean(bins_arr[b:b+2])
 
-                                DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D, avg_bin_df))
+                                    DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D, avg_bin_df))
+                                else:
+                                    # if we dont want to average withing bins
+                                    bin_df['prf_x_coord'] = np.nanmean(bins_arr[b:b+2])
+                                    bin_df['prf_y_coord'] = np.nanmean(bins_arr[b:b+2])
+
+                                    DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D, bin_df))
 
         if bar_color2bin:
             DF_betas_bar_coord1D['attend_color'] = bar_color2bin

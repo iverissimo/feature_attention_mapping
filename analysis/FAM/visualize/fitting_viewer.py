@@ -2626,7 +2626,8 @@ class FAViewer(Viewer):
                                                         max_ecc_ext = 13, 
                                                         bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3), 
                                                         bar_color2bin = cn,
-                                                        center_bin = True)
+                                                        center_bin = True,
+                                                        avg_bool = False)
                 
                 self.plot_betas1D_distanceECC(binned_df = binned_shifted_df, ROI_list = ROI_list, 
                                             orientation_bars = orientation_bars,
@@ -2640,7 +2641,8 @@ class FAViewer(Viewer):
                                                         max_ecc_ext = 13, 
                                                         bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3), 
                                                         bar_color2bin = cn,
-                                                        center_bin = True)
+                                                        center_bin = True,
+                                                        avg_bool = False)
                 
                 self.plot_betas1D_distanceECC(binned_df = binned_abs_shifted_df, ROI_list = ROI_list, 
                                             orientation_bars = orientation_bars,
@@ -2708,20 +2710,15 @@ class FAViewer(Viewer):
                                     ((binned_df['inter_bar_dist'] == distances2plot[ind]) |\
                                     (binned_df['inter_bar_dist'] == -1*distances2plot[ind]))]
 
-        
-                # add extra label for eccentricity of attended bar
-                ecc_label = [key for pos in distDF2plot.Att_bar_coord.values for key, val in self.MRIObj.params['plotting']['bar_ecc_label'].items() if val == np.absolute(pos)]
-                distDF2plot['ecc_label'] = ecc_label
-                
-                sns.scatterplot(data = distDF2plot.reset_index(drop=True),
-                            x = 'prf_x_coord', y = 'betas', hue = 'ecc_label', 
-                            palette = self.MRIObj.params['plotting']['bar_ecc_pal'], 
-                                markers = 'D', alpha = .20, ax = axs[ind], legend = False,
-                )
+                #sns.scatterplot(data = distDF2plot.reset_index(drop=True),
+                #            x = 'prf_x_coord', y = 'betas', hue = 'ecc_label', 
+                #            palette = self.MRIObj.params['plotting']['bar_ecc_pal'], 
+                #                markers = 'D', alpha = .20, ax = axs[ind], legend = False,
+                #)
                 sns.lineplot(data = distDF2plot.reset_index(drop=True),
-                            x = 'prf_x_coord', y = 'betas', hue = 'ecc_label', 
+                            x = 'prf_x_coord', y = 'betas', hue = 'Att_ecc_label', 
                             palette = self.MRIObj.params['plotting']['bar_ecc_pal'],
-                            n_boot = 1000, err_style = 'bars', ax = axs[ind]
+                            n_boot = 1000, ci=68, err_style = 'bars', ax = axs[ind]
                 )
                 
                 # Create a Rectangle patch

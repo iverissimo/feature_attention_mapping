@@ -161,6 +161,7 @@ class Viewer:
             sub_pysub = self.pysub
         else:
             # subject pycortex folder
+            sub_id = '001' #################################################### HARDCODED JUST TO TEST THINGS -->> CHANGE LATER 
             sub_pysub = 'sub-{pp}_{ps}'.format(ps = self.pysub, pp = sub_id)
         
         return sub_pysub

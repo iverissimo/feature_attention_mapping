@@ -750,10 +750,8 @@ class GLMsingle_Model(Model):
         ## for bars going left to right (vertical orientation)
         if orientation_bars == 'parallel_vertical':
             coord_list = self.bar_x_coords_pix
-
         elif orientation_bars == 'parallel_horizontal':
             coord_list = self.bar_y_coords_pix
-
         else:
             raise ValueError('Cross sections not implemented yet')
 
@@ -784,7 +782,11 @@ class GLMsingle_Model(Model):
                         contralateral_bool = np.nan
                     else:
                         inter_bar_dist = (UAtt_bar_coord - Att_bar_coord)/ self.bar_width_pix[0]
-                        contralateral_bool = np.sign(Att_bar_coord) != np.sign(UAtt_bar_coord)
+                        contralateral_bars_bool = np.sign(Att_bar_coord) != np.sign(UAtt_bar_coord) # if bars in contralateral hemifields
+                        if orientation_bars == 'parallel_vertical':
+                            Att_bar_contralateral_RF_bool = np.sign(prf_estimates['sub-{sj}'.format(sj = participant)]['x']) != np.sign(Att_bar_coord) # if attended bar in the same hemifield of pRF
+                        elif orientation_bars == 'parallel_horizontal':
+                            Att_bar_contralateral_RF_bool = np.sign(prf_estimates['sub-{sj}'.format(sj = participant)]['y']) != np.sign(Att_bar_coord) # if attended bar in the same hemifield of pRF
 
                     # differentiate per color
                     for c, color_name in enumerate(att_color_ses_run.keys()):
@@ -801,7 +803,8 @@ class GLMsingle_Model(Model):
                                                             'UAtt_bar_coord': np.tile(UAtt_bar_coord, len(ROIs_dict[rname])),
                                                             'inter_bar_dist': np.tile(inter_bar_dist, len(ROIs_dict[rname])),
                                                             'abs_inter_bar_dist': np.tile(np.absolute(inter_bar_dist), len(ROIs_dict[rname])),
-                                                            'contralateral': np.tile(contralateral_bool, len(ROIs_dict[rname])),
+                                                            'contralateral_bars': np.tile(contralateral_bars_bool, len(ROIs_dict[rname])),
+                                                            'contralateral_Attbar_pRF': Att_bar_contralateral_RF_bool[ROIs_dict[rname]],
                                                             'Att_ecc_label': np.tile(ecc_label, len(ROIs_dict[rname])),
                                                             'prf_index_coord': ROIs_dict[rname],
                                                             'prf_rsq_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['r2'][ROIs_dict[rname]],
@@ -1411,6 +1414,106 @@ class GLMsingle_Model(Model):
                             DF_betas_bar_avg1D = pd.concat((DF_betas_bar_avg1D, trial_binned_df))
 
                         
+        if bar_color2bin:
+            DF_betas_bar_avg1D['attend_color'] = bar_color2bin
+
+        return DF_betas_bar_avg1D
+    
+    def get_delta_betas_bar_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', bar_color2bin = None, avg_bool = True):
+
+        """
+        Calculate delta beta values (according to pRF x,y coordinates) -> beta target bar - beta distractor bar
+        for different ROIs. Essentially subtracting the flipped trial
+
+        Parameters
+        ----------
+        DF_betas_bar_coord: dataframe
+            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        ROI_list: list/arr
+            list with ROI names 
+        bar_color2bin: str
+            attended bar color. if given, will bin betas for that bar color, else will average across colors
+        """
+
+        # if no ROI specified, then plot all
+        if len(ROI_list) == 0:
+            ROI_list = DF_betas_bar_coord.ROI.unique()
+
+        ## for bars going left to right (vertical orientation)
+        if orientation_bars == 'parallel_vertical':
+            coord_list = self.bar_x_coords_pix
+            key2bin = 'prf_x_coord' # column name to bin values
+        elif orientation_bars == 'parallel_horizontal':
+            coord_list = self.bar_y_coords_pix
+            key2bin = 'prf_y_coord'
+        else:
+            raise ValueError('Cross sections not implemented yet')
+        
+        DF_betas_bar_avg1D = pd.DataFrame()
+
+        ## iterate over ROIs
+        for roi_name in ROI_list:
+            
+            for UAtt_bar_coord in coord_list: 
+                for Att_bar_coord in coord_list:
+                    
+                    trial_df = DF_betas_bar_coord[(DF_betas_bar_coord['ROI'] == roi_name) &\
+                                        (DF_betas_bar_coord['Att_bar_coord'] == Att_bar_coord) &\
+                                        (DF_betas_bar_coord['UAtt_bar_coord'] == UAtt_bar_coord)].dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas'])
+                    
+                    flipped_trial_df = DF_betas_bar_coord[(DF_betas_bar_coord['ROI'] == roi_name) &\
+                                        (DF_betas_bar_coord['Att_bar_coord'] == UAtt_bar_coord) &\
+                                        (DF_betas_bar_coord['UAtt_bar_coord'] == Att_bar_coord)].dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas'])
+
+                    if not trial_df.empty and not flipped_trial_df.empty: # if dfs not empty (which might happend when we averaged across trial types etc)
+
+                        ## if we want to bin estimates for specific bar color
+                        if bar_color2bin:
+                            trial_df = trial_df[trial_df['attend_color'] == bar_color2bin]
+                            flipped_trial_df = flipped_trial_df[flipped_trial_df['attend_color'] == bar_color2bin]
+                        else:
+                            # average them, if we dont care
+                            df_column_names = [str(name) for name in list(trial_df.columns) if name not in ['attend_color', 'betas']]
+                            trial_df = trial_df.groupby(df_column_names).mean().reset_index()
+                            flipped_trial_df = flipped_trial_df.groupby(df_column_names).mean().reset_index()
+
+                        ## filter df for each bar position
+                        Att_bar_bin_df = trial_df[(trial_df[key2bin] >= self.convert_pix2dva(Att_bar_coord - self.bar_width_pix[0]/2)) &\
+                                                    (trial_df[key2bin] <= self.convert_pix2dva(Att_bar_coord + self.bar_width_pix[0]/2))]
+                        
+                        flipped_bar_bin_df = flipped_trial_df[(flipped_trial_df[key2bin] >= self.convert_pix2dva(Att_bar_coord - self.bar_width_pix[0]/2)) &\
+                                                            (flipped_trial_df[key2bin] <= self.convert_pix2dva(Att_bar_coord + self.bar_width_pix[0]/2))]
+                        
+                        ## subtract reverse trial type
+                        Att_bar_bin_df.sort_values('prf_index_coord', inplace=True)
+                        flipped_bar_bin_df.sort_values('prf_index_coord', inplace=True)
+                        
+                        delta_betas_df = Att_bar_bin_df.copy()
+                        delta_betas_df['betas'] = Att_bar_bin_df['betas'] - flipped_bar_bin_df['betas']
+                        
+                        if avg_bool:
+                            avg_Delta_df = pd.DataFrame(np.hstack((delta_betas_df.select_dtypes(exclude=np.number)[:1].values,
+                                                                delta_betas_df.select_dtypes(include=np.number).mean().to_frame().T.values)),
+                                                    columns = np.hstack((delta_betas_df.select_dtypes(exclude=np.number)[:1].columns,
+                                                                        delta_betas_df.select_dtypes(include=np.number).mean().to_frame().T.columns)))
+                            
+                            avg_Delta_df['betas'] = self.MRIObj.mri_utils.weighted_mean(delta_betas_df.betas.values, 
+                                                                                    weights = delta_betas_df.prf_rsq_coord.values, 
+                                                                                    norm = True)
+                            avg_Delta_df['std'] = self.MRIObj.mri_utils.weighted_mean_std_sem(delta_betas_df.betas.values, 
+                                                                                    weights = delta_betas_df.prf_rsq_coord.values, 
+                                                                                    norm = True)[0]
+                            avg_Delta_df['sem'] = self.MRIObj.mri_utils.weighted_mean_std_sem(delta_betas_df.betas.values, 
+                                                                                    weights = delta_betas_df.prf_rsq_coord.values, 
+                                                                                    norm = True)[-1]
+
+                            DF_betas_bar_avg1D = pd.concat((DF_betas_bar_avg1D, avg_Delta_df))
+
+                        else:
+                            DF_betas_bar_avg1D = pd.concat((DF_betas_bar_avg1D, delta_betas_df))
+    
         if bar_color2bin:
             DF_betas_bar_avg1D['attend_color'] = bar_color2bin
 

@@ -277,7 +277,7 @@ match task:
                                                  model_type = 'D',
                                                  file_ext = '_cropped.npy', 
                                                  orientation_bars = orientation_bars[choice], 
-                                                 ROI_list = ['V1', 'V2', 'V3'],
+                                                 ROI_list = ['V1'], #['V1', 'V2', 'V3'],
                                                  att_color_ses_run_dict = group_att_color_ses_run,
                                                  mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
                                                                                 crop_nr = FAM_data.task_nr_cropTR['pRF'], 

@@ -1632,22 +1632,15 @@ class FAViewer(Viewer):
 
         for cn in color_list:
                 
-                if bin_bool:
-                    ### get betas binned over 1D coordinate
-                    DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D,
-                                                    self.FAModelObj.get_betas_binned1D_df(DF_betas_bar_coord = DF_betas_bar_coord, 
-                                                                        ROI_list = ROI_list, orientation_bars = 'parallel_vertical', 
-                                                                        max_ecc_ext = max_ecc_ext, 
-                                                                        bin_size = bin_size, 
-                                                                        bar_color2bin = cn)
-                                                    ))
-                else:
-                    ### get betas over 1D coordinate (NOT BINNED)
-                    DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D,
-                                                    self.FAModelObj.get_betas_1D_df(DF_betas_bar_coord = DF_betas_bar_coord, 
-                                                                        ROI_list = ROI_list, orientation_bars = 'parallel_vertical', 
-                                                                        bar_color2bin = cn)
-                                                    ))
+            ### get betas over 1D coordinate
+            DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D,
+                                            self.FAModelObj.get_betas_1D_df(DF_betas_bar_coord = DF_betas_bar_coord, 
+                                                                ROI_list = ROI_list, orientation_bars = 'parallel_vertical', 
+                                                                max_ecc_ext = max_ecc_ext, 
+                                                                bin_size = bin_size, 
+                                                                bin_bool = bin_bool,
+                                                                bar_color2bin = cn)
+                                            ))
 
         ### now plot all combinations (rows - unattended bar pos changes, column, attend bar pos changes)
         for roi_name in ROI_list:
@@ -1806,23 +1799,16 @@ class FAViewer(Viewer):
         DF_betas_bar_coord1D = pd.DataFrame()
 
         for cn in color_list:
-                
-                if bin_bool:
-                    ### get betas binned over 1D coordinate
-                    DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D,
-                                                    self.FAModelObj.get_betas_binned1D_df(DF_betas_bar_coord = DF_betas_bar_coord, 
-                                                                        ROI_list = ROI_list, orientation_bars = 'parallel_vertical', 
-                                                                        max_ecc_ext = max_ecc_ext, 
-                                                                        bin_size = bin_size, 
-                                                                        bar_color2bin = cn)
-                                                    ))
-                else:
-                    ### get betas over 1D coordinate (NOT BINNED)
-                    DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D,
-                                                    self.FAModelObj.get_betas_1D_df(DF_betas_bar_coord = DF_betas_bar_coord, 
-                                                                        ROI_list = ROI_list, orientation_bars = 'parallel_vertical', 
-                                                                        bar_color2bin = cn)
-                                                    ))
+            
+            ### get betas over 1D coordinate
+            DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D,
+                                            self.FAModelObj.get_betas_1D_df(DF_betas_bar_coord = DF_betas_bar_coord, 
+                                                                ROI_list = ROI_list, orientation_bars = 'parallel_vertical', 
+                                                                max_ecc_ext = max_ecc_ext, 
+                                                                bin_size = bin_size, 
+                                                                bin_bool = bin_bool,
+                                                                bar_color2bin = cn)
+                                            ))
 
         ### now plot all combinations (rows - unattended bar pos changes, column, attend bar pos changes)
         for roi_name in ROI_list:
@@ -2773,13 +2759,14 @@ class FAViewer(Viewer):
                     fig_name = fig_name.replace('.png', '_attend-{cn}.png'.format(cn = cn))
 
                 ## now get betas binned over 1D coordinate
-                binned_shifted_df = self.FAModelObj.get_betas_binned1D_df(DF_betas_bar_coord = shifted_DF_betas_bar_coord, 
-                                                        ROI_list = ROI_list, orientation_bars = orientation_bars, 
-                                                        max_ecc_ext = 13, 
-                                                        bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3), 
-                                                        bar_color2bin = cn,
-                                                        center_bin = True,
-                                                        avg_bool = False)
+                binned_shifted_df = self.FAModelObj.get_betas_1D_df(DF_betas_bar_coord = shifted_DF_betas_bar_coord, 
+                                                                ROI_list = ROI_list, orientation_bars = orientation_bars, 
+                                                                max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)]*2, 
+                                                                bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3),
+                                                                bin_bool = True,
+                                                                avg_bool = False,
+                                                                center_bin = True,
+                                                                bar_color2bin = cn)
                 
                 self.plot_betas1D_distanceECC(binned_df = binned_shifted_df, ROI_list = ROI_list, 
                                             orientation_bars = orientation_bars,
@@ -2788,13 +2775,14 @@ class FAViewer(Viewer):
                                             fig_name = fig_name) 
                 
                 ### also plot absolute (collapsed)
-                binned_abs_shifted_df = self.FAModelObj.get_betas_binned1D_df(DF_betas_bar_coord = abs_shifted_DF_betas_bar_coord, 
-                                                        ROI_list = ROI_list, orientation_bars = orientation_bars, 
-                                                        max_ecc_ext = 13, 
-                                                        bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3), 
-                                                        bar_color2bin = cn,
-                                                        center_bin = True,
-                                                        avg_bool = False)
+                binned_abs_shifted_df = self.FAModelObj.get_betas_1D_df(DF_betas_bar_coord = abs_shifted_DF_betas_bar_coord, 
+                                                                ROI_list = ROI_list, orientation_bars = orientation_bars, 
+                                                                max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)]*2, 
+                                                                bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3),
+                                                                bin_bool = True,
+                                                                avg_bool = False,
+                                                                center_bin = True,
+                                                                bar_color2bin = cn)
                 
                 self.plot_betas1D_distanceECC(binned_df = binned_abs_shifted_df, ROI_list = ROI_list, 
                                             orientation_bars = orientation_bars,

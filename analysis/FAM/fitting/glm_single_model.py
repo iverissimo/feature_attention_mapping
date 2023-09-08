@@ -813,12 +813,12 @@ class GLMsingle_Model(Model):
                                                             )) 
                             
         return DF_betas_bar_coord.dropna(subset=['prf_rsq_coord', 'prf_x_coord', 'prf_y_coord'])
-
-    def get_betas_binned1D_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', 
-                                    max_ecc_ext = 5.5, bin_size = .5, bar_color2bin = None, center_bin = False, avg_bool = True):
+    
+    def get_betas_1D_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', bar_color2bin = None,
+                                max_ecc_ext = 5.5, bin_size = .5, center_bin = False, avg_bool = True, bin_bool = False):
 
         """
-        Transform model beta values (according to pRF x,y coordinates) into 1D binned average
+        Transform participant model beta values (according to pRF x,y coordinates) into 1D average/binned average
         for different ROIs
 
         Parameters
@@ -829,25 +829,29 @@ class GLMsingle_Model(Model):
             string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
         ROI_list: list/arr
             list with ROI names 
-        max_ecc_ext: float
-            eccentricity limit (screen)
-        bin_size: float
-            size of bin (in dva)
         bar_color2bin: str
             attended bar color. if given, will bin betas for that bar color, else will average across colors
+        bin_size: float
+            size of bin (in dva)
+        bin_bool: bool
+            if we want to bin over x or y coordinate
+        avg_bool: bool
+            if we bin, then we might also want to average
         center_bin: bool
             if we want to center the bin distribution around 0
         """
 
-        ## bins array (1/3 of bar width, equally spaced across x/y coordinates of screen)
-        # if we want to have the bins centered around 0 
-        if center_bin:
-            bins_arr = np.arange(bin_size/2, max_ecc_ext + bin_size, bin_size)
-            bins_arr = np.concatenate((bins_arr*-1, bins_arr))
-        else:
-            bins_arr = np.arange(0, max_ecc_ext + bin_size, bin_size)
-            bins_arr = np.concatenate((bins_arr[1:]*-1, bins_arr))
-        bins_arr.sort()
+        # if we want to bin data
+        if bin_bool:
+            ## bins array (1/3 of bar width, equally spaced across x/y coordinates of screen)
+            # if we want to have the bins centered around 0 
+            if center_bin:
+                bins_arr = np.arange(bin_size/2, max_ecc_ext + bin_size, bin_size)
+                bins_arr = np.concatenate((bins_arr*-1, bins_arr))
+            else:
+                bins_arr = np.arange(0, max_ecc_ext + bin_size, bin_size)
+                bins_arr = np.concatenate((bins_arr[1:]*-1, bins_arr))
+            bins_arr.sort()
 
         # if no ROI specified, then plot all
         if len(ROI_list) == 0:
@@ -870,98 +874,6 @@ class GLMsingle_Model(Model):
             
             for UAtt_bar_coord in coord_list: 
                 for Att_bar_coord in coord_list:
-
-                    trial_df = DF_betas_bar_coord[(DF_betas_bar_coord['ROI'] == roi_name) &\
-                                        (DF_betas_bar_coord['Att_bar_coord'] == Att_bar_coord) &\
-                                        (DF_betas_bar_coord['UAtt_bar_coord'] == UAtt_bar_coord)].dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas'])
-                    
-                    if not trial_df.empty: # if df not empty (which might happend when we averaged across trial types etc)
-
-                        ## if we want to bin estimates for specific bar color
-                        if bar_color2bin:
-                            trial_df = trial_df[trial_df['attend_color'] == bar_color2bin]
-                        else:
-                            # average them, if we dont care
-                            df_column_names = [str(name) for name in list(trial_df.columns) if name not in ['attend_color', 'betas']]
-                            trial_df = trial_df.groupby(df_column_names).mean().reset_index()
-
-                        for b in range(len(bins_arr)-1):
-
-                            bin_df = trial_df[(trial_df[key2bin] >= bins_arr[b]) &\
-                                            (trial_df[key2bin] <= bins_arr[b+1])]
-
-                            if not bin_df.empty:
-                                if avg_bool:
-                                    avg_bin_df = pd.DataFrame(np.hstack((bin_df.select_dtypes(exclude=np.number)[:1].values,
-                                                                        bin_df.select_dtypes(include=np.number).mean().to_frame().T.values)),
-                                                        columns = np.hstack((bin_df.select_dtypes(exclude=np.number)[:1].columns,
-                                                                            bin_df.select_dtypes(include=np.number).mean().to_frame().T.columns)))
-                                    avg_bin_df['betas'] = self.MRIObj.mri_utils.weighted_mean(bin_df.betas.values, 
-                                                                                            weights = bin_df.prf_rsq_coord.values, 
-                                                                                            norm = True)
-                                    avg_bin_df['std'] = self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
-                                                                                            weights = bin_df.prf_rsq_coord.values, 
-                                                                                            norm = True)[0]
-                                    avg_bin_df['sem'] = self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
-                                                                                            weights = bin_df.prf_rsq_coord.values, 
-                                                                                            norm = True)[-1]
-                                    avg_bin_df['prf_x_coord'] = np.nanmean(bins_arr[b:b+2])
-                                    avg_bin_df['prf_y_coord'] = np.nanmean(bins_arr[b:b+2])
-
-                                    DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D, avg_bin_df))
-                                else:
-                                    # if we dont want to average withing bins
-                                    bin_df['prf_x_coord'] = np.nanmean(bins_arr[b:b+2])
-                                    bin_df['prf_y_coord'] = np.nanmean(bins_arr[b:b+2])
-
-                                    DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D, bin_df))
-
-        if bar_color2bin:
-            DF_betas_bar_coord1D['attend_color'] = bar_color2bin
-        else:
-            DF_betas_bar_coord1D['attend_color'] = np.nan
-
-        return DF_betas_bar_coord1D
-    
-    def get_betas_1D_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', bar_color2bin = None):
-
-        """
-        Transform model beta values (according to pRF x,y coordinates) into 1D average
-        for different ROIs
-
-        Parameters
-        ----------
-        DF_betas_bar_coord: dataframe
-            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
-        orientation_bars: str
-            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
-        ROI_list: list/arr
-            list with ROI names 
-        bar_color2bin: str
-            attended bar color. if given, will bin betas for that bar color, else will average across colors
-        """
-
-        # if no ROI specified, then plot all
-        if len(ROI_list) == 0:
-            ROI_list = DF_betas_bar_coord.ROI.unique()
-
-        ## for bars going left to right (vertical orientation)
-        if orientation_bars == 'parallel_vertical':
-            coord_list = self.bar_x_coords_pix
-
-        elif orientation_bars == 'parallel_horizontal':
-            coord_list = self.bar_y_coords_pix
-
-        else:
-            raise ValueError('Cross sections not implemented yet')
-        
-        DF_betas_bar_coord1D = pd.DataFrame()
-
-        ## iterate over ROIs
-        for roi_name in ROI_list:
-            
-            for UAtt_bar_coord in coord_list: 
-                for Att_bar_coord in coord_list:
                     
                     trial_df = DF_betas_bar_coord[(DF_betas_bar_coord['ROI'] == roi_name) &\
                                         (DF_betas_bar_coord['Att_bar_coord'] == Att_bar_coord) &\
@@ -977,10 +889,43 @@ class GLMsingle_Model(Model):
                             df_column_names = [str(name) for name in list(trial_df.columns) if name not in ['attend_color', 'betas']]
                             trial_df = trial_df.groupby(df_column_names).mean().reset_index()
 
-                        # group by x-coordinates, and average
-                        out_df = trial_df.groupby(['sj', 'ROI', 'Att_bar_coord', 'UAtt_bar_coord', 'prf_x_coord']).mean().reset_index()
+                        if bin_bool:
+                            for b in range(len(bins_arr)-1):
 
-                        DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D, out_df))
+                                bin_df = trial_df[(trial_df[key2bin] >= bins_arr[b]) &\
+                                                (trial_df[key2bin] <= bins_arr[b+1])]
+
+                                if not bin_df.empty:
+                                    if avg_bool:
+                                        avg_bin_df = pd.DataFrame(np.hstack((bin_df.select_dtypes(exclude=np.number)[:1].values,
+                                                                            bin_df.select_dtypes(include=np.number).mean().to_frame().T.values)),
+                                                            columns = np.hstack((bin_df.select_dtypes(exclude=np.number)[:1].columns,
+                                                                                bin_df.select_dtypes(include=np.number).mean().to_frame().T.columns)))
+                                        avg_bin_df['betas'] = self.MRIObj.mri_utils.weighted_mean(bin_df.betas.values, 
+                                                                                                weights = bin_df.prf_rsq_coord.values, 
+                                                                                                norm = True)
+                                        avg_bin_df['std'] = self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
+                                                                                                weights = bin_df.prf_rsq_coord.values, 
+                                                                                                norm = True)[0]
+                                        avg_bin_df['sem'] = self.MRIObj.mri_utils.weighted_mean_std_sem(bin_df.betas.values, 
+                                                                                                weights = bin_df.prf_rsq_coord.values, 
+                                                                                                norm = True)[-1]
+                                        avg_bin_df['prf_x_coord'] = np.nanmean(bins_arr[b:b+2])
+                                        avg_bin_df['prf_y_coord'] = np.nanmean(bins_arr[b:b+2])
+
+                                        DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D, avg_bin_df))
+                                    else:
+                                        # if we dont want to average withing bins
+                                        bin_df['prf_x_coord'] = np.nanmean(bins_arr[b:b+2])
+                                        bin_df['prf_y_coord'] = np.nanmean(bins_arr[b:b+2])
+
+                                        DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D, bin_df))
+
+                        else:    
+                            ## group by x-coordinates, and average
+                            #out_df = trial_df.groupby(['sj', 'ROI', 'Att_bar_coord', 'UAtt_bar_coord', key2bin]).mean().reset_index()
+
+                            DF_betas_bar_coord1D = pd.concat((DF_betas_bar_coord1D, trial_df))
 
         if bar_color2bin:
             DF_betas_bar_coord1D['attend_color'] = bar_color2bin

@@ -2736,17 +2736,6 @@ class FAViewer(Viewer):
                                                                 prf_estimates = prf_estimates, 
                                                                 orientation_bars = orientation_bars)
             
-            ## shift prf x coordinates relative to attended bar position (converted to dva)
-            # to make plots align to center of bar
-            shifted_DF_betas_bar_coord = DF_betas_bar_coord.copy()
-            shifted_DF_betas_bar_coord['prf_x_coord'] -= self.convert_pix2dva(DF_betas_bar_coord.Att_bar_coord.values)
-
-            ## also take absolute distance from attended bar 
-            # for now keeping it as separate df, but might integrate with previous
-            # (we dont necessarily care if its left or right, and then we can collapse more trial types for binning)
-            abs_shifted_DF_betas_bar_coord = shifted_DF_betas_bar_coord.copy()
-            abs_shifted_DF_betas_bar_coord['prf_x_coord'] = np.absolute(shifted_DF_betas_bar_coord['prf_x_coord'])
-
             ## plot betas binned over 1D coordinates
             for cn in [None]: #['color_red', 'color_green', None]:
                 
@@ -2758,51 +2747,48 @@ class FAViewer(Viewer):
                 if cn is not None:
                     fig_name = fig_name.replace('.png', '_attend-{cn}.png'.format(cn = cn))
 
-                ## now get betas binned over 1D coordinate
-                binned_shifted_df = self.FAModelObj.get_betas_1D_df(DF_betas_bar_coord = shifted_DF_betas_bar_coord, 
-                                                                ROI_list = ROI_list, orientation_bars = orientation_bars, 
-                                                                max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)]*2, 
-                                                                bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3),
-                                                                bin_bool = True,
-                                                                avg_bool = False,
-                                                                center_bin = True,
-                                                                bar_color2bin = cn)
-                
-                self.plot_betas1D_distanceECC(binned_df = binned_shifted_df, ROI_list = ROI_list, 
+                ## now get betas binned over 1D coordinate                
+                self.plot_betas1D_centered(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
                                             orientation_bars = orientation_bars,
+                                            max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)]*2, 
+                                            bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3),
+                                            bin_bool = True,
+                                            avg_bool = False,
                                             bar_color2plot = cn, 
                                             collapsed_data = False,
                                             fig_name = fig_name) 
                 
                 ### also plot absolute (collapsed)
-                binned_abs_shifted_df = self.FAModelObj.get_betas_1D_df(DF_betas_bar_coord = abs_shifted_DF_betas_bar_coord, 
-                                                                ROI_list = ROI_list, orientation_bars = orientation_bars, 
-                                                                max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)]*2, 
-                                                                bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3),
-                                                                bin_bool = True,
-                                                                avg_bool = False,
-                                                                center_bin = True,
-                                                                bar_color2bin = cn)
-                
-                self.plot_betas1D_distanceECC(binned_df = binned_abs_shifted_df, ROI_list = ROI_list, 
+                self.plot_betas1D_centered(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
                                             orientation_bars = orientation_bars,
+                                            max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)]*2, 
+                                            bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3),
+                                            bin_bool = True,
+                                            avg_bool = False,
                                             bar_color2plot = cn, 
                                             collapsed_data = True,
                                             fig_name = fig_name.replace('.png', '_collapsed.png')) 
                 
-                ## plot swarmplot of distance
+                #### plot swarmplot of distance
                 self.plot_betas1D_distance(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
                                             orientation_bars = orientation_bars,
                                             bar_color2plot = cn, 
                                             avg_bool = False,
                                             fig_name = fig_name.replace('Betas_', 'BetasBars_')) 
                 
+                ## also plot delta betas for vertices within the bar
+                self.plot_delta_betas_bar(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
+                                            orientation_bars = orientation_bars,
+                                            bar_color2plot = cn, 
+                                            avg_bool = False,
+                                            fig_name = fig_name.replace('Betas_', 'DeltaBetasBars_')) 
 
-    def plot_betas1D_distanceECC(self, binned_df = {}, ROI_list = [], orientation_bars = 'parallel_vertical',
-                                    fig_name = None, bar_color2plot = None, collapsed_data = True):
+    def plot_delta_betas_bar(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical',
+                                    fig_name = None, bar_color2plot = None, avg_bool = False):
 
         """
-        Quick func to plot 1D binned betas for each inter bar distance, while showing ecc of target bar.
+        Plot delta beta values (according to pRF x,y coordinates) -> beta target bar - beta distractor bar
+        for different ROIs. Essentially subtracting the flipped trial
 
         Parameters
         ----------
@@ -2820,35 +2806,130 @@ class FAViewer(Viewer):
 
         # if no ROI specified, then plot all
         if len(ROI_list) == 0:
-            ROI_list = binned_df.ROI.unique()
+            ROI_list = DF_betas_bar_coord.ROI.unique()
 
         ## for bars going left to right (vertical orientation)
         if orientation_bars == 'parallel_vertical':
             coord_list = self.FAModelObj.bar_x_coords_pix
+            key2bin = 'prf_x_coord' # column name to bin values
         elif orientation_bars == 'parallel_horizontal':
             coord_list = self.FAModelObj.bar_y_coords_pix
+            key2bin = 'prf_y_coord' # column name to bin values
         else:
             raise ValueError('Cross sections not implemented yet')
         
-        ## if we want to plot estimates for specific bar color
-        if bar_color2plot:
-            binned_df = binned_df[binned_df['attend_color'] == bar_color2plot]#.dropna(subset=['prf_x_coord', 'prf_y_coord', 'betas']) # drop nans
+         ## subtract reverse trial type within attehnded bar limits
+        DF_delta_betas_bar_avg1D = self.FAModelObj.get_delta_betas_bar_df(DF_betas_bar_coord = DF_betas_bar_coord, 
+                                                                        ROI_list = ROI_list, 
+                                                                        orientation_bars = orientation_bars,
+                                                                        bar_color2bin = bar_color2plot,
+                                                                        avg_bool = avg_bool)
+
+        DF_delta_betas_bar_avg1D.sort_values('Att_ecc_label', inplace=True, ascending = False)
+    
+        ### now plot values for different attended bar positions
+        for roi_name in ROI_list:
         
+            fig, axs = plt.subplots(nrows= 1, ncols=1, figsize=(18, 7.5))
+
+            v1 = pt.RainCloud(data = DF_delta_betas_bar_avg1D[DF_delta_betas_bar_avg1D['ROI'] == roi_name],
+                            x = 'abs_inter_bar_dist', y = 'betas', hue = 'Att_ecc_label',  pointplot = False,
+                        palette = self.MRIObj.params['plotting']['bar_ecc_pal'],
+                        linecolor = 'grey',alpha = .8, dodge = True, saturation = 1, ax = axs)
+
+            v1.set(xlabel=None)
+            v1.set(ylabel=None)
+            plt.margins(y=0.025)
+            axs.hlines(0,-6,6, colors = 'grey', linestyles = 'dashed', zorder = 10)
+
+            plt.xticks(fontsize = 18)
+            plt.yticks(fontsize = 18)
+
+            plt.xlabel('Absolute Distractor distance relative to target',fontsize = 16,labelpad=18)
+            plt.ylabel('$\Delta$ beta within bar',fontsize = 16,labelpad=18)
+            plt.ylim(-4, 4) #(0.5, 2.5)
+
+            # quick fix for legen
+            handles = [mpatches.Patch(color = val, label = key) for key, val in self.MRIObj.params['plotting']['bar_ecc_pal'].items()]
+            axs.legend(loc = 'upper right',fontsize=12, handles = handles, title="Target Bar ecc")#, fancybox=True)
+
+            if fig_name:
+                os.makedirs(op.split(fig_name)[0], exist_ok=True)
+                fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+                         
+    def plot_betas1D_centered(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical',
+                                    fig_name = None, bar_color2plot = None, collapsed_data = True, avg_bool = False,
+                                    max_ecc_ext = 5.5, bin_size = None, bin_bool = True, error_type = 'std'):
+
+        """
+        Plot 1D binned betas, with x/y coordinates centered on the attended bar. 
+        Suplots diveded per inter-bar distance, while showing ecc of target bar.
+
+        Parameters
+        ----------
+        DF_betas_bar_coord: dataframe
+            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        ROI_list: list/arr
+            list with ROI names to plot
+        fig_name: str
+            if given, will save plot with absolute figure name
+        bar_color2plot: str
+            attended bar color. if given, will plot betas for that bar color, else will average across colors
+        """
+
+        # if no ROI specified, then plot all
+        if len(ROI_list) == 0:
+            ROI_list = DF_betas_bar_coord.ROI.unique()
+
+        ## for bars going left to right (vertical orientation)
+        if orientation_bars == 'parallel_vertical':
+            coord_list = self.FAModelObj.bar_x_coords_pix
+            key2bin = 'prf_x_coord' # column name to bin values
+        elif orientation_bars == 'parallel_horizontal':
+            coord_list = self.FAModelObj.bar_y_coords_pix
+            key2bin = 'prf_y_coord' # column name to bin values
+        else:
+            raise ValueError('Cross sections not implemented yet')
+        
+        # if no bin size given, assumes 1/3 of bar width
+        if bin_size is None:
+            bin_size = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]/3)
+
+        ## shift prf x coordinates relative to attended bar position (converted to dva)
+        # to make plots align to center of bar
+        shifted_DF_betas_bar_coord = DF_betas_bar_coord.copy()
+        shifted_DF_betas_bar_coord[key2bin] -= self.convert_pix2dva(DF_betas_bar_coord.Att_bar_coord.values)
+        
+        # if we collapse coordinates (this is, we dont care about left/right or up/down)
+        if collapsed_data:
+            shifted_DF_betas_bar_coord [key2bin] = np.absolute(shifted_DF_betas_bar_coord[key2bin])
+            
+        ### get betas over 1D coordinate
+        DF_betas_bar_coord1D = self.FAModelObj.get_betas_1D_df(DF_betas_bar_coord = shifted_DF_betas_bar_coord, 
+                                                            ROI_list = ROI_list, orientation_bars = orientation_bars, 
+                                                            max_ecc_ext = max_ecc_ext, 
+                                                            bin_size = bin_size, 
+                                                            bin_bool = bin_bool,
+                                                            avg_bool = avg_bool,
+                                                            center_bin = True,
+                                                            bar_color2bin = bar_color2plot)
+    
         ### now plot values for different attended bar positions
         for roi_name in ROI_list:
         
             ## plot distances 
-            distances2plot = np.unique(np.absolute(binned_df.inter_bar_dist.values))
+            distances2plot = np.unique(DF_betas_bar_coord1D.abs_inter_bar_dist.values)
             distances2plot.sort()
 
             fig, axs = plt.subplots(nrows= len(distances2plot),    
                                     ncols=1, figsize=(18, 7.5 * len(distances2plot)), sharex=False, sharey=False)
 
-            for ind in range(len(distances2plot)):
+            for ind, dist in enumerate(distances2plot):
                     
-                distDF2plot = binned_df[(binned_df['ROI'] == roi_name) &\
-                                    ((binned_df['inter_bar_dist'] == distances2plot[ind]) |\
-                                    (binned_df['inter_bar_dist'] == -1*distances2plot[ind]))]
+                distDF2plot = DF_betas_bar_coord1D[(DF_betas_bar_coord1D['ROI'] == roi_name) &\
+                                    (DF_betas_bar_coord1D['abs_inter_bar_dist'] == dist)]
 
                 #sns.scatterplot(data = distDF2plot.reset_index(drop=True),
                 #            x = 'prf_x_coord', y = 'betas', hue = 'ecc_label', 
@@ -2893,7 +2974,7 @@ class FAViewer(Viewer):
                 axs[ind].set_xlabel('pRF distance to center of Target bar (dva)', fontsize = 16)
                 axs[ind].set_ylabel('Beta PSC', fontsize = 16)
                 axs[ind].tick_params(axis='both', labelsize=14)
-                axs[ind].set_title('Inter-bar distance = %i'%ind, fontsize = 20)
+                axs[ind].set_title('Inter-bar distance = %i'%dist, fontsize = 20)
 
                 # quick fix for legen
                 handles = [mpatches.Patch(color = val, label = key) for key, val in self.MRIObj.params['plotting']['bar_ecc_pal'].items()]

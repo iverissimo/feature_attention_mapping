@@ -293,6 +293,163 @@ class Viewer:
                     viewer_params=dict(labels_visible=[],
                                         overlays_visible=overlays_visible, recache=True),
                     size=(1024 * 4, 768 * 4), trim=True, sleep=30)
+            
+    def add_data2FSsurface(self, participant, data_arr = None, mask_arr = None,
+                                surf_name = '', freesurfer_pth = None, overwrite = False,
+                                vmin = 0, vmax = 1, cmap = 'hot', n_bins = 20):
+
+        """
+        Add subject data as a custom surface file
+        in their freesurfer directory (or FS-like directory)
+
+        Parameters
+        ----------
+        participant : str 
+            subject ID
+        data_arr: array
+            data array that we want to add to a specific surface
+        mask_arr: array (bool)
+            if given, will be used to mask the data to be added to the surface
+        surf_name: str
+            name to give this new custom surface
+        freesurfer_pth: str
+            absolute path to freesurfer files
+
+        """
+
+        if freesurfer_pth is None:
+            freesurfer_pth = self.MRIObj.freesurfer_pth 
+
+        # subject path for freesurfer files
+        sub_freesurfer_pth = op.join(freesurfer_pth, 'sub-{sj}'.format(sj = participant))
+
+        if not op.isdir(sub_freesurfer_pth):
+            raise ValueError('Subject directory {sdir} DOES NOT EXIST'.format(sdir = sub_freesurfer_pth))
+        else:
+            sub_custom_surf_pth = op.join(sub_freesurfer_pth, 'custom_surf')
+            print('Saving custom surfaces in {cdir}'.format(cdir = sub_custom_surf_pth))
+            os.makedirs(sub_custom_surf_pth, exist_ok=True)
+
+        # load surface vertices, for each hemi, as dict
+        n_verts_dict, n_faces_dict = self.MRIObj.mri_utils.load_FS_nverts_nfaces(sub_id = participant, 
+                                                                                freesurfer_pth = freesurfer_pth, 
+                                                                                return_faces = True)
+
+        ## mask data, if mask was provided
+        if mask_arr is not None:
+            data_out = data_arr[mask_arr.astype(bool)]
+        else:
+            data_out = data_arr
+
+        ## actually add curvature
+        # left hemi
+        lh_surf = op.join(sub_custom_surf_pth, 'lh.{surf_name}'.format(surf_name = surf_name))
+
+        if op.exists(lh_surf) and not overwrite:
+            print('left hemi surface file already in dir, skipping')
+        else:
+            self.MRIObj.mri_utils.FS_write_curv(fn = lh_surf, 
+                                                curv = data_out[:n_verts_dict['lh']], 
+                                                fnum = n_faces_dict['lh'])
+
+        # right hemi
+        rh_surf = op.join(sub_custom_surf_pth, 'rh.{surf_name}'.format(surf_name = surf_name))
+
+        if op.exists(rh_surf) and not overwrite:
+            print('left hemi surface file already in dir, skipping')
+        else:
+            self.MRIObj.mri_utils.FS_write_curv(fn = rh_surf, 
+                                                curv = data_out[n_verts_dict['lh']:],
+                                                fnum = n_faces_dict['rh'])
+            
+        ## now make overlay_custom str
+        # which will have cmap levels to use when loading surface in freeview
+        cmap_obj = self.plot_utils.make_colormap(colormap = cmap, bins = 256, add_alpha = False, invert_alpha = False, 
+                                                cmap_name = 'custom_surf', discrete = False, return_cmap = True)
+        cmap_arr = self.plot_utils.cmap2array(cmap_obj, n_colors = n_bins, vmin = 0, vmax = 1, include_alpha = False)
+
+        # colormap steps (within data range of values)
+        data_steps = np.linspace(vmin, vmax, n_bins)
+
+        ## actually save overlay custom str
+        # left hemi
+        overlay_filename = op.join(sub_custom_surf_pth, '{surf_name}_overlay'.format(surf_name = surf_name))
+        
+        if op.exists(overlay_filename) and not overwrite:
+            print('overlay custom cmap file already in dir, skipping')
+        else:
+            overlay_custom_str = ['{val},{r},{g},{b}'.format(val = np.round(dval,2), 
+                                                    r = int(cmap_arr[i][0]*255),
+                                                    g = int(cmap_arr[i][1]*255),
+                                                    b = int(cmap_arr[i][2]*255)) for i, dval in enumerate(data_steps)]
+            overlay_custom_str = ','.join(overlay_custom_str)
+
+            self.plot_utils.save_str2file(txt = overlay_custom_str, filename = overlay_filename)
+
+        # return full path to surfaces
+        return {'hemi-L': lh_surf, 'hemi-R': rh_surf}, overlay_filename
+
+    def open_surf_freeview(self, participant, surf_names = [], freesurfer_pth = None, surf_type = 'inflated'):
+
+        """
+        Write and call freeview bash command
+        to open the specific participant surface(s) + the corresponding overlay custom cmap
+
+        Parameters
+        ----------
+        participant : str 
+            subject ID
+        surf_name: list
+            list of strs with custom surface names to load
+        freesurfer_pth: str
+            absolute path to freesurfer files
+        surf_type: str
+            type of surface to load (inflated [default], pial, sphere)
+        """
+
+        if freesurfer_pth is None:
+            freesurfer_pth = self.MRIObj.freesurfer_pth 
+
+        # subject path for freesurfer files
+        sub_freesurfer_pth = op.join(freesurfer_pth, 'sub-{sj}'.format(sj = participant))
+
+        if not op.isdir(sub_freesurfer_pth):
+            raise ValueError('Subject directory {sdir} DOES NOT EXIST'.format(sdir = sub_freesurfer_pth))
+        else:
+            sub_custom_surf_pth = op.join(sub_freesurfer_pth, 'custom_surf')
+            print('Loading custom surfaces in {cdir}'.format(cdir = sub_custom_surf_pth))
+
+        ## write command
+        working_string = """#!/bin/bash
+
+export SUBJECTS_DIR=$DATADIR
+
+cd $DATADIR
+
+freeview -f """
+
+        for ind, surf_file in enumerate(surf_names):
+
+            # load appropriate cmap values
+            ovfile = open(op.join(sub_custom_surf_pth, '{surf_name}_overlay'.format(surf_name = surf_file)), 'r')
+            ovfile_str = ovfile.read()
+
+            # add to command
+            fs_cmd = 'sub-$SJ_NR/surf/lh.{stype}:overlay={sfile}:overlay_custom={ovfile} '.format(stype = surf_type,
+                                                        sfile = op.join(sub_custom_surf_pth, 'lh.{surf_name}'.format(surf_name = surf_file)),
+                                                        ovfile = ovfile_str
+                                                        )
+            fs_cmd += fs_cmd.replace('lh.', 'rh.') # add right hemisphere as well
+
+            working_string += fs_cmd
+
+        ## replace folder path and sub number
+        working_string = working_string.replace('$DATADIR', freesurfer_pth) 
+        working_string = working_string.replace('$SJ_NR', participant) 
+
+        ## actually call command
+        os.system(working_string)
+        
 
     def convert_pix2dva(self, val_pix):
 

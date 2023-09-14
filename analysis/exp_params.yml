@@ -116,9 +116,10 @@ mri: # refers to the Psychopy SyncGenerator class
 
   dummy_TR: 5 # we used extra 5 TRs in beginning that should be disregarded
 
-  space: 'fsLR_den-170k' #'fsaverage' # space of the files to be used in analysis
+  space: 'fsnative' #'fsLR_den-170k' #'fsaverage' # space of the files to be used in analysis
 
   file_ext:  {'fsLR_den-170k': '_bold.dtseries.nii', 
+              'fsnative': '_bold.func.gii',
               'fsaverage': '_bold.func.gii'} # file extension
 
   acq: 'nordic' #'nordic' #'standard' # "acquisition" type to use
@@ -162,6 +163,13 @@ mri: # refers to the Psychopy SyncGenerator class
       sourcedata: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/DATA/sourcedata'
       singularity: ''
     
+    slurm:
+      root: '/projects/0/vusr53215/FAM/DATA'
+      matlab: ''
+      derivatives: '/scratch/derivatives'
+      sourcedata: '/scratch/sourcedata'
+      singularity: '/home/inesv/my_images'
+
     lisa:
       root: '/project/projects_verissimo/FAM/DATA'
       matlab: ''

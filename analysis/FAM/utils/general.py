@@ -23,6 +23,22 @@ class Utils:
             
         """
 
+    def save_str2file(self, txt = '', filename = ''):
+
+        """
+        Save string (example, specific command) as txt file
+
+        Parameters
+        ----------
+        txt: str
+            str to save
+        filename: str
+            absolute filename to save text
+        """
+        file2write = open(filename, 'w')
+        file2write.write(txt)
+        file2write.close()
+
     def dva_per_pix(self, height_cm = 39.3, distance_cm = 194, vert_res_pix = 1080):
 
         """ calculate degrees of visual angle per pixel, 

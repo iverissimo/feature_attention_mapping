@@ -1008,6 +1008,9 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
         Run final processing steps on functional data (after fmriprep)
         """ 
 
+        if len(hemispheres) == 0:
+            hemispheres = self.MRIObj.hemispheres
+
         # loop over participants
         for pp in self.MRIObj.sj_num:
             
@@ -1036,7 +1039,8 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
                     ### load and convert files in numpy arrays, to make format issue obsolete ###
                     # note, if we need headers or affines later on, we will need to get them from fmriprep folder
-                    bold_files = self.MRIObj.mri_utils.load_data_save_npz(bold_files, outdir = output_pth, save_subcortical=save_subcortical)
+                    bold_files = self.MRIObj.mri_utils.load_data_save_npz(bold_files, outdir = output_pth, save_subcortical=save_subcortical, 
+                                                                          hemispheres = hemispheres)
 
                     ### crop files, due to dummies TRs that were saved ##
                     # and extra ones, if we want to

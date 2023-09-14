@@ -8,6 +8,7 @@ import re, json
 from shutil import copy2
 import itertools
 import glob
+import struct
 
 ## imaging, processing, stats packages
 import nibabel as nib
@@ -1483,6 +1484,81 @@ class MRIUtils(Utils):
             z_score = scipy.stats.norm.isf(np.clip(p_val/2, 1.e-300, 1. - 1.e-16)) # deal with inf values of scipy
 
         return t_val,p_val,z_score
+
+    def load_FS_nverts_nfaces(self, sub_id = None, freesurfer_pth = None, return_faces = False):
+        
+        """
+        Load the number of vertices and faces in a given mesh
+        (Adapted from https://github.com/gallantlab/pycortex)
+        and return dict for both hemispheres
+
+        Parameters
+        ----------
+        sub_id : str 
+            subject ID
+        freesurfer_pth: str
+            absolute path to freesurfer files
+        return_faces: bool
+            if we also want to return faces, or only vertices 
+        """    
+        n_faces = []
+        n_verts = []
+        for i in ['lh', 'rh']:
+            surf = op.join(freesurfer_pth, 'sub-{sj}'.format(sj = sub_id), 'surf', f'{i}.inflated')
+            with open(surf, 'rb') as fp:
+                #skip magic
+                fp.seek(3)
+                fp.readline()
+                comment = fp.readline()            
+                i_verts, i_faces = struct.unpack('>2I', fp.read(8))
+                n_verts.append(i_verts)    
+                n_faces.append(i_faces)    
+
+        n_verts_dict = {'lh': n_verts[0], 'rh': n_verts[1]}
+        n_faces_dict = {'lh': n_faces[0], 'rh': n_faces[1]}
+
+        if return_faces:
+            return n_verts_dict, n_faces_dict
+        else:
+            return n_verts_dict
+
+    def FS_write_curv(self, fn = None, curv = None, fnum = None):
+        
+        """
+        Writes a freesurfer .curv file 
+        (based on Marcus Daghlian's implementation, credits go to him)
+
+        Parameters
+        ------------
+        fn: str
+            File name to be written
+        curv: ndaray
+            Data array to be written
+        fnum: int
+            Number of faces in the mesh
+        """
+        
+        NEW_VERSION_MAGIC_NUMBER = 16777215
+        vnum = len(curv)
+        with open(fn, 'wb') as f:
+            self.write_3byte_integer(f, NEW_VERSION_MAGIC_NUMBER)
+            f.write(struct.pack(">i", int(vnum)))
+            f.write(struct.pack('>i', int(fnum)))
+            f.write(struct.pack('>i', 1))
+            f.write(curv.astype('>f').tobytes())
+            f.close()
+
+    def write_3byte_integer(self, f, n):
+        
+        """"
+        helper function for FS_write_curv 
+        """
+        b1 = struct.pack('B', (n >> 16) & 255)
+        b2 = struct.pack('B', (n >> 8) & 255)
+        b3 = struct.pack('B', (n & 255))
+        f.write(b1)
+        f.write(b2)
+        f.write(b3)
 
 
     def CV_FA(voxel,dm,betas):

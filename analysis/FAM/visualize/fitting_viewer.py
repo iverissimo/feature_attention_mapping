@@ -1852,7 +1852,7 @@ class FAViewer(Viewer):
 
                         # add legend
                         handleA = mpatches.Patch(facecolor = 'red', edgecolor = 'k', label = 'target')
-                        handleB= mpatches.Patch( facecolor = 'blue', edgecolor = 'k', label = 'distractor')
+                        handleB= mpatches.Patch( facecolor = 'blue', edgecolor = 'k', label = 'target')
                         leg = axs[tuple(position_matrix[counter])].legend(handles = [handleA,handleB], loc = 'upper right')
 
                         axs[tuple(position_matrix[counter])].set_xlim(np.array([- 1, 1]) * max_ecc_ext)

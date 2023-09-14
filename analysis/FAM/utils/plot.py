@@ -431,6 +431,21 @@ class PlotUtils(Utils):
             return cmap
         else:
             return rgb_fn 
+        
+    def cmap2array(self, cmap, n_colors = 5, vmin = 0, vmax = 1, include_alpha = False):
+
+        """
+        Transform cmap linear object - from matplotlib or make_colormap function - 
+        to np.array of RGB(A) color codes
+        """
+
+        cmap_arr = cmap(np.linspace(vmin, vmax, n_colors))
+
+        if not include_alpha:
+            cmap_arr = cmap_arr[...,:-1]
+        
+        return cmap_arr
+
 
     def make_2D_colormap(self, rgb_color = '101', bins = 50, scale=[1,1]):
         

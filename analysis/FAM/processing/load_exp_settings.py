@@ -239,6 +239,9 @@ class MRIData(BehData):
         ## if we did slicetime correction
         self.stc = self.params['mri']['slicetimecorrection']
 
+        ## hemisphere keys (if using giftis)
+        self.hemispheres = ['hemi-L','hemi-R']
+
         # initialize utilities class
         self.mri_utils = MRIUtils() 
         

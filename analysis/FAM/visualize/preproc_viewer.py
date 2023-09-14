@@ -595,37 +595,59 @@ freeview -v \
 
             # and over sessions (if more than one)
             for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
-                
-                # path to post fmriprep dir
-                postfmriprep_pth = op.join(input_pth, 'sub-{sj}'.format(sj=pp), ses)
 
                 ## bold filenames
-                bold_files = [op.join(postfmriprep_pth, run) for run in os.listdir(postfmriprep_pth) if 'space-{sp}'.format(sp=self.MRIObj.sj_space) in run \
-                                    and 'acq-{a}'.format(a=self.MRIObj.acq) in run and 'task-pRF' in run and run.endswith(file_ext['pRF'])]
+                bold_files = self.MRIObj.mri_utils.get_bold_file_list(pp, task = 'pRF', ses = ses, file_ext = file_ext['pRF'],
+                                                                postfmriprep_pth = input_pth, acq_name = self.MRIObj.acq,
+                                                                run_list = [])
+                ## use-non PSC files
+                bold_files = [fname.replace(file_ext['pRF'], '_cropped.npy') if 'cropped' in fname else fname.replace(file_ext['pRF'], '.npy') for fname in bold_files]
+                        
+                norm_data = []
+                # if using surface data
+                if self.MRIObj.sj_space in ['fsnative', 'fsaverage']:
+                    
+                    # need to load per hemi
+                    for hemi in self.MRIObj.hemispheres:
+                        hemi_bold_files = [fname for fname in bold_files if hemi in fname]
+                        # load runs
+                        # and average the EPI time course
+                        data_arr = np.nanmean(np.nanmean(np.stack((np.load(val, allow_pickle=True) for val in hemi_bold_files)), 
+                                            axis = 0), axis=-1)
+                        # normalize image by dividing the value of each vertex 
+                        # by the value of the vertex with the maximum intensity
+                        norm_data.append(self.MRIObj.mri_utils.normalize(data_arr))
+                    
+                    # make it dict, for bookeeping
+                    norm_data = {self.MRIObj.hemispheres[0]:norm_data[0], self.MRIObj.hemispheres[1]:norm_data[1]}
 
-                mean_epi = []
-                for file in bold_files:
-                    ## use non-PSC file
-                    if 'cropped' in file:
-                        file = file.replace(file_ext['pRF'], '_cropped.npy')
-                    else:
-                        file = file.replace(file_ext['pRF'], '.npy')
-                    mean_epi.append(np.load(file,allow_pickle=True)) 
+                    ## plot 'vein map' on inflated freeview surface
+                    fig_name = op.join(outdir,
+                                    'mean_epi_inflated_sub-{sj}_{ses}_space-{sp}_task-pRF.png'.format(sj=pp, ses=ses, sp = self.MRIObj.sj_space))
+                    
+                    # first add surface to freesurfer custom folder
+                    self.add_data2FSsurface(pp, data_arr = np.hstack((norm_data['hemi-L'],norm_data['hemi-R'])), 
+                                        mask_arr = None, surf_name = 'mean_epi', overwrite = False,
+                                        vmin = 0, vmax = 1, cmap = 'hot', n_bins = 20)
+                    # then save image
+                    self.open_surf_freeview(pp, surf_names = ['mean_epi'], surf_type = ['inflated'], screenshot_filename = fig_name)
 
-                # average the EPI time course
-                mean_epi = np.nanmean(np.nanmean(mean_epi, axis=0), axis=-1)
-                
-                # normalize image by dividing the value of each vertex 
-                # by the value of the vertex with the maximum intensity
-                norm_data = self.MRIObj.mri_utils.normalize(mean_epi)
+                else:
+                    # load runs
+                    # and average the EPI time course
+                    mean_epi = np.nanmean(np.nanmean(np.stack((np.load(val, allow_pickle=True) for val in bold_files)), 
+                                            axis = 0), axis=-1)
+                    # normalize image by dividing the value of each vertex 
+                    # by the value of the vertex with the maximum intensity
+                    norm_data = self.MRIObj.mri_utils.normalize(mean_epi)
 
-                ## plot 'vein map' on flatmap surface ##
-                fig_name = op.join(outdir,
-                                'mean_epi_flatmap_sub-{sj}_{ses}_task-pRF.png'.format(sj=pp, ses=ses))
-                self.plot_utils.plot_flatmap(norm_data, 
-                                            pysub = self.pysub, cmap='hot', 
-                                            vmin1 = 0, vmax1 = 1, 
-                                            fig_abs_name = fig_name)
+                    ## plot 'vein map' on flatmap surface ##
+                    fig_name = op.join(outdir,
+                                    'mean_epi_flatmap_sub-{sj}_{ses}_task-pRF.png'.format(sj=pp, ses=ses))
+                    self.plot_utils.plot_flatmap(norm_data, 
+                                                pysub = self.pysub, cmap='hot', 
+                                                vmin1 = 0, vmax1 = 1, 
+                                                fig_abs_name = fig_name)
 
     def plot_bold_on_surface(self, participant_list = [], input_pth = None, run_num = 'mean', ses_num = 1,
                              task = 'pRF', stim_on_screen = None,

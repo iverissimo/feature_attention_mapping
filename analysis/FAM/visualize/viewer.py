@@ -389,7 +389,7 @@ class Viewer:
         # return full path to surfaces
         return {'hemi-L': lh_surf, 'hemi-R': rh_surf}, overlay_filename
 
-    def open_surf_freeview(self, participant, surf_names = [], freesurfer_pth = None, surf_type = 'inflated'):
+    def open_surf_freeview(self, participant, surf_names = [], freesurfer_pth = None, surf_type = ['inflated'], screenshot_filename = None):
 
         """
         Write and call freeview bash command
@@ -403,8 +403,8 @@ class Viewer:
             list of strs with custom surface names to load
         freesurfer_pth: str
             absolute path to freesurfer files
-        surf_type: str
-            type of surface to load (inflated [default], pial, sphere)
+        surf_type: list
+            list of str with type of surface to load (inflated [default], pial, sphere)
         """
 
         if freesurfer_pth is None:
@@ -428,27 +428,47 @@ cd $DATADIR
 
 freeview -f """
 
-        for ind, surf_file in enumerate(surf_names):
+        for stype in surf_type: # iterate over surface types
 
-            # load appropriate cmap values
-            ovfile = open(op.join(sub_custom_surf_pth, '{surf_name}_overlay'.format(surf_name = surf_file)), 'r')
-            ovfile_str = ovfile.read()
+            for ind, surf_file in enumerate(surf_names): # iterate over data surfaces
 
-            # add to command
-            fs_cmd = 'sub-$SJ_NR/surf/lh.{stype}:overlay={sfile}:overlay_custom={ovfile} '.format(stype = surf_type,
-                                                        sfile = op.join(sub_custom_surf_pth, 'lh.{surf_name}'.format(surf_name = surf_file)),
-                                                        ovfile = ovfile_str
-                                                        )
-            fs_cmd += fs_cmd.replace('lh.', 'rh.') # add right hemisphere as well
+                # load appropriate cmap values
+                ovfile = open(op.join(sub_custom_surf_pth, '{surf_name}_overlay'.format(surf_name = surf_file)), 'r')
+                ovfile_str = ovfile.read()
 
-            working_string += fs_cmd
+                # add to command
+                fs_cmd = 'sub-$SJ_NR/surf/lh.{stype}:overlay={sfile}:overlay_custom={ovfile} '.format(stype = stype,
+                                                            sfile = op.join(sub_custom_surf_pth, 'lh.{surf_name}'.format(surf_name = surf_file)),
+                                                            ovfile = ovfile_str
+                                                            )
+                fs_cmd += fs_cmd.replace('lh.', 'rh.') # add right hemisphere as well
+
+                working_string += fs_cmd
 
         ## replace folder path and sub number
         working_string = working_string.replace('$DATADIR', freesurfer_pth) 
         working_string = working_string.replace('$SJ_NR', participant) 
 
-        ## actually call command
-        os.system(working_string)
+        # if we want to save image --> should turn into function. also need to adapt for when loading several overlay layers, and want to screenshot each
+        if screenshot_filename is not None:
+
+            # load camera params
+            cam_params = self.MRIObj.params['plotting']['freeview']['camera_params']
+
+            ## add relevant params to command string
+            photo_cmd = working_string+' -ss {image_name} --colorscale \
+                --camera Azimuth {cam_azimuth} \
+                    Zoom {cam_zoom} Elevation {cam_elevation} \
+                        Roll {cam_roll} '.format(image_name = screenshot_filename.replace('.png', '_backview.png'),
+                                                 cam_azimuth = cam_params['azimuth']['back'],
+                                                 cam_zoom = cam_params['zoom']['back'],
+                                                 cam_elevation = cam_params['elevation']['back'],
+                                                 cam_roll = cam_params['roll']['back'])
+            ## actually call command
+            os.system(photo_cmd) 
+        else:
+            ## actually call command
+            os.system(working_string)
         
 
     def convert_pix2dva(self, val_pix):

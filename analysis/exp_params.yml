@@ -353,6 +353,13 @@ plotting:
                     'inflated_less': {'surface.{subject}.unfold': 0.35,},
                     }
 
+  freeview:
+    camera_params:
+      azimuth: {'back': 93}
+      zoom: {'back': 1.32}
+      elevation: {'back': 4}
+      roll: {'back': 1}
+
   rsq_threshold: .2 #.1 #.25 
 
 

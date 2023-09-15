@@ -285,7 +285,7 @@ class pRF_model(Model):
     def fit_data(self, participant, pp_models, ses = 'mean',
                     run_type = 'mean', chunk_num = None, vertex = [], ROI = None,
                     model2fit = 'gauss', file_ext = '_cropped_dc_psc.npy', 
-                    outdir = None, save_estimates = False,
+                    outdir = None, save_estimates = False, hemisphere = 'BH',
                     xtol = 1e-3, ftol = 1e-4, n_jobs = 16, rsq_threshold = 0.05):
 
         """
@@ -303,18 +303,20 @@ class pRF_model(Model):
             file extension, to select appropriate files
         mask_DM: bool
             if we want to mask design matrix given behavioral performance
+        hemisphere: str
+            if we want to fit both hemis [default] or only one (LH or RH)
         """  
 
         ## get list of files to load
         bold_filelist = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext,
                                                                 postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
-                                                                acq_name = self.MRIObj.acq)
+                                                                acq_name = self.MRIObj.acq, hemisphere = hemisphere)
                         
         ## if we want an ROI, then get vertices
         if ROI is not None:
             ## get vertices for each relevant ROI
             ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = participant, pysub = self.pysub, use_atlas = self.use_atlas, 
-                                                            annot_filename = self.annot_filename, hemisphere = 'BH',
+                                                            annot_filename = self.annot_filename, hemisphere = hemisphere,
                                                             ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
             if len(vertex) == 0:
                 vertex = ROIs_dict[ROI]
@@ -348,17 +350,8 @@ class pRF_model(Model):
         print('saving files in %s'%outdir)
 
         ## set base filename that will be used for estimates
-        basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
-                                                                        acq = self.MRIObj.acq,
-                                                                        rt = run_type)
-        if chunk_num is not None:
-            basefilename += '_chunk-{ch}'.format(ch = str(chunk_num).zfill(3))
-        elif ROI is not None:
-            basefilename += '_ROI-{roi}'.format(roi = str(ROI))
-        elif vertex is not None:
-            basefilename += '_vertex-{ver}'.format(ver = str(vertex))
-        
-        basefilename += file_ext.replace('.npy', '.npz')
+        basefilename = self.get_estimates_basefilename(participant=participant, run_type=run_type, hemisphere=hemisphere, 
+                                                       chunk_num=chunk_num, vertex=vertex, ROI=ROI, file_ext=file_ext)
 
         ## set model parameters 
         # relevant for grid and iterative fitting
@@ -513,6 +506,35 @@ class pRF_model(Model):
                 estimates['it_{key}'.format(key = model2fit)] = fitter.iterative_search_params
 
             return estimates, masked_data
+        
+    def get_estimates_basefilename(self, participant, run_type = 'mean', hemisphere = 'BH', 
+                                   chunk_num = None, vertex = [], ROI = None, file_ext = '_cropped_dc_psc.npy'):
+        
+        """
+        create base str for estimates filename 
+        (might want to later adapt and include model-specific filename)
+        """
+
+        ## set base filename that will be used for estimates
+        basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
+                                                                        acq = self.MRIObj.acq,
+                                                                        rt = run_type)
+        # if we want specific hemisphere
+        if hemisphere in ['LH', 'hemi-L', 'left']:
+            basefilename += '_hemi-L'
+        elif hemisphere in ['RH', 'hemi-R', 'right']:
+            basefilename += '_hemi-R'
+
+        if chunk_num is not None:
+            basefilename += '_chunk-{ch}'.format(ch = str(chunk_num).zfill(3))
+        elif ROI is not None:
+            basefilename += '_ROI-{roi}'.format(roi = str(ROI))
+        elif vertex is not None:
+            basefilename += '_vertex-{ver}'.format(ver = str(vertex))
+        
+        basefilename += file_ext.replace('.npy', '.npz')
+
+        return basefilename
 
     def get_fit_startparams(self, max_ecc_size = 6):
 

@@ -342,7 +342,7 @@ class MRIUtils(Utils):
             return tsnr
 
     def get_bold_file_list(self, participant, task = 'pRF', ses = 'mean', file_ext = '_cropped_dc_psc.npy',
-                                postfmriprep_pth = '', acq_name = 'nordic', run_list = []):
+                                postfmriprep_pth = '', acq_name = 'nordic', run_list = [], hemisphere = 'BH'):
 
         """
         Helper function to get list of bold file names
@@ -371,13 +371,20 @@ class MRIUtils(Utils):
             ses_key = 'ses-{s}'.format(s = re.findall(r'\d{1,10}', str(ses))[0])
             bold_filelist = [file for file in bold_filelist if ses_key in file]
 
+        # if we only want specific runs
         if len(run_list)>0:
             tmp_boldlist = []
             for rn in run_list:
                 tmp_boldlist += [val for val in bold_filelist if 'run-{r}'.format(r=rn) in val]
             
             bold_filelist = tmp_boldlist
-        
+
+        # if we want specific hemisphere
+        if hemisphere in ['LH', 'hemi-L', 'left']:
+            bold_filelist = [file for file in bold_filelist if 'hemi-L' in file] 
+        elif hemisphere in ['RH', 'hemi-R', 'right']:
+            bold_filelist = [file for file in bold_filelist if 'hemi-R' in file] 
+
         return bold_filelist
 
     def smooth_surface(self, data, pysub = 'hcp_999999', kernel=3, nr_iter=3, normalize = False):

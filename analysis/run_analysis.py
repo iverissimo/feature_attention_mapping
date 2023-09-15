@@ -97,6 +97,11 @@ parser.add_argument("--atlas",
                     default = None,
                     help = "If we want to use atlas ROIs (ex: glasser, wang) or not [default]."
                     )
+parser.add_argument("--hemisphere", 
+                    type = str, 
+                    default = 'BH',
+                    help = "Which hemisphere to fit - LH, RH, BH [default]]."
+                    )
 
 # parse the command line
 args = parser.parse_args()
@@ -116,6 +121,7 @@ run_type = args.run_type
 ses2fit = args.ses2fit 
 fa_model_name = args.fa_model_name
 use_atlas = args.atlas
+hemisphere = args.hemisphere
 
 # vertex list
 if len(args.vertex)>0:
@@ -147,6 +153,10 @@ FAM_pRF = pRF_model(FAM_data, use_atlas = use_atlas)
 FAM_pRF.model_type['pRF'] = prf_model_name
 FAM_pRF.fit_hrf = fit_hrf
 
+# make list of hemispheres to be fitted (useful for when using giftis)
+hemis2fit = [hemisphere]
+if FAM_data.sj_space in ['fsnative', 'fsaverage'] and hemisphere == 'BH':
+    hemis2fit = ['hemi-L', 'hemi-R']
 
 ## run specific steps ##
 match task:
@@ -176,13 +186,14 @@ match task:
             start_time = time.time()
 
             for pp in FAM_data.sj_num:
+                for hemi in hemis2fit: # iterate over hemispheres
 
-                FAM_pRF.fit_data(pp, pp_prf_models, 
-                                ses = ses2fit, run_type = run_type, file_ext = FAM_mri.get_mrifile_ext()['pRF'],
-                                vertex = vertex, chunk_num = chunk_num, ROI = ROI,
-                                model2fit = prf_model_name,
-                                save_estimates = True,
-                                xtol = 1e-3, ftol = 1e-4, n_jobs = n_jobs)
+                    FAM_pRF.fit_data(pp, pp_prf_models, 
+                                    ses = ses2fit, run_type = run_type, file_ext = FAM_mri.get_mrifile_ext()['pRF'],
+                                    vertex = vertex, chunk_num = chunk_num, ROI = ROI,
+                                    model2fit = prf_model_name, hemisphere = hemi,
+                                    save_estimates = True,
+                                    xtol = 1e-3, ftol = 1e-4, n_jobs = n_jobs)
 
             print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
 

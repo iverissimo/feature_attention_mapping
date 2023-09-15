@@ -126,8 +126,8 @@ def main():
 
 
 def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00:00', task = 'pRF',
-                            model_name = 'gauss', partition_name = None, node_name = None, batch_mem_Gib = 90, 
-                            batch_dir ='/home/inesv/batch', send_email = False):
+                            model_name = 'gauss', partition_name = None, node_name = None, batch_mem_Gib = None, 
+                            batch_dir ='/home/inesv/batch', send_email = False, n_cpus = 128, n_nodes = 1):
 
         """
         Submit slurm jobs, to fit pRF model on data
@@ -164,10 +164,13 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
         else:
             ch_list = [None]
 
+        ## number of jobs will be nodes x cpus -2 (to avoid memory issues)
+        n_jobs = int((n_cpus * n_nodes) - 2)
+
         # get base format for bash script
         bash_basetxt = make_SLURM_script(run_time = run_time, logfilename = 'slurm_{tsk}_{md}_fit'.format(md = model_name, tsk = task), 
                                               partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
-                                              task = task, batch_dir = batch_dir, send_email = send_email)
+                                              task = task, batch_dir = batch_dir, send_email = send_email, n_cpus = n_cpus, n_nodes=n_nodes)
            
         # loop over participants
         for pp in participant_list:
@@ -176,8 +179,8 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
                 
                 # set fitting model command 
                 fit_cmd = """python run_analysis.py --subject {pp} --cmd fitmodel --task {task} --dir {dir} --ses2fit {ses} --run_type {rt} \
---prf_model_name {prf_mod} --fa_model_name {fa_mod} --wf_dir $TMPDIR """.format(pp = pp, task = task, dir = system_dir,
-                                                        ses = ses2fit, rt = run_type, prf_mod = prf_model_name, fa_mod = fa_model_name)
+--prf_model_name {prf_mod} --fa_model_name {fa_mod} --n_jobs {n_jobs} --wf_dir $TMPDIR """.format(pp = pp, task = task, dir = system_dir,
+                                                        ses = ses2fit, rt = run_type, prf_mod = prf_model_name, fa_mod = fa_model_name, n_jobs = n_jobs)
                 # if chunking data
                 if ch is not None:
                      fit_cmd += '--chunk_num {ch} '.format(ch = ch)
@@ -188,9 +191,10 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
 
                 fit_cmd += """\n\n"""
 
-                ## replace command and subject number in base string
+                ## replace command, subject number and scratch dir in base string
                 working_string = bash_basetxt.replace('$SJ_NR', pp)
                 working_string = working_string.replace('$PY_CMD', fit_cmd)
+                working_string = working_string.replace('$TMPDIR', '/scratch-shared/$USER/FAM') 
 
                 print(working_string)
 
@@ -202,11 +206,11 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
                 of.close()
 
                 print('submitting ' + js_name + ' to queue')
-                os.system('sbatch ' + js_name)
+                #os.system('sbatch ' + js_name)
 
 
-def make_SLURM_script(run_time = '10:00:00', logfilename = '', partition_name = None, node_name = None, batch_mem_Gib = 90, task = 'pRF', 
-                          batch_dir = '/home/inesv/batch', send_email = False):
+def make_SLURM_script(run_time = '10:00:00', logfilename = '', partition_name = None, node_name = None, batch_mem_Gib = None, task = 'pRF', 
+                          batch_dir = '/home/inesv/batch', send_email = False, n_cpus = 32, n_nodes = 1):
 
         """
         Set up bash script, with generic structure 
@@ -234,18 +238,20 @@ def make_SLURM_script(run_time = '10:00:00', logfilename = '', partition_name = 
 
         slurm_cmd = """#!/bin/bash
 #SBATCH -t {rtime}
-#SBATCH -N 1
+#SBATCH -N {n_nodes}
 #SBATCH -v
-#SBATCH --cpus-per-task=16
-#SBATCH --output=$BD/{logfilename}_%A.out\n""".format(rtime = run_time, logfilename = logfilename)
+#SBATCH --ntasks-per-node={n_cpus}
+#SBATCH --output=$BD/{logfilename}_%A.out\n""".format(rtime = run_time, logfilename = logfilename, n_nodes = n_nodes, n_cpus = n_cpus)
         
+        # if we want a specific node/partition
         if partition_name is not None:
-            slurm_cmd += '#SBATCH --partition {p}\n'.format(p=partition_name)
+            slurm_cmd += '#SBATCH --partition={p}\n'.format(p=partition_name)
         if node_name is not None:
             slurm_cmd += '#SBATCH -w {n}\n'.format(n=node_name)
 
         # add memory for node
-        slurm_cmd += '#SBATCH --mem={mem}G\n'.format(mem=batch_mem_Gib)
+        if batch_mem_Gib is not None:
+            slurm_cmd += '#SBATCH --mem={mem}G\n'.format(mem=batch_mem_Gib)
 
         if task == 'pRF':
             slurm_cmd = slurm_cmd + """# call the programs
@@ -311,7 +317,7 @@ wait
 
 wait          # wait until programs are finished
 
-rsync -chavzP $TMPDIR/derivatives/ $DERIV_DIR
+rsync -chavzP --exclude=".*" $TMPDIR/derivatives/ $DERIV_DIR
 
 wait          # wait until programs are finished
 

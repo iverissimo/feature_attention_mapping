@@ -179,7 +179,7 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
         n_jobs = int((n_cpus -1) * n_nodes)
 
         # get base format for bash script
-        bash_basetxt = make_SLURM_script(run_time = run_time, logfilename = 'slurm_{tsk}_{md}_fit'.format(md = model_name, tsk = task), 
+        bash_basetxt = make_SLURM_script(run_time = run_time, logfilename = 'slurm_FAM_{tsk}_{md}_fit'.format(md = model_name, tsk = task), 
                                               partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
                                               task = task, batch_dir = batch_dir, send_email = send_email, n_cpus = n_cpus, n_nodes=n_nodes)
            
@@ -210,14 +210,14 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
                 print(working_string)
 
                 # run it
-                js_name = op.join(working_string, '{fname}_sub-{sj}_chunk-{ch}_run-{r}_FAM.sh'.format(fname=FAM_data.params['mri']['fitting'][task]['fit_folder'],
-                                                                                        ch = ch, sj = pp, r = run_type))
+                js_name = op.join(batch_dir, '{fname}_model-{m}_sub-{sj}_chunk-{ch}_run-{r}_FAM.sh'.format(fname=FAM_data.params['mri']['fitting'][task]['fit_folder'],
+                                                                                        ch = ch, sj = pp, r = run_type, m = prf_model_name))
                 of = open(js_name, 'w')
                 of.write(working_string)
                 of.close()
 
                 print('submitting ' + js_name + ' to queue')
-                #os.system('sbatch ' + js_name)
+                os.system('sbatch ' + js_name)
 
 
 def make_SLURM_script(run_time = '10:00:00', logfilename = '', partition_name = None, node_name = None, batch_mem_Gib = None, task = 'pRF', 

@@ -66,7 +66,8 @@ class FAMData:
         # project root folder
         self.proj_root_pth = self.params['mri']['paths'][self.base_dir]['root']
 
-        self.batch_dir = op.join(self.proj_root_pth, 'batch')
+        # place to save batch files
+        self.batch_dir = op.join('$HOME', 'batch')
 
         # in case we are computing things in a different workflow dir
         # useful when fitting models in /scratch node

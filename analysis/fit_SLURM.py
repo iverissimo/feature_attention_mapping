@@ -47,8 +47,7 @@ parser.add_argument("--partition_name",
                     )
 parser.add_argument("--batch_mem_Gib", 
                     type = int, 
-                    default = 90,
-                    help = "Node memory limit [default 90]"
+                    help = "Node memory limit, ex: 90 [default None]"
                     )
 parser.add_argument("--email", 
                     action = 'store_true',
@@ -85,6 +84,16 @@ parser.add_argument("--fa_model_name",
                     default = 'glmsingle',
                     help="Type of FA model to fit: glmsingle [default], gain, glm, etc...]"
                     )
+parser.add_argument("--n_cpus", 
+                    type = int, 
+                    default = 32,
+                    help = "Number of CPUs per node [default 32]"
+                    )
+parser.add_argument("--n_nodes", 
+                    type = int, 
+                    default = 1,
+                    help = "Number of nodes [default 1]"
+                    )
 
 # parse the command line
 args = parser.parse_args()
@@ -105,6 +114,8 @@ fit_hrf = args.fit_hrf
 run_type = args.run_type
 ses2fit = args.ses2fit # 'ses-mean'
 fa_model_name = args.fa_model_name
+n_cpus = args.n_cpus
+n_nodes = args.n_nodes
 
 ## Load data object --> as relevant paths, variables and utility functions
 print("Fitting data for subject {sj}!".format(sj=sj))
@@ -122,7 +133,7 @@ def main():
 
     submit_SLURMjobs(participant_list = FAM_data.sj_num, chunk_data = chunk_data, run_time = run_time, task = task,
                             model_name = model_name, partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
-                            batch_dir = FAM_data.batch_dir, send_email = send_email)
+                            batch_dir = FAM_data.batch_dir, send_email = send_email, n_cpus = n_cpus, n_nodes = n_nodes)
 
 
 def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00:00', task = 'pRF',
@@ -165,7 +176,7 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
             ch_list = [None]
 
         ## number of jobs will be nodes x cpus -2 (to avoid memory issues)
-        n_jobs = int((n_cpus * n_nodes) - 2)
+        n_jobs = int((n_cpus -1) * n_nodes)
 
         # get base format for bash script
         bash_basetxt = make_SLURM_script(run_time = run_time, logfilename = 'slurm_{tsk}_{md}_fit'.format(md = model_name, tsk = task), 

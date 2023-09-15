@@ -126,6 +126,8 @@ hemisphere = args.hemisphere
 # vertex list
 if len(args.vertex)>0:
     vertex = [int(val) for val in args.vertex]
+else:
+    vertex = []
 
 # ROI name
 ROI = args.ROI

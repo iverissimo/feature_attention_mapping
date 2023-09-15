@@ -1,5 +1,6 @@
 import numpy as np
 import os.path as op
+import os
 import yaml
 import glob
 
@@ -67,7 +68,7 @@ class FAMData:
         self.proj_root_pth = self.params['mri']['paths'][self.base_dir]['root']
 
         # place to save batch files
-        self.batch_dir = op.join('$HOME', 'batch')
+        self.batch_dir = op.join(os.getenv("HOME"), 'batch')
 
         # in case we are computing things in a different workflow dir
         # useful when fitting models in /scratch node

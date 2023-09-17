@@ -323,6 +323,7 @@ class pRF_model(Model):
             else:
                 vertex = ROIs_dict[ROI][vertex]
 
+        print(bold_filelist)
         ## Load data array
         data = self.get_data4fitting(bold_filelist, task = 'pRF', run_type = run_type, chunk_num = chunk_num, vertex = vertex,
                                     baseline_interval = 'empty_long', ses = ses, return_filenames = False)

@@ -116,7 +116,7 @@ mri: # refers to the Psychopy SyncGenerator class
 
   dummy_TR: 5 # we used extra 5 TRs in beginning that should be disregarded
 
-  space: 'fsnative' #'fsLR_den-170k' #'fsaverage' # space of the files to be used in analysis
+  space: 'fsnative' #'fsnative' #'fsLR_den-170k' #'fsaverage' # space of the files to be used in analysis
 
   file_ext:  {'fsLR_den-170k': '_bold.dtseries.nii', 
               'fsnative': '_bold.func.gii',

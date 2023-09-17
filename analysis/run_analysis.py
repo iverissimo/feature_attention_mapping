@@ -137,7 +137,7 @@ print("\nFitting data for subject {sj}!".format(sj=sj))
 
 FAM_data = load_exp_settings.MRIData(params, sj, 
                                     repo_pth = op.split(load_exp_settings.__file__)[0], 
-                                    base_dir = system_dir, exclude_sj = exclude_sj)
+                                    base_dir = system_dir, exclude_sj = exclude_sj, wf_dir = wf_dir)
 
 print('Subject list is {l}\n'.format(l=str(FAM_data.sj_num)))
 

@@ -362,6 +362,10 @@ class pRF_model(Model):
         # for now only changes minimizer used, but can also be useful to put contraints on dog and dn
         constraints = self.get_fit_constraints(method = self.optimizer['pRF'], ss_larger_than_centre = True, 
                                                 positive_centre_only = True, normalize_RFs = False)
+        
+        ## set hrf grid
+        hrf_1_grid=np.linspace(0,10,10)
+        hrf_2_grid=np.linspace(0,0,1)
 
         ## ACTUALLY FIT 
 
@@ -383,14 +387,15 @@ class pRF_model(Model):
             print("Gauss model GRID fit")
             gauss_fitter = Iso2DGaussianFitter(data = masked_data, 
                                                 model = pp_models['sub-{sj}'.format(sj = participant)]['ses-{s}'.format(s = ses)]['gauss_model'], 
-                                                n_jobs = n_jobs,
-                                                fit_hrf = self.fit_hrf)
+                                                n_jobs = n_jobs)
 
             gauss_fitter.grid_fit(ecc_grid = fit_params['gauss']['eccs'], 
                                     polar_grid = fit_params['gauss']['polars'], 
                                     size_grid = fit_params['gauss']['sizes'], 
                                     fixed_grid_baseline = fit_params['gauss']['fixed_grid_baseline'],
-                                    grid_bounds = fit_params['gauss']['grid_bounds'])
+                                    grid_bounds = fit_params['gauss']['grid_bounds'],
+                                    hrf_1_grid=hrf_1_grid,
+                                    hrf_2_grid=hrf_2_grid)
 
             # iterative fit
             print("Gauss model ITERATIVE fit")
@@ -429,43 +434,52 @@ class pRF_model(Model):
                     fitter = CSS_Iso2DGaussianFitter(data = masked_data, 
                                                     model = pp_models['sub-{sj}'.format(sj = participant)]['ses-{s}'.format(s = ses)]['{key}_model'.format(key = model2fit)], 
                                                     n_jobs = n_jobs,
-                                                    fit_hrf = self.fit_hrf,
-                                                    previous_gaussian_fitter = gauss_fitter)
+                                                    previous_gaussian_fitter = gauss_fitter,
+                                                    use_previous_gaussian_fitter_hrf=self.fit_hrf)
 
                     fitter.grid_fit(fit_params['css']['n_grid'],
                                 fixed_grid_baseline = fit_params['css']['fixed_grid_baseline'],
                                 grid_bounds = fit_params['css']['grid_bounds'],
-                                rsq_threshold = rsq_threshold)
+                                rsq_threshold = rsq_threshold,
+                                hrf_1_grid=hrf_1_grid,
+                                hrf_2_grid=hrf_2_grid)
                 
                 elif model2fit == 'dn':
 
                     fitter = Norm_Iso2DGaussianFitter(data = masked_data, 
                                                     model = pp_models['sub-{sj}'.format(sj = participant)]['ses-{s}'.format(s = ses)]['{key}_model'.format(key = model2fit)], 
                                                     n_jobs = n_jobs,
-                                                    fit_hrf = self.fit_hrf,
-                                                    previous_gaussian_fitter = gauss_fitter)
+                                                    previous_gaussian_fitter = gauss_fitter,
+                                                    use_previous_gaussian_fitter_hrf=self.fit_hrf)
 
-                    fitter.grid_fit(fit_params['dn']['surround_amplitude_grid'],
-                                    fit_params['dn']['surround_size_grid'],
-                                    fit_params['dn']['neural_baseline_grid'],
-                                    fit_params['dn']['surround_baseline_grid'],
+                    fitter.grid_fit(surround_amplitude_grid = fit_params['dn']['surround_amplitude_grid'],
+                                    surround_size_grid = fit_params['dn']['surround_size_grid'],
+                                    neural_baseline_grid = fit_params['dn']['neural_baseline_grid'],
+                                    surround_baseline_grid = fit_params['dn']['surround_baseline_grid'],
                                 fixed_grid_baseline = fit_params['dn']['fixed_grid_baseline'],
                                 grid_bounds = fit_params['dn']['grid_bounds'],
-                                rsq_threshold = rsq_threshold)
+                                rsq_threshold = rsq_threshold,
+                                hrf_1_grid=hrf_1_grid,
+                                hrf_2_grid=hrf_2_grid,
+                                ecc_grid = fit_params['gauss']['eccs'][:10], 
+                                polar_grid = fit_params['gauss']['polars'][:10], 
+                                size_grid = fit_params['gauss']['sizes'][:10])
 
                 elif model2fit == 'dog':
 
                     fitter = DoG_Iso2DGaussianFitter(data = masked_data, 
                                                     model = pp_models['sub-{sj}'.format(sj = participant)]['ses-{s}'.format(s = ses)]['{key}_model'.format(key = model2fit)], 
                                                     n_jobs = n_jobs,
-                                                    fit_hrf = self.fit_hrf,
-                                                    previous_gaussian_fitter = gauss_fitter)
+                                                    previous_gaussian_fitter = gauss_fitter,
+                                                    use_previous_gaussian_fitter_hrf=self.fit_hrf)
 
                     fitter.grid_fit(fit_params['dog']['surround_amplitude_grid'],
                                     fit_params['dog']['surround_size_grid'],
                                 fixed_grid_baseline = fit_params['dog']['fixed_grid_baseline'],
                                 grid_bounds = fit_params['dog']['grid_bounds'],
-                                rsq_threshold = rsq_threshold)
+                                rsq_threshold = rsq_threshold,
+                                hrf_1_grid=hrf_1_grid,
+                                hrf_2_grid=hrf_2_grid)
 
                 # iterative fit
                 print("{key} model ITERATIVE fit".format(key = model2fit))
@@ -530,7 +544,7 @@ class pRF_model(Model):
             basefilename += '_chunk-{ch}'.format(ch = str(chunk_num).zfill(3))
         elif ROI is not None:
             basefilename += '_ROI-{roi}'.format(roi = str(ROI))
-        elif vertex is not None:
+        elif len(vertex)> 0:
             basefilename += '_vertex-{ver}'.format(ver = str(vertex))
         
         basefilename += file_ext.replace('.npy', '.npz')

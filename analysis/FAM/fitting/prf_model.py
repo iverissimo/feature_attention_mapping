@@ -332,6 +332,8 @@ class pRF_model(Model):
         masked_data = data.copy()
         masked_data[np.where(np.isnan(data[...,0]))[0]] = 0
 
+        print(masked_data.shape)
+
         # if leaving one run out, then load test data to also calculate cv-r2
         if 'loo_' in run_type:
             test_file_list, _ = self.MRIObj.mri_utils.get_loo_filename(bold_filelist, loo_key=run_type)

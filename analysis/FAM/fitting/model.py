@@ -201,7 +201,7 @@ class Model:
             else:
                 print('averaging pRF runs')
                 data_arr = np.mean(data_arr, axis = 0)[np.newaxis, ...]
-
+        
         # loop over runs
         data2fit = []
         self.run_num_arr = [] 
@@ -211,6 +211,7 @@ class Model:
             
             # subselect data for that run
             data_out = self.subselect_array(data_arr[r], task = task, chunk_num = chunk_num, vertex = vertex)
+            #print(data_out.shape)
 
             ## if we want to keep baseline fix, we need to correct it!
             if correct_baseline:
@@ -288,7 +289,7 @@ class Model:
             arr_out = input_arr[num_vox_chunk * int(chunk_num):num_vox_chunk * int(chunk_num + 1), :]
 
         # if we want specific vertex
-        elif isinstance(vertex, int) or isinstance(vertex, list) or isinstance(vertex, np.ndarray):
+        elif isinstance(vertex, int) or ((isinstance(vertex, list) or isinstance(vertex, np.ndarray)) and len(vertex) > 0):
             print('Slicing array into vertex {ver}'.format(ver = vertex))
             arr_out = input_arr[vertex]
             

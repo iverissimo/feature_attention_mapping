@@ -722,7 +722,7 @@ class MRIUtils(Utils):
                 # make regressor + intercept for initial baseline period
                 if isinstance(baseline_inter1, int):
                     start_trend_func = [linregress(np.arange(baseline_inter1), vert[:baseline_inter1]) for _,vert in enumerate(tqdm(data))]
-                    start_trend = np.stack((start_trend_func[ind].intercept + start_trend_func[ind].slope * np.arange(baseline_inter1) for ind,_ in enumerate(tqdm(data))))
+                    start_trend = np.stack([start_trend_func[ind].intercept + start_trend_func[ind].slope * np.arange(baseline_inter1) for ind,_ in enumerate(tqdm(data))])
                 else:
                     raise ValueError('index not provided as int')
 
@@ -732,7 +732,7 @@ class MRIUtils(Utils):
                 # make regressor + intercept for end baseline period
                 if isinstance(baseline_inter2, int):
                     end_trend_func = [linregress(np.arange(np.abs(baseline_inter2)), vert[baseline_inter2:]) for _,vert in enumerate(tqdm(data))]
-                    end_trend = np.stack((end_trend_func[ind].intercept + end_trend_func[ind].slope * np.arange(np.abs(baseline_inter2)) for ind,_ in enumerate(tqdm(data))))
+                    end_trend = np.stack([end_trend_func[ind].intercept + end_trend_func[ind].slope * np.arange(np.abs(baseline_inter2)) for ind,_ in enumerate(tqdm(data))])
                 else:
                     raise ValueError('index not provided as int')  
 
@@ -743,7 +743,7 @@ class MRIUtils(Utils):
                 trend_func = [interpolate.interp1d(baseline_timepoints, np.concatenate((start_trend[ind], end_trend[ind])), kind='linear') for ind,_ in enumerate(tqdm(data))]
 
                 # and save trend line
-                trend_line = np.stack((trend_func[ind](np.arange(data.shape[-1])) for ind,_ in enumerate(tqdm(data))))
+                trend_line = np.stack([trend_func[ind](np.arange(data.shape[-1])) for ind,_ in enumerate(tqdm(data))])
 
             # just make line across time series
             else:

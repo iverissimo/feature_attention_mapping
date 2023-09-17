@@ -123,10 +123,10 @@ class pRFViewer(Viewer):
         
         
         ## get estimates for all participants, if applicable 
-        r2_avg = np.stack((final_estimates['sub-{sj}'.format(sj = pp)]['r2'] for pp in participant_list))
-        xx_avg = np.stack((final_estimates['sub-{sj}'.format(sj = pp)]['x'] for pp in participant_list))
-        yy_avg = np.stack((final_estimates['sub-{sj}'.format(sj = pp)]['y'] for pp in participant_list))
-        size_avg = np.stack((final_estimates['sub-{sj}'.format(sj = pp)]['size'] for pp in participant_list))
+        r2_avg = np.stack([final_estimates['sub-{sj}'.format(sj = pp)]['r2'] for pp in participant_list])
+        xx_avg = np.stack([final_estimates['sub-{sj}'.format(sj = pp)]['x'] for pp in participant_list])
+        yy_avg = np.stack([final_estimates['sub-{sj}'.format(sj = pp)]['y'] for pp in participant_list])
+        size_avg = np.stack([final_estimates['sub-{sj}'.format(sj = pp)]['size'] for pp in participant_list])
 
         ## TAKE MEDIAN
         r2_avg = np.nanmedian(r2_avg, axis = 0)
@@ -1034,7 +1034,7 @@ class pRFViewer(Viewer):
             keys = self.pRFModelObj.get_prf_estimate_keys(prf_model_name = prf_model_name)
             
             estimates_dict = {}
-            estimates_dict['it_{name}'.format(name = prf_model_name)] = np.stack((estimates_keys_dict[val][vertex] for val in keys))[np.newaxis,...]
+            estimates_dict['it_{name}'.format(name = prf_model_name)] = np.stack([estimates_keys_dict[val][vertex] for val in keys])[np.newaxis,...]
 
             ## load data array
             bold_filelist = self.pRFModelObj.get_bold_file_list(participant, task = 'pRF', ses = ses, file_ext = file_ext)
@@ -1503,7 +1503,7 @@ class FAViewer(Viewer):
             fig, axs = plt.subplots(nrows = len(coord_list), ncols=len(coord_list), figsize=(4.5 * len(coord_list),4.5 * len(coord_list)), sharex=False, sharey=False)
             
             ## make array with figure axis positions (6*6 = 36x2)
-            position_matrix = np.stack((np.meshgrid(np.arange(len(coord_list)), np.arange(len(coord_list)))), axis = 2).reshape(-1,2)
+            position_matrix = np.stack([np.meshgrid(np.arange(len(coord_list)), np.arange(len(coord_list)))], axis = 2).reshape(-1,2)
 
             # if we want to transpose figure over diagonal
             if transpose_fig:
@@ -1648,7 +1648,7 @@ class FAViewer(Viewer):
             fig, axs = plt.subplots(nrows= len(coord_list), ncols=len(coord_list), figsize=(4.5 * len(coord_list), 4.5 * len(coord_list)), sharex=False, sharey=False)
             
             ## make array with figure axis positions (6*6 = 36x2)
-            position_matrix = np.stack((np.meshgrid(np.arange(len(coord_list)), np.arange(len(coord_list)))), axis = 2).reshape(-1,2)
+            position_matrix = np.stack([np.meshgrid(np.arange(len(coord_list)), np.arange(len(coord_list)))], axis = 2).reshape(-1,2)
 
             # if we want to transpose figure over diagonal
             if transpose_fig:
@@ -1816,7 +1816,7 @@ class FAViewer(Viewer):
             fig, axs = plt.subplots(nrows= len(coord_list), ncols=len(coord_list), figsize=(4.5 * len(coord_list), 4.5 * len(coord_list)), sharex=False, sharey=False)
             
             ## make array with figure axis positions (6*6 = 36x2)
-            position_matrix = np.stack((np.meshgrid(np.arange(len(coord_list)), np.arange(len(coord_list)))), axis = 2).reshape(-1,2)
+            position_matrix = np.stack([np.meshgrid(np.arange(len(coord_list)), np.arange(len(coord_list)))], axis = 2).reshape(-1,2)
 
             # if we want to transpose figure over diagonal
             if transpose_fig:

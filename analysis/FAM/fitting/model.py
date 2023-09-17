@@ -191,7 +191,7 @@ class Model:
 
         ## now actually load data
         print('Loading {x} files of task {t}'.format(x = len(file_list), t = task))
-        data_arr = np.stack((np.load(arr,allow_pickle=True) for arr in file_list)) # will be (run, vertex, TR)
+        data_arr = np.stack([np.load(arr,allow_pickle=True) for arr in file_list]) # will be (run, vertex, TR)
 
         # for pRF task, we always average runs (if several) because same design
         if task == 'pRF':

@@ -612,7 +612,7 @@ freeview -v \
                         hemi_bold_files = [fname for fname in bold_files if hemi in fname]
                         # load runs
                         # and average the EPI time course
-                        data_arr = np.nanmean(np.nanmean(np.stack((np.load(val, allow_pickle=True) for val in hemi_bold_files)), 
+                        data_arr = np.nanmean(np.nanmean(np.stack([np.load(val, allow_pickle=True) for val in hemi_bold_files]), 
                                             axis = 0), axis=-1)
                         # normalize image by dividing the value of each vertex 
                         # by the value of the vertex with the maximum intensity
@@ -635,7 +635,7 @@ freeview -v \
                 else:
                     # load runs
                     # and average the EPI time course
-                    mean_epi = np.nanmean(np.nanmean(np.stack((np.load(val, allow_pickle=True) for val in bold_files)), 
+                    mean_epi = np.nanmean(np.nanmean(np.stack([np.load(val, allow_pickle=True) for val in bold_files]), 
                                             axis = 0), axis=-1)
                     # normalize image by dividing the value of each vertex 
                     # by the value of the vertex with the maximum intensity
@@ -716,7 +716,7 @@ freeview -v \
                                                                     run_list = run_list)
                 
                 # load runs
-                data_arr = np.mean(np.stack((np.load(val, allow_pickle=True) for val in bold_files)), axis = 0)
+                data_arr = np.mean(np.stack([np.load(val, allow_pickle=True) for val in bold_files]), axis = 0)
  
                 ### if FA then we also want to get average timecourse across ROI ####
                 # to check if something is off (some arousal artifact or so) 
@@ -737,7 +737,7 @@ freeview -v \
                         plt.plot(time_sec, avg_bold_roi[roi_name], linewidth = 1.5, label = '%s'%roi_name, alpha = .6)
 
                     # also plot average of all time courses
-                    plt.plot(time_sec, np.mean(np.stack((avg_bold_roi[roi_name] for roi_name in ROIs_dict.keys()), axis = 0), axis = 0),
+                    plt.plot(time_sec, np.mean(np.stack([avg_bold_roi[roi_name] for roi_name in ROIs_dict.keys()], axis = 0), axis = 0),
                             linewidth = 2.5, label = 'average', linestyle = 'solid', color = 'k')
 
                     axis.set_xlabel('Time (s)',fontsize=20, labelpad=20)

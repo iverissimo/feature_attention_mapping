@@ -396,6 +396,7 @@ class pRF_model(Model):
                                     size_grid = fit_params['gauss']['sizes'], 
                                     fixed_grid_baseline = fit_params['gauss']['fixed_grid_baseline'],
                                     grid_bounds = fit_params['gauss']['grid_bounds'],
+                                    n_batches = n_jobs,
                                     hrf_1_grid=hrf_1_grid,
                                     hrf_2_grid=hrf_2_grid)
 
@@ -443,6 +444,7 @@ class pRF_model(Model):
                                 fixed_grid_baseline = fit_params['css']['fixed_grid_baseline'],
                                 grid_bounds = fit_params['css']['grid_bounds'],
                                 rsq_threshold = rsq_threshold,
+                                n_batches = n_jobs,
                                 hrf_1_grid=hrf_1_grid,
                                 hrf_2_grid=hrf_2_grid)
                 
@@ -461,6 +463,7 @@ class pRF_model(Model):
                                 fixed_grid_baseline = fit_params['dn']['fixed_grid_baseline'],
                                 grid_bounds = fit_params['dn']['grid_bounds'],
                                 rsq_threshold = rsq_threshold,
+                                n_batches = n_jobs,
                                 hrf_1_grid=hrf_1_grid,
                                 hrf_2_grid=hrf_2_grid,
                                 ecc_grid = fit_params['gauss']['eccs'][:10], 
@@ -480,6 +483,7 @@ class pRF_model(Model):
                                 fixed_grid_baseline = fit_params['dog']['fixed_grid_baseline'],
                                 grid_bounds = fit_params['dog']['grid_bounds'],
                                 rsq_threshold = rsq_threshold,
+                                n_batches = n_jobs,
                                 hrf_1_grid=hrf_1_grid,
                                 hrf_2_grid=hrf_2_grid)
 

@@ -1138,7 +1138,6 @@ class pRF_model(Model):
                     r2 = final_estimates[..., 9],
                     cv_r2 = cv_r2)
             
-
     def crossvalidate(self, test_data, model_object = None, estimates = [], avg_hrf = False, n_jobs = 8):
 
         """

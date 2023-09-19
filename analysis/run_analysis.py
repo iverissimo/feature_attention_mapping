@@ -102,6 +102,11 @@ parser.add_argument("--hemisphere",
                     default = 'BH',
                     help = "Which hemisphere to fit - LH, RH, BH [default]]."
                     )
+parser.add_argument("--n_batches", 
+                    type = int, 
+                    default = 10,
+                    help = "Number of batches to split data into when fitting [default 10]"
+                    )
 
 # parse the command line
 args = parser.parse_args()
@@ -122,6 +127,7 @@ ses2fit = args.ses2fit
 fa_model_name = args.fa_model_name
 use_atlas = args.atlas
 hemisphere = args.hemisphere
+n_batches = args.n_batches
 
 # vertex list
 if len(args.vertex)>0:
@@ -194,7 +200,7 @@ match task:
                                     ses = ses2fit, run_type = run_type, file_ext = FAM_mri.get_mrifile_ext()['pRF'],
                                     vertex = vertex, chunk_num = chunk_num, ROI = ROI,
                                     model2fit = prf_model_name, hemisphere = hemi,
-                                    save_estimates = True,
+                                    save_estimates = True, n_batches = n_batches,
                                     xtol = 1e-3, ftol = 1e-4, n_jobs = n_jobs)
 
             print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))

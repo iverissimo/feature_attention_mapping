@@ -138,7 +138,7 @@ def main():
 
 def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00:00', task = 'pRF',
                             model_name = 'gauss', partition_name = None, node_name = None, batch_mem_Gib = None, 
-                            batch_dir ='/home/inesv/batch', send_email = False, n_cpus = 128, n_nodes = 1):
+                            batch_dir ='/home/inesv/batch', send_email = False, n_cpus = 128, n_nodes = 1, n_batches = 16):
 
         """
         Submit slurm jobs, to fit pRF model on data
@@ -190,8 +190,8 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
                 
                 # set fitting model command 
                 fit_cmd = """python run_analysis.py --subject {pp} --cmd fitmodel --task {task} --dir {dir} --ses2fit {ses} --run_type {rt} \
---prf_model_name {prf_mod} --fa_model_name {fa_mod} --n_jobs {n_jobs} --wf_dir $TMPDIR """.format(pp = pp, task = task, dir = system_dir,
-                                                        ses = ses2fit, rt = run_type, prf_mod = prf_model_name, fa_mod = fa_model_name, n_jobs = n_jobs)
+--prf_model_name {prf_mod} --fa_model_name {fa_mod} --n_jobs {n_jobs} --n_batches {n_batches} --wf_dir $TMPDIR """.format(pp = pp, task = task, dir = system_dir,
+                                                        ses = ses2fit, rt = run_type, prf_mod = prf_model_name, fa_mod = fa_model_name, n_jobs = n_jobs, n_batches = n_batches)
                 # if chunking data
                 if ch is not None:
                      fit_cmd += '--chunk_num {ch} '.format(ch = ch)
@@ -274,17 +274,17 @@ mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR
 
 wait
 
-cp -r $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/post_fmriprep/$SPACE
+rsync -chavzP --exclude=".*" $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR
 
 wait
 
-cp -r $SOURCE_DIR/sub-$SJ_NR $TMPDIR/sourcedata/
+rsync -chavzP --exclude=".*" $SOURCE_DIR/sub-$SJ_NR/ $TMPDIR/sourcedata/sub-$SJ_NR
 
 wait
 
 if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ] 
 then
-    cp -r $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/$FITFOLDER/$SPACE
+    rsync -chavzP --exclude=".*" $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR
 fi
 
 wait
@@ -301,22 +301,22 @@ mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR
 
 wait
 
-cp -r $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/post_fmriprep/$SPACE
+rsync -chavzP --exclude=".*" $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR
 
 wait
 
-cp -r $SOURCE_DIR/sub-$SJ_NR $TMPDIR/sourcedata/
+rsync -chavzP --exclude=".*" $SOURCE_DIR/sub-$SJ_NR/ $TMPDIR/sourcedata/sub-$SJ_NR
 
 wait
 
 if [ -d "$DERIV_DIR/$PRFFITFOLDER/$SPACE/sub-$SJ_NR" ] 
 then
-    cp -r $DERIV_DIR/$PRFFITFOLDER/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/$PRFFITFOLDER/$SPACE
+    rsync -chavzP --exclude=".*" $DERIV_DIR/$PRFFITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$PRFFITFOLDER/$SPACE/sub-$SJ_NR
 fi
 
 if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ] 
 then
-    cp -r $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/$FITFOLDER/$SPACE
+    rsync -chavzP --exclude=".*" $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR
 fi
 
 wait

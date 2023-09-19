@@ -169,7 +169,8 @@ class pRF_model(Model):
                     
         return self.MRIObj.mri_utils.normalize(visual_dm)
 
-    def set_models(self, participant_list = [], mask_bool_df = None, ses2model = 'mean', stim_on_screen = []):
+    def set_models(self, participant_list = [], mask_bool_df = None, ses2model = 'mean', stim_on_screen = [],
+                        hrf=[1.0, 1.0, 0.0]):
 
         """
         define pRF models to be used for each participant in participant list
@@ -189,7 +190,15 @@ class pRF_model(Model):
         ## if no participant list set, then run all
         if len(participant_list) == 0:
             participant_list = self.MRIObj.sj_num
-        
+
+        ## set filter params
+        filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
+                        'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
+                        'first_modes_to_remove': self.MRIObj.params['mri']['filtering']['first_modes_to_remove'],
+                        'last_modes_to_remove_percent': self.MRIObj.params['mri']['filtering']['last_modes_to_remove_percent'],
+                        'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
+                        'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']}
+                
         # empty dict where we'll store all participant models
         pp_models = {}
         
@@ -226,26 +235,22 @@ class pRF_model(Model):
                 ## define models ##
                 # GAUSS
                 gauss_model = Iso2DGaussianModel(stimulus = prf_stim,
-                                                    filter_predictions = True,
-                                                    filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
-                                                    filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
-                                                                    'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
-                                                                    'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
-                                                                    'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
-                                                    osf = self.osf,
-                                                    hrf_onset = self.hrf_onset,
+                                                hrf=hrf,
+                                                filter_predictions = True,
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
+                                                filter_params = filter_params,
+                                                osf = self.osf,
+                                                hrf_onset = self.hrf_onset,
                                                 )
 
                 pp_models['sub-{sj}'.format(sj=pp)][ses]['gauss_model'] = gauss_model
 
                 # CSS
                 css_model = CSS_Iso2DGaussianModel(stimulus = prf_stim,
+                                                    hrf=hrf,
                                                     filter_predictions = True,
                                                     filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
-                                                    filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
-                                                                    'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
-                                                                    'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
-                                                                    'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
+                                                    filter_params = filter_params,
                                                     osf = self.osf,
                                                     hrf_onset = self.hrf_onset,
                                                 )
@@ -254,12 +259,10 @@ class pRF_model(Model):
 
                 # DN 
                 dn_model =  Norm_Iso2DGaussianModel(stimulus = prf_stim,
+                                                    hrf=hrf,
                                                     filter_predictions = True,
                                                     filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
-                                                    filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
-                                                                    'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
-                                                                    'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
-                                                                    'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
+                                                    filter_params = filter_params,
                                                     osf = self.osf,
                                                     hrf_onset = self.hrf_onset,
                                                 )
@@ -268,14 +271,12 @@ class pRF_model(Model):
 
                 # DOG
                 dog_model = DoG_Iso2DGaussianModel(stimulus = prf_stim,
-                                                    filter_predictions = True,
-                                                    filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
-                                                    filter_params = {'highpass': self.MRIObj.params['mri']['filtering']['highpass'],
-                                                                    'add_mean': self.MRIObj.params['mri']['filtering']['add_mean'],
-                                                                    'window_length': self.MRIObj.params['mri']['filtering']['window_length'],
-                                                                    'polyorder': self.MRIObj.params['mri']['filtering']['polyorder']},
-                                                    osf = self.osf,
-                                                    hrf_onset = self.hrf_onset,
+                                                hrf=hrf,
+                                                filter_predictions = True,
+                                                filter_type = self.MRIObj.params['mri']['filtering']['type']['pRF'],
+                                                filter_params = filter_params,
+                                                osf = self.osf,
+                                                hrf_onset = self.hrf_onset,
                                                 )
                 
                 pp_models['sub-{sj}'.format(sj=pp)][ses]['dog_model'] = dog_model
@@ -286,7 +287,8 @@ class pRF_model(Model):
                     run_type = 'mean', chunk_num = None, vertex = [], ROI = None,
                     model2fit = 'gauss', file_ext = '_cropped_dc_psc.npy', 
                     outdir = None, save_estimates = False, hemisphere = 'BH',
-                    xtol = 1e-3, ftol = 1e-4, n_jobs = 16, rsq_threshold = 0.05):
+                    xtol = 1e-3, ftol = 1e-4, n_jobs = 16, n_batches = 16,
+                    rsq_threshold = 0.05, verbose = True):
 
         """
         fit inputted pRF models to each participant in participant list
@@ -365,10 +367,6 @@ class pRF_model(Model):
         constraints = self.get_fit_constraints(method = self.optimizer['pRF'], ss_larger_than_centre = True, 
                                                 positive_centre_only = True, normalize_RFs = False)
         
-        ## set hrf grid
-        hrf_1_grid=np.linspace(0,10,10)
-        hrf_2_grid=np.linspace(0,0,1)
-
         ## ACTUALLY FIT 
 
         # always start with gauss of course
@@ -396,14 +394,15 @@ class pRF_model(Model):
                                     size_grid = fit_params['gauss']['sizes'], 
                                     fixed_grid_baseline = fit_params['gauss']['fixed_grid_baseline'],
                                     grid_bounds = fit_params['gauss']['grid_bounds'],
-                                    n_batches = n_jobs,
-                                    hrf_1_grid=hrf_1_grid,
-                                    hrf_2_grid=hrf_2_grid)
+                                    n_batches = n_batches,
+                                    verbose = verbose,
+                                    hrf_1_grid = fit_params['gauss']['hrf_1_grid'],
+                                    hrf_2_grid = fit_params['gauss']['hrf_2_grid'])
 
             # iterative fit
             print("Gauss model ITERATIVE fit")
 
-            gauss_fitter.iterative_fit(rsq_threshold = rsq_threshold, verbose = True,
+            gauss_fitter.iterative_fit(rsq_threshold = rsq_threshold, verbose = verbose,
                                         bounds = fit_params['gauss']['bounds'],
                                         constraints = constraints['gauss'],
                                         xtol = xtol, ftol = ftol)
@@ -444,9 +443,10 @@ class pRF_model(Model):
                                 fixed_grid_baseline = fit_params['css']['fixed_grid_baseline'],
                                 grid_bounds = fit_params['css']['grid_bounds'],
                                 rsq_threshold = rsq_threshold,
-                                n_batches = n_jobs,
-                                hrf_1_grid=hrf_1_grid,
-                                hrf_2_grid=hrf_2_grid)
+                                n_batches = n_batches,
+                                verbose = verbose,
+                                hrf_1_grid = fit_params['css']['hrf_1_grid'],
+                                hrf_2_grid = fit_params['css']['hrf_2_grid'])
                 
                 elif model2fit == 'dn':
 
@@ -463,12 +463,13 @@ class pRF_model(Model):
                                 fixed_grid_baseline = fit_params['dn']['fixed_grid_baseline'],
                                 grid_bounds = fit_params['dn']['grid_bounds'],
                                 rsq_threshold = rsq_threshold,
-                                n_batches = n_jobs,
-                                hrf_1_grid=hrf_1_grid,
-                                hrf_2_grid=hrf_2_grid,
-                                ecc_grid = fit_params['gauss']['eccs'][:10], 
-                                polar_grid = fit_params['gauss']['polars'][:10], 
-                                size_grid = fit_params['gauss']['sizes'][:10])
+                                n_batches = n_batches,
+                                verbose = verbose,
+                                hrf_1_grid = fit_params['dn']['hrf_1_grid'],
+                                hrf_2_grid = fit_params['dn']['hrf_2_grid'],
+                                ecc_grid = fit_params['dn']['eccs'], 
+                                polar_grid = fit_params['dn']['polars'], 
+                                size_grid = fit_params['dn']['sizes'])
 
                 elif model2fit == 'dog':
 
@@ -483,15 +484,16 @@ class pRF_model(Model):
                                 fixed_grid_baseline = fit_params['dog']['fixed_grid_baseline'],
                                 grid_bounds = fit_params['dog']['grid_bounds'],
                                 rsq_threshold = rsq_threshold,
-                                n_batches = n_jobs,
-                                hrf_1_grid=hrf_1_grid,
-                                hrf_2_grid=hrf_2_grid)
+                                n_batches = n_batches,
+                                verbose = verbose,
+                                hrf_1_grid = fit_params['dog']['hrf_1_grid'],
+                                hrf_2_grid = fit_params['dog']['hrf_2_grid'])
 
                 # iterative fit
                 print("{key} model ITERATIVE fit".format(key = model2fit))
 
                 fitter.iterative_fit(rsq_threshold = rsq_threshold, 
-                                    verbose = True,
+                                    verbose = verbose,
                                     bounds = fit_params[model2fit]['bounds'],
                                     constraints = constraints[model2fit],
                                     xtol = xtol, ftol = ftol)
@@ -582,6 +584,11 @@ class pRF_model(Model):
         fitpar_dict['gauss']['eccs'] = max_ecc_size * np.linspace(0.1, 1, fitpar_dict['gauss']['grid_nr'])**2
         fitpar_dict['gauss']['polars'] = np.linspace(0, 2*np.pi, fitpar_dict['gauss']['grid_nr'])
 
+        ## set hrf grid
+        fitpar_dict['gauss']['hrf_1_grid'] = np.linspace(0,10,
+                                                        self.MRIObj.params['mri']['fitting']['pRF']['hrf_grid_nr']) # will iterate over hrf derivative grid values
+        fitpar_dict['gauss']['hrf_2_grid'] = np.linspace(0,0,1) # we want to keep dispersion at 0
+
         ## bounds
         fitpar_dict['gauss']['bounds'] = [(-1.5 * (max_ecc_size * 2), 1.5 * (max_ecc_size * 2)),  # x
                                         (-1.5 * (max_ecc_size * 2), 1.5 * (max_ecc_size * 2)),  # y
@@ -601,6 +608,11 @@ class pRF_model(Model):
                                                     self.MRIObj.params['mri']['fitting']['pRF']['max_n'], 
                                                     self.MRIObj.params['mri']['fitting']['pRF']['n_nr'], dtype='float32')
 
+        ## set hrf grid
+        fitpar_dict['css']['hrf_1_grid'] = np.linspace(0,10,
+                                                        self.MRIObj.params['mri']['fitting']['pRF']['hrf_grid_nr']) # will iterate over hrf derivative grid values
+        fitpar_dict['css']['hrf_2_grid'] = np.linspace(0,0,1) # we want to keep dispersion at 0
+
         ## bounds
         fitpar_dict['css']['bounds'] = [(-1.5 * (max_ecc_size * 2), 1.5 * (max_ecc_size * 2)),  # x
                                         (-1.5 * (max_ecc_size * 2), 1.5 * (max_ecc_size * 2)),  # y
@@ -617,16 +629,32 @@ class pRF_model(Model):
         ######################### DN #########################
 
         # Surround amplitude (Normalization parameter C)
-        fitpar_dict['dn']['surround_amplitude_grid'] = np.array([0.1,0.2,0.4,0.7,1,3], dtype='float32') 
+        fitpar_dict['dn']['surround_amplitude_grid'] = np.linspace(0.1,3, self.MRIObj.params['mri']['fitting']['pRF']['dn_grid_nr']) 
         
         # Surround size (gauss sigma_2)
-        fitpar_dict['dn']['surround_size_grid'] = np.array([3,5,8,12,18], dtype='float32')
+        fitpar_dict['dn']['surround_size_grid'] = np.linspace(3,18, self.MRIObj.params['mri']['fitting']['pRF']['dn_grid_nr']) 
         
         # Neural baseline (Normalization parameter B)
-        fitpar_dict['dn']['neural_baseline_grid'] = np.array([0,1,10,100], dtype='float32')
+        fitpar_dict['dn']['neural_baseline_grid'] = np.linspace(0.1,10, self.MRIObj.params['mri']['fitting']['pRF']['dn_grid_nr']) 
 
         # Surround baseline (Normalization parameter D)
-        fitpar_dict['dn']['surround_baseline_grid'] = np.array([0.1,1.0,10.0,100.0], dtype='float32')
+        fitpar_dict['dn']['surround_baseline_grid'] = np.linspace(0.1,10, self.MRIObj.params['mri']['fitting']['pRF']['dn_grid_nr']) 
+
+        ## set hrf grid
+        fitpar_dict['dn']['hrf_1_grid'] = np.linspace(0,10,
+                                                        self.MRIObj.params['mri']['fitting']['pRF']['dn_grid_nr']) # will iterate over hrf derivative grid values
+        fitpar_dict['dn']['hrf_2_grid'] = np.linspace(0,0,1) # we want to keep dispersion at 0
+
+        # if we want to re-fit grid prf positions
+        if self.MRIObj.params['mri']['fitting']['pRF']['re_grid_dn']:
+            # size, ecc, polar angle
+            fitpar_dict['dn']['sizes'] = fitpar_dict['gauss']['sizes'][:self.MRIObj.params['mri']['fitting']['pRF']['dn_grid_nr']]
+            fitpar_dict['dn']['eccs'] = fitpar_dict['gauss']['eccs'][:self.MRIObj.params['mri']['fitting']['pRF']['dn_grid_nr']]
+            fitpar_dict['dn']['polars'] = fitpar_dict['gauss']['polars'][:self.MRIObj.params['mri']['fitting']['pRF']['dn_grid_nr']]
+        else:
+            fitpar_dict['dn']['sizes'] = None
+            fitpar_dict['dn']['eccs'] = None
+            fitpar_dict['dn']['polars'] = None
 
         ## bounds
         fitpar_dict['dn']['bounds'] = [(-1.5 * (max_ecc_size * 2), 1.5 * (max_ecc_size * 2)),  # x
@@ -651,6 +679,11 @@ class pRF_model(Model):
 
         # size for surround
         fitpar_dict['dog']['surround_size_grid'] = np.array([3,5,8,11,14,17,20,23,26], dtype='float32')
+
+        ## set hrf grid
+        fitpar_dict['dog']['hrf_1_grid'] = np.linspace(0,10,
+                                                        self.MRIObj.params['mri']['fitting']['pRF']['hrf_grid_nr']) # will iterate over hrf derivative grid values
+        fitpar_dict['dog']['hrf_2_grid'] = np.linspace(0,0,1) # we want to keep dispersion at 0
 
         ## bounds
         fitpar_dict['dog']['bounds'] = [(-1.5 * (max_ecc_size * 2), 1.5 * (max_ecc_size * 2)),  # x
@@ -763,6 +796,8 @@ class pRF_model(Model):
                         constraints[key].append(NonlinearConstraint(positive_centre_prf_dog,
                                                                     lb=0,
                                                                     ub=np.inf))
+                else:
+                    constraints[key] = None
 
         return constraints
 
@@ -1045,114 +1080,64 @@ class pRF_model(Model):
             cv_r2 = np.zeros(final_estimates.shape[0]); cv_r2[:] = np.nan
                 
         if model_type == 'gauss':
-
-            if self.fit_hrf and not grid:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        hrf_derivative = final_estimates[..., 5],
-                        hrf_dispersion = final_estimates[..., 6], 
-                        r2 = final_estimates[..., 7],
-                        cv_r2 = cv_r2)
-            
-            else:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        r2 = final_estimates[..., 5],
-                        cv_r2 = cv_r2)
+                
+            np.savez(filename,
+                    x = final_estimates[..., 0],
+                    y = final_estimates[..., 1],
+                    size = final_estimates[..., 2],
+                    betas = final_estimates[...,3],
+                    baseline = final_estimates[..., 4],
+                    hrf_derivative = final_estimates[..., 5],
+                    hrf_dispersion = final_estimates[..., 6], 
+                    r2 = final_estimates[..., 7],
+                    cv_r2 = cv_r2)
         
         elif model_type == 'css':
 
-            if self.fit_hrf and not grid:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        ns = final_estimates[..., 5],
-                        hrf_derivative = final_estimates[..., 6],
-                        hrf_dispersion = final_estimates[..., 7], 
-                        r2 = final_estimates[..., 8],
-                        cv_r2 = cv_r2)
-            
-            else:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        ns = final_estimates[..., 5],
-                        r2 = final_estimates[..., 6],
-                        cv_r2 = cv_r2)
+            np.savez(filename,
+                    x = final_estimates[..., 0],
+                    y = final_estimates[..., 1],
+                    size = final_estimates[..., 2],
+                    betas = final_estimates[...,3],
+                    baseline = final_estimates[..., 4],
+                    ns = final_estimates[..., 5],
+                    hrf_derivative = final_estimates[..., 6],
+                    hrf_dispersion = final_estimates[..., 7], 
+                    r2 = final_estimates[..., 8],
+                    cv_r2 = cv_r2)
 
         elif model_type == 'dn':
 
-            if self.fit_hrf and not grid:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        sa = final_estimates[..., 5],
-                        ss = final_estimates[..., 6], 
-                        nb = final_estimates[..., 7], 
-                        sb = final_estimates[..., 8], 
-                        hrf_derivative = final_estimates[..., 9],
-                        hrf_dispersion = final_estimates[..., 10], 
-                        r2 = final_estimates[..., 11],
-                        cv_r2 = cv_r2)
-            
-            else:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        sa = final_estimates[..., 5],
-                        ss = final_estimates[..., 6], 
-                        nb = final_estimates[..., 7], 
-                        sb = final_estimates[..., 8], 
-                        r2 = final_estimates[..., 9],
-                        cv_r2 = cv_r2)
+            np.savez(filename,
+                    x = final_estimates[..., 0],
+                    y = final_estimates[..., 1],
+                    size = final_estimates[..., 2],
+                    betas = final_estimates[...,3],
+                    baseline = final_estimates[..., 4],
+                    sa = final_estimates[..., 5],
+                    ss = final_estimates[..., 6], 
+                    nb = final_estimates[..., 7], 
+                    sb = final_estimates[..., 8], 
+                    hrf_derivative = final_estimates[..., 9],
+                    hrf_dispersion = final_estimates[..., 10], 
+                    r2 = final_estimates[..., 11],
+                    cv_r2 = cv_r2)
 
         elif model_type == 'dog':
 
-            if self.fit_hrf and not grid:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        sa = final_estimates[..., 5],
-                        ss = final_estimates[..., 6], 
-                        hrf_derivative = final_estimates[..., 7],
-                        hrf_dispersion = final_estimates[..., 8], 
-                        r2 = final_estimates[..., 9],
-                        cv_r2 = cv_r2)
+            np.savez(filename,
+                    x = final_estimates[..., 0],
+                    y = final_estimates[..., 1],
+                    size = final_estimates[..., 2],
+                    betas = final_estimates[...,3],
+                    baseline = final_estimates[..., 4],
+                    sa = final_estimates[..., 5],
+                    ss = final_estimates[..., 6], 
+                    hrf_derivative = final_estimates[..., 7],
+                    hrf_dispersion = final_estimates[..., 8], 
+                    r2 = final_estimates[..., 9],
+                    cv_r2 = cv_r2)
             
-            else:
-                np.savez(filename,
-                        x = final_estimates[..., 0],
-                        y = final_estimates[..., 1],
-                        size = final_estimates[..., 2],
-                        betas = final_estimates[...,3],
-                        baseline = final_estimates[..., 4],
-                        sa = final_estimates[..., 5],
-                        ss = final_estimates[..., 6], 
-                        r2 = final_estimates[..., 7],
-                        cv_r2 = cv_r2)
 
     def crossvalidate(self, test_data, model_object = None, estimates = [], avg_hrf = False, n_jobs = 8):
 

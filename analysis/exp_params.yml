@@ -149,6 +149,7 @@ mri: # refers to the Psychopy SyncGenerator class
       FA: 'LinDetrend'
     cut_off_hz: 0.01 # cut off frequency to filter
     first_modes_to_remove: 5 # Number of low-frequency eigenmodes to remove (highpass)
+    last_modes_to_remove_percent: 0
 
     window_length: 201
     polyorder: 3
@@ -201,8 +202,10 @@ mri: # refers to the Psychopy SyncGenerator class
       fix_bold_baseline: True
       correct_baseline: True
       num_baseline_TRs: 8
+      ecc_in_stim_range: False
+      surround_size_as_proportion: False
 
-      grid_nr: 40 # number of grid steps
+      grid_nr: 30 # number of grid steps
       min_eccen: 0.2
       max_eccen: 10
 
@@ -212,6 +215,11 @@ mri: # refers to the Psychopy SyncGenerator class
       min_n: 0.05
       max_n: 1
       n_nr: 20
+
+      hrf_grid_nr: 20
+
+      dn_grid_nr: 10
+      re_grid_dn: False
 
       N_PROCS: 4
 

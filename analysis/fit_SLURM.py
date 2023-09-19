@@ -94,6 +94,11 @@ parser.add_argument("--n_nodes",
                     default = 1,
                     help = "Number of nodes [default 1]"
                     )
+parser.add_argument("--n_batches", 
+                    type = int, 
+                    default = 10,
+                    help = "Number of batches to split data into when fitting [default 10]"
+                    )
 
 # parse the command line
 args = parser.parse_args()
@@ -116,6 +121,7 @@ ses2fit = args.ses2fit # 'ses-mean'
 fa_model_name = args.fa_model_name
 n_cpus = args.n_cpus
 n_nodes = args.n_nodes
+n_batches = args.n_batches
 
 ## Load data object --> as relevant paths, variables and utility functions
 print("Fitting data for subject {sj}!".format(sj=sj))
@@ -133,7 +139,7 @@ def main():
 
     submit_SLURMjobs(participant_list = FAM_data.sj_num, chunk_data = chunk_data, run_time = run_time, task = task,
                             model_name = model_name, partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
-                            batch_dir = FAM_data.batch_dir, send_email = send_email, n_cpus = n_cpus, n_nodes = n_nodes)
+                            batch_dir = FAM_data.batch_dir, send_email = send_email, n_cpus = n_cpus, n_nodes = n_nodes, n_batches = n_batches)
 
 
 def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00:00', task = 'pRF',

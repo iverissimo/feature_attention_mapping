@@ -54,6 +54,129 @@ class pRFViewer(Viewer):
 
         # Load pRF model object
         self.pRFModelObj = pRFModelObj
+
+    def view_pRF_surf_estimates(self, participant_list = [], mask_bool_df = None, stim_on_screen = [],
+                                        ses = 'mean', run_type = 'mean', prf_model_name = 'gauss',
+                                        mask_arr = True, iterative = True, 
+                                        vmin1 = {'ecc': 0, 'size': 0, 'r2': 0}, vmax1 = {'ecc': 5.5, 'size': 10, 'r2': .8},
+                                        angle_thresh = 3*np.pi/4, open_fs = True):
+        
+        ## load estimates for all participants 
+        # store in dict, for ease of access
+        print('Loading iterative estimates')
+        group_estimates, group_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant_list = participant_list,
+                                                                    ses = ses, run_type = run_type, 
+                                                                    model_name = prf_model_name, 
+                                                                    iterative = iterative,
+                                                                    mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
+                                                                    fit_hrf = self.pRFModelObj.fit_hrf)
+
+        ## mask the estimates, if such is the case
+        if mask_arr:
+            print('masking estimates')
+
+            # get estimate keys
+            keys = self.pRFModelObj.get_prf_estimate_keys(prf_model_name = prf_model_name)
+
+            # get screen lim for all participants
+            max_ecc_ext = {'sub-{sj}'.format(sj = pp): group_prf_models['sub-{sj}'.format(sj = pp)]['ses-{s}'.format(s = ses)]['prf_stim'].screen_size_degrees/2 for pp in participant_list}
+
+            final_estimates = {'sub-{sj}'.format(sj = pp): self.pRFModelObj.mask_pRF_model_estimates(group_estimates['sub-{sj}'.format(sj = pp)], 
+                                                                                estimate_keys = keys,
+                                                                                x_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
+                                                                                y_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
+                                                                                rsq_threshold = self.rsq_threshold_plot) for pp in participant_list}
+        else:
+            final_estimates = group_estimates
+
+        ## per participant, add surface to freesurfer custom folder
+        for pp in participant_list:
+
+            surface_name_list = []
+            
+            ## RSQ ##
+            # estimate surface name 
+            R2_surface_name = '{tsk}_ses-{ses}_run-{run}_model-{model}_R2'.format(tsk = 'pRF',
+                                                                space = self.MRIObj.sj_space,
+                                                                ses = ses, run = run_type, model = prf_model_name)
+            # if we fitted hrf, then add that to surf name
+            if self.pRFModelObj.fit_hrf:
+                R2_surface_name = R2_surface_name+'_withHRF'
+
+            # add surface to freesurfer custom folder
+            self.add_data2FSsurface(pp, data_arr = final_estimates['sub-{sj}'.format(sj = pp)]['r2'], 
+                                mask_arr = None, surf_name = R2_surface_name, overwrite = False,
+                                vmin = vmin1['r2'], vmax = vmax1['r2'], cmap = 'hot', n_bins = 20)
+            surface_name_list.append(R2_surface_name) 
+
+            ## ECCENTRICITY ##
+            eccentricity = self.pRFModelObj.get_eccentricity(xx = final_estimates['sub-{sj}'.format(sj = pp)]['x'],
+                                                             yy = final_estimates['sub-{sj}'.format(sj = pp)]['y'],
+                                                             rsq = final_estimates['sub-{sj}'.format(sj = pp)]['r2'])
+            ECC_surface_name = R2_surface_name.replace('_R2', '_ECC')
+
+            # add surface to freesurfer custom folder
+            self.add_data2FSsurface(pp, data_arr = eccentricity, 
+                                mask_arr = None, surf_name = ECC_surface_name, overwrite = False,
+                                vmin = vmin1['ecc'], vmax = vmax1['ecc'], cmap = 'viridis', n_bins = 20)
+            surface_name_list.append(ECC_surface_name) 
+
+            ## FWHM SIZE ## 
+            size_fwhmaxmin = self.pRFModelObj.fwhmax_fwatmin(prf_model_name, 
+                                                            final_estimates['sub-{sj}'.format(sj = pp)])
+            
+            SIZEFWHM_surface_name = R2_surface_name.replace('_R2', '_SIZEFWHM')
+
+            # add surface to freesurfer custom folder
+            self.add_data2FSsurface(pp, data_arr = size_fwhmaxmin[0], 
+                                mask_arr = None, surf_name = SIZEFWHM_surface_name, overwrite = False,
+                                vmin = vmin1['size'], vmax = vmax1['size'], cmap = 'cubehelix', n_bins = 20)
+            surface_name_list.append(SIZEFWHM_surface_name) 
+
+            ### POLAR ANGLE ####
+            # plot non-uniform color wheel 
+            cmap_pa_sns = sns.hls_palette(as_cmap=True, h = 0.01, s=.9, l=.65)
+
+            pa_transformed = self.pRFModelObj.get_polar_angle(xx = final_estimates['sub-{sj}'.format(sj = pp)]['x'],
+                                                             yy = final_estimates['sub-{sj}'.format(sj = pp)]['y'],
+                                                            rsq = final_estimates['sub-{sj}'.format(sj = pp)]['r2'],
+                                                            pa_transform = 'flip', angle_thresh = angle_thresh)
+            
+            PA_surface_name = R2_surface_name.replace('_R2', '_PAflip')
+
+            # add surface to freesurfer custom folder
+            self.add_data2FSsurface(pp, data_arr = pa_transformed, 
+                                mask_arr = None, surf_name = PA_surface_name, overwrite = False,
+                                vmin = -angle_thresh, vmax = angle_thresh, cmap = cmap_pa_sns, n_bins = 20)
+            surface_name_list.append(PA_surface_name) 
+
+            # plot x and y separately, for sanity check
+            cmap_coords = sns.diverging_palette(250, 30, l=65, center="dark", as_cmap=True)
+
+            ## XX ##
+            XX_surface_name = R2_surface_name.replace('_R2', '_XX')
+
+            # add surface to freesurfer custom folder
+            self.add_data2FSsurface(pp, data_arr = final_estimates['sub-{sj}'.format(sj = pp)]['x'], 
+                                mask_arr = None, surf_name = XX_surface_name, overwrite = False,
+                                vmin = -5, vmax = 5, cmap = cmap_coords, n_bins = 20)
+            surface_name_list.append(XX_surface_name) 
+
+            ## YY ##
+            YY_surface_name = R2_surface_name.replace('_R2', '_YY')
+
+            # add surface to freesurfer custom folder
+            self.add_data2FSsurface(pp, data_arr = final_estimates['sub-{sj}'.format(sj = pp)]['y'], 
+                                mask_arr = None, surf_name = YY_surface_name, overwrite = False,
+                                vmin = -5, vmax = 5, cmap = cmap_coords, n_bins = 20)
+            surface_name_list.append(YY_surface_name) 
+
+            if open_fs:
+                # then OPEN FREESURFER
+                self.open_surf_freeview(pp, surf_names = surface_name_list, 
+                                        surf_type = ['inflated'], screenshot_filename = None)
+
+
                 
     def save_estimates4drawing(self, participant_list = [],
                                     ses = 'mean', run_type = 'mean',  mask_bool_df = None, stim_on_screen = [],

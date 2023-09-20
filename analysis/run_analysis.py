@@ -201,7 +201,7 @@ match task:
                                     vertex = vertex, chunk_num = chunk_num, ROI = ROI,
                                     model2fit = prf_model_name, hemisphere = hemi,
                                     save_estimates = True, n_batches = n_batches,
-                                    xtol = 1e-3, ftol = 1e-4, n_jobs = n_jobs)
+                                    xtol = 1e-5, ftol = 1e-5, n_jobs = n_jobs)
 
             print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
 

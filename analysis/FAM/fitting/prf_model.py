@@ -403,6 +403,7 @@ class pRF_model(Model):
             print("Gauss model ITERATIVE fit")
 
             gauss_fitter.iterative_fit(rsq_threshold = rsq_threshold, verbose = verbose,
+                                       starting_params = gauss_fitter.gridsearch_params,
                                         bounds = fit_params['gauss']['bounds'],
                                         constraints = constraints['gauss'],
                                         xtol = xtol, ftol = ftol)
@@ -585,7 +586,7 @@ class pRF_model(Model):
         fitpar_dict['gauss']['polars'] = np.linspace(0, 2*np.pi, fitpar_dict['gauss']['grid_nr'])
 
         ## set hrf grid
-        fitpar_dict['gauss']['hrf_1_grid'] = np.linspace(0,10,
+        fitpar_dict['gauss']['hrf_1_grid'] = np.linspace(0,1,
                                                         self.MRIObj.params['mri']['fitting']['pRF']['hrf_grid_nr']) # will iterate over hrf derivative grid values
         fitpar_dict['gauss']['hrf_2_grid'] = np.linspace(0,0,1) # we want to keep dispersion at 0
 
@@ -609,7 +610,7 @@ class pRF_model(Model):
                                                     self.MRIObj.params['mri']['fitting']['pRF']['n_nr'], dtype='float32')
 
         ## set hrf grid
-        fitpar_dict['css']['hrf_1_grid'] = np.linspace(0,10,
+        fitpar_dict['css']['hrf_1_grid'] = np.linspace(0,1,
                                                         self.MRIObj.params['mri']['fitting']['pRF']['hrf_grid_nr']) # will iterate over hrf derivative grid values
         fitpar_dict['css']['hrf_2_grid'] = np.linspace(0,0,1) # we want to keep dispersion at 0
 
@@ -641,7 +642,7 @@ class pRF_model(Model):
         fitpar_dict['dn']['surround_baseline_grid'] = np.linspace(0.1,10, self.MRIObj.params['mri']['fitting']['pRF']['dn_grid_nr']) 
 
         ## set hrf grid
-        fitpar_dict['dn']['hrf_1_grid'] = np.linspace(0,10,
+        fitpar_dict['dn']['hrf_1_grid'] = np.linspace(0,1,
                                                         self.MRIObj.params['mri']['fitting']['pRF']['dn_grid_nr']) # will iterate over hrf derivative grid values
         fitpar_dict['dn']['hrf_2_grid'] = np.linspace(0,0,1) # we want to keep dispersion at 0
 
@@ -681,7 +682,7 @@ class pRF_model(Model):
         fitpar_dict['dog']['surround_size_grid'] = np.array([3,5,8,11,14,17,20,23,26], dtype='float32')
 
         ## set hrf grid
-        fitpar_dict['dog']['hrf_1_grid'] = np.linspace(0,10,
+        fitpar_dict['dog']['hrf_1_grid'] = np.linspace(0,1,
                                                         self.MRIObj.params['mri']['fitting']['pRF']['hrf_grid_nr']) # will iterate over hrf derivative grid values
         fitpar_dict['dog']['hrf_2_grid'] = np.linspace(0,0,1) # we want to keep dispersion at 0
 
@@ -701,12 +702,22 @@ class pRF_model(Model):
 
         ### EXTRA ###
 
-        # if we want to also fit hrf
-        if self.fit_hrf:
-            fitpar_dict['gauss']['bounds'] += [(0,10),(0,0)]
-            fitpar_dict['css']['bounds'] += [(0,10),(0,0)]
-            fitpar_dict['dn']['bounds'] += [(0,10),(0,0)]
-            fitpar_dict['dog']['bounds'] += [(0,10),(0,0)]
+        # add hrf bounds (regardless of fitting hrf or not)
+        fitpar_dict['gauss']['bounds'] += [(0,10),(0,0)]
+        fitpar_dict['css']['bounds'] += [(0,10),(0,0)]
+        fitpar_dict['dn']['bounds'] += [(0,10),(0,0)]
+        fitpar_dict['dog']['bounds'] += [(0,10),(0,0)]
+
+        # if not fitting hrf, then set grids to none
+        if not self.fit_hrf:
+            fitpar_dict['gauss']['hrf_1_grid'] = None
+            fitpar_dict['gauss']['hrf_2_grid'] = None
+            fitpar_dict['css']['hrf_1_grid'] = None
+            fitpar_dict['css']['hrf_2_grid'] = None
+            fitpar_dict['dn']['hrf_1_grid'] = None
+            fitpar_dict['dn']['hrf_2_grid'] = None
+            fitpar_dict['dog']['hrf_1_grid'] = None
+            fitpar_dict['dog']['hrf_2_grid'] = None
         
         # if we want to keep the baseline fixed at 0
         if self.fix_bold_baseline['pRF']:
@@ -859,13 +870,211 @@ class pRF_model(Model):
                 crossval = False
 
             # append
-            pp_prf_est_dict['sub-{sj}'.format(sj=participant)] = self.load_pRF_model_chunks(pRFdir, fit_model = model_name,
-                                                    basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
-                                                                                                                acq = self.MRIObj.acq,
-                                                                                                                rt = run_type),
-                                                    fit_hrf = fit_hrf, iterative = iterative, crossval = crossval)
-            
+            if self.MRIObj.sj_space in ['fsnative']:
+                pp_prf_est_dict['sub-{sj}'.format(sj=participant)] = self.load_pRF_model_hemis(pRFdir, fit_model = model_name,
+                                                        basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
+                                                                                                                    acq = self.MRIObj.acq,
+                                                                                                                    rt = run_type),
+                                                        fit_hrf = fit_hrf, iterative = iterative, crossval = crossval)
+            else:
+                pp_prf_est_dict['sub-{sj}'.format(sj=participant)] = self.load_pRF_model_chunks(pRFdir, fit_model = model_name,
+                                                        basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
+                                                                                                                    acq = self.MRIObj.acq,
+                                                                                                                    rt = run_type),
+                                                        fit_hrf = fit_hrf, iterative = iterative, crossval = crossval)
+                
         return pp_prf_est_dict, pp_prf_models
+    
+    def load_pRF_model_hemis(self, fit_path, fit_model = 'css', fit_hrf = False, basefilename = None, 
+                                    overwrite = False, iterative = True, crossval = False):
+        
+        """ 
+        combine all both hemispheres from fsnative fit
+        into one single estimate numpy array
+        assumes input is whole brain (vertex, time)
+
+        Parameters
+        ----------
+        fit_path : str
+            absolute path to files
+        fit_model: str
+            fit model of estimates
+        fit_hrf: bool
+            if we fitted hrf or not
+        
+        Outputs
+        -------
+        estimates : npz 
+            numpy array of estimates
+        """
+
+        if not self.MRIObj.sj_space in ['fsnative']:
+            raise NameError('Not using fsnative surface, used other function')
+
+        # if we are fitting HRF, then we want to look for those files
+        if fit_hrf:
+            filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'hemi-L' in x and 'HRF' in x and 'chunk' not in x]
+        else:
+            filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'hemi-L' in x and 'HRF' not in x and 'chunk' not in x]
+        
+        ## if we defined a base filename that should be used to fish out right estimates
+        if basefilename:
+            filename = [file for file in filename_list if basefilename in file][0]
+        else:
+            filename = filename_list[0]
+        
+        filename = filename.replace('_hemi-L', '_hemi-B')
+
+        if not op.exists(filename) or overwrite:
+
+            for h_ind, hemi in enumerate(self.MRIObj.hemispheres):
+
+                # if we are fitting HRF, then we want to look for those files
+                if fit_hrf:
+                    hemi_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and hemi in x and 'HRF' in x and 'chunk' not in x]
+                else:
+                    hemi_name_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and hemi in x and 'HRF' not in x and 'chunk' not in x]
+                
+                ## if we defined a base filename that should be used to fish out right estimates
+                if basefilename:
+                    hemi_name = [file for file in hemi_name_list if basefilename in file][0]
+                else:
+                    hemi_name = hemi_name_list[0]
+
+                print('loading hemi %s'%hemi_name)
+                chunk = np.load(hemi_name) # load chunk
+                
+                if h_ind == 0:
+                    xx = chunk['x']
+                    yy = chunk['y']
+
+                    size = chunk['size']
+
+                    beta = chunk['betas']
+                    baseline = chunk['baseline']
+
+                    if 'css' in fit_model: 
+                        ns = chunk['ns']
+                    elif fit_model in ['dn', 'dog']:
+                        sa = chunk['sa']
+                        ss = chunk['ss']
+                    
+                    if 'dn' in fit_model:
+                        nb = chunk['nb']
+                        sb = chunk['sb']
+
+                    rsq = chunk['r2']
+                    # if we cross validated
+                    if crossval:
+                        cv_r2 = chunk['cv_r2']
+                    else:
+                        cv_r2 = np.zeros(xx.shape) 
+
+                    if fit_hrf and iterative:
+                        hrf_derivative = chunk['hrf_derivative']
+                        hrf_dispersion = chunk['hrf_dispersion']
+                    else: # assumes standard spm params
+                        hrf_derivative = np.ones(xx.shape)
+                        hrf_dispersion = np.zeros(xx.shape) 
+
+                else:
+                    xx = np.concatenate((xx, chunk['x']))
+                    yy = np.concatenate((yy, chunk['y']))
+
+                    size = np.concatenate((size, chunk['size']))
+
+                    beta = np.concatenate((beta, chunk['betas']))
+                    baseline = np.concatenate((baseline, chunk['baseline']))
+
+                    if 'css' in fit_model:
+                        ns = np.concatenate((ns, chunk['ns']))
+                    elif fit_model in ['dn', 'dog']:
+                        sa = np.concatenate((sa, chunk['sa']))
+                        ss = np.concatenate((ss, chunk['ss']))
+
+                    if 'dn' in fit_model:
+                        nb = np.concatenate((nb, chunk['nb']))
+                        sb = np.concatenate((sb, chunk['sb']))
+
+                    rsq = np.concatenate((rsq, chunk['r2']))
+
+                    # if we cross validated
+                    if crossval:
+                        cv_r2 = np.concatenate((cv_r2, chunk['cv_r2'])) 
+                    else:
+                        cv_r2 = np.concatenate((cv_r2, np.zeros(chunk['r2'].shape))) 
+                    
+                    if fit_hrf and iterative:
+                        hrf_derivative = np.concatenate((hrf_derivative, chunk['hrf_derivative']))
+                        hrf_dispersion = np.concatenate((hrf_dispersion, chunk['hrf_dispersion']))
+                    else: # assumes standard spm params
+                        hrf_derivative = np.concatenate((hrf_derivative, np.ones(xx.shape)))
+                        hrf_dispersion = np.concatenate((hrf_dispersion, np.zeros(xx.shape))) 
+            
+            print('shape of estimates is %s'%(str(xx.shape)))
+
+            # save file
+            print('saving %s'%filename)
+
+            if 'gauss' in fit_model:
+                np.savez(filename,
+                        x = xx,
+                        y = yy,
+                        size = size,
+                        betas = beta,
+                        baseline = baseline,
+                        hrf_derivative = hrf_derivative,
+                        hrf_dispersion = hrf_dispersion,
+                        r2 = rsq,
+                        cv_r2 = cv_r2)
+
+            elif 'css' in fit_model:
+                np.savez(filename,
+                        x = xx,
+                        y = yy,
+                        size = size,
+                        betas = beta,
+                        baseline = baseline,
+                        ns = ns,
+                        hrf_derivative = hrf_derivative,
+                        hrf_dispersion = hrf_dispersion,
+                        r2 = rsq,
+                        cv_r2 = cv_r2)
+
+            elif 'dn' in fit_model:
+                np.savez(filename,
+                        x = xx,
+                        y = yy,
+                        size = size,
+                        betas = beta,
+                        baseline = baseline,
+                        sa = sa,
+                        ss = ss,
+                        nb = nb,
+                        sb = sb,
+                        hrf_derivative = hrf_derivative,
+                        hrf_dispersion = hrf_dispersion,
+                        r2 = rsq,
+                        cv_r2 = cv_r2)
+
+            elif 'dog' in fit_model:
+                np.savez(filename,
+                        x = xx,
+                        y = yy,
+                        size = size,
+                        betas = beta,
+                        baseline = baseline,
+                        sa = sa,
+                        ss = ss,
+                        hrf_derivative = hrf_derivative,
+                        hrf_dispersion = hrf_dispersion,
+                        r2 = rsq,
+                        cv_r2 = cv_r2)
+            
+        else:
+            print('file already exists, loading %s'%filename)
+        
+        return np.load(filename)
 
     def load_pRF_model_chunks(self, fit_path, fit_model = 'css', fit_hrf = False, basefilename = None, 
                                     overwrite = False, iterative = True, crossval = False):

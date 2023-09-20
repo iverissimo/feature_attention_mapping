@@ -127,6 +127,7 @@ fa_model_name = args.fa_model_name
 n_cpus = args.n_cpus
 n_nodes = args.n_nodes
 n_batches = args.n_batches
+n_cpus_task = args.n_cpus_task
 
 ## Load data object --> as relevant paths, variables and utility functions
 print("Fitting data for subject {sj}!".format(sj=sj))

@@ -99,6 +99,11 @@ parser.add_argument("--n_batches",
                     default = 10,
                     help = "Number of batches to split data into when fitting [default 10]"
                     )
+parser.add_argument("--n_cpus_task", 
+                    type = int, 
+                    default = 4,
+                    help = "Number of CPUS to use per process, which should allow threading [default 4]"
+                    )
 
 # parse the command line
 args = parser.parse_args()
@@ -139,12 +144,13 @@ def main():
 
     submit_SLURMjobs(participant_list = FAM_data.sj_num, chunk_data = chunk_data, run_time = run_time, task = task,
                             model_name = model_name, partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
-                            batch_dir = FAM_data.batch_dir, send_email = send_email, n_cpus = n_cpus, n_nodes = n_nodes, n_batches = n_batches)
+                            batch_dir = FAM_data.batch_dir, send_email = send_email, 
+                            n_cpus = n_cpus, n_nodes = n_nodes, n_batches = n_batches, n_cpus_task=n_cpus_task)
 
 
 def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00:00', task = 'pRF',
                             model_name = 'gauss', partition_name = None, node_name = None, batch_mem_Gib = None, 
-                            batch_dir ='/home/inesv/batch', send_email = False, n_cpus = 128, n_nodes = 1, n_batches = 16):
+                            batch_dir ='/home/inesv/batch', send_email = False, n_cpus = 128, n_nodes = 1, n_batches = 16, n_cpus_task = 4):
 
         """
         Submit slurm jobs, to fit pRF model on data
@@ -181,13 +187,23 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
         else:
             ch_list = [None]
 
-        ## number of jobs will be nodes x cpus -2 (to avoid memory issues)
-        n_jobs = int((n_cpus -1) * n_nodes)
+        ## limit number of cpus in usage = nodes x cpus -2 (to avoid memory issues)
+        #new_n_cpus = int((n_cpus * n_nodes - 2))
+        #print('allocating %i CPUS'%new_n_cpus)
+        
+        ## allocate node resources efficiently
+        # number of cpus that can be used per task = threads within a process
+        # so then we can obtain max possible number of processes, for the number of cpus we allocate
+        n_tasks = int(n_cpus/n_cpus_task) # (processes that will run in paralell)
+
+        ## number of jobs will be number of tasks -1 (to avoid memory issues)
+        n_jobs = int(n_tasks - 1)
 
         # get base format for bash script
         bash_basetxt = make_SLURM_script(run_time = run_time, logfilename = 'slurm_FAM_{tsk}_{md}_fit'.format(md = model_name, tsk = task), 
                                               partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
-                                              task = task, batch_dir = batch_dir, send_email = send_email, n_cpus = n_cpus, n_nodes=n_nodes)
+                                              task = task, batch_dir = batch_dir, send_email = send_email, 
+                                              n_tasks = n_jobs, n_nodes=n_nodes, n_cpus_task = n_cpus_task)
            
         # loop over participants
         for pp in participant_list:
@@ -227,7 +243,7 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
 
 
 def make_SLURM_script(run_time = '10:00:00', logfilename = '', partition_name = None, node_name = None, batch_mem_Gib = None, task = 'pRF', 
-                          batch_dir = '/home/inesv/batch', send_email = False, n_cpus = 32, n_nodes = 1):
+                          batch_dir = '/home/inesv/batch', send_email = False, n_tasks = 16, n_nodes = 1, n_cpus_task = 4):
 
         """
         Set up bash script, with generic structure 
@@ -257,8 +273,9 @@ def make_SLURM_script(run_time = '10:00:00', logfilename = '', partition_name = 
 #SBATCH -t {rtime}
 #SBATCH -N {n_nodes}
 #SBATCH -v
-#SBATCH --ntasks-per-node={n_cpus}
-#SBATCH --output=$BD/{logfilename}_%A.out\n""".format(rtime = run_time, logfilename = logfilename, n_nodes = n_nodes, n_cpus = n_cpus)
+#SBATCH --ntasks-per-node={ntasks}
+#SBATCH --n_cpus_task {n_cpus_task}
+#SBATCH --output=$BD/{logfilename}_%A.out\n""".format(rtime = run_time, logfilename = logfilename, n_nodes = n_nodes, n_cpus_task = n_cpus_task, ntasks = n_tasks)
         
         # if we want a specific node/partition
         if partition_name is not None:
@@ -273,6 +290,9 @@ def make_SLURM_script(run_time = '10:00:00', logfilename = '', partition_name = 
         if task == 'pRF':
             slurm_cmd = slurm_cmd + """# call the programs
 $START_EMAIL
+
+omp_threads=$SLURM_CPUS_PER_TASK
+export OMP_NUM_THREADS=$omp_threads
 
 # make derivatives dir in node and sourcedata because we want to access behav files
 mkdir -p $TMPDIR/derivatives/{post_fmriprep,$FITFOLDER}/$SPACE/sub-$SJ_NR

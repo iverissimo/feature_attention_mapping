@@ -275,7 +275,7 @@ def make_SLURM_script(run_time = '10:00:00', logfilename = '', partition_name = 
 #SBATCH -N {n_nodes}
 #SBATCH -v
 #SBATCH --ntasks-per-node={ntasks}
-#SBATCH --n_cpus_task {n_cpus_task}
+#SBATCH -cpus-per-task={n_cpus_task}
 #SBATCH --output=$BD/{logfilename}_%A.out\n""".format(rtime = run_time, logfilename = logfilename, n_nodes = n_nodes, n_cpus_task = n_cpus_task, ntasks = n_tasks)
         
         # if we want a specific node/partition

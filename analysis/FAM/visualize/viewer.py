@@ -138,7 +138,7 @@ class Viewer:
         else: 
             if 'sub-{sj}'.format(sj = sub_id) not in list(self.ROIs_dict.keys()): # if using participant specifc ROIs, load them if not loaded yet
                 self.ROIs_dict['sub-{sj}'.format(sj = sub_id)] = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = sub_id, pysub = self.pysub, use_atlas = self.use_atlas, 
-                                                                                            annot_filename = self.annot_filename, hemisphere = hemisphere,
+                                                                                            annot_filename = self.annot_filename, hemisphere = 'BH',
                                                                                             ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key],
                                                                                             freesurfer_pth = self.MRIObj.freesurfer_pth, 
                                                                                             use_fs_label = self.use_fs_label)
@@ -150,7 +150,7 @@ class Viewer:
             # number of vertices in one hemisphere (for bookeeping) 
             if self.use_fs_label:
                 # load surface vertices, for each hemi, as dict
-                n_verts_dict = self.load_FS_nverts_nfaces(sub_id = sub_id, freesurfer_pth = self.MRIObj.freesurfer_pth, return_faces = False)
+                n_verts_dict = self.MRIObj.mri_utils.load_FS_nverts_nfaces(sub_id = sub_id, freesurfer_pth = self.MRIObj.freesurfer_pth, return_faces = False)
                 hemi_vert_num = n_verts_dict['lh']
             else:
                 hemi_vert_num = cortex.db.get_surfinfo(self.pysub).left.shape[0] 

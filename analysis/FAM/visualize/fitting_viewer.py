@@ -380,25 +380,25 @@ class pRFViewer(Viewer):
 
         ## Now actually plot results
         # 
-        ### RSQ ###
-        self.plot_rsq(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
-                                            model_name = prf_model_name, fit_hrf = self.pRFModelObj.fit_hrf, vmin1 = 0, vmax1 = .8,
-                                            figures_pth = op.join(self.figures_pth, 'rsq', self.pRFModelObj.fitfolder['pRF']))
+        # ### RSQ ###
+        # self.plot_rsq(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+        #                                     model_name = prf_model_name, fit_hrf = self.pRFModelObj.fit_hrf, vmin1 = 0, vmax1 = .8,
+        #                                     figures_pth = op.join(self.figures_pth, 'rsq', self.pRFModelObj.fitfolder['pRF']))
 
-        ### ECC and SIZE ###
-        self.plot_ecc_size(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
-                                            model_name = prf_model_name, n_bins_dist = 8, 
-                                            vmin1 = {'ecc': 0, 'size': 0}, vmax1 = {'ecc': 5.5, 'size': 15})
+        # ### ECC and SIZE ###
+        # self.plot_ecc_size(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+        #                                     model_name = prf_model_name, n_bins_dist = 8, 
+        #                                     vmin1 = {'ecc': 0, 'size': 0}, vmax1 = {'ecc': 5.5, 'size': 15})
 
-        ### EXPONENT ###
-        if prf_model_name == 'css':
-            self.plot_exponent(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
-                                            model_name = prf_model_name, vmin1 = 0, vmax1 = 1)
+        # ### EXPONENT ###
+        # if prf_model_name == 'css':
+        #     self.plot_exponent(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+        #                                     model_name = prf_model_name, vmin1 = 0, vmax1 = 1)
 
-        ### POLAR ANGLE ####
-        self.plot_pa(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
-                                        model_name = prf_model_name, 
-                                        n_bins_colors = 256, max_x_lim = 5.5, angle_thresh = 3*np.pi/4)
+        # ### POLAR ANGLE ####
+        # self.plot_pa(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+        #                                 model_name = prf_model_name, 
+        #                                 n_bins_colors = 256, max_x_lim = 5.5, angle_thresh = 3*np.pi/4)
         
         ### Visual Field coverage ###
         self.plot_VFcoverage(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,

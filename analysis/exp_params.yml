@@ -315,6 +315,7 @@ plotting:
     far: 337.5
   
   ROIs: {'fsaverage': ['V1','V2','V3','V3AB','hV4','LO','IPS0','IPS1','IPS2+','sPCS','iPCS'], 
+        'fsnative': ['V1','V2','V3','V3AB','LO'], 
         'fsLR_den-170k': ['V1','V2','V3','V3AB','LO','TO', 'hV4', 'VO', 'IPS', 'sIPS'], 
         'glasser': {'V1': ['V1'], 
                     'V2': ['V2'],

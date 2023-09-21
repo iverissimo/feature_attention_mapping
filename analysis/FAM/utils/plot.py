@@ -241,7 +241,8 @@ class PlotUtils(Utils):
                         cmap='hot', fig_abs_name = None, recache = False, with_colorbar = True,
                         with_curvature = True, with_sulci = True, with_labels=False,
                         curvature_brightness = 0.4, curvature_contrast = 0.1, with_rois = True,
-                        zoom2ROI = None, hemi_list = ['left', 'right'], figsize=(15,5), dpi=300, margin = 10):
+                        zoom2ROI = None, hemi_list = ['left', 'right'], figsize=(15,5), dpi=300, margin = 10,
+                        qshow = True):
 
         """
         plot flatmap of data (1D)
@@ -304,14 +305,15 @@ class PlotUtils(Utils):
                                                 vmin2 = vmin2, vmax2 = vmax2, 
                                                 pysub = pysub, data2D = data2D)
 
-        if len(hemi_list)>1 and zoom2ROI is not None:
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize = figsize, dpi = dpi)
-        else:
-            fig, ax1 =  plt.subplots(1, figsize = figsize, dpi = dpi)
+        if qshow:
+            if len(hemi_list)>1 and zoom2ROI is not None:
+                fig, (ax1, ax2) = plt.subplots(1, 2, figsize = figsize, dpi = dpi)
+            else:
+                fig, ax1 =  plt.subplots(1, figsize = figsize, dpi = dpi)
 
-        cortex.quickshow(flatmap, fig = ax1, recache = recache, with_colorbar = with_colorbar, with_rois = with_rois,
-                                with_curvature = with_curvature, with_sulci = with_sulci, with_labels = with_labels,
-                                curvature_brightness = curvature_brightness, curvature_contrast = curvature_contrast)
+            cortex.quickshow(flatmap, fig = ax1, recache = recache, with_colorbar = with_colorbar, with_rois = with_rois,
+                                    with_curvature = with_curvature, with_sulci = with_sulci, with_labels = with_labels,
+                                    curvature_brightness = curvature_brightness, curvature_contrast = curvature_contrast)
         
         if zoom2ROI is not None:
             # Zoom on just one hemisphere
@@ -446,6 +448,22 @@ class PlotUtils(Utils):
         
         return cmap_arr
 
+    def add_FSsub_db(self, fs_sub, cx_subject = '', freesurfer_subject_dir = None):
+
+        """
+        import freesurfer sub files to pycortex database
+        if file already exists, then will NOT overwrite
+        """
+        db_sub_list = list(cortex.database.db.subjects.keys())
+
+        if cx_subject in db_sub_list:
+            print('pysub already in database - WILL NOT OVERWRITE')
+        else:
+            if freesurfer_subject_dir is None:
+                raise NameError('please specify freesurfer folder location')
+            else:
+                cortex.freesurfer.import_subj(fs_sub, cx_subject = cx_subject,
+                                                freesurfer_subject_dir = freesurfer_subject_dir)
 
     def make_2D_colormap(self, rgb_color = '101', bins = 50, scale=[1,1]):
         

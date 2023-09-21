@@ -181,7 +181,7 @@ class Viewer:
 
     def plot_rsq(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean',
                         model_name = 'gauss', task = 'pRF', figures_pth = None, vmin1 = 0, vmax1 = .8,
-                        fit_hrf = True):
+                        fit_hrf = True, save_flatmap = False):
         
         """
         plot R2 estimates of model fit (for either task)
@@ -221,10 +221,24 @@ class Viewer:
             if fit_hrf:
                 fig_name = fig_name.replace('.png','_withHRF.png') 
 
-            self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['r2'], 
-                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'hot', 
-                                        vmin1 = vmin1, vmax1 = vmax1, 
-                                        fig_abs_name = fig_name)
+            # if we want to save flatmap (note - requires flattened surface overlay file)
+            if save_flatmap:
+                self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['r2'], 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap = 'hot', 
+                                            vmin1 = vmin1, vmax1 = vmax1, 
+                                            fig_abs_name = fig_name, qshow = True)
+            else:
+                # first check if sub in filestore
+                self.plot_utils.add_FSsub_db('sub-{sj}'.format(sj = pp), 
+                                            cx_subject = self.get_pysub_name(sub_id = pp), 
+                                            freesurfer_subject_dir = self.MRIObj.freesurfer_pth)
+
+                ## pop-up web browser to check 
+                flatmap = self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['r2'].copy(), 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap = 'hot', 
+                                            vmin1 = vmin1, vmax1 = vmax1, 
+                                            fig_abs_name = None, qshow = False)
+                cortex.webshow(flatmap)
 
             ## get estimates per ROI
             pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, estimates_pp = group_estimates['sub-{sj}'.format(sj = pp)], 

@@ -379,11 +379,12 @@ class pRFViewer(Viewer):
             final_estimates = group_estimates
 
         ## Now actually plot results
-        # 
-        # ### RSQ ###
-        # self.plot_rsq(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
-        #                                     model_name = prf_model_name, fit_hrf = self.pRFModelObj.fit_hrf, vmin1 = 0, vmax1 = .8,
-        #                                     figures_pth = op.join(self.figures_pth, 'rsq', self.pRFModelObj.fitfolder['pRF']))
+        
+        ### RSQ ###
+        self.plot_rsq(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+                                            model_name = prf_model_name, fit_hrf = self.pRFModelObj.fit_hrf, vmin1 = 0, vmax1 = .8,
+                                            figures_pth = op.join(self.figures_pth, 'rsq', self.pRFModelObj.fitfolder['pRF']),
+                                            save_flatmap = False)
 
         # ### ECC and SIZE ###
         # self.plot_ecc_size(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,

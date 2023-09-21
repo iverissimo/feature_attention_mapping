@@ -175,17 +175,29 @@ match task:
 
             case 'draw_roi':
 
-                plotter.save_estimates4drawing(participant_list = FAM_data.sj_num, 
-                                                ses = ses2fit, run_type = run_type,
-                                                prf_model_name = prf_model_name, 
-                                                rsq_threshold = 0.1,
-                                                mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                if FAM_data.sj_space in ['fsnative']: # will draw custom label in freesurfer folder
+
+                    plotter.view_pRF_surf_estimates(participant_list = FAM_data.sj_num, 
+                                                    ses = ses2fit, run_type = run_type, prf_model_name = prf_model_name,
+                                                    mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
                                                                                 crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                                 shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
-                                                stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                    stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
                                                                                     crop_nr = FAM_data.task_nr_cropTR['pRF'], 
-                                                                                    shift = FAM_data.shift_TRs_num)
-                                                )
+                                                                                    shift = FAM_data.shift_TRs_num),
+                                                    mask_arr = True, iterative = True, open_fs = True)
+                else:
+                    plotter.save_estimates4drawing(participant_list = FAM_data.sj_num, 
+                                                    ses = ses2fit, run_type = run_type,
+                                                    prf_model_name = prf_model_name, 
+                                                    rsq_threshold = 0.1,
+                                                    mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                                                    crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                    shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
+                                                    stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                                                        crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                        shift = FAM_data.shift_TRs_num)
+                                                    )
 
             case 'prf_rsq':
                 ## ask for user input on models to compare

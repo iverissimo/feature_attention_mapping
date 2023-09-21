@@ -92,6 +92,10 @@ class pRFViewer(Viewer):
         ## per participant, add surface to freesurfer custom folder
         for pp in participant_list:
 
+            ## make an alpha mask, based on rsq values - exclude nan values (should be bellow previously defined threshold)
+            alpha_mask = np.ones_like(final_estimates['sub-{sj}'.format(sj = pp)]['r2'], dtype=bool)
+            alpha_mask[np.isnan(final_estimates['sub-{sj}'.format(sj = pp)]['r2'])] = False
+
             surface_name_list = []
             
             ## RSQ ##
@@ -105,7 +109,7 @@ class pRFViewer(Viewer):
 
             # add surface to freesurfer custom folder
             self.add_data2FSsurface(pp, data_arr = final_estimates['sub-{sj}'.format(sj = pp)]['r2'], 
-                                mask_arr = None, surf_name = R2_surface_name, overwrite = False,
+                                mask_arr = alpha_mask, surf_name = R2_surface_name, overwrite = False,
                                 vmin = vmin1['r2'], vmax = vmax1['r2'], cmap = 'hot', n_bins = 20)
             surface_name_list.append(R2_surface_name) 
 
@@ -117,7 +121,7 @@ class pRFViewer(Viewer):
 
             # add surface to freesurfer custom folder
             self.add_data2FSsurface(pp, data_arr = eccentricity, 
-                                mask_arr = None, surf_name = ECC_surface_name, overwrite = False,
+                                mask_arr = alpha_mask, surf_name = ECC_surface_name, overwrite = False,
                                 vmin = vmin1['ecc'], vmax = vmax1['ecc'], cmap = 'viridis', n_bins = 20)
             surface_name_list.append(ECC_surface_name) 
 
@@ -129,7 +133,7 @@ class pRFViewer(Viewer):
 
             # add surface to freesurfer custom folder
             self.add_data2FSsurface(pp, data_arr = size_fwhmaxmin[0], 
-                                mask_arr = None, surf_name = SIZEFWHM_surface_name, overwrite = False,
+                                mask_arr = alpha_mask, surf_name = SIZEFWHM_surface_name, overwrite = False,
                                 vmin = vmin1['size'], vmax = vmax1['size'], cmap = 'cubehelix', n_bins = 20)
             surface_name_list.append(SIZEFWHM_surface_name) 
 
@@ -144,9 +148,13 @@ class pRFViewer(Viewer):
             
             PA_surface_name = R2_surface_name.replace('_R2', '_PAflip')
 
+            # make different mask for PA, due to flipping
+            pa_alpha_mask = alpha_mask.copy()
+            pa_alpha_mask[np.isnan(pa_transformed)] = False
+
             # add surface to freesurfer custom folder
             self.add_data2FSsurface(pp, data_arr = pa_transformed, 
-                                mask_arr = None, surf_name = PA_surface_name, overwrite = False,
+                                mask_arr = pa_alpha_mask, surf_name = PA_surface_name, overwrite = False,
                                 vmin = -angle_thresh, vmax = angle_thresh, cmap = cmap_pa_sns, n_bins = 20)
             surface_name_list.append(PA_surface_name) 
 
@@ -158,7 +166,7 @@ class pRFViewer(Viewer):
 
             # add surface to freesurfer custom folder
             self.add_data2FSsurface(pp, data_arr = final_estimates['sub-{sj}'.format(sj = pp)]['x'], 
-                                mask_arr = None, surf_name = XX_surface_name, overwrite = False,
+                                mask_arr = alpha_mask, surf_name = XX_surface_name, overwrite = False,
                                 vmin = -5, vmax = 5, cmap = cmap_coords, n_bins = 20)
             surface_name_list.append(XX_surface_name) 
 
@@ -167,7 +175,7 @@ class pRFViewer(Viewer):
 
             # add surface to freesurfer custom folder
             self.add_data2FSsurface(pp, data_arr = final_estimates['sub-{sj}'.format(sj = pp)]['y'], 
-                                mask_arr = None, surf_name = YY_surface_name, overwrite = False,
+                                mask_arr = alpha_mask, surf_name = YY_surface_name, overwrite = False,
                                 vmin = -5, vmax = 5, cmap = cmap_coords, n_bins = 20)
             surface_name_list.append(YY_surface_name) 
 
@@ -175,7 +183,6 @@ class pRFViewer(Viewer):
                 # then OPEN FREESURFER
                 self.open_surf_freeview(pp, surf_names = surface_name_list, 
                                         surf_type = ['inflated'], screenshot_filename = None)
-
 
                 
     def save_estimates4drawing(self, participant_list = [],

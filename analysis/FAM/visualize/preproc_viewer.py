@@ -193,7 +193,9 @@ freeview -v \
                 ## get vertices for each relevant ROI
                 ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = pp, pysub = self.pysub, use_atlas = self.use_atlas, 
                                                                 annot_filename = self.annot_filename, hemisphere = 'BH',
-                                                                ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
+                                                                ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key],
+                                                                freesurfer_pth = self.MRIObj.freesurfer_pth, 
+                                                                use_fs_label = self.use_fs_label)
 
             outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp))
             # if output path doesn't exist, create it
@@ -489,7 +491,9 @@ freeview -v \
                 ## get vertices for each relevant ROI
                 ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = pp, pysub = self.pysub, use_atlas = self.use_atlas, 
                                                                 annot_filename = self.annot_filename, hemisphere = 'BH',
-                                                                ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
+                                                                ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key],
+                                                                freesurfer_pth = self.MRIObj.freesurfer_pth, 
+                                                                use_fs_label = self.use_fs_label)
 
             outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp))
             # if output path doesn't exist, create it
@@ -692,7 +696,9 @@ freeview -v \
             if (self.use_atlas is None) or (pp_ind == 0):
                 ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = pp, pysub = self.pysub, use_atlas = self.use_atlas, 
                                                                 annot_filename = self.annot_filename, hemisphere = 'BH',
-                                                                ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
+                                                                ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key],
+                                                                freesurfer_pth = self.MRIObj.freesurfer_pth, 
+                                                                use_fs_label = self.use_fs_label)
 
             outdir = op.join(output_pth,'sub-{sj}'.format(sj=pp))
             # if output path doesn't exist, create it

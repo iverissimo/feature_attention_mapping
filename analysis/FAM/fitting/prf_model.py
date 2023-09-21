@@ -319,7 +319,9 @@ class pRF_model(Model):
             ## get vertices for each relevant ROI
             ROIs_dict = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = participant, pysub = self.pysub, use_atlas = self.use_atlas, 
                                                             annot_filename = self.annot_filename, hemisphere = hemisphere,
-                                                            ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
+                                                            ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key],
+                                                            freesurfer_pth = self.MRIObj.freesurfer_pth, 
+                                                            use_fs_label = self.use_fs_label)
             if len(vertex) == 0:
                 vertex = ROIs_dict[ROI]
             else:

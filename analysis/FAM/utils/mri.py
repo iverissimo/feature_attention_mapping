@@ -132,7 +132,8 @@ class MRIUtils(Utils):
                 
         return atlas_df
     
-    def create_sjROI_df(self, sub_id = None, pysub = 'hcp_999999', ROI_list = ['V1', 'V2', 'V3', 'hV4', 'LO', 'V3AB']):
+    def create_sjROI_df(self, sub_id = None, pysub = 'hcp_999999', ROI_list = ['V1', 'V2', 'V3', 'hV4', 'LO', 'V3AB'], 
+                            freesurfer_pth = None, use_fs_label = False):
         
         """ Function to create pycortex subject dataframe
         with ROI names and vertex indices
@@ -147,27 +148,70 @@ class MRIUtils(Utils):
             relevant roi names
         """
 
-        # subject pycortex folder
-        sub_id = '001' #################################################### HARDCODED JUST TO TEST THINGS -->> CHANGE LATER 
-        sub_pysub = 'sub-{pp}_{ps}'.format(ps = pysub, pp = sub_id)
-        
-        # number of vertices in one hemisphere (for bookeeping) 
-        hemi_vert_num = cortex.db.get_surfinfo(sub_pysub).left.shape[0] 
-        
+        # if we want to FS labels to get ROIs
+        if use_fs_label:
+            if freesurfer_pth is None:
+                raise NameError('path to freesurfer folder not provided!')
+            else:
+                # load surface vertices, for each hemi, as dict
+                n_verts_dict = self.load_FS_nverts_nfaces(sub_id = sub_id, 
+                                                        freesurfer_pth = freesurfer_pth, 
+                                                        return_faces = False)
+                # number of vertices for left hemisphere (for bookeeping) 
+                hemi_vert_num = n_verts_dict['lh']
+
+                # get path to FS labels 
+                # and make generic base path str that can be update later
+                sub_label_str = op.join(freesurfer_pth, 'sub-{sj}'.format(sj = sub_id), 
+                                        'label', '{hemi}.custom.{roi}.label')
+
+        else:
+            # subject pycortex folder
+            sub_pysub = 'sub-{pp}_{ps}'.format(ps = pysub, pp = sub_id)
+            
+            # number of vertices in one hemisphere (for bookeeping) 
+            hemi_vert_num = cortex.db.get_surfinfo(sub_pysub).left.shape[0] 
+            
         ## make subject ROI data frame
         sjROI_df = pd.DataFrame({'ROI': [], 'hemi_vertex': [], 'merge_vertex': [], 'hemisphere': []})
 
         for roi_name in ROI_list:
 
-            # get vertex indices for whole surface 
-            merge_vert = cortex.get_roi_verts(sub_pysub, roi = roi_name)[roi_name]
+            if use_fs_label:
+                
+                # check if drawn label exists
+                roi_label_str = {key: sub_label_str.format(hemi = key, roi = roi_name) for key in ['lh','rh']}
 
-            # hemisphere
-            hemi_arr = np.tile('R', len(merge_vert))
-            hemi_arr[np.where(merge_vert < hemi_vert_num)[0]] = 'L'
-            # get vertex indices for each hemisphere separately
-            hemi_vert = merge_vert.copy()
-            hemi_vert[np.where(merge_vert >= hemi_vert_num)[0]] -= hemi_vert_num
+                if op.exists(roi_label_str['lh']) and op.exists(roi_label_str['rh']):
+
+                    # get vertices for each hemisphere
+                    hemi_vert_dict = {key: nib.freesurfer.io.read_label(roi_label_str[key]) for key in ['lh','rh']}
+                    
+                    # get vertex indices for each hemisphere separately 
+                    hemi_vert = np.concatenate((hemi_vert_dict['lh'], 
+                                                hemi_vert_dict['rh']))
+                    # and combined (merge)
+                    merge_vert = np.concatenate((hemi_vert_dict['lh'], 
+                                                 hemi_vert_dict['rh']+hemi_vert_num))
+                    # also add a hemisphere name label for bookeeping
+                    hemi_arr = np.concatenate((np.tile('L', len(hemi_vert_dict['lh'])), 
+                                               np.tile('R', len(hemi_vert_dict['rh']))))
+                else:
+                    # add empty lists and raise warning
+                    print('WARNING: No label found for {roi} in freesurfer folder, skipping'.format(roi = roi_name))
+                    hemi_vert = [None, None]
+                    merge_vert = [None, None]
+                    hemi_arr = ['L', 'R']
+            else:
+                # get vertex indices for whole surface 
+                merge_vert = cortex.get_roi_verts(sub_pysub, roi = roi_name)[roi_name]
+
+                # hemisphere
+                hemi_arr = np.tile('R', len(merge_vert))
+                hemi_arr[np.where(merge_vert < hemi_vert_num)[0]] = 'L'
+                # get vertex indices for each hemisphere separately
+                hemi_vert = merge_vert.copy()
+                hemi_vert[np.where(merge_vert >= hemi_vert_num)[0]] -= hemi_vert_num
 
             # fill df
             sjROI_df = pd.concat((sjROI_df,
@@ -201,10 +245,13 @@ class MRIUtils(Utils):
 
         for roi2plot in roi_list:
             if hemi == 'BH':
-                roi_vert += list(allROI_df[allROI_df['ROI'] == roi2plot].merge_vertex.values.astype(int))
+                verts = allROI_df[allROI_df['ROI'] == roi2plot].merge_vertex.values
             else:
-                roi_vert += list(allROI_df[(allROI_df['ROI'] == roi2plot) & \
-                                        (allROI_df['hemisphere'] == hemi[0])].merge_vertex.values.astype(int))
+                verts = allROI_df[(allROI_df['ROI'] == roi2plot) & \
+                                (allROI_df['hemisphere'] == hemi[0])].merge_vertex.values
+            
+            verts_list = [np.nan] if len(verts) <= 2 else list(verts.astype(int))
+            roi_vert += verts_list
 
         return np.array(roi_vert)
     
@@ -212,7 +259,8 @@ class MRIUtils(Utils):
                             annot_filename = '', hemisphere = 'BH',
                             ROI_labels = {'V1': ['V1v', 'V1d'], 'V2': ['V2v', 'V2d'],'V3': ['V3v', 'V3d'],
                                           'V3AB': ['V3A', 'V3B'], 'LO': ['LO1', 'LO2'], 'hV4': ['hV4'], 
-                                          'IPS0': ['IPS0'], 'IPS1': ['IPS1'], 'IPS2': ['IPS2']}):
+                                          'IPS0': ['IPS0'], 'IPS1': ['IPS1'], 'IPS2': ['IPS2']},
+                            freesurfer_pth = None, use_fs_label = False):
 
         """ 
         get straightforward dictionary of (ROI, vert) pairs
@@ -246,14 +294,19 @@ class MRIUtils(Utils):
         else:
             # if not, load subject hand-drawn rois
             tmp_arr = sorted({x for v in rlabels_dict.values() for x in v})
-            allROI_df = self.create_sjROI_df(sub_id = sub_id, pysub = pysub, ROI_list = tmp_arr)
+            allROI_df = self.create_sjROI_df(sub_id = sub_id, pysub = pysub, ROI_list = tmp_arr, 
+                                            freesurfer_pth = freesurfer_pth, use_fs_label = use_fs_label)
 
         # iterate over rois and get vertices
         output_dict = {}
         for rname in rlabels_dict.keys():
 
-            output_dict[rname] = self.get_roi_vert(allROI_df, roi_list = rlabels_dict[rname], 
+            roi_vert_arr = self.get_roi_vert(allROI_df, roi_list = rlabels_dict[rname], 
                                                    hemi = hemisphere)
+            if len(roi_vert_arr) > 2:
+                output_dict[rname] = roi_vert_arr
+            else:
+                output_dict[rname] = []
             
         return output_dict       
 

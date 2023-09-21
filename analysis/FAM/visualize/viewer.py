@@ -49,7 +49,12 @@ class Viewer:
         self.nr_pp = len(self.MRIObj.sj_num)
 
         # pycortex subject
-        self.pysub = pysub
+        if self.MRIObj.sj_space in ['fsnative']: # if using subject specific surfs
+            self.pysub = self.MRIObj.sj_space
+            self.use_fs_label = True
+        else:
+            self.pysub = pysub
+            self.use_fs_label = False
 
         ## set variables useful when loading ROIs
         if use_atlas is None:
@@ -68,7 +73,9 @@ class Viewer:
         if isinstance(self.use_atlas, str):
             self.ROIs_dict[self.use_atlas] = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = None, pysub = self.pysub, use_atlas = self.use_atlas, 
                                                             annot_filename = self.annot_filename, hemisphere = 'BH',
-                                                            ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
+                                                            ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key],
+                                                            freesurfer_pth = self.MRIObj.freesurfer_pth, 
+                                                            use_fs_label = self.use_fs_label)
 
         # set some generic variables useful for plotting
         self.bar_cond_colors = self.MRIObj.params['plotting']['cond_colors']
@@ -132,14 +139,21 @@ class Viewer:
             if 'sub-{sj}'.format(sj = sub_id) not in list(self.ROIs_dict.keys()): # if using participant specifc ROIs, load them if not loaded yet
                 self.ROIs_dict['sub-{sj}'.format(sj = sub_id)] = self.MRIObj.mri_utils.get_ROIs_dict(sub_id = sub_id, pysub = self.pysub, use_atlas = self.use_atlas, 
                                                                                             annot_filename = self.annot_filename, hemisphere = hemisphere,
-                                                                                            ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key])
+                                                                                            ROI_labels = self.MRIObj.params['plotting']['ROIs'][self.plot_key],
+                                                                                            freesurfer_pth = self.MRIObj.freesurfer_pth, 
+                                                                                            use_fs_label = self.use_fs_label)
             pp_ROI_dict = self.ROIs_dict['sub-{sj}'.format(sj = sub_id)]
 
         if hemisphere == 'BH':
             return pp_ROI_dict
         else:
             # number of vertices in one hemisphere (for bookeeping) 
-            hemi_vert_num = cortex.db.get_surfinfo(self.pysub).left.shape[0] 
+            if self.use_fs_label:
+                # load surface vertices, for each hemi, as dict
+                n_verts_dict = self.load_FS_nverts_nfaces(sub_id = sub_id, freesurfer_pth = self.MRIObj.freesurfer_pth, return_faces = False)
+                hemi_vert_num = n_verts_dict['lh']
+            else:
+                hemi_vert_num = cortex.db.get_surfinfo(self.pysub).left.shape[0] 
 
             # iterate over rois and get vertices
             hemi_pp_ROI_dict = {Rkey: (verts[np.where(verts < hemi_vert_num)[0]] if hemisphere == 'LH' else verts[np.where(verts >= hemi_vert_num)[0]]) for Rkey, verts in pp_ROI_dict.items()}
@@ -161,7 +175,6 @@ class Viewer:
             sub_pysub = self.pysub
         else:
             # subject pycortex folder
-            sub_id = '001' #################################################### HARDCODED JUST TO TEST THINGS -->> CHANGE LATER 
             sub_pysub = 'sub-{pp}_{ps}'.format(ps = self.pysub, pp = sub_id)
         
         return sub_pysub
@@ -337,7 +350,10 @@ class Viewer:
 
         ## mask data, if mask was provided
         if mask_arr is not None:
-            data_out = data_arr[mask_arr.astype(bool)]
+            mask_arr = mask_arr.astype(bool)
+            data_out = np.zeros_like(data_arr, dtype=float)
+            data_out[mask_arr] = data_arr[mask_arr]
+            data_out[~mask_arr] = vmin - 1 # to hide non-relevant vertices from surface
         else:
             data_out = data_arr
 
@@ -389,7 +405,8 @@ class Viewer:
         # return full path to surfaces
         return {'hemi-L': lh_surf, 'hemi-R': rh_surf}, overlay_filename
 
-    def open_surf_freeview(self, participant, surf_names = [], freesurfer_pth = None, surf_type = ['inflated'], screenshot_filename = None):
+    def open_surf_freeview(self, participant, surf_names = [], freesurfer_pth = None, surf_type = ['inflated'], screenshot_filename = None, 
+                                show_colorbar = True):
 
         """
         Write and call freeview bash command
@@ -468,6 +485,8 @@ freeview -f """
             os.system(photo_cmd) 
         else:
             ## actually call command
+            if show_colorbar:
+                working_string += ' --colorscale'
             os.system(working_string)
         
 

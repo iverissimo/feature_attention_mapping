@@ -26,8 +26,14 @@ class Model:
         ## set data object to use later on
         # has relevant paths etc
         self.MRIObj = MRIObj
-
-        self.pysub = pysub
+        
+        # pycortex subject
+        if self.MRIObj.sj_space in ['fsnative']: # if using subject specific surfs
+            self.pysub = self.MRIObj.sj_space
+            self.use_fs_label = True
+        else:
+            self.pysub = pysub
+            self.use_fs_label = False
 
         # if output dir not defined, then make it in derivatives
         if outputdir is None:

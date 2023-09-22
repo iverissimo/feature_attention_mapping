@@ -234,11 +234,26 @@ class Viewer:
                                             freesurfer_subject_dir = self.MRIObj.freesurfer_pth)
 
                 ## pop-up web browser to check 
-                flatmap = self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['r2'].copy(), 
-                                            pysub = self.get_pysub_name(sub_id = pp), cmap = 'hot', 
-                                            vmin1 = vmin1, vmax1 = vmax1, 
-                                            fig_abs_name = None, qshow = False)
-                cortex.webshow(flatmap)
+                #turn str cmap to cmap object
+                cmap2plot = self.plot_utils.make_colormap('hot', bins = 256, cmap_name = 'hot_custom', discrete = False, add_alpha = False, return_cmap = True)
+
+                flatmap = self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['r2'], 
+                                                    pysub = self.get_pysub_name(sub_id = pp), cmap = cmap2plot, 
+                                                    vmin1 = vmin1, vmax1 = vmax1, 
+                                                    fig_abs_name = None, qshow = False)
+                #cortex.webshow(flatmap, recache = True)
+                ## get angles for browser plots
+                angles2plot_dict = {'RH': {'camera.azimuth': 205, 'camera.altitude': 70, 'camera.radius': 295, 
+                                                            'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,
+                                                        'surface.{subject}.left': False,},
+                                    'LH': {'camera.azimuth': 155, 'camera.altitude': 68, 'camera.radius': 295, 
+                                                            'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,
+                                                        'surface.{subject}.right': False,}}
+                
+                self.save_inflated_3Dviews(flatmap, viewer_angles_dict = angles2plot_dict, 
+                                base_name = fig_name.replace('_flatmap', ''), 
+                                unfold_type = 'inflated', overlays_visible=[])
+                
 
             ## get estimates per ROI
             pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, estimates_pp = group_estimates['sub-{sj}'.format(sj = pp)], 
@@ -308,7 +323,8 @@ class Viewer:
             viewer_angles_dict = self.MRIObj.params['plotting']['webview']['angle_params']
 
         list_angles = list(viewer_angles_dict.items())
-        list_surfaces = [(unfold_type, self.MRIObj.params['plotting']['webview']['unfold_params'][unfold_type]) for i in range(len(viewer_angles_dict))]
+        #list_surfaces = [(unfold_type, self.MRIObj.params['plotting']['webview']['unfold_params'][unfold_type]) for i in range(len(viewer_angles_dict))]
+        list_surfaces = [unfold_type for i in range(len(viewer_angles_dict))]
 
         # save inflated 3D screenshots 
         for i in range(len(viewer_angles_dict)):
@@ -319,7 +335,7 @@ class Viewer:
                         list_surfaces = [list_surfaces[i]],        
                     viewer_params=dict(labels_visible=[],
                                         overlays_visible=overlays_visible, recache=True),
-                    size=(1024 * 4, 768 * 4), trim=True, sleep=30)
+                    size=(1024 * 4, 768 * 4), trim=True, sleep=15)
             
     def add_data2FSsurface(self, participant, data_arr = None, mask_arr = None,
                                 surf_name = '', freesurfer_pth = None, overwrite = False,

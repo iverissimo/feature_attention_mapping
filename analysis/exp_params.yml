@@ -348,12 +348,13 @@ plotting:
         }
 
   webview:
-    angle_params: {'lateral_left': {'camera.azimuth': 87, 'camera.altitude': 90, 'camera.radius': 220, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,},
-                    'lateral_right': {'camera.azimuth': 273, 'camera.altitude': 90, 'camera.radius': 220, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,},
-                    'top': {'camera.azimuth': 180, 'camera.altitude': 5, 'camera.radius': 270, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,},
-                    'bottom': {'camera.azimuth': 0, 'camera.altitude': 180, 'camera.radius': 270, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,},
-                    'medial_right': {'camera.azimuth': 87, 'camera.altitude': 100, 'camera.radius': 180, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,'surface.{subject}.left': False,},
-                    'medial_left': {'camera.azimuth': 273, 'camera.altitude': 100, 'camera.radius': 180, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,'surface.{subject}.right': False,}
+    angle_params: {'lateral_left': {'camera.azimuth': 87, 'camera.altitude': 90, 'camera.radius': 220, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,'surface.{subject}.left': False,},
+                    'lateral_right': {'camera.azimuth': 273, 'camera.altitude': 90, 'camera.radius': 220, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,'surface.{subject}.left': False,},
+                    'top': {'camera.azimuth': 180, 'camera.altitude': 30, 'camera.radius': 270, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,},
+                    'back': {'camera.azimuth': 180, 'camera.altitude': 90, 'camera.radius': 200, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,},
+                    'bottom': {'camera.azimuth': 180, 'camera.altitude': 136, 'camera.radius': 248, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,},
+                    'medial_right': {'camera.azimuth': 100, 'camera.altitude': 110, 'camera.radius': 160, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,'surface.{subject}.left': False,},
+                    'medial_left': {'camera.azimuth': 273, 'camera.altitude': 110, 'camera.radius': 160, 'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,'surface.{subject}.right': False,}
                   }
     unfold_params: {'inflated': {'surface.{subject}.unfold': 0.5,},
                     'flatmap': {'surface.{subject}.unfold': 1,},

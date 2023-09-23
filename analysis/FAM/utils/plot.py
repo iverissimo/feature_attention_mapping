@@ -241,8 +241,7 @@ class PlotUtils(Utils):
                         cmap='hot', fig_abs_name = None, recache = False, with_colorbar = True,
                         with_curvature = True, with_sulci = True, with_labels=False,
                         curvature_brightness = 0.4, curvature_contrast = 0.1, with_rois = True,
-                        zoom2ROI = None, hemi_list = ['left', 'right'], figsize=(15,5), dpi=300, margin = 10,
-                        qshow = True):
+                        zoom2ROI = None, hemi_list = ['left', 'right'], figsize=(15,5), dpi=300, margin = 10):
 
         """
         plot flatmap of data (1D)
@@ -305,15 +304,14 @@ class PlotUtils(Utils):
                                                 vmin2 = vmin2, vmax2 = vmax2, 
                                                 pysub = pysub, data2D = data2D)
 
-        if qshow:
-            if len(hemi_list)>1 and zoom2ROI is not None:
-                fig, (ax1, ax2) = plt.subplots(1, 2, figsize = figsize, dpi = dpi)
-            else:
-                fig, ax1 =  plt.subplots(1, figsize = figsize, dpi = dpi)
+        if len(hemi_list)>1 and zoom2ROI is not None:
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize = figsize, dpi = dpi)
+        else:
+            fig, ax1 =  plt.subplots(1, figsize = figsize, dpi = dpi)
 
-            cortex.quickshow(flatmap, fig = ax1, recache = recache, with_colorbar = with_colorbar, with_rois = with_rois,
-                                    with_curvature = with_curvature, with_sulci = with_sulci, with_labels = with_labels,
-                                    curvature_brightness = curvature_brightness, curvature_contrast = curvature_contrast)
+        cortex.quickshow(flatmap, fig = ax1, recache = recache, with_colorbar = with_colorbar, with_rois = with_rois,
+                                with_curvature = with_curvature, with_sulci = with_sulci, with_labels = with_labels,
+                                curvature_brightness = curvature_brightness, curvature_contrast = curvature_contrast)
         
         if zoom2ROI is not None:
             # Zoom on just one hemisphere
@@ -340,6 +338,80 @@ class PlotUtils(Utils):
                 _ = cortex.quickflat.make_png(fig_abs_name, flatmap, recache = recache, with_colorbar = with_colorbar, with_rois = with_rois,
                                                     with_curvature = with_curvature, with_sulci = with_sulci, with_labels = with_labels,
                                                     curvature_brightness = curvature_brightness, curvature_contrast = curvature_contrast)
+            
+        return flatmap
+    
+    def prepare_inflated(self, est_arr1, est_arr2 = None, verts = None, pysub = 'fsnative',
+                                vmin1 = 0, vmax1 = .8, vmin2 = None, vmax2 = None, 
+                                cmap='hot', fig_abs_name = None, recache = False, with_colorbar = True,
+                                with_curvature = True, with_sulci = True, with_labels=False,
+                                curvature_brightness = 0.4, curvature_contrast = 0.1, with_rois = True,
+                                cmap2str = True):
+
+        """
+        prepare vertex object to later plot inflated surface of data (1D)
+        with option to only show select vertices
+
+        Parameters
+        ----------
+        est_arr1 : array
+            data array
+        est_arr2 : array
+            data array
+        verts: array
+            list of vertices to select
+        cmap : str
+            string with colormap name
+        vmin1: int/float
+            minimum value est_arr1
+        vmin2: int/float
+            minimum value est_arr2
+        vmax1: int/float 
+            maximum value est_arr1
+        vmax2: int/float 
+            maximum value est_arr2
+        fig_abs_name: str
+            if provided, will save figure with this absolute name
+        zoom2ROI: str
+            if we want to zoom into an ROI, provide ROI name
+        hemi_list: list/arr
+            when zooming, which hemisphere to look at (can also be both)
+        """
+
+        #turn str cmap to cmap object
+        if cmap2str and isinstance(cmap, str):
+            cmap = self.make_colormap(cmap, bins = 256, cmap_name = cmap+'_custom', discrete = False, add_alpha = False, return_cmap = True)
+
+        # subselect vertices, if provided
+        if verts is not None:
+            surface_arr1 = np.zeros(est_arr1.shape[0])
+            surface_arr1[:] = np.nan
+            surface_arr1[verts] = est_arr1[verts]
+            if est_arr2 is not None:
+                surface_arr2 = np.zeros(est_arr2.shape[0])
+                surface_arr2[:] = np.nan
+                surface_arr2[verts] = est_arr2[verts]
+            else:
+                surface_arr2 = None
+        else:
+            surface_arr1 = est_arr1
+            surface_arr2 = est_arr2
+
+        if isinstance(cmap, str):
+            flatmap = self.get_flatmaps(surface_arr1, est_arr2 = surface_arr2, 
+                                vmin1 = vmin1, vmax1 = vmax1, vmin2 = vmin2, vmax2 = vmax2,
+                                cmap = cmap, pysub = pysub)
+        else:
+            if surface_arr2 is None:
+                data2D = False
+            else:
+                data2D = True
+            flatmap = self.make_raw_vertex_image(surface_arr1, 
+                                                cmap = cmap, 
+                                                vmin = vmin1, vmax = vmax1, 
+                                                data2 = surface_arr2, 
+                                                vmin2 = vmin2, vmax2 = vmax2, 
+                                                pysub = pysub, data2D = data2D)
             
         return flatmap
 

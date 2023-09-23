@@ -226,7 +226,7 @@ class Viewer:
                 self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['r2'], 
                                             pysub = self.get_pysub_name(sub_id = pp), cmap = 'hot', 
                                             vmin1 = vmin1, vmax1 = vmax1, 
-                                            fig_abs_name = fig_name, qshow = True)
+                                            fig_abs_name = fig_name)
             else:
                 # first check if sub in filestore
                 self.plot_utils.add_FSsub_db('sub-{sj}'.format(sj = pp), 
@@ -242,17 +242,18 @@ class Viewer:
                                                     vmin1 = vmin1, vmax1 = vmax1, 
                                                     fig_abs_name = None, qshow = False)
                 #cortex.webshow(flatmap, recache = True)
-                ## get angles for browser plots
-                angles2plot_dict = {'RH': {'camera.azimuth': 205, 'camera.altitude': 70, 'camera.radius': 295, 
-                                                            'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,
-                                                        'surface.{subject}.left': False,},
-                                    'LH': {'camera.azimuth': 155, 'camera.altitude': 68, 'camera.radius': 295, 
-                                                            'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,
-                                                        'surface.{subject}.right': False,}}
                 
-                self.save_inflated_3Dviews(flatmap, viewer_angles_dict = angles2plot_dict, 
-                                base_name = fig_name.replace('_flatmap', ''), 
-                                unfold_type = 'inflated', overlays_visible=[])
+                ## get angles for browser plots
+                # angles2plot_dict = {'RH': {'camera.azimuth': 205, 'camera.altitude': 70, 'camera.radius': 295, 
+                #                                             'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,
+                #                                         'surface.{subject}.left': False,},
+                #                     'LH': {'camera.azimuth': 155, 'camera.altitude': 68, 'camera.radius': 295, 
+                #                                             'surface.{subject}.specularity': 0, 'surface.{subject}.pivot': 0,
+                #                                         'surface.{subject}.right': False,}}
+                
+                # self.save_inflated_3Dviews(flatmap, viewer_angles_dict = angles2plot_dict, 
+                #                 base_name = fig_name.replace('_flatmap', '').replace('.png', ''), 
+                #                 unfold_type = 'inflated', overlays_visible=[])
                 
 
             ## get estimates per ROI
@@ -519,6 +520,12 @@ freeview -f """
                 working_string += ' --colorscale'
             os.system(working_string)
         
+    def plot_inflated(self, group_estimates['sub-{sj}'.format(sj = pp)]['r2'], 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap = 'hot', 
+                                            vmin1 = vmin1, vmax1 = vmax1, 
+                                            fig_abs_name = fig_name, qshow = True):
+        
+
 
     def convert_pix2dva(self, val_pix):
 

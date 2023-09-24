@@ -144,7 +144,7 @@ class pRFViewer(Viewer):
             pa_transformed = self.pRFModelObj.get_polar_angle(xx = final_estimates['sub-{sj}'.format(sj = pp)]['x'],
                                                              yy = final_estimates['sub-{sj}'.format(sj = pp)]['y'],
                                                             rsq = final_estimates['sub-{sj}'.format(sj = pp)]['r2'],
-                                                            pa_transform = 'flip', angle_thresh = angle_thresh)
+                                                            pa_transform = 'flip', angle_thresh = angle_thresh, sub_id = pp)
             
             PA_surface_name = R2_surface_name.replace('_R2', '_PAflip')
 
@@ -347,7 +347,7 @@ class pRFViewer(Viewer):
 
     def plot_prf_results(self, participant_list = [], mask_bool_df = None, stim_on_screen = [],
                                 ses = 'mean', run_type = 'mean', prf_model_name = 'gauss',
-                                mask_arr = True, iterative = True):
+                                mask_arr = True, iterative = True, save_flatmap = False):
 
 
         ## load estimates for all participants 
@@ -384,22 +384,23 @@ class pRFViewer(Viewer):
         self.plot_rsq(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
                                             model_name = prf_model_name, fit_hrf = self.pRFModelObj.fit_hrf, vmin1 = 0, vmax1 = .8,
                                             figures_pth = op.join(self.figures_pth, 'rsq', self.pRFModelObj.fitfolder['pRF']),
-                                            save_flatmap = False)
+                                            save_flatmap = save_flatmap)
 
-        # ### ECC and SIZE ###
-        # self.plot_ecc_size(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
-        #                                     model_name = prf_model_name, n_bins_dist = 8, 
-        #                                     vmin1 = {'ecc': 0, 'size': 0}, vmax1 = {'ecc': 5.5, 'size': 15})
+        ### ECC and SIZE ###
+        self.plot_ecc_size(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+                                            model_name = prf_model_name, n_bins_dist = 8, 
+                                            vmin1 = {'ecc': 0, 'size': 0}, vmax1 = {'ecc': 5.5, 'size': 15},
+                                            save_flatmap = save_flatmap)
 
-        # ### EXPONENT ###
-        # if prf_model_name == 'css':
-        #     self.plot_exponent(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
-        #                                     model_name = prf_model_name, vmin1 = 0, vmax1 = 1)
+        ### EXPONENT ###
+        if prf_model_name == 'css':
+            self.plot_exponent(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+                                            model_name = prf_model_name, vmin1 = 0, vmax1 = 1, save_flatmap = save_flatmap)
 
-        # ### POLAR ANGLE ####
-        # self.plot_pa(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
-        #                                 model_name = prf_model_name, 
-        #                                 n_bins_colors = 256, max_x_lim = 5.5, angle_thresh = 3*np.pi/4)
+        ### POLAR ANGLE ####
+        self.plot_pa(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
+                                        model_name = prf_model_name, save_flatmap = save_flatmap,
+                                        n_bins_colors = 256, max_x_lim = 5.5, angle_thresh = 3*np.pi/4)
         
         ### Visual Field coverage ###
         self.plot_VFcoverage(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
@@ -534,7 +535,7 @@ class pRFViewer(Viewer):
             fig.savefig(op.join(figures_pth, op.split(fig_name)[-1].replace('flatmap','violinplot').replace('sub-{sj}'.format(sj = pp),'sub-GROUP')))
             
     def plot_ecc_size(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean',
-                        figures_pth = None, model_name = 'gauss', n_bins_dist = 8, 
+                        figures_pth = None, model_name = 'gauss', n_bins_dist = 8, save_flatmap = False,
                         vmin1 = {'ecc': 0, 'size': 0}, vmax1 = {'ecc': 5.5, 'size': 17}):
         
         ## make output folder for figures
@@ -564,6 +565,10 @@ class pRFViewer(Viewer):
                                                              yy = group_estimates['sub-{sj}'.format(sj = pp)]['y'],
                                                              rsq = r2)
             
+            ## get SIZE estimates 
+            size_fwhmaxmin = self.pRFModelObj.fwhmax_fwatmin(model_name, 
+                                                            group_estimates['sub-{sj}'.format(sj = pp)])
+            
             ## plot rsq values on flatmap surface ##
             fig_name = op.join(sub_figures_pth,
                             'sub-{sj}_task-{tsk}_acq-{acq}_space-{space}_ses-{ses}_run-{run}_model-{model}_flatmap_ECC.png'.format(sj=pp, tsk = 'pRF',
@@ -574,31 +579,51 @@ class pRFViewer(Viewer):
             if self.pRFModelObj.fit_hrf:
                 fig_name = fig_name.replace('.png','_withHRF.png') 
 
-            self.plot_utils.plot_flatmap(eccentricity, 
-                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'viridis', 
+            # if we want to save flatmap (note - requires flattened surface overlay file)
+            if save_flatmap:
+                self.plot_utils.plot_flatmap(eccentricity, 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap = 'viridis', 
+                                            vmin1 = vmin1['ecc'], vmax1 = vmax1['ecc'],
+                                            est_arr2 = alpha_level,
+                                            vmin2 = 0, vmax2 = 1, 
+                                            fig_abs_name = fig_name)
+            
+                self.plot_utils.plot_flatmap(size_fwhmaxmin[0], 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap = 'cubehelix', 
+                                            vmin1 = vmin1['size'], vmax1 = vmax1['size'],
+                                            est_arr2 = alpha_level,
+                                            vmin2 = 0, vmax2 = 1, 
+                                            fig_abs_name = fig_name.replace('ECC', 'SIZE-fwhmax'))
+                
+                # also plot just size estimate
+                self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['size'], 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap = 'cubehelix', 
+                                            vmin1 = 0, vmax1 = 6,
+                                            est_arr2 = alpha_level,
+                                            vmin2 = 0, vmax2 = 1, 
+                                            fig_abs_name = fig_name.replace('ECC', 'SIZE'))  
+            else:
+                self.plot_inflated(pp, est_arr1 = eccentricity, 
+                                        cmap = 'viridis', cmap2str = True, 
                                         vmin1 = vmin1['ecc'], vmax1 = vmax1['ecc'],
-                                        est_arr2 = alpha_level,
-                                        vmin2 = 0, vmax2 = 1, 
-                                        fig_abs_name = fig_name)
+                                        fig_abs_name = fig_name.replace('_flatmap', ''), 
+                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        unfold_type = 'inflated')
             
-            ## get SIZE estimates 
-            size_fwhmaxmin = self.pRFModelObj.fwhmax_fwatmin(model_name, 
-                                                                group_estimates['sub-{sj}'.format(sj = pp)])
-            
-            self.plot_utils.plot_flatmap(size_fwhmaxmin[0], 
-                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'cubehelix', 
+                self.plot_inflated(pp, est_arr1 = size_fwhmaxmin[0], 
+                                        cmap = 'cubehelix', cmap2str = True, 
                                         vmin1 = vmin1['size'], vmax1 = vmax1['size'],
-                                        est_arr2 = alpha_level,
-                                        vmin2 = 0, vmax2 = 1, 
-                                        fig_abs_name = fig_name.replace('ECC', 'SIZE-fwhmax'))
-            
-            # also plot just size estimate
-            self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['size'], 
-                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'cubehelix', 
+                                        fig_abs_name = fig_name.replace('_flatmap', '').replace('ECC', 'SIZE-fwhmax'),
+                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        unfold_type = 'inflated')
+                
+                # also plot just size estimate
+                self.plot_inflated(pp, est_arr1 = group_estimates['sub-{sj}'.format(sj = pp)]['size'], 
+                                        cmap = 'cubehelix', cmap2str = True, 
                                         vmin1 = 0, vmax1 = 6,
-                                        est_arr2 = alpha_level,
-                                        vmin2 = 0, vmax2 = 1, 
-                                        fig_abs_name = fig_name.replace('ECC', 'SIZE'))
+                                        fig_abs_name = fig_name.replace('_flatmap', '').replace('ECC', 'SIZE'),
+                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        unfold_type = 'inflated')
             
             ## GET values per ROI ##
             ecc_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, eccentricity, 
@@ -736,7 +761,7 @@ class pRFViewer(Viewer):
                             dpi=100,bbox_inches = 'tight')
 
     def plot_exponent(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean',
-                        figures_pth = None, model_name = 'gauss', vmin1 = 0, vmax1 = 1):
+                        figures_pth = None, model_name = 'gauss', vmin1 = 0, vmax1 = 1, save_flatmap = False):
         
         ## make output folder for figures
         if figures_pth is None:
@@ -770,12 +795,21 @@ class pRFViewer(Viewer):
             alpha_level = np.ones(r2.shape[0]) #self.MRIObj.mri_utils.normalize(np.clip(r2, 0, .6)) # normalize 
             alpha_level[np.where((np.isnan(r2)))[0]] = np.nan
 
-            self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['ns'], 
-                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'magma', 
+            # if we want to save flatmap (note - requires flattened surface overlay file)
+            if save_flatmap:
+                self.plot_utils.plot_flatmap(group_estimates['sub-{sj}'.format(sj = pp)]['ns'], 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap = 'magma', 
+                                            vmin1 = vmin1, vmax1 = vmax1, 
+                                            est_arr2 = alpha_level,
+                                            vmin2 = 0, vmax2 = 1, 
+                                            fig_abs_name = fig_name)
+            else:
+                self.plot_inflated(pp, est_arr1 = group_estimates['sub-{sj}'.format(sj = pp)]['ns'], 
+                                        cmap = 'magma', cmap2str = True, 
                                         vmin1 = vmin1, vmax1 = vmax1, 
-                                        est_arr2 = alpha_level,
-                                        vmin2 = 0, vmax2 = 1, 
-                                        fig_abs_name = fig_name)
+                                        fig_abs_name = fig_name.replace('_flatmap', ''), 
+                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        unfold_type = 'inflated')
             
             ## GET values per ROI ##
             ns_pp_roi_df = self.MRIObj.mri_utils.get_estimates_roi_df(pp, group_estimates['sub-{sj}'.format(sj = pp)]['ns'], 
@@ -843,7 +877,7 @@ class pRFViewer(Viewer):
 
             fig.savefig(op.join(figures_pth, op.split(fig_name)[-1].replace('flatmap','violinplot').replace('sub-{sj}'.format(sj = pp),'sub-GROUP')))
 
-    def plot_pa(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean',
+    def plot_pa(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean', save_flatmap = False,
                         figures_pth = None, model_name = 'gauss', n_bins_colors = 256, max_x_lim = 5.5, angle_thresh = 3*np.pi/4,
                         colormap_list = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb', '#3d549f','#655099','#ad5a9b','#dd3933']):
         
@@ -873,8 +907,13 @@ class pRFViewer(Viewer):
             yy = group_estimates['sub-{sj}'.format(sj = pp)]['y']
 
             ## calculate polar angle (normalize PA between 0 and 1)
-            polar_angle_norm = self.pRFModelObj.get_polar_angle(xx = xx, yy = yy, rsq = r2, 
+            polar_angle_norm = self.pRFModelObj.get_polar_angle(xx = xx, yy = yy, rsq = r2, sub_id = pp,
                                                             pa_transform = 'norm', angle_thresh = None)
+            
+            ## also plot non-uniform color wheel ##
+            cmap_pa_sns = sns.hls_palette(as_cmap=True, h = 0.01, s=.9, l=.65)
+            pa_transformed = self.pRFModelObj.get_polar_angle(xx = xx, yy = yy, rsq = r2, sub_id = pp,
+                                                            pa_transform = 'flip', angle_thresh = angle_thresh)
                
             ## plot rsq values on flatmap surface ##
             fig_name = op.join(sub_figures_pth,
@@ -886,42 +925,71 @@ class pRFViewer(Viewer):
             if self.pRFModelObj.fit_hrf:
                 fig_name = fig_name.replace('.png','_withHRF.png') 
 
-            self.plot_utils.plot_flatmap(polar_angle_norm, 
-                                        pysub = self.get_pysub_name(sub_id = pp), cmap = PA_cmap, 
-                                        vmin1 = 0, vmax1 = 1,
-                                        est_arr2 = alpha_level,
-                                        vmin2 = 0, vmax2 = 1, 
-                                        with_colorbar = False,
-                                        fig_abs_name = fig_name)
-            
-            ## also plot non-uniform color wheel ##
-            cmap_pa_sns = sns.hls_palette(as_cmap=True, h = 0.01, s=.9, l=.65)
-            pa_transformed = self.pRFModelObj.get_polar_angle(xx = xx, yy = yy, rsq = r2, 
-                                                            pa_transform = 'flip', angle_thresh = angle_thresh)
+            # if we want to save flatmap (note - requires flattened surface overlay file)
+            if save_flatmap:
+                self.plot_utils.plot_flatmap(polar_angle_norm, 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap = PA_cmap, 
+                                            vmin1 = 0, vmax1 = 1,
+                                            est_arr2 = alpha_level,
+                                            vmin2 = 0, vmax2 = 1, 
+                                            with_colorbar = False,
+                                            fig_abs_name = fig_name)
 
-            self.plot_utils.plot_flatmap(pa_transformed, 
-                                        pysub = self.get_pysub_name(sub_id = pp), cmap = cmap_pa_sns, 
+                self.plot_utils.plot_flatmap(pa_transformed, 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap = cmap_pa_sns, 
+                                            vmin1 = -angle_thresh, vmax1 = angle_thresh, 
+                                            est_arr2 = alpha_level,
+                                            vmin2 = 0, vmax2 = 1, 
+                                            with_colorbar = False,
+                                            fig_abs_name = fig_name.replace('_PA', '_PAnonUNI'))
+
+                # plot x and y separately, for sanity check
+                # XX
+                self.plot_utils.plot_flatmap(xx, 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap = 'BuBkRd_alpha_2D', 
+                                            vmin1 = -max_x_lim, vmax1 = max_x_lim, 
+                                            est_arr2 = alpha_level,
+                                            vmin2 = 0, vmax2 = 1, 
+                                            fig_abs_name = fig_name.replace('_PA', '_XX'))
+                # YY
+                self.plot_utils.plot_flatmap(yy, 
+                                            pysub = self.get_pysub_name(sub_id = pp), cmap = 'BuBkRd_alpha_2D', 
+                                            vmin1 = -max_x_lim, vmax1 = max_x_lim, 
+                                            est_arr2 = alpha_level,
+                                            vmin2 = 0, vmax2 = 1, 
+                                            fig_abs_name = fig_name.replace('_PA', '_YY'))
+            else:
+                self.plot_inflated(pp, est_arr1 = polar_angle_norm, 
+                                        cmap = PA_cmap, cmap2str = True, 
+                                        vmin1 = 0, vmax1 = 1, 
+                                        fig_abs_name = fig_name.replace('_flatmap', ''), 
+                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        unfold_type = 'inflated')
+                
+                self.plot_inflated(pp, est_arr1 = pa_transformed, 
+                                        cmap = cmap_pa_sns, cmap2str = True, 
                                         vmin1 = -angle_thresh, vmax1 = angle_thresh, 
-                                        est_arr2 = alpha_level,
-                                        vmin2 = 0, vmax2 = 1, 
-                                        with_colorbar = False,
-                                        fig_abs_name = fig_name.replace('_PA', '_PAnonUNI'))
+                                        fig_abs_name = fig_name.replace('_flatmap', '').replace('_PA', '_PAnonUNI'), 
+                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        unfold_type = 'inflated')
+                
+                # color map for x and y
+                cmap_coords = sns.diverging_palette(250, 30, l=65, center="dark", as_cmap=True)
+                
+                self.plot_inflated(pp, est_arr1 = xx, 
+                                        cmap = cmap_coords, cmap2str = True, 
+                                        vmin1 = -max_x_lim, vmax1 = max_x_lim, 
+                                        fig_abs_name = fig_name.replace('_flatmap', '').replace('_PA', '_XX'), 
+                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        unfold_type = 'inflated')
 
-            # plot x and y separately, for sanity check
-            # XX
-            self.plot_utils.plot_flatmap(xx, 
-                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'BuBkRd_alpha_2D', 
+                self.plot_inflated(pp, est_arr1 = yy, 
+                                        cmap = cmap_coords, cmap2str = True, 
                                         vmin1 = -max_x_lim, vmax1 = max_x_lim, 
-                                        est_arr2 = alpha_level,
-                                        vmin2 = 0, vmax2 = 1, 
-                                        fig_abs_name = fig_name.replace('_PA', '_XX'))
-            # YY
-            self.plot_utils.plot_flatmap(yy, 
-                                        pysub = self.get_pysub_name(sub_id = pp), cmap = 'BuBkRd_alpha_2D', 
-                                        vmin1 = -max_x_lim, vmax1 = max_x_lim, 
-                                        est_arr2 = alpha_level,
-                                        vmin2 = 0, vmax2 = 1, 
-                                        fig_abs_name = fig_name.replace('_PA', '_YY'))
+                                        fig_abs_name = fig_name.replace('_flatmap', '').replace('_PA', '_YY'), 
+                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        unfold_type = 'inflated')
+
 
         ## plot the colorwheels as figs
             

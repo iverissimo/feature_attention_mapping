@@ -1476,7 +1476,7 @@ class pRF_model(Model):
 
         return eccentricity
     
-    def get_polar_angle(self, xx = [], yy = [], rsq = [], pa_transform = 'mirror', angle_thresh = 3*np.pi/4):
+    def get_polar_angle(self, xx = [], yy = [], rsq = [], pa_transform = 'mirror', angle_thresh = 3*np.pi/4, sub_id = None):
 
         """
         Helper function that calculates PA and returns array of
@@ -1501,8 +1501,16 @@ class pRF_model(Model):
 
         if pa_transform is not None:
 
-            ## get mid vertex index (diving hemispheres)
-            left_index = cortex.db.get_surfinfo(self.pysub).left.shape[0] 
+            # number of vertices in one hemisphere (for bookeeping) 
+            if self.use_fs_label:
+                # load surface vertices, for each hemi, as dict
+                n_verts_dict = self.MRIObj.mri_utils.load_FS_nverts_nfaces(sub_id = sub_id, 
+                                                                           freesurfer_pth = self.MRIObj.freesurfer_pth, 
+                                                                           return_faces = False)
+                left_index = n_verts_dict['lh']
+            else:
+                ## get mid vertex index (diving hemispheres)
+                left_index = cortex.db.get_surfinfo(self.pysub).left.shape[0] 
 
             polar_angle_out = polar_angle.copy()
 

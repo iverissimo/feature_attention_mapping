@@ -1533,24 +1533,49 @@ class FAViewer(Viewer):
         ## plot correlations and binary masks
         for task in self.MRIObj.tasks:
 
-            corr_arr = np.load(op.join(fitpath, 'spcorrelation_task-{tsk}.npy'.format(tsk = task)))
+            if self.MRIObj.sj_space in ['fsnative']:
+                # load hemis
+                corr_arr = np.concatenate((np.load(op.join(fitpath, 'hemi-L', 'spcorrelation_task-{tsk}.npy'.format(tsk = task))),
+                                           np.load(op.join(fitpath, 'hemi-R', 'spcorrelation_task-{tsk}.npy'.format(tsk = task)))))
+                binary_arr = np.concatenate((np.load(op.join(fitpath, 'hemi-L', 'binary_mask_spcorrelation_task-{tsk}.npy'.format(tsk = task))),
+                                           np.load(op.join(fitpath, 'hemi-R', 'binary_mask_spcorrelation_task-{tsk}.npy'.format(tsk = task)))))
+                
+                ## plot inflated
+                self.plot_inflated(participant, est_arr1 = corr_arr, 
+                                    min1 = 0, vmax1 = 1, 
+                                    cmap='hot', fig_abs_name = op.join(op.split(fig_basename)[0], 
+                                                                        'spcorrelation_task-{tsk}_{bn}'.format(bn = op.split(fig_basename)[-1],
+                                                                        tsk = task)),
+                                    recache = True, overlays_visible=[], cmap2str = True, 
+                                    angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                    unfold_type = 'inflated')
 
-            self.plot_utils.plot_flatmap(corr_arr, 
-                                        pysub = self.get_pysub_name(sub_id = participant), cmap='hot', 
-                                        vmin1 = 0, vmax1 = 1, 
-                                        fig_abs_name = op.join(op.split(fig_basename)[0], 'spcorrelation_task-{tsk}_{bn}'.format(bn = op.split(fig_basename)[-1],
-                                                                                              tsk = task)))
+                self.plot_inflated(participant, est_arr1 = binary_arr, 
+                                    min1 = 0, vmax1 = 1, 
+                                    cmap='hot', fig_abs_name = op.join(op.split(fig_basename)[0], 
+                                                                        'binary_mask_spcorrelation_task-{tsk}_{bn}'.format(bn = op.split(fig_basename)[-1],
+                                                                        tsk = task)),
+                                    recache = True, overlays_visible=[], cmap2str = True, 
+                                    angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                    unfold_type = 'inflated')
+            else:
+                corr_arr = np.load(op.join(fitpath, 'spcorrelation_task-{tsk}.npy'.format(tsk = task)))
+                binary_arr = np.load(op.join(fitpath, 'binary_mask_spcorrelation_task-{tsk}.npy'.format(tsk = task)))
 
-            binary_arr = np.load(op.join(fitpath, 'binary_mask_spcorrelation_task-{tsk}.npy'.format(tsk = task)))
+                self.plot_utils.plot_flatmap(corr_arr, 
+                                            pysub = self.get_pysub_name(sub_id = participant), cmap='hot', 
+                                            vmin1 = 0, vmax1 = 1, 
+                                            fig_abs_name = op.join(op.split(fig_basename)[0], 'spcorrelation_task-{tsk}_{bn}'.format(bn = op.split(fig_basename)[-1],
+                                                                                                tsk = task)))
 
-            self.plot_utils.plot_flatmap(binary_arr, 
-                                        pysub = self.get_pysub_name(sub_id = participant), cmap='hot', 
-                                        vmin1 = 0, vmax1 = 1, 
-                                        fig_abs_name = op.join(op.split(fig_basename)[0], 'binary_mask_spcorrelation_task-{tsk}_{bn}'.format(bn = op.split(fig_basename)[-1],
-                                                                                              tsk = task)))
+                self.plot_utils.plot_flatmap(binary_arr, 
+                                            pysub = self.get_pysub_name(sub_id = participant), cmap='hot', 
+                                            vmin1 = 0, vmax1 = 1, 
+                                            fig_abs_name = op.join(op.split(fig_basename)[0], 'binary_mask_spcorrelation_task-{tsk}_{bn}'.format(bn = op.split(fig_basename)[-1],
+                                                                                                tsk = task)))
 
     def plot_glmsingle_estimates(self, participant_list = [], model_type = ['A','D'],
-                                    mask_bool_df = None, stim_on_screen = [], mask_arr = True):
+                                    mask_bool_df = None, stim_on_screen = [], mask_arr = True, save_flatmap = False):
 
         """
         Plot split half correlations used in GLM single fit
@@ -1599,31 +1624,58 @@ class FAViewer(Viewer):
                 ## plot R2 on flatmap surface ##
                 r2 = estimates_dict['onoffR2'] if name == 'A' else estimates_dict['R2']
 
+                ## plot average betas
+                avg_betas = estimates_dict['betasmd'][...,0] if name == 'A' else np.mean(estimates_dict['betasmd'], axis = -1)
+
+                ## plot betas with pRF threshold
+                thresh_betas = avg_betas.copy()
+                thresh_betas[np.isnan(final_estimates['sub-{sj}'.format(sj = pp)]['r2'])] = np.nan
+
+                # set figure name
                 fig_name = op.join(output_pth,
                                 'R2_Model-{m}_flatmap_sub-{sj}_acq-{acq}.png'.format(sj = pp, 
                                                                                     m = name,
                                                                                     acq=self.MRIObj.sj_space))
-                self.plot_utils.plot_flatmap(r2, 
-                                            pysub = self.get_pysub_name(sub_id = pp), cmap='hot', 
-                                            vmin1 = 0, vmax1 = 50, 
-                                            fig_abs_name = fig_name)
                 
-                ## plot average betas
-                avg_betas = estimates_dict['betasmd'][...,0] if name == 'A' else np.mean(estimates_dict['betasmd'], axis = -1)
+                # if we want to save flatmap (note - requires flattened surface overlay file)
+                if save_flatmap:
+                    self.plot_utils.plot_flatmap(r2, 
+                                                pysub = self.get_pysub_name(sub_id = pp), cmap='hot', 
+                                                vmin1 = 0, vmax1 = 50, 
+                                                fig_abs_name = fig_name)
 
-                self.plot_utils.plot_flatmap(avg_betas, 
-                                            pysub = self.get_pysub_name(sub_id = pp), cmap='RdBu_r', 
-                                            vmin1 = -2, vmax1 = 2, 
-                                            fig_abs_name = fig_name.replace('R2_', 'Betas_'))
-                
-                ## plot betas with pRF threshold
-                avg_betas[np.isnan(final_estimates['sub-{sj}'.format(sj = pp)]['r2'])] = np.nan
-
-                self.plot_utils.plot_flatmap(avg_betas, 
-                                            pysub = self.get_pysub_name(sub_id = pp), cmap='RdBu_r', 
-                                            vmin1 = -2, vmax1 = 2, 
-                                            fig_abs_name = fig_name.replace('R2_', 'Betas_pRF_'))
-                
+                    self.plot_utils.plot_flatmap(avg_betas, 
+                                                pysub = self.get_pysub_name(sub_id = pp), cmap='RdBu_r', 
+                                                vmin1 = -2, vmax1 = 2, 
+                                                fig_abs_name = fig_name.replace('R2_', 'Betas_'))
+                    
+                    self.plot_utils.plot_flatmap(thresh_betas, 
+                                                pysub = self.get_pysub_name(sub_id = pp), cmap='RdBu_r', 
+                                                vmin1 = -2, vmax1 = 2, 
+                                                fig_abs_name = fig_name.replace('R2_', 'Betas_pRF_'))
+                else:
+                    ## plot inflated
+                    self.plot_inflated(pp, est_arr1 = r2, 
+                                        vmin1 = 0, vmax1 = 50, 
+                                        cmap='hot', fig_abs_name = fig_name.replace('_flatmap', ''), 
+                                        recache = True, overlays_visible=[], cmap2str = True, 
+                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        unfold_type = 'inflated')
+                    
+                    self.plot_inflated(pp, est_arr1 = avg_betas, 
+                                       vmin1 = -2, vmax1 = 2, 
+                                        cmap='RdBu_r', fig_abs_name = fig_name.replace('_flatmap', '').replace('R2_', 'Betas_'), 
+                                        recache = True, overlays_visible=[], cmap2str = True, 
+                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        unfold_type = 'inflated')
+                    
+                    self.plot_inflated(pp, est_arr1 = thresh_betas, 
+                                        vmin1 = -2, vmax1 = 2, 
+                                        cmap='RdBu_r', fig_abs_name = fig_name.replace('_flatmap', '').replace('R2_', 'Betas_pRF_'), 
+                                        recache = True, overlays_visible=[], cmap2str = True, 
+                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        unfold_type = 'inflated')
+                    
                 # if not on-off model
                 if name != 'A':
                     ## plot beta standard deviation, to see how much they vary
@@ -1631,27 +1683,52 @@ class FAViewer(Viewer):
                                                                             single_trl_DM = self.FAModelObj.load_single_trl_DM(pp), 
                                                                             return_std = True)
                     
-                    self.plot_utils.plot_flatmap(np.mean(std_surf, axis = 0), 
-                                            pysub = self.get_pysub_name(sub_id = pp), cmap='gnuplot', 
-                                            vmin1 = 0, vmax1 = 1.5, 
-                                            fig_abs_name = fig_name.replace('R2_', 'Betas_SD_'))
+                    if save_flatmap:
+                        self.plot_utils.plot_flatmap(np.mean(std_surf, axis = 0), 
+                                                pysub = self.get_pysub_name(sub_id = pp), cmap='gnuplot', 
+                                                vmin1 = 0, vmax1 = 1.5, 
+                                                fig_abs_name = fig_name.replace('R2_', 'Betas_SD_'))
+                    else:
+                        self.plot_inflated(pp, est_arr1 = np.mean(std_surf, axis = 0), 
+                                        vmin1 = 0, vmax1 = 1.5, 
+                                        cmap='gnuplot', fig_abs_name = fig_name.replace('_flatmap', '').replace('R2_', 'Betas_SD_'), 
+                                        recache = True, overlays_visible=[], cmap2str = True, 
+                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        unfold_type = 'inflated')
 
                 # if full model    
                 if name == 'D':
-                    ## plot FracRidge
-                    self.plot_utils.plot_flatmap(estimates_dict['FRACvalue'], 
-                                            pysub = self.get_pysub_name(sub_id = pp), cmap='copper', 
-                                            vmin1 = 0, vmax1 = 1, 
-                                            fig_abs_name = fig_name.replace('R2_', 'FRACvalue_'))
-                    
-                    ## plot Noise pool
-                    self.plot_utils.plot_flatmap(estimates_dict['noisepool'], 
-                                            pysub = self.get_pysub_name(sub_id = pp), cmap='hot', 
-                                            vmin1 = 0, vmax1 = 1, 
-                                            fig_abs_name = fig_name.replace('R2_', 'NoisePool_'))
-                    
-                    ## and plot binary masks + correlations used to make noise pool
-                    self.plot_spcorrelations(pp, fig_basename = fig_name.replace('R2_', ''))
+                    if save_flatmap:
+                        ## plot FracRidge
+                        self.plot_utils.plot_flatmap(estimates_dict['FRACvalue'], 
+                                                pysub = self.get_pysub_name(sub_id = pp), cmap='copper', 
+                                                vmin1 = 0, vmax1 = 1, 
+                                                fig_abs_name = fig_name.replace('R2_', 'FRACvalue_'))
+                        
+                        ## plot Noise pool
+                        self.plot_utils.plot_flatmap(estimates_dict['noisepool'], 
+                                                pysub = self.get_pysub_name(sub_id = pp), cmap='hot', 
+                                                vmin1 = 0, vmax1 = 1, 
+                                                fig_abs_name = fig_name.replace('R2_', 'NoisePool_'))
+                        
+                        ## and plot binary masks + correlations used to make noise pool
+                        self.plot_spcorrelations(pp, fig_basename = fig_name.replace('R2_', ''))
+                    else:
+                        self.plot_inflated(pp, est_arr1 = estimates_dict['FRACvalue'], 
+                                        vmin1 = 0, vmax1 = 1, 
+                                        cmap='copper', fig_abs_name = fig_name.replace('_flatmap', '').replace('R2_', 'FRACvalue_'), 
+                                        recache = True, overlays_visible=[], cmap2str = True, 
+                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        unfold_type = 'inflated')
+                        
+                        self.plot_inflated(pp, est_arr1 = estimates_dict['noisepool'], 
+                                        vmin1 = 0, vmax1 = 1, 
+                                        cmap='hot', fig_abs_name = fig_name.replace('_flatmap', '').replace('R2_', 'NoisePool_'), 
+                                        recache = True, overlays_visible=[], cmap2str = True, 
+                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        unfold_type = 'inflated')
+                        
+                        self.plot_spcorrelations(pp, fig_basename = fig_name.replace('_flatmap', '').replace('R2_', ''))
 
     def plot_betas_2D(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical',
                             max_ecc_ext = 5.5, fig_name = None, bar_color2plot = None, transpose_fig = False):

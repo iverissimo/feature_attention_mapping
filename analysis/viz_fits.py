@@ -271,7 +271,7 @@ match task:
 
             case 'fa_estimates':
                 plotter.plot_glmsingle_estimates(participant_list = FAM_data.sj_num, 
-                                                 model_type = ['A','D'],
+                                                 model_type = ['D'], #['A','D'],
                                                  mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
                                                                                 crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                                 shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses

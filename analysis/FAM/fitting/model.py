@@ -88,7 +88,7 @@ class Model:
         ## total number of chunks we divide data when fitting
         self.total_chunks = {key:self.MRIObj.params['mri']['fitting'][key]['total_chunks'][self.MRIObj.sj_space] for key in self.MRIObj.tasks}
 
-    def get_run_ses_pp(self, participant, task = 'pRF', run_type = 'mean', ses = 'mean', file_ext = '_cropped.npy'):
+    def get_run_ses_pp(self, participant, task = 'pRF', run_type = 'mean', ses = 'mean', file_ext = '_cropped.npy', hemisphere = 'BH'):
 
         """
         get data file list
@@ -110,7 +110,7 @@ class Model:
         ## get list of files to load
         file_list = self.MRIObj.mri_utils.get_bold_file_list(participant, task = task, ses = ses, file_ext = file_ext,
                                                             postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
-                                                            acq_name = self.MRIObj.acq)
+                                                            acq_name = self.MRIObj.acq, hemisphere = hemisphere)
         
         # if loading specific run
         if isinstance(run_type, int) or (isinstance(run_type, str) and 'loo_' not in run_type and len(re.findall(r'\d{1,10}', run_type))>0):

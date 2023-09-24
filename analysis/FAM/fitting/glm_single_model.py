@@ -90,7 +90,7 @@ class GLMsingle_Model(Model):
 
 
     def get_correlation_mask(self, participant, task = 'pRF', ses = 'mean', file_ext = '_cropped_dc_psc.npy',
-                                n_jobs = 8, seed_num = 2023, perc_thresh_nm = 95, smooth = True,
+                                n_jobs = 8, seed_num = 2023, perc_thresh_nm = 95, smooth = True, hemisphere = 'BH',
                                 kernel=3, nr_iter=3, normalize = False, filename = None):
 
         """
@@ -128,11 +128,16 @@ class GLMsingle_Model(Model):
             if we want to max normalize smoothed data (default = False)
         """
 
+        if self.MRIObj.sj_space in ['fsnative']:
+            pysub = 'sub-{pp}_{ps}'.format(pp = participant, ps = self.MRIObj.sj_space)
+        else:
+            pysub = self.pysub
+
         # get bold filenames
         task_bold_files = self.MRIObj.mri_utils.get_bold_file_list(participant, task = task, 
                                                                 ses = ses, file_ext = file_ext,
                                                                 postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
-                                                                acq_name = self.MRIObj.acq)
+                                                                acq_name = self.MRIObj.acq, hemisphere = hemisphere)
         
         ## find unique session number
         task_ses_num = np.unique([self.MRIObj.mri_utils.get_run_ses_from_str(f)[-1] for f in task_bold_files])
@@ -170,7 +175,7 @@ class GLMsingle_Model(Model):
 
         ## make final mask
         if smooth:
-            final_corr_arr = self.MRIObj.mri_utils.smooth_surface(task_avg_sh_corr, pysub = self.pysub, 
+            final_corr_arr = self.MRIObj.mri_utils.smooth_surface(task_avg_sh_corr, pysub = pysub, hemisphere = hemisphere,
                                                             kernel = kernel, nr_iter = nr_iter, normalize = normalize)
         else:
             final_corr_arr = task_avg_sh_corr
@@ -388,7 +393,7 @@ class GLMsingle_Model(Model):
 
     def get_singletrial_estimates(self, estimate_arr = [], single_trl_DM = [], return_std = True,
                                         att_bar_xy = [], unatt_bar_xy = [], average_betas = True, att_color_ses_run = None,
-                                        participant = None, file_ext = '_cropped.npy'):
+                                        participant = None, file_ext = '_cropped.npy', hemisphere = 'BH'):
 
         """
         Get beta values for each single trial type (our condition)
@@ -413,7 +418,7 @@ class GLMsingle_Model(Model):
         # if we provided dict with attended color run/ses keys, then average by color
         if att_color_ses_run:
             # get run and ses number in order used in DM 
-            run_num_arr,ses_num_arr = self.get_run_ses_pp(participant, task = 'FA', run_type = 'all', ses = 'all', file_ext = file_ext)
+            run_num_arr,ses_num_arr = self.get_run_ses_pp(participant, task = 'FA', run_type = 'all', ses = 'all', file_ext = file_ext, hemisphere = hemisphere)
             print(run_num_arr)
             print(ses_num_arr)
 
@@ -529,8 +534,22 @@ class GLMsingle_Model(Model):
         ## path to files
         fitpath = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant))
 
-        return np.load(op.join(fitpath, self.MRIObj.params['mri']['fitting']['FA']['glmsingle_models'][model_type]),
+        if self.MRIObj.sj_space in ['fsnative']:
+            # load hemis
+            LH_arr = np.load(op.join(fitpath, 'hemi-L', self.MRIObj.params['mri']['fitting']['FA']['glmsingle_models'][model_type]),
+                                            allow_pickle=True).item()
+            RH_arr = np.load(op.join(fitpath, 'hemi-R', self.MRIObj.params['mri']['fitting']['FA']['glmsingle_models'][model_type]),
+                                            allow_pickle=True).item()
+            out_arr = {}
+            for key in LH_arr.keys():
+                if isinstance(LH_arr[key], int):
+                    out_arr[key] = LH_arr[key]
+                else:
+                    out_arr[key] = np.concatenate((LH_arr[key], RH_arr[key]))
+        else:
+            out_arr = np.load(op.join(fitpath, self.MRIObj.params['mri']['fitting']['FA']['glmsingle_models'][model_type]),
                        allow_pickle=True).item()
+        return out_arr
     
     def load_single_trl_DM(self, participant):
 
@@ -551,7 +570,7 @@ class GLMsingle_Model(Model):
     def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', 
                         smooth_nm = True, perc_thresh_nm = 95, n_jobs = 8,
                         seed_num = 2023, kernel = 3, nr_iter = 3, normalize = False,
-                        pp_bar_pos_df = {}, fit_hrf = False,
+                        pp_bar_pos_df = {}, fit_hrf = False, hemisphere = 'BH',
                         file_extent_nm = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_LinDetrend_psc.npy'}):
 
         """
@@ -589,6 +608,8 @@ class GLMsingle_Model(Model):
 
         ## set output dir to save estimates
         outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant))
+        if hemisphere != 'BH':
+            outdir = op.join(outdir, 'hemi-L') if hemisphere in ['LH', 'hemi-L', 'left'] else op.join(outdir, 'hemi-R')
 
         os.makedirs(outdir, exist_ok = True)
         print('saving files in %s'%outdir)
@@ -596,7 +617,7 @@ class GLMsingle_Model(Model):
         ## get list of files to load
         bold_filelist = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'FA', ses = 'all', file_ext = file_ext,
                                                                 postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
-                                                                acq_name = self.MRIObj.acq)
+                                                                acq_name = self.MRIObj.acq, hemisphere = hemisphere)
 
         ## Load data array and file list names
         data, train_file_list = self.get_data4fitting(bold_filelist, task = 'FA', run_type = 'all', 
@@ -604,6 +625,7 @@ class GLMsingle_Model(Model):
                                                 baseline_interval = 'empty', correct_baseline = None, return_filenames = True)
     
         ## Make single trial DM for all runs
+        print('Run ID : {ri}  Ses ID: {si}'.format(ri = self.run_num_arr, si = self.ses_num_arr))
         single_trl_DM = self.make_singletrial_dm(run_num_arr = self.run_num_arr, 
                                                 ses_num_arr = self.ses_num_arr,
                                                 pp_bar_pos_df = pp_bar_pos_df)
@@ -615,24 +637,28 @@ class GLMsingle_Model(Model):
         
         ### make mask array of pRF high fitting voxels,
         # to give as input to glmsingle (excluding them from noise pool)
+        pRFcorr_filename = op.join(outdir, 'spcorrelation_task-pRF.npy')
+
         binary_prf_mask = self.get_correlation_mask(participant, task = 'pRF', ses = 'mean', 
                                                     file_ext = file_extent_nm['pRF'], n_jobs = n_jobs, 
                                                     seed_num = seed_num, perc_thresh_nm = perc_thresh_nm, 
                                                     smooth = smooth_nm, kernel = kernel, nr_iter = nr_iter, 
-                                                    normalize = normalize, 
-                                                    filename = op.join(outdir, 'spcorrelation_task-pRF.npy'))
+                                                    normalize = normalize, hemisphere = hemisphere,
+                                                    filename = pRFcorr_filename)
         # load correlation array - glmsingle deletes files in folder, should fix later
-        corr_pRF = np.load(op.join(outdir, 'spcorrelation_task-pRF.npy'), allow_pickle=True)
+        corr_pRF = np.load(pRFcorr_filename, allow_pickle=True)
 
         ## now do the same correlation mask for the FA runs
+        FAcorr_filename = pRFcorr_filename.replace('-pRF', '-FA')
+
         binary_fa_mask = self.get_correlation_mask(participant, task = 'FA', ses = 'mean', 
                                                     file_ext = file_extent_nm['FA'], n_jobs = n_jobs, 
                                                     seed_num = int(seed_num * 2), perc_thresh_nm = perc_thresh_nm, 
                                                     smooth = smooth_nm, kernel = kernel, nr_iter = nr_iter, 
-                                                    normalize = normalize,
-                                                    filename = op.join(outdir, 'spcorrelation_task-FA.npy'))
+                                                    normalize = normalize, hemisphere = hemisphere,
+                                                    filename = FAcorr_filename)
         # load correlation array - glmsingle deletes files in folder, should fix later
-        corr_FA = np.load(op.join(outdir, 'spcorrelation_task-FA.npy'), allow_pickle=True)
+        corr_FA = np.load(FAcorr_filename, allow_pickle=True)
 
         ### final mask is multiplication of the two
         final_mask = binary_fa_mask * binary_prf_mask
@@ -710,12 +736,12 @@ class GLMsingle_Model(Model):
         np.save(op.join(outdir, 'single_trl_DM.npy'), single_trl_DM)
 
         # also save binary mask, to later check
-        np.save(op.join(outdir, 'binary_mask_spcorrelation_task-pRF.npy'), binary_prf_mask)
-        np.save(op.join(outdir, 'binary_mask_spcorrelation_task-FA.npy'), binary_fa_mask)
+        np.save(pRFcorr_filename.replace('spcorrelation', 'binary_mask_spcorrelation'), binary_prf_mask)
+        np.save(FAcorr_filename.replace('spcorrelation', 'binary_mask_spcorrelation'), binary_fa_mask)
 
         # save correlations again
-        np.save(op.join(outdir, 'spcorrelation_task-pRF.npy'), corr_pRF)
-        np.save(op.join(outdir, 'spcorrelation_task-FA.npy'), corr_FA)
+        np.save(pRFcorr_filename, corr_pRF)
+        np.save(FAcorr_filename, corr_FA)
 
     def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, 
                                             file_ext = '_cropped.npy', ROIs_dict = {}, prf_estimates = {}, orientation_bars = 'parallel_vertical'):

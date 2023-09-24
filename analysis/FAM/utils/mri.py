@@ -440,7 +440,7 @@ class MRIUtils(Utils):
 
         return bold_filelist
 
-    def smooth_surface(self, data, pysub = 'hcp_999999', kernel=3, nr_iter=3, normalize = False):
+    def smooth_surface(self, data, pysub = 'hcp_999999', kernel=3, nr_iter=3, normalize = False, hemisphere = 'BH'):
 
         """
         smooth surface data, with a given kernel size 
@@ -469,13 +469,33 @@ class MRIUtils(Utils):
         ## first remove nans (turn to 0)
         data[np.isnan(data)] = 0
 
-        lh_data_smooth = lh_surf.smooth(data[:lh_surf_data[0].shape[0]], factor=kernel, iterations=nr_iter)
-        rh_data_smooth = rh_surf.smooth(data[rh_surf_data[0].shape[0]:], factor=kernel, iterations=nr_iter)
-        if normalize:
-            lh_data_smooth /= lh_data_smooth.max()
-            rh_data_smooth /= rh_data_smooth.max()
+        if hemisphere == 'BH':
+            lh_data_smooth = lh_surf.smooth(data[:lh_surf_data[0].shape[0]], factor=kernel, iterations=nr_iter)
+            rh_data_smooth = rh_surf.smooth(data[lh_surf_data[0].shape[0]:], factor=kernel, iterations=nr_iter)
 
-        return np.concatenate((lh_data_smooth,rh_data_smooth), axis=0)
+            if normalize:
+                lh_data_smooth /= lh_data_smooth.max()
+                rh_data_smooth /= rh_data_smooth.max()
+
+            out_data = np.concatenate((lh_data_smooth,rh_data_smooth), axis=0)
+        else:
+            if data.shape[0] ==  (lh_surf_data[0].shape[0] + rh_surf_data[0].shape[0]): # if providing data from both hemispheres
+                if hemisphere in ['hemi-L', 'LH', 'left']:
+                    hemi_data_smooth = lh_surf.smooth(data[:lh_surf_data[0].shape[0]], factor=kernel, iterations=nr_iter)
+                else:
+                    hemi_data_smooth = rh_surf.smooth(data[lh_surf_data[0].shape[0]:], factor=kernel, iterations=nr_iter)
+            else:
+                if hemisphere in ['hemi-L', 'LH', 'left']:
+                    hemi_data_smooth = lh_surf.smooth(data, factor=kernel, iterations=nr_iter)
+                else:
+                    hemi_data_smooth = rh_surf.smooth(data, factor=kernel, iterations=nr_iter)
+
+            if normalize:
+                hemi_data_smooth /= hemi_data_smooth.max()
+
+            out_data = hemi_data_smooth
+
+        return out_data
 
     def crop_epi(self, file, outdir = None, num_TR_crop = 5):
 

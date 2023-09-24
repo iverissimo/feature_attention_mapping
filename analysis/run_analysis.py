@@ -243,12 +243,14 @@ match task:
                         # get participant bar positions for FA task
                         pp_bar_pos_df = FAM_beh.load_FA_bar_position(pp, ses_num = None, ses_type = 'func', run_num = None)
 
-                        _ = FAM_FA.fit_data(pp, pp_prf_estimates['sub-{sj}'.format(sj = pp)], 
-                                            pp_prf_models['sub-{sj}'.format(sj = pp)]['ses-mean']['{mname}_model'.format(mname = prf_model_name)],  
-                                            file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 99, 
-                                            file_extent_nm = FAM_mri.get_mrifile_ext(), fit_hrf = False,
-                                            pp_bar_pos_df = pp_bar_pos_df) 
-                        
+                        for hemi in hemis2fit: # iterate over hemispheres
+
+                            _ = FAM_FA.fit_data(pp, pp_prf_estimates['sub-{sj}'.format(sj = pp)], 
+                                                pp_prf_models['sub-{sj}'.format(sj = pp)]['ses-mean']['{mname}_model'.format(mname = prf_model_name)],  
+                                                file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 99, 
+                                                file_extent_nm = FAM_mri.get_mrifile_ext(), fit_hrf = False,
+                                                pp_bar_pos_df = pp_bar_pos_df, hemisphere = hemi) 
+                            
                 case 'gain':
 
                     ## load FA model class

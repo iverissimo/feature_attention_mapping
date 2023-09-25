@@ -104,6 +104,14 @@ parser.add_argument("--n_cpus_task",
                     default = 4,
                     help = "Number of CPUS to use per process, which should allow threading [default 4]"
                     )
+parser.add_argument("--n_jobs", 
+                    type = int, 
+                    help = "If given, sets number of jobs for parallel"
+                    )
+parser.add_argument("--n_tasks", 
+                    type = int, 
+                    help = "If given, sets number of processes"
+                    )
 
 # parse the command line
 args = parser.parse_args()
@@ -128,6 +136,8 @@ n_cpus = args.n_cpus
 n_nodes = args.n_nodes
 n_batches = args.n_batches
 n_cpus_task = args.n_cpus_task
+n_jobs = args.n_jobs
+n_tasks = args.n_tasks
 
 ## Load data object --> as relevant paths, variables and utility functions
 print("Fitting data for subject {sj}!".format(sj=sj))
@@ -145,7 +155,7 @@ def main():
 
     submit_SLURMjobs(participant_list = FAM_data.sj_num, chunk_data = chunk_data, run_time = run_time, task = task,
                             model_name = model_name, partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
-                            batch_dir = FAM_data.batch_dir, send_email = send_email, 
+                            batch_dir = FAM_data.batch_dir, send_email = send_email, n_jobs = n_jobs, n_tasks = n_tasks,
                             n_cpus = n_cpus, n_nodes = n_nodes, n_batches = n_batches, n_cpus_task=n_cpus_task)
 
 

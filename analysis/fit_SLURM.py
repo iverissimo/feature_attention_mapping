@@ -219,7 +219,7 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
         bash_basetxt = make_SLURM_script(run_time = run_time, logfilename = 'slurm_FAM_{tsk}_{md}_fit'.format(md = model_name, tsk = task), 
                                               partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
                                               task = task, batch_dir = batch_dir, send_email = send_email, 
-                                              n_tasks = n_jobs, n_nodes=n_nodes, n_cpus_task = n_cpus_task)
+                                              n_tasks = n_tasks, n_nodes=n_nodes, n_cpus_task = n_cpus_task)
            
         # loop over participants
         for pp in participant_list:

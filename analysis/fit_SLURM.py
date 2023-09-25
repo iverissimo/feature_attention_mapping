@@ -151,7 +151,8 @@ def main():
 
 def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00:00', task = 'pRF',
                             model_name = 'gauss', partition_name = None, node_name = None, batch_mem_Gib = None, 
-                            batch_dir ='/home/inesv/batch', send_email = False, n_cpus = 128, n_nodes = 1, n_batches = 16, n_cpus_task = 4):
+                            batch_dir ='/home/inesv/batch', send_email = False, n_cpus = 128, n_nodes = 1, n_batches = 16, n_cpus_task = 4,
+                            n_tasks = None, n_jobs = None):
 
         """
         Submit slurm jobs, to fit pRF model on data
@@ -195,10 +196,14 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
         ## allocate node resources efficiently
         # number of cpus that can be used per task = threads within a process
         # so then we can obtain max possible number of processes, for the number of cpus we allocate
-        n_tasks = int(n_cpus/n_cpus_task) # (processes that will run in paralell)
+        if n_tasks is None:
+            n_tasks = int(n_cpus/n_cpus_task) # (processes that will run in paralell)
+        else:
+            n_cpus_task = int((n_cpus * n_nodes)/n_tasks) # if we specify number of tasks, divide cpus accordingly  
 
         ## number of jobs will be number of tasks -1 (to avoid memory issues)
-        n_jobs = int(n_tasks - 1)
+        if n_jobs is None:
+            n_jobs = int(n_tasks - 1)            
 
         # get base format for bash script
         bash_basetxt = make_SLURM_script(run_time = run_time, logfilename = 'slurm_FAM_{tsk}_{md}_fit'.format(md = model_name, tsk = task), 

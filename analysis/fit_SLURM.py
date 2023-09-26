@@ -307,9 +307,6 @@ def make_SLURM_script(run_time = '10:00:00', logfilename = '', partition_name = 
             slurm_cmd = slurm_cmd + """# call the programs
 $START_EMAIL
 
-#omp_threads=$SLURM_CPUS_PER_TASK
-#export OMP_NUM_THREADS=$omp_threads
-
 # make derivatives dir in node and sourcedata because we want to access behav files
 mkdir -p $TMPDIR/derivatives/{post_fmriprep,$FITFOLDER}/$SPACE/sub-$SJ_NR
 mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR

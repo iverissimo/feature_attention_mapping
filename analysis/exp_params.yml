@@ -219,7 +219,7 @@ mri: # refers to the Psychopy SyncGenerator class
       hrf_grid_nr: 20
 
       dn_grid_nr: 10
-      re_grid_dn: False
+      re_grid_dn: True
 
       N_PROCS: 4
 

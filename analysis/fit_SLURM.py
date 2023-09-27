@@ -2,6 +2,7 @@ import os, sys
 import os.path as op
 import numpy as np
 import argparse
+import time
 
 import yaml
 from FAM.processing import load_exp_settings
@@ -258,13 +259,16 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
 
                 # run it
                 js_name = op.join(batch_dir, '{fname}_model-{m}_sub-{sj}_chunk-{ch}_run-{r}_FAM.sh'.format(fname=FAM_data.params['mri']['fitting'][task]['fit_folder'],
-                                                                                        ch = ch, sj = pp, r = run_type, m = prf_model_name))
+                                                                                        ch = str(ch).zfill(3), sj = pp, r = run_type, m = prf_model_name))
                 of = open(js_name, 'w')
                 of.write(working_string)
                 of.close()
 
                 print('submitting ' + js_name + ' to queue')
                 os.system('sbatch ' + js_name)
+
+                # wait a bit, to give stuff time to start running
+                time.sleep(.2)
 
 
 def make_SLURM_script(run_time = '10:00:00', logfilename = '', partition_name = None, node_name = None, batch_mem_Gib = None, task = 'pRF', 

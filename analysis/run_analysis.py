@@ -107,6 +107,10 @@ parser.add_argument("--n_batches",
                     default = 10,
                     help = "Number of batches to split data into when fitting [default 10]"
                     )
+parser.add_argument("--total_chunks", 
+                    type = int, 
+                    help = "If given, will indicate number of chunk in which data is fitted AND saved into separate files [default None]"
+                    )
 
 # parse the command line
 args = parser.parse_args()
@@ -128,6 +132,7 @@ fa_model_name = args.fa_model_name
 use_atlas = args.atlas
 hemisphere = args.hemisphere
 n_batches = args.n_batches
+total_chunks = args.total_chunks
 
 # vertex list
 if len(args.vertex)>0:
@@ -198,7 +203,7 @@ match task:
 
                     FAM_pRF.fit_data(pp, pp_prf_models, 
                                     ses = ses2fit, run_type = run_type, file_ext = FAM_mri.get_mrifile_ext()['pRF'],
-                                    vertex = vertex, chunk_num = chunk_num, ROI = ROI,
+                                    vertex = vertex, chunk_num = chunk_num, ROI = ROI, total_chunks = total_chunks,
                                     model2fit = prf_model_name, hemisphere = hemi,
                                     save_estimates = True, n_batches = n_batches,
                                     xtol = 1e-5, ftol = 1e-5, n_jobs = n_jobs)

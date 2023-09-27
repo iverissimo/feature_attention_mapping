@@ -184,7 +184,7 @@ mri: # refers to the Psychopy SyncGenerator class
   fitting:
     pRF:
       run: 'mean' 
-      total_chunks: {'fsaverage': 83, 'T1w': 89, 'fsLR_den-170k': 54, 'fsnative': 2} # total number of chunks to split the data, depends on space of files
+      total_chunks: {'fsaverage': 83, 'T1w': 89, 'fsLR_den-170k': 54, 'fsnative': 100} # total number of chunks to split the data, depends on space of files
 
       fit_folder: 'pRF_fit'
 

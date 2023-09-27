@@ -147,7 +147,7 @@ class Model:
         return run_num_arr, ses_num_arr
 
     def get_data4fitting(self, file_list, task = 'pRF', run_type = 'mean',
-                            chunk_num = None, vertex = None,
+                            chunk_num = None, vertex = None, total_chunks = None,
                             baseline_interval = 'empty_long', ses = 'mean', return_filenames = False, correct_baseline = None):
 
         """
@@ -216,7 +216,7 @@ class Model:
         for r in range(data_arr.shape[0]):
             
             # subselect data for that run
-            data_out = self.subselect_array(data_arr[r], task = task, chunk_num = chunk_num, vertex = vertex)
+            data_out = self.subselect_array(data_arr[r], task = task, chunk_num = chunk_num, vertex = vertex, total_chunks = total_chunks)
             #print(data_out.shape)
 
             ## if we want to keep baseline fix, we need to correct it!
@@ -265,7 +265,7 @@ class Model:
         else:
             return data2fit
 
-    def subselect_array(self, input_arr, task = 'pRF', chunk_num = None, vertex = None):
+    def subselect_array(self, input_arr, task = 'pRF', chunk_num = None, vertex = None, total_chunks = None):
         
         """
         Helper function to subselect array (with estimate values for example)
@@ -286,13 +286,16 @@ class Model:
 
         # if we want to chunk it
         if isinstance(chunk_num, int):
-            # number of vertices of chunk
-            num_vox_chunk = int(input_arr.shape[0]/self.total_chunks[task])
-            print('Slicing array into chunk {ch} of {ch_total}'.format(ch = chunk_num, 
-                                        ch_total = self.total_chunks[task]))
-    
+            if total_chunks is None:
+                total_chunks = self.total_chunks[task]
+
+            # split data in chunks
+            #split_indices = np.array_split(np.arange(input_arr.shape[0]), total_chunks)
+            data_chunks = np.array_split(input_arr, total_chunks, axis=0)
+            print('Slicing array into chunk {ch} of {ch_total}'.format(ch = chunk_num, ch_total = total_chunks))
+            
             # chunk it
-            arr_out = input_arr[num_vox_chunk * int(chunk_num):num_vox_chunk * int(chunk_num + 1), :]
+            arr_out = data_chunks[chunk_num]
 
         # if we want specific vertex
         elif isinstance(vertex, int) or ((isinstance(vertex, list) or isinstance(vertex, np.ndarray)) and len(vertex) > 0):

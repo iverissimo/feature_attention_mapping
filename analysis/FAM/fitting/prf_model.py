@@ -288,7 +288,7 @@ class pRF_model(Model):
                     model2fit = 'gauss', file_ext = '_cropped_dc_psc.npy', 
                     outdir = None, save_estimates = False, hemisphere = 'BH',
                     xtol = 1e-3, ftol = 1e-4, n_jobs = 16, n_batches = 16,
-                    rsq_threshold = 0.05, verbose = True):
+                    rsq_threshold = 0.05, verbose = True, total_chunks = None):
 
         """
         fit inputted pRF models to each participant in participant list
@@ -330,7 +330,7 @@ class pRF_model(Model):
         print(bold_filelist)
         ## Load data array
         data = self.get_data4fitting(bold_filelist, task = 'pRF', run_type = run_type, chunk_num = chunk_num, vertex = vertex,
-                                    baseline_interval = 'empty_long', ses = ses, return_filenames = False)
+                                    baseline_interval = 'empty_long', ses = ses, return_filenames = False, total_chunks = total_chunks)
 
         ## Set nan voxels to 0, to avoid issues when fitting
         masked_data = data.copy()
@@ -737,6 +737,28 @@ class pRF_model(Model):
                  
         return fitpar_dict
 
+    def get_pp_fit_dir(self, participant, run_type = 'mean', ses = 'mean', iterative = True, model_name = 'gauss'):
+
+        """
+        Helper func to get participant prf fit dir
+        """
+
+        # if we want to load iterative results, or grid (iterative = False)
+        if iterative:
+            est_folder = 'it_{model_name}'.format(model_name = model_name)
+        else:
+            est_folder = 'grid_{model_name}'.format(model_name = model_name)
+
+        ## path to estimates
+        if 'loo_' in run_type:
+            pRFdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type, est_folder)
+            crossval = True
+        else:
+            pRFdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses), est_folder)
+            crossval = False
+
+        return pRFdir
+
     def get_fit_constraints(self, method = 'L-BFGS-B', ss_larger_than_centre = True, 
                                     positive_centre_only = False, normalize_RFs = False):
 
@@ -815,7 +837,7 @@ class pRF_model(Model):
         return constraints
 
     def load_pRF_model_estimates(self, participant_list = [], ses = 'mean', run_type = 'mean', model_name = None, 
-                                    iterative = True, fit_hrf = False, mask_bool_df = None, stim_on_screen = []):
+                                    iterative = True, fit_hrf = False, mask_bool_df = None, stim_on_screen = [], total_chunks = None):
 
         """
         Load pRF model estimates
@@ -883,7 +905,7 @@ class pRF_model(Model):
                                                         basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
                                                                                                                     acq = self.MRIObj.acq,
                                                                                                                     rt = run_type),
-                                                        fit_hrf = fit_hrf, iterative = iterative, crossval = crossval)
+                                                        fit_hrf = fit_hrf, iterative = iterative, crossval = crossval, total_chunks = total_chunks)
                 
         return pp_prf_est_dict, pp_prf_models
     
@@ -972,7 +994,7 @@ class pRF_model(Model):
                     else:
                         cv_r2 = np.zeros(xx.shape) 
 
-                    if fit_hrf and iterative:
+                    if fit_hrf:
                         hrf_derivative = chunk['hrf_derivative']
                         hrf_dispersion = chunk['hrf_dispersion']
                     else: # assumes standard spm params
@@ -1006,7 +1028,7 @@ class pRF_model(Model):
                     else:
                         cv_r2 = np.concatenate((cv_r2, np.zeros(chunk['r2'].shape))) 
                     
-                    if fit_hrf and iterative:
+                    if fit_hrf:
                         hrf_derivative = np.concatenate((hrf_derivative, chunk['hrf_derivative']))
                         hrf_dispersion = np.concatenate((hrf_dispersion, chunk['hrf_dispersion']))
                     else: # assumes standard spm params
@@ -1079,7 +1101,7 @@ class pRF_model(Model):
         return np.load(filename)
 
     def load_pRF_model_chunks(self, fit_path, fit_model = 'css', fit_hrf = False, basefilename = None, 
-                                    overwrite = False, iterative = True, crossval = False):
+                                    overwrite = False, iterative = True, crossval = False, total_chunks = None):
 
         """ 
         combine all chunks 
@@ -1101,6 +1123,9 @@ class pRF_model(Model):
             numpy array of estimates
         """
 
+        if total_chunks is None:
+            total_chunks = self.total_chunks['pRF']
+
         # if we are fitting HRF, then we want to look for those files
         if fit_hrf:
             filename_list = [op.join(fit_path, x) for x in os.listdir(fit_path) if fit_model in x and 'chunk-000' in x and 'HRF' in x]
@@ -1117,7 +1142,7 @@ class pRF_model(Model):
 
         if not op.exists(filename) or overwrite:
         
-            for ch in np.arange(self.total_chunks['pRF']):
+            for ch in np.arange(total_chunks):
                 
                 # if we are fitting HRF, then we want to look for those files
                 if fit_hrf:
@@ -1160,7 +1185,7 @@ class pRF_model(Model):
                     else:
                         cv_r2 = np.zeros(xx.shape) 
 
-                    if fit_hrf and iterative:
+                    if fit_hrf:
                         hrf_derivative = chunk['hrf_derivative']
                         hrf_dispersion = chunk['hrf_dispersion']
                     else: # assumes standard spm params
@@ -1194,7 +1219,7 @@ class pRF_model(Model):
                     else:
                         cv_r2 = np.concatenate((cv_r2, np.zeros(chunk['r2'].shape))) 
                     
-                    if fit_hrf and iterative:
+                    if fit_hrf:
                         hrf_derivative = np.concatenate((hrf_derivative, chunk['hrf_derivative']))
                         hrf_dispersion = np.concatenate((hrf_dispersion, chunk['hrf_dispersion']))
                     else: # assumes standard spm params

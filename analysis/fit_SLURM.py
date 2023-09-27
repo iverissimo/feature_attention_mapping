@@ -112,6 +112,11 @@ parser.add_argument("--n_tasks",
                     type = int, 
                     help = "If given, sets number of processes"
                     )
+parser.add_argument("--n_chunks", 
+                    type = int, 
+                    default = 100,
+                    help = "Number of chunks to split jobs into into when fitting [default 100]"
+                    )
 
 # parse the command line
 args = parser.parse_args()
@@ -138,6 +143,7 @@ n_batches = args.n_batches
 n_cpus_task = args.n_cpus_task
 n_jobs = args.n_jobs
 n_tasks = args.n_tasks
+n_chunks = args.n_chunks
 
 ## Load data object --> as relevant paths, variables and utility functions
 print("Fitting data for subject {sj}!".format(sj=sj))
@@ -156,13 +162,13 @@ def main():
     submit_SLURMjobs(participant_list = FAM_data.sj_num, chunk_data = chunk_data, run_time = run_time, task = task,
                             model_name = model_name, partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
                             batch_dir = FAM_data.batch_dir, send_email = send_email, n_jobs = n_jobs, n_tasks = n_tasks,
-                            n_cpus = n_cpus, n_nodes = n_nodes, n_batches = n_batches, n_cpus_task=n_cpus_task)
+                            n_cpus = n_cpus, n_nodes = n_nodes, n_batches = n_batches, n_cpus_task=n_cpus_task, n_chunks = n_chunks)
 
 
 def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00:00', task = 'pRF',
                             model_name = 'gauss', partition_name = None, node_name = None, batch_mem_Gib = None, 
                             batch_dir ='/home/inesv/batch', send_email = False, n_cpus = 128, n_nodes = 1, n_batches = 16, n_cpus_task = 4,
-                            n_tasks = None, n_jobs = None):
+                            n_tasks = None, n_jobs = None, n_chunks = None):
 
         """
         Submit slurm jobs, to fit pRF model on data
@@ -193,9 +199,12 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
         """
 
         # if we're chunking the data, then need to submit each chunk at a time
-        if chunk_data:
+        if n_chunks is None:
             # total number of chunks
-            ch_list = np.arange(FAM_data.params['mri']['fitting'][task]['total_chunks'][FAM_data.sj_space])
+            n_chunks = FAM_data.params['mri']['fitting'][task]['total_chunks'][FAM_data.sj_space]
+
+        if chunk_data:
+            ch_list = np.arange(n_chunks)
         else:
             ch_list = [None]
 
@@ -232,7 +241,7 @@ def submit_SLURMjobs(participant_list = [], chunk_data = True, run_time = '10:00
                                                         ses = ses2fit, rt = run_type, prf_mod = prf_model_name, fa_mod = fa_model_name, n_jobs = n_jobs, n_batches = n_batches)
                 # if chunking data
                 if ch is not None:
-                     fit_cmd += '--chunk_num {ch} '.format(ch = ch)
+                    fit_cmd += '--chunk_num {ch} --total_chunks {tch} '.format(ch = ch, tch = n_chunks)
 
                 # if we want to fit hrf
                 if fit_hrf:

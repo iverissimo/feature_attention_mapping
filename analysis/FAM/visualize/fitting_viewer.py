@@ -57,7 +57,7 @@ class pRFViewer(Viewer):
 
     def view_pRF_surf_estimates(self, participant_list = [], mask_bool_df = None, stim_on_screen = [],
                                         ses = 'mean', run_type = 'mean', prf_model_name = 'gauss',
-                                        mask_arr = True, iterative = True, 
+                                        mask_arr = True, iterative = True, surf_type = 'inflated',
                                         vmin1 = {'ecc': 0, 'size': 0, 'r2': 0}, vmax1 = {'ecc': 5.5, 'size': 10, 'r2': .8},
                                         angle_thresh = 3*np.pi/4, open_fs = True):
         
@@ -182,7 +182,7 @@ class pRFViewer(Viewer):
             if open_fs:
                 # then OPEN FREESURFER
                 self.open_surf_freeview(pp, surf_names = surface_name_list, 
-                                        surf_type = ['inflated'], screenshot_filename = None)
+                                        surf_type = [surf_type], screenshot_filename = None)
 
                 
     def save_estimates4drawing(self, participant_list = [],
@@ -347,7 +347,8 @@ class pRFViewer(Viewer):
 
     def plot_prf_results(self, participant_list = [], mask_bool_df = None, stim_on_screen = [],
                                 ses = 'mean', run_type = 'mean', prf_model_name = 'gauss',
-                                mask_arr = True, iterative = True, save_flatmap = False):
+                                mask_arr = True, iterative = True, save_flatmap = False, 
+                                angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left']):
 
 
         ## load estimates for all participants 
@@ -384,23 +385,23 @@ class pRFViewer(Viewer):
         self.plot_rsq(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
                                             model_name = prf_model_name, fit_hrf = self.pRFModelObj.fit_hrf, vmin1 = 0, vmax1 = .8,
                                             figures_pth = op.join(self.figures_pth, 'rsq', self.pRFModelObj.fitfolder['pRF']),
-                                            save_flatmap = save_flatmap)
+                                            save_flatmap = save_flatmap, angles2plot_list = angles2plot_list)
 
         ### ECC and SIZE ###
         self.plot_ecc_size(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
                                             model_name = prf_model_name, n_bins_dist = 8, 
                                             vmin1 = {'ecc': 0, 'size': 0}, vmax1 = {'ecc': 5.5, 'size': 15},
-                                            save_flatmap = save_flatmap)
+                                            save_flatmap = save_flatmap, angles2plot_list = angles2plot_list)
 
         ### EXPONENT ###
         if prf_model_name == 'css':
             self.plot_exponent(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
-                                            model_name = prf_model_name, vmin1 = 0, vmax1 = 1, save_flatmap = save_flatmap)
+                                            model_name = prf_model_name, vmin1 = 0, vmax1 = 1, save_flatmap = save_flatmap, angles2plot_list = angles2plot_list)
 
         ### POLAR ANGLE ####
         self.plot_pa(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
                                         model_name = prf_model_name, save_flatmap = save_flatmap,
-                                        n_bins_colors = 256, max_x_lim = 5.5, angle_thresh = 3*np.pi/4)
+                                        n_bins_colors = 256, max_x_lim = 5.5, angle_thresh = 3*np.pi/4, angles2plot_list = angles2plot_list)
         
         ### Visual Field coverage ###
         self.plot_VFcoverage(participant_list = participant_list, group_estimates = final_estimates, ses = ses, run_type = run_type,
@@ -536,7 +537,8 @@ class pRFViewer(Viewer):
             
     def plot_ecc_size(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean',
                         figures_pth = None, model_name = 'gauss', n_bins_dist = 8, save_flatmap = False,
-                        vmin1 = {'ecc': 0, 'size': 0}, vmax1 = {'ecc': 5.5, 'size': 17}):
+                        vmin1 = {'ecc': 0, 'size': 0}, vmax1 = {'ecc': 5.5, 'size': 17}, 
+                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left']):
         
         ## make output folder for figures
         if figures_pth is None:
@@ -607,14 +609,14 @@ class pRFViewer(Viewer):
                                         cmap = 'viridis', cmap2str = True, 
                                         vmin1 = vmin1['ecc'], vmax1 = vmax1['ecc'],
                                         fig_abs_name = fig_name.replace('_flatmap', ''), 
-                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        angles2plot_list = angles2plot_list, 
                                         unfold_type = 'inflated')
             
                 self.plot_inflated(pp, est_arr1 = size_fwhmaxmin[0], 
                                         cmap = 'cubehelix', cmap2str = True, 
                                         vmin1 = vmin1['size'], vmax1 = vmax1['size'],
                                         fig_abs_name = fig_name.replace('_flatmap', '').replace('ECC', 'SIZE-fwhmax'),
-                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        angles2plot_list = angles2plot_list, 
                                         unfold_type = 'inflated')
                 
                 # also plot just size estimate
@@ -622,7 +624,7 @@ class pRFViewer(Viewer):
                                         cmap = 'cubehelix', cmap2str = True, 
                                         vmin1 = 0, vmax1 = 6,
                                         fig_abs_name = fig_name.replace('_flatmap', '').replace('ECC', 'SIZE'),
-                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        angles2plot_list = angles2plot_list, 
                                         unfold_type = 'inflated')
             
             ## GET values per ROI ##
@@ -761,7 +763,8 @@ class pRFViewer(Viewer):
                             dpi=100,bbox_inches = 'tight')
 
     def plot_exponent(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean',
-                        figures_pth = None, model_name = 'gauss', vmin1 = 0, vmax1 = 1, save_flatmap = False):
+                        figures_pth = None, model_name = 'gauss', vmin1 = 0, vmax1 = 1, save_flatmap = False,
+                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left']):
         
         ## make output folder for figures
         if figures_pth is None:
@@ -808,7 +811,7 @@ class pRFViewer(Viewer):
                                         cmap = 'magma', cmap2str = True, 
                                         vmin1 = vmin1, vmax1 = vmax1, 
                                         fig_abs_name = fig_name.replace('_flatmap', ''), 
-                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        angles2plot_list = angles2plot_list, 
                                         unfold_type = 'inflated')
             
             ## GET values per ROI ##
@@ -879,7 +882,8 @@ class pRFViewer(Viewer):
 
     def plot_pa(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean', save_flatmap = False,
                         figures_pth = None, model_name = 'gauss', n_bins_colors = 256, max_x_lim = 5.5, angle_thresh = 3*np.pi/4,
-                        colormap_list = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb', '#3d549f','#655099','#ad5a9b','#dd3933']):
+                        colormap_list = ['#ec9b3f','#f3eb53','#7cb956','#82cbdb', '#3d549f','#655099','#ad5a9b','#dd3933'],
+                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left']):
         
         ## make output folder for figures
         if figures_pth is None:
@@ -963,14 +967,14 @@ class pRFViewer(Viewer):
                                         cmap = PA_cmap, cmap2str = True, 
                                         vmin1 = 0, vmax1 = 1, 
                                         fig_abs_name = fig_name.replace('_flatmap', ''), 
-                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        angles2plot_list = angles2plot_list, 
                                         unfold_type = 'inflated')
                 
                 self.plot_inflated(pp, est_arr1 = pa_transformed, 
                                         cmap = cmap_pa_sns, cmap2str = True, 
                                         vmin1 = -angle_thresh, vmax1 = angle_thresh, 
                                         fig_abs_name = fig_name.replace('_flatmap', '').replace('_PA', '_PAnonUNI'), 
-                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        angles2plot_list = angles2plot_list, 
                                         unfold_type = 'inflated')
                 
                 # color map for x and y
@@ -980,14 +984,14 @@ class pRFViewer(Viewer):
                                         cmap = cmap_coords, cmap2str = True, 
                                         vmin1 = -max_x_lim, vmax1 = max_x_lim, 
                                         fig_abs_name = fig_name.replace('_flatmap', '').replace('_PA', '_XX'), 
-                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        angles2plot_list = angles2plot_list, 
                                         unfold_type = 'inflated')
 
                 self.plot_inflated(pp, est_arr1 = yy, 
                                         cmap = cmap_coords, cmap2str = True, 
                                         vmin1 = -max_x_lim, vmax1 = max_x_lim, 
                                         fig_abs_name = fig_name.replace('_flatmap', '').replace('_PA', '_YY'), 
-                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        angles2plot_list = angles2plot_list, 
                                         unfold_type = 'inflated')
 
 

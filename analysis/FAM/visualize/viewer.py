@@ -181,7 +181,7 @@ class Viewer:
 
     def plot_rsq(self, participant_list = [], group_estimates = {}, ses = 'mean',  run_type = 'mean',
                         model_name = 'gauss', task = 'pRF', figures_pth = None, vmin1 = 0, vmax1 = .8,
-                        fit_hrf = True, save_flatmap = False):
+                        fit_hrf = True, save_flatmap = False, angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left']):
         
         """
         plot R2 estimates of model fit (for either task)
@@ -233,7 +233,7 @@ class Viewer:
                                     vmin1 = vmin1, vmax1 = vmax1,
                                     cmap='hot', fig_abs_name = fig_name.replace('_flatmap', ''), 
                                     recache = True, overlays_visible=[], cmap2str = True, 
-                                    angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                    angles2plot_list = angles2plot_list, 
                                     unfold_type = 'inflated')
 
             ## get estimates per ROI

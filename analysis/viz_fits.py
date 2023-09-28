@@ -170,7 +170,8 @@ match task:
                                                                                 shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
                                         stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
                                                                                     crop_nr = FAM_data.task_nr_cropTR['pRF'], 
-                                                                                    shift = FAM_data.shift_TRs_num)
+                                                                                    shift = FAM_data.shift_TRs_num),
+                                        angles2plot_list = ['back']
                                         )
 
             case 'draw_roi':
@@ -185,7 +186,7 @@ match task:
                                                     stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
                                                                                     crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                                     shift = FAM_data.shift_TRs_num),
-                                                    mask_arr = True, iterative = True, open_fs = True)
+                                                    mask_arr = True, iterative = True, open_fs = True, surf_type = 'sphere')
                 else:
                     plotter.save_estimates4drawing(participant_list = FAM_data.sj_num, 
                                                     ses = ses2fit, run_type = run_type,

@@ -551,7 +551,7 @@ class GLMsingle_Model(Model):
                        allow_pickle=True).item()
         return out_arr
     
-    def load_single_trl_DM(self, participant):
+    def load_single_trl_DM(self, participant, hemisphere = None):
 
         """
         Load glm single design matrix
@@ -565,7 +565,15 @@ class GLMsingle_Model(Model):
         ## path to files
         fitpath = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant))
 
-        return np.load(op.join(fitpath, 'single_trl_DM.npy'), allow_pickle=True)
+        if hemisphere is not None: #DM is saved in hemi folder, might change later
+            if hemisphere == 'BH':
+                return np.load(op.join(fitpath, 'hemi-L', 'single_trl_DM.npy'), allow_pickle=True), np.load(op.join(fitpath, 'hemi-R', 'single_trl_DM.npy'), allow_pickle=True)
+            elif hemisphere in ['left', 'LH', 'hemi-L']:
+                return np.load(op.join(fitpath, 'hemi-L', 'single_trl_DM.npy'), allow_pickle=True)
+            else:
+                return np.load(op.join(fitpath, 'hemi-R', 'single_trl_DM.npy'), allow_pickle=True)
+        else:
+            return np.load(op.join(fitpath, 'single_trl_DM.npy'), allow_pickle=True)
     
     def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', 
                         smooth_nm = True, perc_thresh_nm = 95, n_jobs = 8,

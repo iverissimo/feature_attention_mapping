@@ -137,7 +137,6 @@ class Model:
         ses_num_arr = []
 
         for file in file_list:
-    
             ## append run number, and ses number in list of ints
             # useful for when fitting several runs at same time
             file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(file)

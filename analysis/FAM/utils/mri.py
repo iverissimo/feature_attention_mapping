@@ -438,6 +438,9 @@ class MRIUtils(Utils):
         elif hemisphere in ['RH', 'hemi-R', 'right']:
             bold_filelist = [file for file in bold_filelist if 'hemi-R' in file] 
 
+        ## sort by session and run keys, to avoid mismatchings later on
+        bold_filelist.sort(key = lambda x:(re.search(r'ses-._', x).group(0), re.search(r'run-._', x).group(0)))
+
         return bold_filelist
 
     def smooth_surface(self, data, pysub = 'hcp_999999', kernel=3, nr_iter=3, normalize = False, hemisphere = 'BH'):

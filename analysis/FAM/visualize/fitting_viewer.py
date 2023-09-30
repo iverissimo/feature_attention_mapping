@@ -1546,7 +1546,7 @@ class FAViewer(Viewer):
                 
                 ## plot inflated
                 self.plot_inflated(participant, est_arr1 = corr_arr, 
-                                    min1 = 0, vmax1 = 1, 
+                                    vmin1 = 0, vmax1 = 1, 
                                     cmap='hot', fig_abs_name = op.join(op.split(fig_basename)[0], 
                                                                         'spcorrelation_task-{tsk}_{bn}'.format(bn = op.split(fig_basename)[-1],
                                                                         tsk = task)),
@@ -1555,7 +1555,7 @@ class FAViewer(Viewer):
                                     unfold_type = 'inflated')
 
                 self.plot_inflated(participant, est_arr1 = binary_arr, 
-                                    min1 = 0, vmax1 = 1, 
+                                    vmin1 = 0, vmax1 = 1, 
                                     cmap='hot', fig_abs_name = op.join(op.split(fig_basename)[0], 
                                                                         'binary_mask_spcorrelation_task-{tsk}_{bn}'.format(bn = op.split(fig_basename)[-1],
                                                                         tsk = task)),
@@ -1579,7 +1579,8 @@ class FAViewer(Viewer):
                                                                                                 tsk = task)))
 
     def plot_glmsingle_estimates(self, participant_list = [], model_type = ['A','D'],
-                                    mask_bool_df = None, stim_on_screen = [], mask_arr = True, save_flatmap = False):
+                                    mask_bool_df = None, stim_on_screen = [], mask_arr = True, save_flatmap = False,
+                                    angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left']):
 
         """
         Plot split half correlations used in GLM single fit
@@ -1663,42 +1664,42 @@ class FAViewer(Viewer):
                                         vmin1 = 0, vmax1 = 50, 
                                         cmap='hot', fig_abs_name = fig_name.replace('_flatmap', ''), 
                                         recache = True, overlays_visible=[], cmap2str = True, 
-                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        angles2plot_list = angles2plot_list, 
                                         unfold_type = 'inflated')
                     
                     self.plot_inflated(pp, est_arr1 = avg_betas, 
                                        vmin1 = -2, vmax1 = 2, 
                                         cmap='RdBu_r', fig_abs_name = fig_name.replace('_flatmap', '').replace('R2_', 'Betas_'), 
                                         recache = True, overlays_visible=[], cmap2str = True, 
-                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        angles2plot_list = angles2plot_list, 
                                         unfold_type = 'inflated')
                     
                     self.plot_inflated(pp, est_arr1 = thresh_betas, 
                                         vmin1 = -2, vmax1 = 2, 
                                         cmap='RdBu_r', fig_abs_name = fig_name.replace('_flatmap', '').replace('R2_', 'Betas_pRF_'), 
                                         recache = True, overlays_visible=[], cmap2str = True, 
-                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        angles2plot_list = angles2plot_list, 
                                         unfold_type = 'inflated')
                     
-                # if not on-off model
-                if name != 'A':
-                    ## plot beta standard deviation, to see how much they vary
-                    _, std_surf = self.FAModelObj.get_singletrial_estimates(estimate_arr = estimates_dict['betasmd'], 
-                                                                            single_trl_DM = self.FAModelObj.load_single_trl_DM(pp), 
-                                                                            return_std = True)
+                # # if not on-off model
+                # if name != 'A':
+                #     ## plot beta standard deviation, to see how much they vary
+                #     _, std_surf = self.FAModelObj.get_singletrial_estimates(estimate_arr = estimates_dict['betasmd'], 
+                #                                                             single_trl_DM = self.FAModelObj.load_single_trl_DM(pp), 
+                #                                                             return_std = True)
                     
-                    if save_flatmap:
-                        self.plot_utils.plot_flatmap(np.mean(std_surf, axis = 0), 
-                                                pysub = self.get_pysub_name(sub_id = pp), cmap='gnuplot', 
-                                                vmin1 = 0, vmax1 = 1.5, 
-                                                fig_abs_name = fig_name.replace('R2_', 'Betas_SD_'))
-                    else:
-                        self.plot_inflated(pp, est_arr1 = np.mean(std_surf, axis = 0), 
-                                        vmin1 = 0, vmax1 = 1.5, 
-                                        cmap='gnuplot', fig_abs_name = fig_name.replace('_flatmap', '').replace('R2_', 'Betas_SD_'), 
-                                        recache = True, overlays_visible=[], cmap2str = True, 
-                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
-                                        unfold_type = 'inflated')
+                #     if save_flatmap:
+                #         self.plot_utils.plot_flatmap(np.mean(std_surf, axis = 0), 
+                #                                 pysub = self.get_pysub_name(sub_id = pp), cmap='gnuplot', 
+                #                                 vmin1 = 0, vmax1 = 1.5, 
+                #                                 fig_abs_name = fig_name.replace('R2_', 'Betas_SD_'))
+                #     else:
+                #         self.plot_inflated(pp, est_arr1 = np.mean(std_surf, axis = 0), 
+                #                         vmin1 = 0, vmax1 = 1.5, 
+                #                         cmap='gnuplot', fig_abs_name = fig_name.replace('_flatmap', '').replace('R2_', 'Betas_SD_'), 
+                #                         recache = True, overlays_visible=[], cmap2str = True, 
+                #                         angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                #                         unfold_type = 'inflated')
 
                 # if full model    
                 if name == 'D':
@@ -1722,14 +1723,14 @@ class FAViewer(Viewer):
                                         vmin1 = 0, vmax1 = 1, 
                                         cmap='copper', fig_abs_name = fig_name.replace('_flatmap', '').replace('R2_', 'FRACvalue_'), 
                                         recache = True, overlays_visible=[], cmap2str = True, 
-                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        angles2plot_list = angles2plot_list, 
                                         unfold_type = 'inflated')
                         
                         self.plot_inflated(pp, est_arr1 = estimates_dict['noisepool'], 
                                         vmin1 = 0, vmax1 = 1, 
                                         cmap='hot', fig_abs_name = fig_name.replace('_flatmap', '').replace('R2_', 'NoisePool_'), 
                                         recache = True, overlays_visible=[], cmap2str = True, 
-                                        angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left'], 
+                                        angles2plot_list = angles2plot_list, 
                                         unfold_type = 'inflated')
                         
                         self.plot_spcorrelations(pp, fig_basename = fig_name.replace('_flatmap', '').replace('R2_', ''))

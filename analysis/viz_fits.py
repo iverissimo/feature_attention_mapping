@@ -272,13 +272,14 @@ match task:
 
             case 'fa_estimates':
                 plotter.plot_glmsingle_estimates(participant_list = FAM_data.sj_num, 
-                                                 model_type = ['D'], #['A','D'],
-                                                 mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                model_type = ['D'], #['A','D'],
+                                                mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
                                                                                 crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                                 shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
-                                                 stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
                                                                                     crop_nr = FAM_data.task_nr_cropTR['pRF'], 
-                                                                                    shift = FAM_data.shift_TRs_num)
+                                                                                    shift = FAM_data.shift_TRs_num),
+                                                angles2plot_list = ['lateral_left', 'lateral_right', 'back']
                                                 )
                 
             case 'betas_coord':

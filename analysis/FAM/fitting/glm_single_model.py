@@ -751,7 +751,7 @@ class GLMsingle_Model(Model):
         np.save(pRFcorr_filename, corr_pRF)
         np.save(FAcorr_filename, corr_FA)
 
-    def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, 
+    def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, hemisphere = None,
                                             file_ext = '_cropped.npy', ROIs_dict = {}, prf_estimates = {}, orientation_bars = 'parallel_vertical'):
 
         """
@@ -808,7 +808,8 @@ class GLMsingle_Model(Model):
                                                                 att_color_ses_run = att_color_ses_run,
                                                                 participant = participant, file_ext = file_ext,
                                                                 att_bar_xy = att_bar_xy, 
-                                                                unatt_bar_xy = unatt_bar_xy)
+                                                                unatt_bar_xy = unatt_bar_xy,
+                                                                hemisphere = hemisphere)
                     
                     ## get inter-bar distance 
                     if orientation_bars == 'crossed':

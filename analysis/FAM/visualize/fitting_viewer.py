@@ -1784,10 +1784,10 @@ class FAViewer(Viewer):
             fig, axs = plt.subplots(nrows = len(coord_list), ncols=len(coord_list), figsize=(4.5 * len(coord_list),4.5 * len(coord_list)), sharex=False, sharey=False)
             
             ## make array with figure axis positions (6*6 = 36x2)
-            position_matrix = np.stack([np.meshgrid(np.arange(len(coord_list)), np.arange(len(coord_list)))], axis = 2).reshape(-1,2)
+            position_matrix = np.array(np.meshgrid(np.arange(len(coord_list)),np.arange(len(coord_list)))).T.reshape(-1,2)
 
-            # if we want to transpose figure over diagonal
-            if transpose_fig:
+            # if we DO NOT want to transpose figure over diagonal
+            if not transpose_fig:
                 position_matrix = np.array([np.flip(pair) for pair in position_matrix])
 
             # counter
@@ -1929,10 +1929,10 @@ class FAViewer(Viewer):
             fig, axs = plt.subplots(nrows= len(coord_list), ncols=len(coord_list), figsize=(4.5 * len(coord_list), 4.5 * len(coord_list)), sharex=False, sharey=False)
             
             ## make array with figure axis positions (6*6 = 36x2)
-            position_matrix = np.stack([np.meshgrid(np.arange(len(coord_list)), np.arange(len(coord_list)))], axis = 2).reshape(-1,2)
+            position_matrix = np.array(np.meshgrid(np.arange(len(coord_list)),np.arange(len(coord_list)))).T.reshape(-1,2)
 
-            # if we want to transpose figure over diagonal
-            if transpose_fig:
+            # if we DO NOT want to transpose figure over diagonal
+            if not transpose_fig:
                 position_matrix = np.array([np.flip(pair) for pair in position_matrix])
 
             # counter
@@ -2097,10 +2097,10 @@ class FAViewer(Viewer):
             fig, axs = plt.subplots(nrows= len(coord_list), ncols=len(coord_list), figsize=(4.5 * len(coord_list), 4.5 * len(coord_list)), sharex=False, sharey=False)
             
             ## make array with figure axis positions (6*6 = 36x2)
-            position_matrix = np.stack([np.meshgrid(np.arange(len(coord_list)), np.arange(len(coord_list)))], axis = 2).reshape(-1,2)
+            position_matrix = np.array(np.meshgrid(np.arange(len(coord_list)),np.arange(len(coord_list)))).T.reshape(-1,2)
 
-            # if we want to transpose figure over diagonal
-            if transpose_fig:
+            # if we DO NOT want to transpose figure over diagonal
+            if not transpose_fig:
                 position_matrix = np.array([np.flip(pair) for pair in position_matrix])
 
             # counter
@@ -2366,7 +2366,8 @@ class FAViewer(Viewer):
             GLMsing_estimates_dict = self.FAModelObj.load_estimates(pp, model_type = model_type)
 
             ## load single trial DM
-            single_trl_DM = self.FAModelObj.load_single_trl_DM(pp)
+            hemisphere = 'LH' if self.MRIObj.sj_space == 'fsnative' else None
+            single_trl_DM = self.FAModelObj.load_single_trl_DM(pp, hemisphere = hemisphere)
 
             ## get DF with betas and coordinates
             # for vertical parallel bar positions
@@ -2376,7 +2377,8 @@ class FAViewer(Viewer):
                                                                 file_ext = file_ext, 
                                                                 ROIs_dict = pp_ROI_dict, 
                                                                 prf_estimates = prf_estimates, 
-                                                                orientation_bars = orientation_bars)
+                                                                orientation_bars = orientation_bars,
+                                                                hemisphere = hemisphere)
 
             ## 2D plot betas for each attended bar color separately + averaged
             for cn in ['color_red', 'color_green', None]:

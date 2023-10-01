@@ -186,7 +186,7 @@ match task:
                                                     stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
                                                                                     crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                                     shift = FAM_data.shift_TRs_num),
-                                                    mask_arr = True, iterative = True, open_fs = True, surf_type = 'sphere')
+                                                    mask_arr = True, iterative = True, open_fs = True, surf_type = 'inflated') #'sphere')
                 else:
                     plotter.save_estimates4drawing(participant_list = FAM_data.sj_num, 
                                                     ses = ses2fit, run_type = run_type,
@@ -291,7 +291,7 @@ match task:
                                                  model_type = 'D',
                                                  file_ext = '_cropped.npy', 
                                                  orientation_bars = orientation_bars[choice], 
-                                                 ROI_list = ['V1'], #['V1', 'V2', 'V3'],
+                                                 ROI_list = ['V1', 'hV4'], #['V1', 'V2', 'V3'],
                                                  att_color_ses_run_dict = group_att_color_ses_run,
                                                  mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
                                                                                 crop_nr = FAM_data.task_nr_cropTR['pRF'], 
@@ -329,7 +329,7 @@ match task:
                                             model_type = 'D',
                                             file_ext = '_cropped.npy', 
                                             orientation_bars = orientation_bars[choice], 
-                                            ROI_list = ['V1'], #['V1', 'V2', 'V3'],
+                                            ROI_list = ['V1', 'hV4'], #['V1', 'V2', 'V3'],
                                             att_color_ses_run_dict = group_att_color_ses_run,
                                             mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
                                                                         crop_nr = FAM_data.task_nr_cropTR['pRF'], 

@@ -393,7 +393,7 @@ class GLMsingle_Model(Model):
 
     def get_singletrial_estimates(self, estimate_arr = [], single_trl_DM = [], return_std = True,
                                         att_bar_xy = [], unatt_bar_xy = [], average_betas = True, att_color_ses_run = None,
-                                        participant = None, file_ext = '_cropped.npy', hemisphere = 'BH'):
+                                        participant = None, file_ext = '_cropped.npy', hemisphere = None):
 
         """
         Get beta values for each single trial type (our condition)
@@ -414,6 +414,9 @@ class GLMsingle_Model(Model):
         average_betas: bool
             if we want to average betas across runs
         """
+
+        if self.MRIObj.sj_space in ['fsnative'] and hemisphere is None:
+            hemisphere = 'hemi-L'
         
         # if we provided dict with attended color run/ses keys, then average by color
         if att_color_ses_run:
@@ -565,15 +568,13 @@ class GLMsingle_Model(Model):
         ## path to files
         fitpath = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant))
 
-        if hemisphere is not None: #DM is saved in hemi folder, might change later
-            if hemisphere == 'BH':
-                return np.load(op.join(fitpath, 'hemi-L', 'single_trl_DM.npy'), allow_pickle=True), np.load(op.join(fitpath, 'hemi-R', 'single_trl_DM.npy'), allow_pickle=True)
-            elif hemisphere in ['left', 'LH', 'hemi-L']:
-                return np.load(op.join(fitpath, 'hemi-L', 'single_trl_DM.npy'), allow_pickle=True)
-            else:
-                return np.load(op.join(fitpath, 'hemi-R', 'single_trl_DM.npy'), allow_pickle=True)
-        else:
-            return np.load(op.join(fitpath, 'single_trl_DM.npy'), allow_pickle=True)
+        if self.MRIObj.sj_space in ['fsnative']:
+            fitpath = op.join(fitpath, 'hemi-L')
+
+            if isinstance(hemisphere, str) and hemisphere in ['right', 'RH', 'hemi-R']: # if we want to load right hemisphere specifically (example, to compare DM and check if same)
+                fitpath = fitpath.replace('hemi-L', 'hemi-R')
+
+        return np.load(op.join(fitpath, 'single_trl_DM.npy'), allow_pickle=True)
     
     def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', 
                         smooth_nm = True, perc_thresh_nm = 95, n_jobs = 8,
@@ -751,7 +752,7 @@ class GLMsingle_Model(Model):
         np.save(pRFcorr_filename, corr_pRF)
         np.save(FAcorr_filename, corr_FA)
 
-    def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, hemisphere = None,
+    def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {},
                                             file_ext = '_cropped.npy', ROIs_dict = {}, prf_estimates = {}, orientation_bars = 'parallel_vertical'):
 
         """
@@ -808,8 +809,7 @@ class GLMsingle_Model(Model):
                                                                 att_color_ses_run = att_color_ses_run,
                                                                 participant = participant, file_ext = file_ext,
                                                                 att_bar_xy = att_bar_xy, 
-                                                                unatt_bar_xy = unatt_bar_xy,
-                                                                hemisphere = hemisphere)
+                                                                unatt_bar_xy = unatt_bar_xy)
                     
                     ## get inter-bar distance 
                     if orientation_bars == 'crossed':

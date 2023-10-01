@@ -158,33 +158,32 @@ class pRFViewer(Viewer):
                                 vmin = -angle_thresh, vmax = angle_thresh, cmap = cmap_pa_sns, n_bins = 20)
             surface_name_list.append(PA_surface_name) 
 
-            # plot x and y separately, for sanity check
-            cmap_coords = sns.diverging_palette(250, 30, l=65, center="dark", as_cmap=True)
+            # # plot x and y separately, for sanity check
+            # cmap_coords = sns.diverging_palette(250, 30, l=65, center="dark", as_cmap=True)
 
-            ## XX ##
-            XX_surface_name = R2_surface_name.replace('_R2', '_XX')
+            # ## XX ##
+            # XX_surface_name = R2_surface_name.replace('_R2', '_XX')
 
-            # add surface to freesurfer custom folder
-            self.add_data2FSsurface(pp, data_arr = final_estimates['sub-{sj}'.format(sj = pp)]['x'], 
-                                mask_arr = alpha_mask, surf_name = XX_surface_name, overwrite = False,
-                                vmin = -5, vmax = 5, cmap = cmap_coords, n_bins = 20)
-            surface_name_list.append(XX_surface_name) 
+            # # add surface to freesurfer custom folder
+            # self.add_data2FSsurface(pp, data_arr = final_estimates['sub-{sj}'.format(sj = pp)]['x'], 
+            #                     mask_arr = alpha_mask, surf_name = XX_surface_name, overwrite = False,
+            #                     vmin = -5, vmax = 5, cmap = cmap_coords, n_bins = 20)
+            # surface_name_list.append(XX_surface_name) 
 
-            ## YY ##
-            YY_surface_name = R2_surface_name.replace('_R2', '_YY')
+            # ## YY ##
+            # YY_surface_name = R2_surface_name.replace('_R2', '_YY')
 
-            # add surface to freesurfer custom folder
-            self.add_data2FSsurface(pp, data_arr = final_estimates['sub-{sj}'.format(sj = pp)]['y'], 
-                                mask_arr = alpha_mask, surf_name = YY_surface_name, overwrite = False,
-                                vmin = -5, vmax = 5, cmap = cmap_coords, n_bins = 20)
-            surface_name_list.append(YY_surface_name) 
+            # # add surface to freesurfer custom folder
+            # self.add_data2FSsurface(pp, data_arr = final_estimates['sub-{sj}'.format(sj = pp)]['y'], 
+            #                     mask_arr = alpha_mask, surf_name = YY_surface_name, overwrite = False,
+            #                     vmin = -5, vmax = 5, cmap = cmap_coords, n_bins = 20)
+            # surface_name_list.append(YY_surface_name) 
 
             if open_fs:
                 # then OPEN FREESURFER
                 self.open_surf_freeview(pp, surf_names = surface_name_list, 
                                         surf_type = [surf_type], screenshot_filename = None)
-
-                
+             
     def save_estimates4drawing(self, participant_list = [],
                                     ses = 'mean', run_type = 'mean',  mask_bool_df = None, stim_on_screen = [],
                                     prf_model_name = 'gauss', rsq_threshold = .1, mask_arr = True,
@@ -2366,8 +2365,7 @@ class FAViewer(Viewer):
             GLMsing_estimates_dict = self.FAModelObj.load_estimates(pp, model_type = model_type)
 
             ## load single trial DM
-            hemisphere = 'LH' if self.MRIObj.sj_space == 'fsnative' else None
-            single_trl_DM = self.FAModelObj.load_single_trl_DM(pp, hemisphere = hemisphere)
+            single_trl_DM = self.FAModelObj.load_single_trl_DM(pp)
 
             ## get DF with betas and coordinates
             # for vertical parallel bar positions
@@ -2377,8 +2375,7 @@ class FAViewer(Viewer):
                                                                 file_ext = file_ext, 
                                                                 ROIs_dict = pp_ROI_dict, 
                                                                 prf_estimates = prf_estimates, 
-                                                                orientation_bars = orientation_bars,
-                                                                hemisphere = hemisphere)
+                                                                orientation_bars = orientation_bars)
 
             ## 2D plot betas for each attended bar color separately + averaged
             for cn in ['color_red', 'color_green', None]:

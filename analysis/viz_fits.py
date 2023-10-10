@@ -171,7 +171,7 @@ match task:
                                         stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
                                                                                     crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                                     shift = FAM_data.shift_TRs_num),
-                                        angles2plot_list = ['back'],
+                                        angles2plot_list = [], #['back'], #[],
                                         rsq_threshold = None, positive_rf = True, size_std = 2.5)
 
             case 'draw_roi':

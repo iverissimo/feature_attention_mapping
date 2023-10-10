@@ -693,7 +693,7 @@ class pRFViewer(Viewer):
             plt.xticks(fontsize = 18)
             plt.yticks(fontsize = 18)
             ax.axes.set_xlim(vmin1['ecc'], vmax1['ecc'])
-            #ax.axes.set_ylim(vmin1['size'], vmax1['size'])
+            ax.axes.set_ylim(vmin1['size'], vmax1['size'] * 2)
             ax.set_xlabel('pRF eccentricity [deg]', fontsize = 20, labelpad = 15)
             ax.set_ylabel('pRF size FWHMax [deg]', fontsize = 20, labelpad = 15)
             sns.despine(offset=15)
@@ -708,9 +708,9 @@ class pRFViewer(Viewer):
             ## bin it, for cleaner plot
             for r_name in pp_ROI_dict.keys()   :
 
-                mean_x, _, mean_y, _ = self.MRIObj.mri_utils.get_weighted_bins (df_ecc_siz.loc[(df_ecc_siz['ROI'] == r_name)],
+                mean_x, _, mean_y, _ = self.MRIObj.mri_utils.get_weighted_bins(df_ecc_siz.loc[(df_ecc_siz['ROI'] == r_name)],
                                                                                 x_key = 'ecc', y_key = 'size_fwhm', 
-                                                                                weight_key = 'rsq', sort_key = 'ecc', n_bins = n_bins_dist)
+                                                                                weight_key = 'rsq', sort_key = 'ecc', n_bins = int(n_bins_dist * 3))
 
                 avg_bin_df = pd.concat((avg_bin_df,
                                         pd.DataFrame({ 'sj': np.tile('sub-{sj}'.format(sj = pp), len(mean_x)),

@@ -347,8 +347,12 @@ class pRFViewer(Viewer):
     def plot_prf_results(self, participant_list = [], mask_bool_df = None, stim_on_screen = [],
                                 ses = 'mean', run_type = 'mean', prf_model_name = 'gauss',
                                 mask_arr = True, iterative = True, save_flatmap = False, 
+                                rsq_threshold = None, positive_rf = True, size_std = None,
                                 angles2plot_list = ['lateral_left', 'lateral_right', 'back', 'medial_right', 'medial_left']):
-
+        
+        # if not provided, use default
+        if rsq_threshold is None:
+            rsq_threshold = self.rsq_threshold_plot
 
         ## load estimates for all participants 
         # store in dict, for ease of access
@@ -374,7 +378,9 @@ class pRFViewer(Viewer):
                                                                                 estimate_keys = keys,
                                                                                 x_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
                                                                                 y_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
-                                                                                rsq_threshold = self.rsq_threshold_plot) for pp in participant_list}
+                                                                                rsq_threshold = rsq_threshold,
+                                                                                positive_rf = positive_rf,
+                                                                                size_std = size_std) for pp in participant_list}
         else:
             final_estimates = group_estimates
 
@@ -603,7 +609,8 @@ class pRFViewer(Viewer):
                                             est_arr2 = alpha_level,
                                             vmin2 = 0, vmax2 = 1, 
                                             fig_abs_name = fig_name.replace('ECC', 'SIZE'))  
-            else:
+            ## plot inflated
+            elif len(angles2plot_list) > 0:
                 self.plot_inflated(pp, est_arr1 = eccentricity, 
                                         cmap = 'viridis', cmap2str = True, 
                                         vmin1 = vmin1['ecc'], vmax1 = vmax1['ecc'],
@@ -805,7 +812,8 @@ class pRFViewer(Viewer):
                                             est_arr2 = alpha_level,
                                             vmin2 = 0, vmax2 = 1, 
                                             fig_abs_name = fig_name)
-            else:
+            ## plot inflated
+            elif len(angles2plot_list) > 0:
                 self.plot_inflated(pp, est_arr1 = group_estimates['sub-{sj}'.format(sj = pp)]['ns'], 
                                         cmap = 'magma', cmap2str = True, 
                                         vmin1 = vmin1, vmax1 = vmax1, 
@@ -961,7 +969,8 @@ class pRFViewer(Viewer):
                                             est_arr2 = alpha_level,
                                             vmin2 = 0, vmax2 = 1, 
                                             fig_abs_name = fig_name.replace('_PA', '_YY'))
-            else:
+            ## plot inflated
+            elif len(angles2plot_list) > 0:
                 self.plot_inflated(pp, est_arr1 = polar_angle_norm, 
                                         cmap = PA_cmap, cmap2str = True, 
                                         vmin1 = 0, vmax1 = 1, 

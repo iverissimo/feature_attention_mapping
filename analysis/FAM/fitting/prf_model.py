@@ -1408,7 +1408,8 @@ class pRF_model(Model):
         return CV_rsq
 
     def mask_pRF_model_estimates(self, estimates, vertex = [], x_ecc_lim = [-6,6], y_ecc_lim = [-6,6],
-                                rsq_threshold = .1, estimate_keys = ['x','y','size','betas','baseline','r2']):
+                                rsq_threshold = .1, estimate_keys = ['x','y','size','betas','baseline','r2'],
+                                positive_rf = True, size_std = None):
     
         """ 
         mask estimates, to be positive RF, within screen limits
@@ -1437,19 +1438,22 @@ class pRF_model(Model):
             masked_dict[k][:] = np.nan
 
         # set limits for xx and yy, forcing it to be within the screen boundaries
+        # and to be above a certain rsq thresh
+        bool_arr = ~np.isnan(estimates['r2']) * estimates['r2']>= rsq_threshold
+        bool_arr *= ((estimates['x'] <= np.max(x_ecc_lim)) * (estimates['x'] >= np.min(x_ecc_lim)) * (estimates['y'] <= np.max(y_ecc_lim)) * (estimates['y'] >= np.min(y_ecc_lim)))
+
         # also for positive pRFs
-        indices = np.where((~np.isnan(estimates['r2']))& \
-                            (estimates['r2']>= rsq_threshold)& \
-                        (estimates['x'] <= np.max(x_ecc_lim))& \
-                        (estimates['x'] >= np.min(x_ecc_lim))& \
-                        (estimates['y'] <= np.max(y_ecc_lim))& \
-                        (estimates['y'] >= np.min(y_ecc_lim))& \
-                        (estimates['betas']>=0)
-                        )[0]
+        if positive_rf:
+            bool_arr *= (estimates['betas']>=0)
+
+        # and if we are clipping extremely large pRF size
+        if size_std is not None:
+            size_thresh = np.nanstd(estimates['size'][bool_arr]) * size_std
+            bool_arr *= (estimates['size'] <= size_thresh)
                             
         # save values
         for k in estimate_keys:
-            masked_dict[k][indices] = estimates[k][indices]
+            masked_dict[k][bool_arr] = estimates[k][bool_arr]
 
         # if we want to subselect for specifc vertices
         if len(vertex) > 0:

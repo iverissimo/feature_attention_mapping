@@ -227,8 +227,8 @@ class Viewer:
                                             pysub = self.get_pysub_name(sub_id = pp), cmap = 'hot', 
                                             vmin1 = vmin1, vmax1 = vmax1, 
                                             fig_abs_name = fig_name)
-            else:
-                ## plot inflated
+            ## plot inflated
+            elif len(angles2plot_list) > 0:
                 self.plot_inflated(pp, est_arr1 = group_estimates['sub-{sj}'.format(sj = pp)]['r2'], 
                                     vmin1 = vmin1, vmax1 = vmax1,
                                     cmap='hot', fig_abs_name = fig_name.replace('_flatmap', ''), 
@@ -320,7 +320,6 @@ class Viewer:
         self.save_inflated_3Dviews(inflated_surf, viewer_angles_dict = angles2plot_dict, 
                                     base_name = fig_abs_name.replace('.png', ''), 
                                     unfold_type = unfold_type, overlays_visible = overlays_visible)
-
 
     def save_inflated_3Dviews(self, flatmap, viewer_angles_dict = None, base_name = None, unfold_type = 'inflated',
                                     overlays_visible=['sulci']):

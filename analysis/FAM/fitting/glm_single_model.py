@@ -237,9 +237,11 @@ class GLMsingle_Model(Model):
                 trial_combinations_dict['UnattBar_bar_pass_direction'].append(np.tile(unatt_ori, np.array(indice_pairs).shape[0]))
 
         ## turn into dataframe
-        self.trial_combinations_df = pd.DataFrame.from_dict(trial_combinations_dict).apply(pd.Series.explode).reset_index().drop(columns=['index'])
+        trial_combinations_df = pd.DataFrame.from_dict(trial_combinations_dict).apply(pd.Series.explode).reset_index().drop(columns=['index'])
 
-    def make_singletrial_dm(self, run_num_arr = [], ses_num_arr = [], pp_bar_pos_df = {}):
+        return trial_combinations_df
+
+    def make_singletrial_dm(self, run_num_arr = [], ses_num_arr = [], pp_bar_pos_df = {}, trial_combinations_df = None):
 
         """
         Make single trial design matrix for one or more runs 
@@ -258,54 +260,45 @@ class GLMsingle_Model(Model):
 
         ## get all possible trial combinations
         # to use for bookkeeping of single trial DM
-        try:
-            self.trial_combinations_df
-        except AttributeError:
-            self.get_single_trial_combinations()
+        if trial_combinations_df is None:
+            trial_combinations_df = self.get_single_trial_combinations()
 
         ## make single trial DM
         # with shape [runs, TRs, conditions]
-        single_trl_DM = np.zeros((len(run_num_arr), len(self.condition_per_TR), len(self.trial_combinations_df)))
+        single_trl_DM = np.zeros((len(run_num_arr), len(self.condition_per_TR), len(trial_combinations_df)))
 
         ## loop over runs
-        for file_ind in range(len(run_num_arr)):
+        for file_ind, run_num in enumerate(run_num_arr):
 
+            # get session number
             ses_num = ses_num_arr[file_ind]
-            run_num = run_num_arr[file_ind]
 
             ## get bar position df for run
             run_bar_pos_df = pp_bar_pos_df['ses-{s}'.format(s = ses_num)]['run-{r}'.format(r=run_num)]
+            print('loading bar positions for ses-{s}, run-{r}'. format(s = ses_num, r=run_num))
 
             ## get run bar midpoint and direction values
-            # for each bar type
-            AttBar_bar_midpoint = run_bar_pos_df[run_bar_pos_df['attend_condition'] == 1].bar_midpoint_at_TR.values[0]
-            AttBar_bar_pass_direction = run_bar_pos_df[run_bar_pos_df['attend_condition'] == 1].bar_pass_direction_at_TR.values[0]
-
-            UnattBar_bar_midpoint = run_bar_pos_df[run_bar_pos_df['attend_condition'] == 0].bar_midpoint_at_TR.values[0]
-            UnattBar_bar_pass_direction = run_bar_pos_df[run_bar_pos_df['attend_condition'] == 0].bar_pass_direction_at_TR.values[0]
-
-            # set trial index counter
-            trl_ind = 0
+            # for each bar type (arrays will have len == total number of trial types)
+            AttBar_bar_midpoint, AttBar_bar_pass_direction = run_bar_pos_df.loc[(run_bar_pos_df['attend_condition'] == 1), 
+                                                                                ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
+            UnattBar_bar_midpoint, UnattBar_bar_pass_direction = run_bar_pos_df.loc[(run_bar_pos_df['attend_condition'] == 0), 
+                                                                                ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
 
             ## fill DM for all TRs
-            for i_TR, cond in enumerate(self.condition_per_TR):
-                
-                if cond == 'task':
-                    
-                    ## get condition index 
-                    # where midpoint and direction for both bars is the same as the one of this trial
-                    cond_index = self.trial_combinations_df[(self.trial_combinations_df['AttBar_bar_midpoint'].apply(lambda x: str(AttBar_bar_midpoint[trl_ind]) == str(x))) &\
-                                (self.trial_combinations_df['AttBar_bar_pass_direction'].apply(lambda x: str(AttBar_bar_pass_direction[trl_ind]) == str(x))) &\
-                                (self.trial_combinations_df['UnattBar_bar_midpoint'].apply(lambda x: str(UnattBar_bar_midpoint[trl_ind]) == str(x))) &\
-                                (self.trial_combinations_df['UnattBar_bar_pass_direction'].apply(lambda x: str(UnattBar_bar_pass_direction[trl_ind]) == str(x)))].index[0]
+            # get TR indices when bar on screen
+            i_TR = np.where((self.condition_per_TR == 'task'))[0]
 
-                    # set which condition had its onset at that TR
-                    single_trl_DM[file_ind, i_TR, cond_index] = 1
-                    
-                    # increment trial counter
-                    trl_ind += 1
+            ## get trial condition index, to find order of trial types
+            # relative to reference DF 
+            cond_index = np.array([trial_combinations_df[(trial_combinations_df['AttBar_bar_midpoint'].apply(lambda x: str(AttBar_bar_midpoint[trl_ind]) == str(x))) &\
+                        (trial_combinations_df['AttBar_bar_pass_direction'].apply(lambda x: str(AttBar_bar_pass_direction[trl_ind]) == str(x))) &\
+                        (trial_combinations_df['UnattBar_bar_midpoint'].apply(lambda x: str(UnattBar_bar_midpoint[trl_ind]) == str(x))) &\
+                        (trial_combinations_df['UnattBar_bar_pass_direction'].apply(lambda x: str(UnattBar_bar_pass_direction[trl_ind]) == str(x)))].index[0] for trl_ind in range(AttBar_bar_midpoint.shape[0])])
 
-        return single_trl_DM
+            # fill DM with which condition had its onset at what TR
+            single_trl_DM[file_ind, i_TR, cond_index] = 1
+
+        return single_trl_DM, trial_combinations_df
 
     def get_average_hrf(self, pp_prf_estimates, prf_modelobj, rsq_threshold = None):
 
@@ -354,7 +347,8 @@ class GLMsingle_Model(Model):
         
         return hrf_final/np.max(hrf_final)
 
-    def subselect_trial_combinations(self, att_bar_xy = [], unatt_bar_xy = [], orientation_bars = None):
+    def subselect_trial_combinations(self, att_bar_xy = [], unatt_bar_xy = [], orientation_bars = None, single_trial_reference_df = None, 
+                                            participant = None, hemisphere = None):
 
         """
         subselect trial combinations according to (un)attended bar position or bar orientations, 
@@ -370,13 +364,11 @@ class GLMsingle_Model(Model):
             string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
         """
 
-        try:
-            self.single_trial_reference_df
-        except AttributeError:
-            self.get_single_trial_reference_df()
-
         # get reference df
-        ref_df = self.single_trial_reference_df.copy()
+        if single_trial_reference_df is None:
+            ref_df = self.get_single_trial_reference_df(participant = participant, hemisphere = hemisphere)
+        else:
+            ref_df = single_trial_reference_df
 
         if len(att_bar_xy) > 1: # if provided specific coordinates for attended bar
             ref_df = ref_df[(ref_df['AttBar_coord_x'].isin([att_bar_xy[0]])) &\
@@ -426,7 +418,7 @@ class GLMsingle_Model(Model):
             print(ses_num_arr)
 
         # get reference df
-        ref_df = self.subselect_trial_combinations(att_bar_xy = att_bar_xy, unatt_bar_xy = unatt_bar_xy)
+        ref_df = self.subselect_trial_combinations(att_bar_xy = att_bar_xy, unatt_bar_xy = unatt_bar_xy, participant = participant, hemisphere = hemisphere)
             
         # get single trial indices to extract betas from
         single_trial_ind = ref_df.ind.values.astype(int)
@@ -441,12 +433,12 @@ class GLMsingle_Model(Model):
             cond_ind = np.where(np.hstack(single_trl_DM[:, self.condition_per_TR == 'task', i] == 1))[0]
             
             if average_betas and att_color_ses_run is None: # average across all runs
-               avg_all.append(np.nanmean(estimate_arr[...,cond_ind], axis = -1))
+                avg_all.append(np.nanmean(estimate_arr[...,cond_ind], axis = -1))
             else:
                 avg_all.append(estimate_arr[...,cond_ind])
             
             if return_std:
-                std_all.append(np.std(estimate_arr[...,cond_ind], axis = -1))
+                std_all.append(np.nanstd(estimate_arr[...,cond_ind], axis = -1))
 
         # assumes we want to average across attended condition (this is, only average runs where same color bar was attended)
         if att_color_ses_run and average_betas:
@@ -459,29 +451,44 @@ class GLMsingle_Model(Model):
             out_avg = np.swapaxes(np.swapaxes(np.stack(out_avg),0,1),1,2)
         else:
             out_avg = np.stack(avg_all)
+            if att_color_ses_run is None:
+                out_avg = out_avg[..., np.newaxis]
 
         if return_std:
             return out_avg, np.stack(std_all)
         else:
             return out_avg
         
-    def get_single_trial_reference_df(self):
+    def get_single_trial_reference_df(self, participant = None, hemisphere = None):
 
         """
         make reference dataframe of bar positions
         to facilitate getting single-trials estimates from DM
         """
-
+        
         ## get all possible trial combinations
-        try:
-            self.trial_combinations_df
-        except AttributeError:
-            self.get_single_trial_combinations()
+
+        ## path to files
+        fitpath = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant))
+
+        if self.MRIObj.sj_space in ['fsnative']:
+            fitpath = op.join(fitpath, 'hemi-L')
+
+            if isinstance(hemisphere, str) and hemisphere in ['right', 'RH', 'hemi-R']: # if we want to load right hemisphere specifically (example, to compare DM and check if same)
+                fitpath = fitpath.replace('hemi-L', 'hemi-R')
+
+        filename = op.join(fitpath, 'trial_combinations_df.csv')
+
+        # if file was stored, load
+        if op.exists(filename):
+            trial_combinations_df = pd.read_csv(filename, sep='\t') 
+        else:
+            trial_combinations_df = self.get_single_trial_combinations()
 
         single_trial_reference_df = pd.DataFrame({'ind': [], 'AttBar_coord_x': [], 'AttBar_coord_y': [], 
                                                 'UnattBar_coord_x': [], 'UnattBar_coord_y': [], 'orientation_bars': []})
 
-        for ind, row in self.trial_combinations_df.iterrows():
+        for ind, row in trial_combinations_df.iterrows():
             
             # save relevant coordinates
             att_bar_xy = row['AttBar_bar_midpoint']
@@ -518,8 +525,7 @@ class GLMsingle_Model(Model):
                                                                 'UnattBar_coord_x': [unatt_bar_xy[0]], 
                                                                 'UnattBar_coord_y': [unatt_bar_xy[-1]], 
                                                                 'orientation_bars': [orientation_bars]})))
-            
-        self.single_trial_reference_df = single_trial_reference_df
+        return single_trial_reference_df
 
     def load_estimates(self, participant, model_type = 'D'):
 
@@ -635,10 +641,10 @@ class GLMsingle_Model(Model):
     
         ## Make single trial DM for all runs
         print('Run ID : {ri}  Ses ID: {si}'.format(ri = self.run_num_arr, si = self.ses_num_arr))
-        single_trl_DM = self.make_singletrial_dm(run_num_arr = self.run_num_arr, 
-                                                ses_num_arr = self.ses_num_arr,
-                                                pp_bar_pos_df = pp_bar_pos_df)
-        
+        single_trl_DM, trial_combinations_df = self.make_singletrial_dm(run_num_arr = self.run_num_arr, 
+                                                                        ses_num_arr = self.ses_num_arr,
+                                                                        pp_bar_pos_df = pp_bar_pos_df)
+                                
         print('Fitting {n} files: {f}'.format(n = len(train_file_list), f = str(train_file_list)))
 
         ## get average hrf
@@ -743,7 +749,9 @@ class GLMsingle_Model(Model):
 
         # save DM for ease of use later
         np.save(op.join(outdir, 'single_trl_DM.npy'), single_trl_DM)
-
+        # as well as single trial combinations
+        trial_combinations_df.to_csv(op.join(outdir, 'trial_combinations_df.csv'), sep='\t', index=False)#, quoting=csv.QUOTE_ALL)
+        
         # also save binary mask, to later check
         np.save(pRFcorr_filename.replace('spcorrelation', 'binary_mask_spcorrelation'), binary_prf_mask)
         np.save(FAcorr_filename.replace('spcorrelation', 'binary_mask_spcorrelation'), binary_fa_mask)
@@ -752,8 +760,8 @@ class GLMsingle_Model(Model):
         np.save(pRFcorr_filename, corr_pRF)
         np.save(FAcorr_filename, corr_FA)
 
-    def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {},
-                                            file_ext = '_cropped.npy', ROIs_dict = {}, prf_estimates = {}, orientation_bars = 'parallel_vertical'):
+    def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, demean = False,
+                                file_ext = '_cropped.npy', ROIs_dict = {}, prf_estimates = {}, orientation_bars = 'parallel_vertical'):
 
         """
         make dataframe with beta values, with info on prf location, attended color, ROI vertices belong to,
@@ -779,6 +787,12 @@ class GLMsingle_Model(Model):
             string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
         """
 
+        # if we dont want to load betas per color
+        if att_color_ses_run is None or len(att_color_ses_run) == 0:
+            att_color_keys = [None]
+        else:
+            att_color_keys = list(att_color_ses_run.keys())
+
         DF_betas_bar_coord = pd.DataFrame({'sj': [], 'ROI': [], 'betas': [], 'prf_rsq_coord': [], 'prf_index_coord': [],
                                             'prf_x_coord': [], 'prf_y_coord': [], 'attend_color': []})
 
@@ -791,7 +805,6 @@ class GLMsingle_Model(Model):
             raise ValueError('Cross sections not implemented yet')
 
         for UAtt_bar_coord in coord_list: # let's start with unattended bar vertical leftmost, attended bar left to right (5 positions)
-
             for Att_bar_coord in coord_list:
 
                 if Att_bar_coord != UAtt_bar_coord: ## bars cannot fully overlap
@@ -814,7 +827,7 @@ class GLMsingle_Model(Model):
                     ## get inter-bar distance 
                     if orientation_bars == 'crossed':
                         inter_bar_dist = np.nan
-                        contralateral_bool = np.nan
+                        contralateral_bars_bool = np.nan
                     else:
                         inter_bar_dist = (UAtt_bar_coord - Att_bar_coord)/ self.bar_width_pix[0]
                         contralateral_bars_bool = np.sign(Att_bar_coord) != np.sign(UAtt_bar_coord) # if bars in contralateral hemifields
@@ -824,7 +837,7 @@ class GLMsingle_Model(Model):
                             Att_bar_contralateral_RF_bool = np.sign(prf_estimates['sub-{sj}'.format(sj = participant)]['y']) != np.sign(Att_bar_coord) # if attended bar in the same hemifield of pRF
 
                     # differentiate per color
-                    for c, color_name in enumerate(att_color_ses_run.keys()):
+                    for c, color_name in enumerate(att_color_keys):
                     
                         # iterate over ROIs
                         for rname in ROIs_dict.keys():

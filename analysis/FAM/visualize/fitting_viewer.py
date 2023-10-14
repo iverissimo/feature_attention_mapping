@@ -710,7 +710,7 @@ class pRFViewer(Viewer):
 
                 mean_x, _, mean_y, _ = self.MRIObj.mri_utils.get_weighted_bins(df_ecc_siz.loc[(df_ecc_siz['ROI'] == r_name)],
                                                                                 x_key = 'ecc', y_key = 'size_fwhm', 
-                                                                                weight_key = 'rsq', sort_key = 'ecc', n_bins = int(n_bins_dist * 3))
+                                                                                weight_key = 'rsq', sort_key = 'ecc', n_bins = int(n_bins_dist))
 
                 avg_bin_df = pd.concat((avg_bin_df,
                                         pd.DataFrame({ 'sj': np.tile('sub-{sj}'.format(sj = pp), len(mean_x)),

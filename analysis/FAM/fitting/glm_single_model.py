@@ -1668,48 +1668,53 @@ class GLMsingle_Model(Model):
                 else:
                     # collapsing same eccentricities of attended and unattended bar
                     # while keeping flipped trial types
+
                     ECC_betas_GRID_coord = pd.DataFrame()
 
                     # loop over bar eccentricity
                     for Att_ecc_label in abs_dist_dict.keys():
-                        Att_ecc_df = ROI_betas_GRID_coord.loc[(ROI_betas_GRID_coord['Att_ecc_label'] == Att_ecc_label)]
-                        FLIPAtt_ecc_df = ROI_betas_GRID_coord.loc[(ROI_betas_GRID_coord['UAtt_ecc_label'] == Att_ecc_label)]
-
                         # loop over inter bar distance
                         for abs_dist in abs_dist_dict[Att_ecc_label]:
-                            distance_Att_ecc_df = Att_ecc_df[(Att_ecc_df['abs_inter_bar_dist'] == abs_dist) &\
-                                                            (Att_ecc_df['UAtt_ecc_label'].isin(ecc_order_dict[Att_ecc_label]))]
-                            distance_FLIPAtt_ecc_df = FLIPAtt_ecc_df[(FLIPAtt_ecc_df['abs_inter_bar_dist'] == abs_dist) &\
-                                                                    (FLIPAtt_ecc_df['Att_ecc_label'].isin(ecc_order_dict[Att_ecc_label]))]
 
-                            # if empty then it's the simetrical case --> so nothing to collapse across ecc
-                            if distance_Att_ecc_df.empty or len(ecc_order_dict[Att_ecc_label]) == 0:
-                                condition_Att_ecc_df = Att_ecc_df[(Att_ecc_df['abs_inter_bar_dist'] == abs_dist) &\
-                                                                    (Att_ecc_df['Att_ecc_label'] == Att_ecc_label) &\
-                                                                    (Att_ecc_df['UAtt_ecc_label'] == Att_ecc_label) &\
-                                                                    (Att_ecc_df['Att_bar_coord'] < 0)] 
-                                flipped_condition_Att_ecc_df = Att_ecc_df[(Att_ecc_df['abs_inter_bar_dist'] == abs_dist) &\
-                                                                            (Att_ecc_df['Att_ecc_label'] == Att_ecc_label) &\
-                                                                            (Att_ecc_df['UAtt_ecc_label'] == Att_ecc_label) &\
-                                                                            (Att_ecc_df['Att_bar_coord'] > 0)] 
-                            else:
-                                # collapse specific attended eccentricity trials
-                                condition_Att_ecc_df = distance_Att_ecc_df.copy()
-                                # flip x,y screen coordinates (in appropriate axis) as well as bar coords
-                                condition_Att_ecc_df.update(distance_Att_ecc_df.loc[distance_Att_ecc_df['Att_bar_coord'] > 0][collapse_coord_key] * -1)
-                                condition_Att_ecc_df.update(distance_Att_ecc_df.loc[distance_Att_ecc_df['Att_bar_coord'] > 0][['Att_bar_coord', 'UAtt_bar_coord']] * -1)
+                            distance_ecc_df = ROI_betas_GRID_coord.loc[(ROI_betas_GRID_coord['Att_ecc_label'] == Att_ecc_label) &\
+                                                                        (ROI_betas_GRID_coord['abs_inter_bar_dist'] == abs_dist)]
+                        
+                            if not distance_ecc_df.empty:
 
-                                # same for reverse condition
-                                flipped_condition_Att_ecc_df = distance_FLIPAtt_ecc_df.copy()
-                                flipped_condition_Att_ecc_df.update(distance_FLIPAtt_ecc_df.loc[distance_FLIPAtt_ecc_df['Att_bar_coord'] > 0][collapse_coord_key] * -1)
-                                flipped_condition_Att_ecc_df.update(distance_FLIPAtt_ecc_df.loc[distance_FLIPAtt_ecc_df['Att_bar_coord'] > 0][['Att_bar_coord', 'UAtt_bar_coord']] * -1)
+                                Att_bar_coord_list = distance_ecc_df.Att_bar_coord.unique()
+                                Att_bar_coord_list = np.sort(Att_bar_coord_list)
 
-                            # label if condition or flipped, for bookeeping
-                            condition_Att_ecc_df[['flipped_condition']] = np.zeros(len(condition_Att_ecc_df)).reshape(-1,1)
-                            flipped_condition_Att_ecc_df[['flipped_condition']] = np.ones(len(flipped_condition_Att_ecc_df)).reshape(-1,1)
+                                # if empty then it's the simetrical case --> so nothing to collapse across ecc
+                                if (Att_bar_coord_list[-1] == distance_ecc_df[distance_ecc_df['Att_bar_coord'] == Att_bar_coord_list[0]].UAtt_bar_coord.values[0]) | (Att_ecc_label == 'near'):
+                                    Att_bar_coord_list = Att_bar_coord_list[:1]
+                      
+                                for Att_bar_coord in Att_bar_coord_list: # overlay both sides of hemifield
+                                    print('ATT: %s \nAbsolute dist: %i \nnum att %i'%(str(Att_bar_coord), abs_dist, len(Att_bar_coord_list)))
 
-                            ECC_betas_GRID_coord = pd.concat((ECC_betas_GRID_coord, condition_Att_ecc_df), ignore_index=True)
-                            ECC_betas_GRID_coord = pd.concat((ECC_betas_GRID_coord, flipped_condition_Att_ecc_df), ignore_index=True)
+                                    if Att_bar_coord < 0: 
+                                        ATT_df = distance_ecc_df[(distance_ecc_df['Att_bar_coord'] == Att_bar_coord) &\
+                                                                (distance_ecc_df['UAtt_bar_coord'] > Att_bar_coord)]
+                                    else:
+                                        ATT_df = distance_ecc_df[(distance_ecc_df['Att_bar_coord'] == Att_bar_coord) &\
+                                                                        (distance_ecc_df['UAtt_bar_coord'] < Att_bar_coord)] 
+                                        
+                                    ## get flip trial type
+                                    UAtt_bar_coord = ATT_df.UAtt_bar_coord.unique()[0]
+                                    UATT_df = ROI_betas_GRID_coord[(ROI_betas_GRID_coord['Att_bar_coord'] == UAtt_bar_coord) &\
+                                                                (ROI_betas_GRID_coord['UAtt_bar_coord'] == Att_bar_coord) &\
+                                                                (ROI_betas_GRID_coord['abs_inter_bar_dist'] == abs_dist)]
+                                    
+                                    # rotate relevant axis coordinate, because we want to collapse over ecc 
+                                    if Att_bar_coord > 0: 
+                                        ATT_df[collapse_coord_key] = ATT_df[collapse_coord_key].values * -1
+                                        UATT_df[collapse_coord_key] = UATT_df[collapse_coord_key].values * -1
+
+                                    # label if condition or flipped, for bookeeping
+                                    ATT_df[['flipped_condition']] = np.zeros(len(ATT_df)).reshape(-1,1)
+                                    UATT_df[['flipped_condition']] = np.ones(len(UATT_df)).reshape(-1,1)
+
+                                    ECC_betas_GRID_coord = pd.concat((ECC_betas_GRID_coord, ATT_df), ignore_index=True)
+                                    ECC_betas_GRID_coord = pd.concat((ECC_betas_GRID_coord, UATT_df), ignore_index=True)
                     
                     ## concat!
                     DF_betas_GRID_coord = pd.concat((DF_betas_GRID_coord, ECC_betas_GRID_coord), ignore_index=True)

@@ -71,6 +71,8 @@ class GLMsingle_Model(Model):
         
         # define bar width in pixel
         self.bar_width_pix = self.MRIObj.screen_res * self.MRIObj.bar_width['FA']
+        # and in deg
+        self.bar_width_deg = self.convert_pix2dva(self.bar_width_pix)
 
         # define number of bars per direction
         num_bars = np.array(self.MRIObj.FA_num_bar_position) 
@@ -88,6 +90,35 @@ class GLMsingle_Model(Model):
 
         self.hor_bar_pos_pix = np.array([np.array([x,0]) for _,x in enumerate(self.bar_x_coords_pix)])
 
+        # get screen coordinates in deg
+        # in a range of "bar position" center coordinates
+        x_coords_deg = np.concatenate(([self.bar_x_coords_pix[0] - self.bar_width_pix[0]], self.bar_x_coords_pix))
+        x_coords_deg = np.concatenate((x_coords_deg, [self.bar_x_coords_pix[-1] + self.bar_width_pix[0]]))
+        self.x_coords_deg = self.convert_pix2dva(x_coords_deg)
+
+        y_coords_deg = np.concatenate(([self.bar_y_coords_pix[0] - self.bar_width_pix[1]], self.bar_y_coords_pix))
+        y_coords_deg = np.concatenate((y_coords_deg, [self.bar_y_coords_pix[-1] + self.bar_width_pix[1]]))
+        self.y_coords_deg = self.convert_pix2dva(y_coords_deg)
+
+    def convert_coord_pRF2screen_grid(self, prf_x_coord = np.array([]), prf_y_coord = np.array([])):
+
+        """
+        convert prf x and y arrays, to "bar position" center coordinates
+        --> will return array of labels for bins of screen coordinates (in deg)
+        useful when plotting/analysis grid heatmap
+        """
+
+        ## label prf coordinates to
+        # screen binned coords
+        x_deg_arr = np.zeros(prf_x_coord.shape)
+        y_deg_arr = np.zeros(prf_y_coord.shape)
+
+        for (x_val, y_val) in zip(self.x_coords_deg, self.y_coords_deg):
+                
+            x_deg_arr[(prf_x_coord <= (x_val + self.bar_width_deg[0])) & (prf_x_coord > (x_val - self.bar_width_deg[0]))] = x_val
+            y_deg_arr[(prf_y_coord <= (y_val + self.bar_width_deg[1])) & (prf_y_coord > (y_val - self.bar_width_deg[1]))] = y_val
+
+        return x_deg_arr, y_deg_arr
 
     def get_correlation_mask(self, participant, task = 'pRF', ses = 'mean', file_ext = '_cropped_dc_psc.npy',
                                 n_jobs = 8, seed_num = 2023, perc_thresh_nm = 95, smooth = True, hemisphere = 'BH',
@@ -811,6 +842,8 @@ class GLMsingle_Model(Model):
 
                     # get eccentricity label of attended bar
                     ecc_label = [key for key, val in self.MRIObj.params['plotting']['bar_ecc_label'].items() if val == np.absolute(Att_bar_coord)]
+                    # and distractor
+                    distr_ecc_label = [key for key, val in self.MRIObj.params['plotting']['bar_ecc_label'].items() if val == np.absolute(UAtt_bar_coord)]
 
                     att_bar_xy = [Att_bar_coord, np.nan] if orientation_bars == 'parallel_vertical' else [np.nan, Att_bar_coord]
                     unatt_bar_xy = [UAtt_bar_coord, np.nan] if orientation_bars == 'parallel_vertical' else [np.nan, UAtt_bar_coord]
@@ -854,6 +887,7 @@ class GLMsingle_Model(Model):
                                                             'contralateral_bars': np.tile(contralateral_bars_bool, len(ROIs_dict[rname])),
                                                             'contralateral_Attbar_pRF': Att_bar_contralateral_RF_bool[ROIs_dict[rname]],
                                                             'Att_ecc_label': np.tile(ecc_label, len(ROIs_dict[rname])),
+                                                            'UAtt_ecc_label': np.tile(distr_ecc_label, len(ROIs_dict[rname])),
                                                             'prf_index_coord': ROIs_dict[rname],
                                                             'prf_rsq_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['r2'][ROIs_dict[rname]],
                                                             'prf_x_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['x'][ROIs_dict[rname]], 
@@ -1568,4 +1602,116 @@ class GLMsingle_Model(Model):
 
         return new_df
 
+    def get_betas_grid_coord_df(self, DF_betas_bar_coord = {}, collapse_ecc = False, orientation_bars = 'parallel_vertical'):
+
+        """
+        convert dataframe of betas coordinates, into grid betas coord 
+        --> to then use for heatmap representation <---
+
+        NOTE: provide DF_betas_bar_coord for SPECIFIC bar orientation (ex: parallel_vertical), 
+        because mixing will lead to errors when labelling
+
+        Parameters
+        ----------
+        DF_betas_bar_coord: dataframe
+            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+        collapse_ecc: bool
+            if we want to collapse over eccentricity (will still keep reversed condition)
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        """
         
+        # dict with absolute inter bar distance per eccentricity --> hardcoded, so improve later
+        abs_dist_dict = {'far': np.arange(5)+1, 'middle': np.arange(3)+1, 'near': np.arange(1)+1}
+        ecc_order_dict = {'far': ['middle', 'near'], 'middle': ['near'], 'near': []}
+
+        ## for bars going left to right (vertical orientation) or bottom-up (horizontal orientation)
+        if orientation_bars == 'parallel_vertical':
+            collapse_coord_key = 'screen_x_coord'
+        elif orientation_bars == 'parallel_horizontal':
+            collapse_coord_key = 'screen_y_coord'
+        else:
+            raise ValueError('Cross sections not implemented yet')
+
+        DF_betas_GRID_coord = pd.DataFrame()
+
+        for sj in DF_betas_bar_coord.sj.unique():
+            for roi_name in DF_betas_bar_coord.ROI.unique():
+                
+                ROI_betas_GRID_coord = pd.DataFrame()
+
+                for Att_bar_coord in DF_betas_bar_coord.Att_bar_coord.unique():
+                    for UAtt_bar_coord in DF_betas_bar_coord.UAtt_bar_coord.unique():
+
+                        trial_df = DF_betas_bar_coord[(DF_betas_bar_coord['sj'] == sj) &\
+                                                    (DF_betas_bar_coord['ROI'] == roi_name) &\
+                                                    (DF_betas_bar_coord['Att_bar_coord'] == Att_bar_coord) &\
+                                                    (DF_betas_bar_coord['UAtt_bar_coord'] == UAtt_bar_coord)]
+                        
+                        ## label prf coordinates to
+                        # screen binned coords
+                        x_deg_arr, y_deg_arr = self.convert_coord_pRF2screen_grid(prf_x_coord = trial_df.prf_x_coord.values, 
+                                                                                prf_y_coord = trial_df.prf_y_coord.values)
+
+                        ## keep some information on the attended bar, for bookeeping --> need to multiindex
+                        df_betas_heatmap = trial_df.loc[:, ['sj', 'ROI', 'betas', 'prf_index_coord', 'Att_bar_coord', 'UAtt_bar_coord', 
+                                                            'inter_bar_dist', 'abs_inter_bar_dist', 'Att_ecc_label', 'UAtt_ecc_label']]
+                        df_betas_heatmap[['screen_x_coord', 'screen_y_coord']] = np.vstack((x_deg_arr, y_deg_arr)).T
+
+                        ## concat within roi
+                        ROI_betas_GRID_coord = pd.concat((ROI_betas_GRID_coord, df_betas_heatmap), ignore_index=True)
+                        
+                if not collapse_ecc:
+                    ## concat!
+                    DF_betas_GRID_coord = pd.concat((DF_betas_GRID_coord, ROI_betas_GRID_coord), ignore_index=True)
+
+                else:
+                    # collapsing same eccentricities of attended and unattended bar
+                    # while keeping flipped trial types
+                    ECC_betas_GRID_coord = pd.DataFrame()
+
+                    # loop over bar eccentricity
+                    for Att_ecc_label in abs_dist_dict.keys():
+                        Att_ecc_df = ROI_betas_GRID_coord.loc[(ROI_betas_GRID_coord['Att_ecc_label'] == Att_ecc_label)]
+                        FLIPAtt_ecc_df = ROI_betas_GRID_coord.loc[(ROI_betas_GRID_coord['UAtt_ecc_label'] == Att_ecc_label)]
+
+                        # loop over inter bar distance
+                        for abs_dist in abs_dist_dict[Att_ecc_label]:
+                            distance_Att_ecc_df = Att_ecc_df[(Att_ecc_df['abs_inter_bar_dist'] == abs_dist) &\
+                                                            (Att_ecc_df['UAtt_ecc_label'].isin(ecc_order_dict[Att_ecc_label]))]
+                            distance_FLIPAtt_ecc_df = FLIPAtt_ecc_df[(FLIPAtt_ecc_df['abs_inter_bar_dist'] == abs_dist) &\
+                                                                    (FLIPAtt_ecc_df['Att_ecc_label'].isin(ecc_order_dict[Att_ecc_label]))]
+
+                            # if empty then it's the simetrical case --> so nothing to collapse across ecc
+                            if distance_Att_ecc_df.empty or len(ecc_order_dict[Att_ecc_label]) == 0:
+                                condition_Att_ecc_df = Att_ecc_df[(Att_ecc_df['abs_inter_bar_dist'] == abs_dist) &\
+                                                                    (Att_ecc_df['Att_ecc_label'] == Att_ecc_label) &\
+                                                                    (Att_ecc_df['UAtt_ecc_label'] == Att_ecc_label) &\
+                                                                    (Att_ecc_df['Att_bar_coord'] < 0)] 
+                                flipped_condition_Att_ecc_df = Att_ecc_df[(Att_ecc_df['abs_inter_bar_dist'] == abs_dist) &\
+                                                                            (Att_ecc_df['Att_ecc_label'] == Att_ecc_label) &\
+                                                                            (Att_ecc_df['UAtt_ecc_label'] == Att_ecc_label) &\
+                                                                            (Att_ecc_df['Att_bar_coord'] > 0)] 
+                            else:
+                                # collapse specific attended eccentricity trials
+                                condition_Att_ecc_df = distance_Att_ecc_df.copy()
+                                # flip x,y screen coordinates (in appropriate axis) as well as bar coords
+                                condition_Att_ecc_df.update(distance_Att_ecc_df.loc[distance_Att_ecc_df['Att_bar_coord'] > 0][collapse_coord_key] * -1)
+                                condition_Att_ecc_df.update(distance_Att_ecc_df.loc[distance_Att_ecc_df['Att_bar_coord'] > 0][['Att_bar_coord', 'UAtt_bar_coord']] * -1)
+
+                                # same for reverse condition
+                                flipped_condition_Att_ecc_df = distance_FLIPAtt_ecc_df.copy()
+                                flipped_condition_Att_ecc_df.update(distance_FLIPAtt_ecc_df.loc[distance_FLIPAtt_ecc_df['Att_bar_coord'] > 0][collapse_coord_key] * -1)
+                                flipped_condition_Att_ecc_df.update(distance_FLIPAtt_ecc_df.loc[distance_FLIPAtt_ecc_df['Att_bar_coord'] > 0][['Att_bar_coord', 'UAtt_bar_coord']] * -1)
+
+                            # label if condition or flipped, for bookeeping
+                            condition_Att_ecc_df[['flipped_condition']] = np.zeros(len(condition_Att_ecc_df)).reshape(-1,1)
+                            flipped_condition_Att_ecc_df[['flipped_condition']] = np.ones(len(flipped_condition_Att_ecc_df)).reshape(-1,1)
+
+                            ECC_betas_GRID_coord = pd.concat((ECC_betas_GRID_coord, condition_Att_ecc_df), ignore_index=True)
+                            ECC_betas_GRID_coord = pd.concat((ECC_betas_GRID_coord, flipped_condition_Att_ecc_df), ignore_index=True)
+                    
+                    ## concat!
+                    DF_betas_GRID_coord = pd.concat((DF_betas_GRID_coord, ECC_betas_GRID_coord), ignore_index=True)
+
+        return DF_betas_GRID_coord

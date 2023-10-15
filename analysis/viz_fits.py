@@ -292,6 +292,7 @@ match task:
                                         orientation_bars = orientation_bars[choice], 
                                         ROI_list = ['V1', 'hV4'], #['V1', 'V2', 'V3'],
                                         demean = True, betas_per_color = False,
+                                        rsq_threshold = .1, positive_rf = True, size_std = 2.5,
                                         att_color_ses_run_dict = group_att_color_ses_run,
                                         mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
                                                                     crop_nr = FAM_data.task_nr_cropTR['pRF'], 

@@ -893,8 +893,16 @@ class GLMsingle_Model(Model):
                                                             'prf_x_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['x'][ROIs_dict[rname]], 
                                                             'prf_y_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['y'][ROIs_dict[rname]]})
                                                             )) 
+
+        output_df = DF_betas_bar_coord.dropna(subset=['prf_rsq_coord', 'prf_x_coord', 'prf_y_coord'])               
+        
+        # if we want to demean betas, per trial type and ROI
+        if demean:
+            output_df = self.demean_betas_df(DF_betas_bar_coord = DF_betas_bar_coord.dropna(subset=['prf_rsq_coord', 'prf_x_coord', 'prf_y_coord']), 
+                                            ROI_list = list(ROIs_dict.keys()), orientation_bars = orientation_bars, 
+                                            bar_color = None) ## HARDCODED, change later to go through different colors if wanted
                             
-        return DF_betas_bar_coord.dropna(subset=['prf_rsq_coord', 'prf_x_coord', 'prf_y_coord'])
+        return output_df
     
     def get_betas_1D_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', bar_color2bin = None,
                                 max_ecc_ext = 5.5, bin_size = .5, center_bin = False, avg_bool = True, bin_bool = False):

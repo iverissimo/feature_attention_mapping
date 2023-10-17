@@ -1805,18 +1805,24 @@ class FAViewer(Viewer):
             # counter
             counter = 0
 
-            for Att_bar_coord in coord_list:
+            for ind_att, Att_bar_coord in enumerate(coord_list):
                 
-                for UAtt_bar_coord in coord_list:
+                for ind_uatt, UAtt_bar_coord in enumerate(coord_list):
 
                     if as_heatmap:
                         ## get DF with betas and coordinates
                         # labeled by screen bar-centered grid 
                         if DF_betas_GRID_coord is None:
-                            DF_betas_GRID_coord = self.FAModelObj.get_betas_grid_coord_df(DF_betas_bar_coord = DF_betas_bar_coord, 
-                                                                                            collapse_ecc = False, 
-                                                                                            orientation_bars = orientation_bars)
-                        
+
+                            DF_betas_GRID_coord = pd.DataFrame()
+
+                            for pp in DF_betas_bar_coord.sj.unique(): # iterate over participants
+                                DF_betas_GRID_coord = pd.concat((DF_betas_GRID_coord,
+                                                                 self.FAModelObj.get_betas_grid_coord_df(DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['sj'] == pp], 
+                                                                                                        collapse_ecc = False, 
+                                                                                                        orientation_bars = orientation_bars)
+                                                                ), ignore_index=True)
+                            
                         df2plot = DF_betas_GRID_coord[(DF_betas_GRID_coord['ROI'] == roi_name) &\
                                                     (DF_betas_GRID_coord['Att_bar_coord'] == Att_bar_coord) &\
                                                     (DF_betas_GRID_coord['UAtt_bar_coord'] == UAtt_bar_coord)]
@@ -1860,8 +1866,15 @@ class FAViewer(Viewer):
                             ## settings for reference bar positions
                             att_rect_facecolor = 'none'
                             att_rect_edgecolor = '#8d9e59'
+                            att_rect_pos = (ind_att+1, 0)
+                            att_rect_width = 1
+                            att_rect_height = 8
+
                             uatt_rect_facecolor = 'none'
                             uatt_rect_edgecolor = '#969696'
+                            uatt_rect_pos = (ind_uatt+1, 0)
+                            uatt_rect_width = 1
+                            uatt_rect_height = 8
                             alpha = 1
                         else:
                             g = sns.scatterplot(x='prf_x_coord', y='prf_y_coord', hue_norm=(vmin, vmax),
@@ -1879,36 +1892,45 @@ class FAViewer(Viewer):
                             ## settings for reference bar positions
                             att_rect_facecolor = '#8d9e59'
                             att_rect_edgecolor = '#8d9e59'
+                            att_rect_pos = (self.convert_pix2dva(Att_bar_coord - self.FAModelObj.bar_width_pix[0]/2), 
+                                                -self.convert_pix2dva(self.MRIObj.screen_res[1]/2))
+                            att_rect_width = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0])
+                            att_rect_height = self.convert_pix2dva(self.MRIObj.screen_res[1])
+                            
                             uatt_rect_facecolor = '#969696'
                             uatt_rect_edgecolor = '#969696'
+                            uatt_rect_pos = (self.convert_pix2dva(UAtt_bar_coord - self.FAModelObj.bar_width_pix[0]/2), 
+                                            -self.convert_pix2dva(self.MRIObj.screen_res[1]/2))
+                            uatt_rect_width = self.convert_pix2dva(self.FAModelObj.bar_width_pix[0])
+                            uatt_rect_height = self.convert_pix2dva(self.MRIObj.screen_res[1])
                             alpha = .15
 
                         # Create a Rectangle patch
                         # for unattended bar
-                        unatt_rect = mpatches.Rectangle((self.convert_pix2dva(UAtt_bar_coord - self.FAModelObj.bar_width_pix[0]/2), 
-                                                -self.convert_pix2dva(self.MRIObj.screen_res[1]/2)), 
-                                                self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]), 
-                                                self.convert_pix2dva(self.MRIObj.screen_res[1]), 
+                        unatt_rect = mpatches.Rectangle(uatt_rect_pos, uatt_rect_width, uatt_rect_height,
                                                 linewidth=2.5, alpha = alpha, zorder = 10,
                                                 edgecolor=uatt_rect_edgecolor, facecolor=uatt_rect_facecolor)
                         
                         if orientation_bars == 'parallel_horizontal': # then rotate patches
-                            rotation_transform = mtransforms.Affine2D().rotate_deg(90) + axs[tuple(position_matrix[counter])].transData
+                            if as_heatmap: # rotation needs to be around center of screen (and heatmap has different range from data ticks)
+                                rotation_transform = mtransforms.Affine2D().rotate_deg_around(4,4, -90) + axs[tuple(position_matrix[counter])].transData
+                            else:
+                                rotation_transform = mtransforms.Affine2D().rotate_deg(90) + axs[tuple(position_matrix[counter])].transData
                             unatt_rect.set_transform(rotation_transform)
 
                         axs[tuple(position_matrix[counter])].add_patch(unatt_rect) # Add the patch to the Axes
                         axs[tuple(position_matrix[counter])].patches[-1].set_hatch('///')
 
                         # for attended bar
-                        att_rect = mpatches.Rectangle((self.convert_pix2dva(Att_bar_coord - self.FAModelObj.bar_width_pix[0]/2), 
-                                                -self.convert_pix2dva(self.MRIObj.screen_res[1]/2)), 
-                                                self.convert_pix2dva(self.FAModelObj.bar_width_pix[0]), 
-                                                self.convert_pix2dva(self.MRIObj.screen_res[1]), 
+                        att_rect = mpatches.Rectangle(att_rect_pos, att_rect_width, att_rect_height,
                                                 linewidth=2.5, alpha = alpha, zorder = 10,
                                                 edgecolor=att_rect_edgecolor, facecolor=att_rect_facecolor)
                         
                         if orientation_bars == 'parallel_horizontal': # then rotate patches
-                            rotation_transform = mtransforms.Affine2D().rotate_deg(90) + axs[tuple(position_matrix[counter])].transData
+                            if as_heatmap: # rotation needs to be around center of screen (and heatmap has different range from data ticks)
+                                rotation_transform = mtransforms.Affine2D().rotate_deg_around(4,4, -90) + axs[tuple(position_matrix[counter])].transData
+                            else:
+                                rotation_transform = mtransforms.Affine2D().rotate_deg(90) + axs[tuple(position_matrix[counter])].transData
                             att_rect.set_transform(rotation_transform)
 
                         axs[tuple(position_matrix[counter])].add_patch(att_rect) # Add the patch to the Axes
@@ -1916,7 +1938,7 @@ class FAViewer(Viewer):
 
                         # add legend
                         handleA = mpatches.Patch(facecolor = att_rect_edgecolor, edgecolor = att_rect_edgecolor, label = 'target')
-                        handleB= mpatches.Patch( facecolor = uatt_rect_edgecolor, edgecolor = uatt_rect_edgecolor, label = 'distractor', hatch = '///')
+                        handleB= mpatches.Patch( facecolor = uatt_rect_edgecolor, edgecolor = uatt_rect_edgecolor, label = 'distractor')#, hatch = '///')
                         leg = axs[tuple(position_matrix[counter])].legend(handles = [handleA,handleB], loc = 'upper right')
                     else:
                         axs[tuple(position_matrix[counter])].set_visible(False)
@@ -2628,6 +2650,9 @@ class FAViewer(Viewer):
         color2plot2D_list = ['color_red', 'color_green', None] if betas_per_color else [None]
         color2plot1D_list = [['color_red', 'color_green'], None] if betas_per_color else [None]
 
+        # if we want to combine both parallel types, then we need to rotate
+        rotate_bars = True if orientation_bars == 'parallel' else False
+
         ## path to store plots
         output_pth = op.join(self.figures_pth, 'betas_coord')
 
@@ -2663,6 +2688,7 @@ class FAViewer(Viewer):
 
         ## concatenate group
         DF_betas_GRID_coord_GROUP = pd.DataFrame()
+        DF_betas_bar_coord_GROUP = pd.DataFrame()
 
         # iterate over participant list
         for pp in participant_list:
@@ -2689,9 +2715,13 @@ class FAViewer(Viewer):
                                                                 att_color_ses_run = att_color_ses_run, 
                                                                 file_ext = file_ext, 
                                                                 demean = demean,
+                                                                rotate_bars = rotate_bars,
                                                                 ROIs_dict = pp_ROI_dict, 
                                                                 prf_estimates = prf_estimates, 
                                                                 orientation_bars = orientation_bars)
+            
+            # concatenate for group
+            DF_betas_bar_coord_GROUP = pd.concat((DF_betas_bar_coord_GROUP, DF_betas_bar_coord), ignore_index = True)
 
             ## 2D plot betas for each attended bar color separately + averaged
             for cn in color2plot2D_list:
@@ -2829,7 +2859,7 @@ class FAViewer(Viewer):
                                         fig_name = fig_name.replace('binned', 'ECCoverlaid_binned_bar')) 
                         
         ## plot for group
-        if len(DF_betas_GRID_coord_GROUP) > 1:
+        if len(participant_list) > 1:
 
             ## 2D plot betas for each attended bar color separately + averaged
             for cn in color2plot2D_list:
@@ -2846,9 +2876,9 @@ class FAViewer(Viewer):
                     fig_name = fig_name.replace('.png', '_demean.png')
                 
                 # plot as heatmap
-                self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['sj'] == 'sub-{sj}'.format(sj = participant_list[0])], 
-                                   ROI_list = ROI_list, 
-                                   DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP,
+                self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord_GROUP, 
+                                ROI_list = ROI_list, 
+                                #DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP,
                                 orientation_bars = orientation_bars, 
                                 as_heatmap = True, 
                                 max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = participant_list[0])], 
@@ -2860,7 +2890,7 @@ class FAViewer(Viewer):
             for cn in color2plot2D_list:
 
                 # absolute figure name
-                fig_name = op.join(sub_figures_pth,
+                fig_name = op.join(output_pth,
                             'sub-GROUP_acq-{acq}_space-{space}_model-{model}_bar_orientation-{ori}_GLMsingle_betas2DoverECC_heatmap.png'.format(acq = self.MRIObj.acq, 
                                                                                                                                 space = self.MRIObj.sj_space,
                                                                                                             model = model_type, ori = orientation_bars))
@@ -3540,9 +3570,14 @@ class FAViewer(Viewer):
                     
                     if not df2plot.empty: # if dataframe not empty
 
-                        dfHEAT2plot = df2plot.groupby(['screen_x_coord', 'screen_y_coord']).mean().reset_index().pivot(index='screen_y_coord', 
-                                                                                                                        columns='screen_x_coord', 
-                                                                                                                        values='betas')
+                        ## make pivot table - with screen x coordinates as columns and screen y coords + sj identifier as index
+                        # and then average over participants
+                        dfHEAT2plot = pd.pivot_table(df2plot, 
+                                                    values = 'betas', 
+                                                    index = ['screen_y_coord', 'sj'],
+                                                    columns = ['screen_x_coord'], 
+                                                    aggfunc = 'mean', fill_value = None).groupby(['screen_y_coord']).mean()
+
                         # sort index
                         dfHEAT2plot.sort_index(axis='columns', ascending=True, inplace=True)
                         dfHEAT2plot.sort_index(level=0, ascending=False, inplace=True)
@@ -3578,7 +3613,7 @@ class FAViewer(Viewer):
                                                 linewidth=2.5, edgecolor='grey', facecolor='none', alpha = 1, zorder = 10)
                         
                         if orientation_bars == 'parallel_horizontal': # then rotate patches
-                            rotation_transform = mtransforms.Affine2D().rotate_deg(90) + axs[tuple(new_position_matrix[counter])].transData
+                            rotation_transform = mtransforms.Affine2D().rotate_deg_around(4,4, -90) + axs[tuple(new_position_matrix[counter])].transData
                             unatt_rect.set_transform(rotation_transform)
 
                         axs[tuple(new_position_matrix[counter])].add_patch(unatt_rect) # Add the patch to the Axes
@@ -3588,7 +3623,7 @@ class FAViewer(Viewer):
                                                 linewidth=2.5, edgecolor = target_color_rect, facecolor='none', alpha = 1, zorder = 10)
                         
                         if orientation_bars == 'parallel_horizontal': # then rotate patches
-                            rotation_transform = mtransforms.Affine2D().rotate_deg(90) + axs[tuple(new_position_matrix[counter])].transData
+                            rotation_transform = mtransforms.Affine2D().rotate_deg_around(4,4, -90) + axs[tuple(new_position_matrix[counter])].transData
                             att_rect.set_transform(rotation_transform)
 
                         axs[tuple(new_position_matrix[counter])].add_patch(att_rect) # Add the patch to the Axes
@@ -3702,17 +3737,23 @@ class FAViewer(Viewer):
                     
                     if not df2plot.empty: # if dataframe not empty
 
-                        dfHEAT2plot = df2plot.groupby(['screen_x_coord', 'screen_y_coord']).mean().reset_index().pivot(index='screen_y_coord', 
-                                                                                                                        columns='screen_x_coord', 
-                                                                                                                        values='betas')
+                        ## make pivot table - with screen x coordinates as columns and screen y coords + sj identifier as index
+                        # and then average over participants
+                        dfHEAT2plot = pd.pivot_table(df2plot, 
+                                                    values = 'betas', 
+                                                    index = ['screen_y_coord', 'sj'],
+                                                    columns = ['screen_x_coord'], 
+                                                    aggfunc = 'mean', fill_value = None).groupby(['screen_y_coord']).mean()
                         # sort index
                         dfHEAT2plot.sort_index(axis='columns', ascending=True, inplace=True)
                         dfHEAT2plot.sort_index(level=0, ascending=False, inplace=True)
 
                         ##### flipped case 
-                        Rev_dfHEAT2plot = Rev_df2plot.groupby(['screen_x_coord', 'screen_y_coord']).mean().reset_index().pivot(index='screen_y_coord', 
-                                                                                                                        columns='screen_x_coord', 
-                                                                                                                        values='betas')
+                        Rev_dfHEAT2plot = pd.pivot_table(Rev_df2plot, 
+                                                    values = 'betas', 
+                                                    index = ['screen_y_coord', 'sj'],
+                                                    columns = ['screen_x_coord'], 
+                                                    aggfunc = 'mean', fill_value = None).groupby(['screen_y_coord']).mean()
                         # sort index
                         Rev_dfHEAT2plot.sort_index(axis='columns', ascending=True, inplace=True)
                         Rev_dfHEAT2plot.sort_index(level=0, ascending=False, inplace=True)
@@ -3740,20 +3781,20 @@ class FAViewer(Viewer):
                         # Create a Rectangle patch
                         # for unattended bar
                         unatt_rect = mpatches.Rectangle((distractor_pos_rect, 0), 1, 8,
-                                                linewidth=2, edgecolor='green', facecolor='none', alpha = 1, zorder = 10)
+                                                linewidth=2.5, edgecolor='green', facecolor='none', alpha = 1, zorder = 10)
                         
                         if orientation_bars == 'parallel_horizontal': # then rotate patches
-                            rotation_transform = mtransforms.Affine2D().rotate_deg(90) + axs[tuple(new_position_matrix[counter])].transData
+                            rotation_transform = mtransforms.Affine2D().rotate_deg_around(4,4, -90) + axs[tuple(new_position_matrix[counter])].transData
                             unatt_rect.set_transform(rotation_transform)
 
                         axs[tuple(new_position_matrix[counter])].add_patch(unatt_rect) # Add the patch to the Axes
 
                         # for attended bar
                         att_rect = mpatches.Rectangle((target_pos_rect, 0), 1, 8,
-                                                linewidth=2, edgecolor = target_color_rect, facecolor='none', alpha = 1, zorder = 10)
+                                                linewidth=2.5, edgecolor = target_color_rect, facecolor='none', alpha = 1, zorder = 10)
                         
                         if orientation_bars == 'parallel_horizontal': # then rotate patches
-                            rotation_transform = mtransforms.Affine2D().rotate_deg(90) + axs[tuple(new_position_matrix[counter])].transData
+                            rotation_transform = mtransforms.Affine2D().rotate_deg_around(4,4, -90) + axs[tuple(new_position_matrix[counter])].transData
                             att_rect.set_transform(rotation_transform)
 
                         axs[tuple(new_position_matrix[counter])].add_patch(att_rect) # Add the patch to the Axes

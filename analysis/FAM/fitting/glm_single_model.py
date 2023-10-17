@@ -791,12 +791,69 @@ class GLMsingle_Model(Model):
         np.save(pRFcorr_filename, corr_pRF)
         np.save(FAcorr_filename, corr_FA)
 
-    def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, demean = False,
+    def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, demean = False, rotate_bars = True, 
                                 file_ext = '_cropped.npy', ROIs_dict = {}, prf_estimates = {}, orientation_bars = 'parallel_vertical'):
 
         """
+        Get dataframe with beta values, with info on prf location, attended color, ROI vertices belong to,
+        for trials with a specific bar orientation (parallel - vert/hor -, or crossed) or for the combination of different 
+        orientations
+
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        betas_arr : list/arr
+            array with beta values for 
+        single_trl_DM: arr
+            glm single design matrix
+        att_color_ses_run_dict: dict
+            dict with info for each participant, indicating session and run number for same attended color
+        file_ext: str
+            file extent of FA data
+        ROIs_dict: dict/df
+            vertex index and ROI labels, to use when parsing data array
+        prf_estimates : dict
+            dict with participant prf estimates
+        orientation_bars: str/list
+            if string with descriptor for bar orientations (crossed, parallel_vertical, parallel_horizontal or parallel (combination of previous ones))
+            if list then gets and concatenates all orientations in list 
+        """
+
+        output_df = pd.DataFrame()
+        
+        # check which bar orientations to load
+        if isinstance(orientation_bars, str):
+            if orientation_bars == 'parallel':
+                orientation_bars_list = ['parallel_vertical', 'parallel_horizontal']
+            else:
+                orientation_bars_list = [orientation_bars]
+        else:
+            orientation_bars_list = orientation_bars
+
+        for ori_bars in orientation_bars_list:
+
+            # make betas dataframe
+            ori_betas_df = self.get_orientation_betas_coord_df(participant, betas_arr = betas_arr, single_trl_DM = single_trl_DM, 
+                                                               att_color_ses_run = att_color_ses_run, demean = demean,
+                                                                file_ext = file_ext, ROIs_dict = ROIs_dict, 
+                                                                prf_estimates = prf_estimates, orientation_bars = ori_bars)
+            
+            # if we want to rotate horizontal bars
+            if ori_bars == 'parallel_horizontal' and rotate_bars:
+                ori_betas_df = self.rotate_prf_coordinates(DF_betas_bar_coord = ori_betas_df, 
+                                                            og_orientation_bars = ori_bars)
+            
+            output_df = pd.concat((output_df, ori_betas_df), ignore_index=True)
+
+        return output_df
+    
+    def get_orientation_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, demean = False,
+                                            file_ext = '_cropped.npy', ROIs_dict = {}, prf_estimates = {}, orientation_bars = 'parallel_vertical'):
+
+        """
         make dataframe with beta values, with info on prf location, attended color, ROI vertices belong to,
-        for trials with a specific bar oriantation (parallel - vert/hor -, or crossed)
+        for trials with a specific bar orientation (parallel - vert/hor -, or crossed)
 
         Parameters
         ----------
@@ -1616,6 +1673,33 @@ class GLMsingle_Model(Model):
         convert dataframe of betas coordinates, into grid betas coord 
         --> to then use for heatmap representation <---
 
+        for trials with a specific bar orientation (parallel - vert/hor -, or crossed) 
+        or for the combination of different orientations
+
+        Parameters
+        ----------
+        DF_betas_bar_coord: dataframe
+            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+        collapse_ecc: bool
+            if we want to collapse over eccentricity (will still keep reversed condition)
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        """
+
+        ## when parallel assumes that we have already combined parallel vertical with rotated parallel horizontal in betas dataframe
+        # so heatmap like coordinates will be applied to "vertical" reference frame
+        grid_orientation_bars = 'parallel_vertical' if orientation_bars == 'parallel' else orientation_bars
+
+        return self.get_orientation_betas_grid_coord_df(DF_betas_bar_coord = DF_betas_bar_coord, 
+                                                        collapse_ecc = collapse_ecc, 
+                                                        orientation_bars = grid_orientation_bars)
+
+    def get_orientation_betas_grid_coord_df(self, DF_betas_bar_coord = {}, collapse_ecc = False, orientation_bars = 'parallel_vertical'):
+
+        """
+        convert dataframe of betas coordinates, into grid betas coord 
+        --> to then use for heatmap representation <---
+
         NOTE: provide DF_betas_bar_coord for SPECIFIC bar orientation (ex: parallel_vertical), 
         because mixing will lead to errors when labelling
 
@@ -1728,3 +1812,23 @@ class GLMsingle_Model(Model):
                     DF_betas_GRID_coord = pd.concat((DF_betas_GRID_coord, ECC_betas_GRID_coord), ignore_index=True)
 
         return DF_betas_GRID_coord
+
+    def rotate_prf_coordinates(self, DF_betas_bar_coord = None, og_orientation_bars = 'parallel_horizontal'):
+
+        """
+        quick function to rotate betas coordinates
+        """
+        NEW_DF_betas_bar_coord = DF_betas_bar_coord.copy()
+
+        ## if given parallel horizontal case, we want to rotate 90 deg clockwise
+        # which implies transformation of y --> new x and x --> -new y
+        if og_orientation_bars == 'parallel_horizontal':
+
+            ## rotate 90 deg to align to parallel vertical
+            new_y = DF_betas_bar_coord.prf_x_coord.values * -1
+            new_x = DF_betas_bar_coord.prf_y_coord.values 
+            
+            NEW_DF_betas_bar_coord['prf_x_coord'] = new_x
+            NEW_DF_betas_bar_coord['prf_y_coord'] = new_y
+
+        return NEW_DF_betas_bar_coord

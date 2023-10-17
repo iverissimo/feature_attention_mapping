@@ -255,11 +255,11 @@ match task:
 
             case 'betas_coord' | 'attention_mod' | 'bar_dist':
 
-                orientation_bars = {0: 'parallel_vertical', 1: 'parallel_horizontal', 2: 'crossed'}
+                orientation_bars = {0: 'parallel_vertical', 1: 'parallel_horizontal', 2: 'crossed', 3: 'parallel'}
                 
                 choice = None
-                while choice not in (0,1,2):
-                    choice = int(input("Which trial type?\n0) parallel vertical\n1) parallel horizontal\n2) crossed\nNumber picked: "))
+                while choice not in (0,1,2, 3):
+                    choice = int(input("Which trial type?\n0) parallel vertical\n1) parallel horizontal\n2) crossed\n3) parallel (combined)\nNumber picked: "))
 
                 # get participant run number and session number
                 # by attended bar
@@ -290,7 +290,7 @@ match task:
                                         model_type = 'D',
                                         file_ext = '_cropped.npy', 
                                         orientation_bars = orientation_bars[choice], 
-                                        ROI_list = ['V1', 'hV4'], #['V1', 'V2', 'V3'],
+                                        ROI_list = ['V1'], #, 'hV4'], #['V1', 'V2', 'V3'],
                                         demean = True, betas_per_color = False,
                                         rsq_threshold = .1, positive_rf = True, size_std = 2.5,
                                         att_color_ses_run_dict = group_att_color_ses_run,

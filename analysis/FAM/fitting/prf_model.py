@@ -3,6 +3,7 @@ import os
 import os.path as op
 import pandas as pd
 import yaml
+import re
 
 from PIL import Image, ImageDraw
 
@@ -86,6 +87,9 @@ class pRF_model(Model):
 
         visual_dm = None
         save_dm = False
+
+        if isinstance(ses, str) and 'ses' in ses: # to account for differences in input
+            ses = re.search(r'(?<=ses-).*', ses)[0]
 
         if filename:
             if op.exists(filename):

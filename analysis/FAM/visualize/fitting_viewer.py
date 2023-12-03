@@ -3655,7 +3655,7 @@ class FAViewer(Viewer):
                         handleB= mpatches.Patch( facecolor = 'grey', edgecolor = 'k', label = 'distractor')
                         leg = axs[tuple(new_position_matrix[counter])].legend(handles = [handleA,handleB], loc = 'upper right')
 
-                        counter +=1
+                    counter +=1
 
             # remove other axis from plot 
             for pos_arr in position_matrix:
@@ -3821,7 +3821,7 @@ class FAViewer(Viewer):
                         axs[tuple(new_position_matrix[counter])].add_patch(att_rect) # Add the patch to the Axes
                         #axs[row_ind][col_ind].patches[-1].set_hatch('*')
 
-                        counter +=1
+                    counter +=1
 
             # remove other axis from plot 
             for pos_arr in position_matrix:

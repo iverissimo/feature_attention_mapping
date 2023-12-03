@@ -1651,7 +1651,7 @@ class pRF_model(Model):
         """
 
         screen_res = self.MRIObj.screen_res[0] if bar_direction == 'horizontal' else self.MRIObj.screen_res[1]
-        conditions = ['L-R', 'R-L'] if bar_direction == 'horizontal' else ['U-D', 'D-U'] 
+        conditions = ['L-R', 'R-L'] if bar_direction == 'horizontal' else ['D-U','U-D'] 
 
         bar_coord_per_TR = []
 

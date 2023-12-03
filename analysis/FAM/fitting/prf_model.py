@@ -1641,3 +1641,87 @@ class pRF_model(Model):
         else:
             return result
     
+    def get_pRF_bar_coords_per_TR(self, bar_direction = 'horizontal'):
+
+        """
+        Get array with pRF bar center coordinates per TR.
+        Note - if horizontal bar pass (bar is vertically oriented), will return y coordinates; 
+        if vertical bar passes (bar is horizontally oriented)) will return x coordinates
+
+        """
+
+        screen_res = self.MRIObj.screen_res[0] if bar_direction == 'horizontal' else self.MRIObj.screen_res[1]
+        conditions = ['L-R', 'R-L'] if bar_direction == 'horizontal' else ['U-D', 'D-U'] 
+
+        bar_coord_per_TR = []
+
+        for _,bartype in enumerate(self.MRIObj.pRF_bar_pass):
+
+            if bartype == conditions[0]:
+                bar_coord_per_TR += list(screen_res*np.linspace(-.5,.5, self.MRIObj.pRF_nr_TRs[bartype]))
+            elif bartype == conditions[1]:
+                bar_coord_per_TR += list(screen_res*np.linspace(.5,-.5, self.MRIObj.pRF_nr_TRs[bartype]))
+            else:
+                # want to keep the irrelevant dimensions as nan, to avoid confusion
+                bar_coord_per_TR += list(np.repeat(np.nan, self.MRIObj.pRF_nr_TRs[bartype]))
+
+        # crop and shift array, if such was the case
+        bar_coord_per_TR = self.MRIObj.mri_utils.crop_shift_arr(np.array(bar_coord_per_TR), 
+                                                                crop_nr = self.MRIObj.task_nr_cropTR['pRF'], 
+                                                                shift = self.MRIObj.shift_TRs_num)
+
+        return bar_coord_per_TR
+    
+    def get_masked_bar_coords(self, participant, ses = 'mean', mask_bool_df = None, bar_direction = None):
+
+        """
+        Get dict with unique pRF bar coordinates (for horizontal and vertical bar passes)
+        masked for participant visibility
+
+        Parameters
+        ----------
+        participant : str
+            participant number
+        ses : str
+            session number (default mean)
+        mask_bool_df: dataframe
+            will be used to mask design matrix given behavioral performance
+        bar_direction: str
+            if given, will only return horizontal/vertical bar pass coordinates 
+        """
+
+        if isinstance(ses, str) and 'ses' in ses: # to account for differences in input
+            ses = re.search(r'(?<=ses-).*', ses)[0]
+
+        # if we set a specific session, then select that one, else combine
+        if ses == 'mean':
+            mask_bool = mask_bool_df[mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant)]['mask_bool'].values
+        else:
+            mask_bool = mask_bool_df[(mask_bool_df['ses'] == 'ses-{s}'.format(s = ses)) & \
+                                (mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant))]['mask_bool'].values 
+        mask_bool = np.prod(mask_bool, axis = 0)
+            
+        # iterate over bar directions
+        if bar_direction is None:
+            bar_direction_list = ['vertical', 'horizontal']
+        elif isinstance(bar_direction, str):
+            bar_direction_list = [bar_direction]
+
+        bar_coords_dict = {}
+        
+        for bd_key in bar_direction_list:
+
+            ## get pRF bar center coordinates per TR for bar pass direction
+            bar_coords_masked = self.get_pRF_bar_coords_per_TR(bar_direction = bd_key).copy()
+            bar_coords_masked[np.where((mask_bool == 0))[0]] = np.nan
+
+            # get unique coordinates
+            uniq_bar_coords = np.unique(bar_coords_masked)
+            uniq_bar_coords = np.array([val for val in uniq_bar_coords if ~np.isnan(val)])
+
+            bar_coords_dict[bd_key] = uniq_bar_coords
+
+        return bar_coords_dict
+                    
+
+

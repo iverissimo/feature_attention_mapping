@@ -791,7 +791,8 @@ class GLMsingle_Model(Model):
         np.save(pRFcorr_filename, corr_pRF)
         np.save(FAcorr_filename, corr_FA)
 
-    def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, demean = False, rotate_bars = True, 
+    def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, 
+                                demean = False, rotate_bars = True, prf_bar_coords_dict = None,
                                 file_ext = '_cropped.npy', ROIs_dict = {}, prf_estimates = {}, orientation_bars = 'parallel_vertical'):
 
         """
@@ -818,6 +819,8 @@ class GLMsingle_Model(Model):
         orientation_bars: str/list
             if string with descriptor for bar orientations (crossed, parallel_vertical, parallel_horizontal or parallel (combination of previous ones))
             if list then gets and concatenates all orientations in list 
+        prf_bar_coords_dict: dict
+            if given, will use pRF bar coordinates as reference to mask FA trials where bar not visible
         """
 
         output_df = pd.DataFrame()
@@ -835,7 +838,8 @@ class GLMsingle_Model(Model):
 
             # make betas dataframe
             ori_betas_df = self.get_orientation_betas_coord_df(participant, betas_arr = betas_arr, single_trl_DM = single_trl_DM, 
-                                                               att_color_ses_run = att_color_ses_run, demean = demean,
+                                                               att_color_ses_run = att_color_ses_run, 
+                                                               demean = demean, prf_bar_coords_dict = prf_bar_coords_dict,
                                                                 file_ext = file_ext, ROIs_dict = ROIs_dict, 
                                                                 prf_estimates = prf_estimates, orientation_bars = ori_bars)
             
@@ -848,7 +852,8 @@ class GLMsingle_Model(Model):
 
         return output_df
     
-    def get_orientation_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, demean = False,
+    def get_orientation_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, 
+                                            demean = False, prf_bar_coords_dict = None,
                                             file_ext = '_cropped.npy', ROIs_dict = {}, prf_estimates = {}, orientation_bars = 'parallel_vertical'):
 
         """
@@ -873,6 +878,8 @@ class GLMsingle_Model(Model):
             dict with participant prf estimates
         orientation_bars: str
             string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        prf_bar_coords_dict: dict
+            if given, will use pRF bar coordinates as reference to mask FA trials where bar not visible
         """
 
         # if we dont want to load betas per color
@@ -887,8 +894,14 @@ class GLMsingle_Model(Model):
         ## for bars going left to right (vertical orientation)
         if orientation_bars == 'parallel_vertical':
             coord_list = self.bar_x_coords_pix
+            # if we provided prf bar coordinates
+            if prf_bar_coords_dict is not None:
+                coord_list = [val for val in coord_list if val in prf_bar_coords_dict['horizontal']]  # horizontal bar pass, bars are vertically oriented
         elif orientation_bars == 'parallel_horizontal':
             coord_list = self.bar_y_coords_pix
+            # if we provided prf bar coordinates
+            if prf_bar_coords_dict is not None:
+                coord_list = [val for val in coord_list if val in prf_bar_coords_dict['vertical']]  # vertical bar pass, bars are horizontally oriented
         else:
             raise ValueError('Cross sections not implemented yet')
 

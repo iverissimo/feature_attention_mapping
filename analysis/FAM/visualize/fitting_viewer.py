@@ -2615,7 +2615,7 @@ class FAViewer(Viewer):
                 fig.savefig(fig_name.replace('.png', '_pairs_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
 
     def plot_betas_coord(self, participant_list = [], model_type = 'D', mask_bool_df = None, stim_on_screen = [], mask_arr = True, 
-                                rsq_threshold = .1, positive_rf = True, size_std = 2.5, betas_per_color = False, demean = False,
+                                rsq_threshold = .1, positive_rf = True, size_std = 2.5, betas_per_color = False, demean = False, mask_betas = True,
                                 att_color_ses_run_dict = {}, file_ext = '_cropped.npy', orientation_bars = 'parallel_vertical', ROI_list = ['V1']):
 
         """
@@ -2706,6 +2706,15 @@ class FAViewer(Viewer):
             ## load single trial DM
             single_trl_DM = self.FAModelObj.load_single_trl_DM(pp)
 
+            # if we want to mask betas according to pRF behavior
+            if mask_betas:
+                prf_bar_coords_dict = self.pRFModelObj.get_masked_bar_coords(pp, 
+                                                                ses = 'mean', 
+                                                                mask_bool_df = mask_bool_df, 
+                                                                bar_direction = None)
+            else:
+                prf_bar_coords_dict = None
+
             ## get DF with betas and coordinates - for vertical parallel bar positions
             # if we want to plot separately per attended color
             att_color_ses_run = att_color_ses_run_dict['sub-{sj}'.format(sj = pp)] if betas_per_color else None
@@ -2715,6 +2724,7 @@ class FAViewer(Viewer):
                                                                 att_color_ses_run = att_color_ses_run, 
                                                                 file_ext = file_ext, 
                                                                 demean = demean,
+                                                                prf_bar_coords_dict = prf_bar_coords_dict,
                                                                 rotate_bars = rotate_bars,
                                                                 ROIs_dict = pp_ROI_dict, 
                                                                 prf_estimates = prf_estimates, 
@@ -2736,6 +2746,9 @@ class FAViewer(Viewer):
                     fig_name = fig_name.replace('.png', '_attend-{cn}.png'.format(cn = cn))
                 if demean:
                     fig_name = fig_name.replace('.png', '_demean.png')
+                if mask_betas:
+                    fig_name = fig_name.replace('.png', '_masked.png')
+
                 
                 self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
                                     orientation_bars = orientation_bars, as_heatmap = False, 
@@ -2774,6 +2787,8 @@ class FAViewer(Viewer):
                     fig_name = fig_name.replace('.png', '_attend-{cn}.png'.format(cn = cn))
                 if demean:
                     fig_name = fig_name.replace('.png', '_demean.png')
+                if mask_betas:
+                    fig_name = fig_name.replace('.png', '_masked.png')
                 
                 self.plot_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord, ROI_list = ROI_list, 
                                         orientation_bars = orientation_bars, 
@@ -2826,6 +2841,8 @@ class FAViewer(Viewer):
                         fig_name = fig_name.replace('.png', '_per_color.png')
                     if demean:
                         fig_name = fig_name.replace('.png', '_demean.png')
+                    if mask_betas:
+                        fig_name = fig_name.replace('.png', '_masked.png')
 
                     self.plot_betas_1D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
                                         orientation_bars = orientation_bars,
@@ -2874,6 +2891,8 @@ class FAViewer(Viewer):
                     fig_name = fig_name.replace('.png', '_attend-{cn}.png'.format(cn = cn))
                 if demean:
                     fig_name = fig_name.replace('.png', '_demean.png')
+                if mask_betas:
+                    fig_name = fig_name.replace('.png', '_masked.png')
                 
                 # plot as heatmap
                 self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord_GROUP, 
@@ -2899,6 +2918,8 @@ class FAViewer(Viewer):
                     fig_name = fig_name.replace('.png', '_attend-{cn}.png'.format(cn = cn))
                 if demean:
                     fig_name = fig_name.replace('.png', '_demean.png')
+                if mask_betas:
+                    fig_name = fig_name.replace('.png', '_masked.png')
                 
                 self.plot_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, ROI_list = ROI_list, 
                                         orientation_bars = orientation_bars, 

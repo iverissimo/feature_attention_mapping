@@ -290,7 +290,7 @@ match task:
                                         model_type = 'D',
                                         file_ext = '_cropped.npy', 
                                         orientation_bars = orientation_bars[choice], 
-                                        ROI_list = ['V1'], #, 'hV4'], #['V1', 'V2', 'V3'],
+                                        ROI_list = ['V1', 'V2', 'V3', 'V3AB', 'hV4', 'LO'], #['V1'], #, 'hV4'], #['V1', 'V2', 'V3'],
                                         demean = True, betas_per_color = False,
                                         mask_betas = True,
                                         rsq_threshold = .1, positive_rf = True, size_std = 2.5,

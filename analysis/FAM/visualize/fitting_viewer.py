@@ -13,6 +13,7 @@ import matplotlib.patches as mpatches
 from  matplotlib.ticker import FuncFormatter
 from matplotlib.lines import Line2D
 import matplotlib.transforms as mtransforms
+from matplotlib.collections import PolyCollection
 
 import cortex
 
@@ -2688,6 +2689,7 @@ class FAViewer(Viewer):
 
         ## concatenate group
         DF_betas_GRID_coord_GROUP = pd.DataFrame()
+        DF_betas_bigGRID_coord_GROUP = pd.DataFrame()
         DF_betas_bar_coord_GROUP = pd.DataFrame()
 
         # iterate over participant list
@@ -2774,6 +2776,17 @@ class FAViewer(Viewer):
             
             # concatenate for group
             DF_betas_GRID_coord_GROUP = pd.concat((DF_betas_GRID_coord_GROUP, DF_betas_GRID_coord), ignore_index = True)
+            
+            ## do same for bigger grid, 
+            # to use in countour plots
+            DF_betas_bigGRID_coord = self.FAModelObj.get_betas_grid_coord_df(DF_betas_bar_coord = DF_betas_bar_coord, 
+                                                                        collapse_ecc = True, 
+                                                                        orientation_bars = orientation_bars,
+                                                                        grid_num = 17)
+            
+            # concatenate for group
+            DF_betas_bigGRID_coord_GROUP = pd.concat((DF_betas_bigGRID_coord_GROUP, 
+                                                    DF_betas_bigGRID_coord), ignore_index = True)
 
             for cn in color2plot2D_list:
 
@@ -2790,23 +2803,40 @@ class FAViewer(Viewer):
                 if mask_betas:
                     fig_name = fig_name.replace('.png', '_masked.png')
                 
-                self.plot_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord, ROI_list = ROI_list, 
+                # self.plot_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord, ROI_list = ROI_list, 
+                #                         orientation_bars = orientation_bars, 
+                #                         flipped_trials = False,
+                #                         transpose_fig = False,
+                #                         fig_name = fig_name) 
+                # self.plot_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord, ROI_list = ROI_list, 
+                #                         orientation_bars = orientation_bars, 
+                #                         flipped_trials = True,
+                #                         transpose_fig = False,
+                #                         fig_name = fig_name) 
+                
+                # ## plot subtraction
+                # self.plot_diff_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord, ROI_list = ROI_list, 
+                #                             orientation_bars = orientation_bars, 
+                #                             #flipped_trials = True,
+                #                             transpose_fig = False,
+                #                             fig_name = fig_name)
+                
+                ## plot 3D
+                self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord, 
+                                        DF_betas_bigGRID_coord = DF_betas_bigGRID_coord,
+                                        ROI_list = ROI_list, 
                                         orientation_bars = orientation_bars, 
                                         flipped_trials = False,
                                         transpose_fig = False,
-                                        fig_name = fig_name) 
-                self.plot_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord, ROI_list = ROI_list, 
+                                        fig_name = fig_name.replace('heatmap', '3D')) 
+                self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord, 
+                                        DF_betas_bigGRID_coord = DF_betas_bigGRID_coord,
+                                        ROI_list = ROI_list, 
                                         orientation_bars = orientation_bars, 
                                         flipped_trials = True,
                                         transpose_fig = False,
-                                        fig_name = fig_name) 
+                                        fig_name = fig_name.replace('heatmap', '3D')) 
                 
-                ## plot subtraction
-                self.plot_diff_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord, ROI_list = ROI_list, 
-                                            orientation_bars = orientation_bars, 
-                                            #flipped_trials = True,
-                                            transpose_fig = False,
-                                            fig_name = fig_name)
             
             # ## plot betas over 1D coordinates --> all values (messy, might remove later)
             # for cn in color2plot1D_list:
@@ -2921,23 +2951,39 @@ class FAViewer(Viewer):
                 if mask_betas:
                     fig_name = fig_name.replace('.png', '_masked.png')
                 
-                self.plot_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, ROI_list = ROI_list, 
+                # self.plot_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, ROI_list = ROI_list, 
+                #                         orientation_bars = orientation_bars, 
+                #                         flipped_trials = False,
+                #                         transpose_fig = False,
+                #                         fig_name = fig_name) 
+                # self.plot_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, ROI_list = ROI_list, 
+                #                         orientation_bars = orientation_bars, 
+                #                         flipped_trials = True,
+                #                         transpose_fig = False,
+                #                         fig_name = fig_name) 
+                
+                # ## plot subtraction
+                # self.plot_diff_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, ROI_list = ROI_list, 
+                #                             orientation_bars = orientation_bars, 
+                #                             #flipped_trials = True,
+                #                             transpose_fig = False,
+                #                             fig_name = fig_name)
+                
+                ## plot 3D
+                self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, 
+                                        DF_betas_bigGRID_coord = DF_betas_bigGRID_coord_GROUP,
+                                        ROI_list = ROI_list, 
                                         orientation_bars = orientation_bars, 
                                         flipped_trials = False,
                                         transpose_fig = False,
-                                        fig_name = fig_name) 
-                self.plot_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, ROI_list = ROI_list, 
+                                        fig_name = fig_name.replace('heatmap', '3D')) 
+                self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, 
+                                        DF_betas_bigGRID_coord = DF_betas_bigGRID_coord_GROUP,
+                                        ROI_list = ROI_list, 
                                         orientation_bars = orientation_bars, 
                                         flipped_trials = True,
                                         transpose_fig = False,
-                                        fig_name = fig_name) 
-                
-                ## plot subtraction
-                self.plot_diff_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, ROI_list = ROI_list, 
-                                            orientation_bars = orientation_bars, 
-                                            #flipped_trials = True,
-                                            transpose_fig = False,
-                                            fig_name = fig_name)
+                                        fig_name = fig_name.replace('heatmap', '3D')) 
 
                 
     def plot_att_modulation(self, participant_list = [], model_type = 'D', mask_bool_df = None, stim_on_screen = [], mask_arr = True, rsq_threshold = .1,
@@ -3509,6 +3555,230 @@ class FAViewer(Viewer):
                 os.makedirs(op.split(fig_name)[0], exist_ok=True)
                 fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
 
+    def plot_betas_GRID_3D(self, DF_betas_GRID_coord = {}, DF_betas_bigGRID_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', collapse_ecc = True,
+                                max_ecc_ext = 5.5, fig_name = None, bar_color2plot = None, transpose_fig = False, flipped_trials = False,
+                                vmin = -1.5, vmax = 1.5):
+
+        """
+        Plot model beta values (according to pRF x,y coordinates) in visual space
+        for different ROIs --> as 3D grid heatmap
+
+        Parameters
+        ----------
+        DF_betas_bar_coord: dataframe
+            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        ROI_list: list/arr
+            list with ROI names to plot
+        max_ecc_ext: float
+            eccentricity limit (screen) for plotting
+        fig_name: str
+            if given, will save plot with absolute figure name
+        bar_color2plot: str
+            attended bar color. if given, will plot betas for that bar color, else will average across colors
+        """
+
+        # if no ROI specified, then plot all
+        if len(ROI_list) == 0:
+            ROI_list = DF_betas_GRID_coord.ROI.unique()
+
+        ## for bars going left to right (vertical orientation)
+        if orientation_bars == 'parallel_vertical' or orientation_bars == 'parallel':
+            coord_list = self.FAModelObj.bar_x_coords_pix
+        elif orientation_bars == 'parallel_horizontal':
+            coord_list = self.FAModelObj.bar_y_coords_pix
+        else:
+            raise ValueError('Cross sections not implemented yet')
+        
+        ## get y coordinates for plotting
+        y_coord_grid = DF_betas_GRID_coord.screen_y_coord.unique()
+        y_coord_grid = np.sort(y_coord_grid)
+        y_coord_bgrid = DF_betas_bigGRID_coord.screen_y_coord.unique()
+        y_coord_bgrid = np.sort(y_coord_bgrid)
+
+        #### only plot trials or flipped trials at a time
+        
+        ### now plot all combinations (rows - unattended bar pos changes, column, attend bar pos changes)
+        for roi_name in ROI_list:
+        
+            fig, axs = plt.subplots(nrows= len(coord_list), ncols=len(coord_list), figsize=(4.5 * len(coord_list), 4.5 * len(coord_list)), sharex=False, sharey=False,
+                                    subplot_kw={'projection': '3d'})
+
+            ## make array with figure axis positions (6*6 = 36x2)
+            position_matrix = np.array(np.meshgrid(np.arange(len(coord_list)),np.arange(len(coord_list)))).T.reshape(-1,2)
+
+            # if we DO NOT want to transpose figure over diagonal
+            if not transpose_fig:
+                position_matrix = np.array([np.flip(pair) for pair in position_matrix])
+
+            ## new position matrix, which ends up being triangle (1/4 of original 6x6 matrix)
+            # not very clean, but good enough for now
+            new_position_matrix = np.concatenate((position_matrix[:5],position_matrix[(5+2):10]))
+            new_position_matrix = np.concatenate((new_position_matrix, position_matrix[(10+4):15]))
+            
+            # dict of bar ecc position --> to label heatmap
+            abs_dist_dict = {'far': np.arange(5)+1, 'middle': np.arange(3)+1, 'near': np.arange(1)+1}
+            pos_ecc_rect_dict = {'far': 1, 'middle': 2, 'near': 3}
+
+            # counter
+            counter = 0
+
+            flipped_condition_dict = {0: 'Att_ecc_label', 1:'UAtt_ecc_label'}
+
+            for Att_bar_ecc in abs_dist_dict.keys(): # for each attended bar distance
+                
+                for abs_dist in abs_dist_dict[Att_bar_ecc]: # for each inter bar distance
+                        
+                    ## select relevant condition
+                    GRIDdf2plot = DF_betas_GRID_coord[(DF_betas_GRID_coord['ROI'] == roi_name) &\
+                                                (DF_betas_GRID_coord['flipped_condition'] == int(flipped_trials)) &\
+                                                (DF_betas_GRID_coord[flipped_condition_dict[int(flipped_trials)]] == Att_bar_ecc) &\
+                                                (DF_betas_GRID_coord['abs_inter_bar_dist'] == abs_dist)]
+
+                    bigGRIDdf2plot = DF_betas_bigGRID_coord[(DF_betas_bigGRID_coord['ROI'] == roi_name) &\
+                                                (DF_betas_bigGRID_coord['flipped_condition'] == int(flipped_trials)) &\
+                                                (DF_betas_bigGRID_coord[flipped_condition_dict[int(flipped_trials)]] == Att_bar_ecc) &\
+                                                (DF_betas_bigGRID_coord['abs_inter_bar_dist'] == abs_dist)]
+                    
+                    if not GRIDdf2plot.empty: # if dataframe not empty
+                        
+                        ## average for same grid screen coordinates
+                        mean_GRIDdf2plot = GRIDdf2plot.groupby(['sj', 'ROI', 'abs_inter_bar_dist', 'screen_x_coord', 'screen_y_coord', 'flipped_condition']).mean().reset_index()
+                        mean_bigGRIDdf2plot = bigGRIDdf2plot.groupby(['sj', 'ROI', 'abs_inter_bar_dist', 'screen_x_coord', 'screen_y_coord', 'flipped_condition']).mean().reset_index()
+
+                        # get mean over across y coordinates to plot average line + SEM
+                        mean_betas = GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().betas.values
+                        sem_betas = GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).sem().betas.values
+                        x_pos = GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().index.values
+
+                        # if more than 1 participant (GROUP)
+                        if len(GRIDdf2plot.sj.unique()) > 1:
+                            # get sem and mean per x coords for plotting
+                            mean_betas = mean_GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().betas.values
+                            sem_betas = mean_GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).sem().betas.values
+                            x_pos = mean_GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().index.values
+                        
+                            # and average again 
+                            mean_GRIDdf2plot = mean_GRIDdf2plot.groupby(['ROI', 'abs_inter_bar_dist', 'screen_x_coord', 'screen_y_coord', 'flipped_condition']).mean().reset_index()
+                            mean_bigGRIDdf2plot = mean_bigGRIDdf2plot.groupby(['ROI', 'abs_inter_bar_dist', 'screen_x_coord', 'screen_y_coord', 'flipped_condition']).mean().reset_index()
+
+                        ## make 2D arrays for GRID plotting
+
+                        # initialize at zero
+                        GRID_Xcoord2D = np.zeros((len(y_coord_grid),len(y_coord_grid)))
+                        GRID_Ycoord2D = np.zeros((len(y_coord_grid),len(y_coord_grid)))
+                        GRID_Betas2D = np.zeros((len(y_coord_grid),len(y_coord_grid)))
+
+                        # loop over y coordinates
+                        for ind, y_coord in enumerate(y_coord_grid):
+                            coord_df = mean_GRIDdf2plot[mean_GRIDdf2plot['screen_y_coord'] == y_coord].sort_values(by=['screen_x_coord'])
+                            GRID_Ycoord2D[ind][:] = y_coord
+                            GRID_Xcoord2D[ind][:] = y_coord_grid 
+                            GRID_Betas2D[ind][:len(coord_df)] = coord_df.betas.values
+                            
+                        ## make 2D arrays for GRID plotting
+                        
+                        # initialize at zero
+                        bigGRID_Xcoord2D = np.zeros((len(y_coord_bgrid),len(y_coord_bgrid)))
+                        bigGRID_Ycoord2D = np.zeros((len(y_coord_bgrid),len(y_coord_bgrid)))
+                        bigGRID_Betas2D = np.zeros((len(y_coord_bgrid),len(y_coord_bgrid)))
+
+                        # loop over y coordinates
+                        for ind, y_coord in enumerate(y_coord_bgrid):
+                            coord_df = mean_bigGRIDdf2plot[mean_bigGRIDdf2plot['screen_y_coord'] == y_coord].sort_values(by=['screen_x_coord'])
+                            bigGRID_Ycoord2D[ind][:] = y_coord
+                            bigGRID_Xcoord2D[ind][:] = y_coord_bgrid 
+                            bigGRID_Betas2D[ind][:len(coord_df)] = coord_df.betas.values  
+                            
+                        ## settings depending on which condition we are plotting
+                        if int(flipped_trials) == 1:
+                            # edge position for target bar rectangle
+                            distractor_pos_rect = y_coord_grid[pos_ecc_rect_dict[Att_bar_ecc]]
+                            # edge position for distractor bar rectangle
+                            target_pos_rect = y_coord_grid[pos_ecc_rect_dict[Att_bar_ecc] + abs_dist]
+                            target_color_rect = 'green'
+                        else:
+                            # edge position for target bar rectangle
+                            target_pos_rect = y_coord_grid[pos_ecc_rect_dict[Att_bar_ecc]]
+                            # edge position for distractor bar rectangle
+                            distractor_pos_rect = y_coord_grid[pos_ecc_rect_dict[Att_bar_ecc] + abs_dist]
+                            target_color_rect = 'purple'
+
+                        ## actually plot 
+                        
+                        # Plot the 3D surface
+                        surf = axs[tuple(new_position_matrix[counter])].plot_surface(GRID_Xcoord2D, GRID_Ycoord2D, GRID_Betas2D, edgecolor='k', 
+                                                                                rstride=1, cstride=1, cmap='coolwarm',
+                                                                                lw=0.5, alpha=.8, vmin = vmin, vmax = vmax)
+
+                        # Plot projections of the contours for each dimension.  By choosing offsets
+                        # that match the appropriate axes limits, the projected contours will sit on
+                        # the 'walls' of the graph
+                        axs[tuple(new_position_matrix[counter])].contourf(bigGRID_Xcoord2D, bigGRID_Ycoord2D, bigGRID_Betas2D, 
+                                                                            zdir='z', offset=(vmin+.1), cmap='coolwarm', 
+                                                                            vmin = vmin, vmax = vmax, 
+                                                                            antialiased=False, 
+                                                                            levels = 50)
+                        
+                        # plot average line at the back plane
+                        axs[tuple(new_position_matrix[counter])].plot(x_pos, np.repeat(y_coord_bgrid[-1], len(x_pos)), 
+                                                                        mean_betas,
+                                                                        color = 'k', lw=2.5, zorder=5)
+                        # and error bars (shading)
+                        axs[tuple(new_position_matrix[counter])].add_collection3d(axs[tuple(new_position_matrix[counter])].fill_between(x_pos, 
+                                                                                    mean_betas + sem_betas, 
+                                                                                    mean_betas - sem_betas, 
+                                                                                    color = target_color_rect, alpha=0.5), zs=y_coord_bgrid[-1], zdir='y')
+
+                        # plot 0 line
+                        axs[tuple(new_position_matrix[counter])].plot(bigGRID_Xcoord2D[0], 
+                                                                      np.repeat(y_coord_bgrid[-1], len(bigGRID_Xcoord2D[0])), 
+                                                                        np.zeros(len(bigGRID_Xcoord2D[0])),
+                                                                        color = 'k', lw=1.5, zorder=5, ls='--')
+                        axs[tuple(new_position_matrix[counter])].plot(np.zeros(len(bigGRID_Xcoord2D[0])), 
+                                                                      np.linspace(vmin,vmax, len(bigGRID_Xcoord2D[0])), 
+                                                                    color = 'k', lw=1.5, zorder=2, ls='--', zs=y_coord_bgrid[-1], zdir='y')
+                        
+                        ## plot reference bar positions
+                        ## for attended bar
+                        axs[tuple(new_position_matrix[counter])].bar([target_pos_rect], 3, 
+                                                                    width = self.FAModelObj.bar_width_deg[0], bottom = vmin, 
+                                                                    color = target_color_rect, alpha = .3, zs=y_coord_bgrid[-1], zdir='y')
+                        ## for unattended bar
+                        axs[tuple(new_position_matrix[counter])].bar([distractor_pos_rect], 3, 
+                                                                width = self.FAModelObj.bar_width_deg[0], bottom = vmin, 
+                                                                color = 'grey', alpha = .3, zs=y_coord_bgrid[-1], zdir='y')
+
+                        ## set limits
+                        Cplot = axs[tuple(new_position_matrix[counter])].set(xlim=(y_coord_bgrid[0], y_coord_bgrid[-1]), 
+                                                                             ylim=(y_coord_bgrid[0], y_coord_bgrid[-1]), 
+                                                                             zlim=(vmin, vmax),
+                            xlabel='X', ylabel='Y', zlabel='Betas')
+
+                        # add legend
+                        handleA = mpatches.Patch(facecolor = target_color_rect, edgecolor = 'k', label = 'target')
+                        handleB = mpatches.Patch( facecolor = 'grey', edgecolor = 'k', label = 'distractor')
+                        leg = axs[tuple(new_position_matrix[counter])].legend(handles = [handleA,handleB], loc = 'upper right')
+
+                    counter +=1
+
+            # remove other axis from plot 
+            for pos_arr in position_matrix:
+                if not np.any(np.all(pos_arr == new_position_matrix, axis=1)):
+                    axs[tuple(pos_arr)].set_visible(False)
+                    axs[tuple(pos_arr)].set_axis_off()
+
+            # add colorbar
+            #fig.colorbar(surf, orientation='vertical')
+
+            if fig_name:
+                os.makedirs(op.split(fig_name)[0], exist_ok=True)
+                if flipped_trials:
+                    fig.savefig(fig_name.replace('.png', '_flipped_condition_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+                else:
+                    fig.savefig(fig_name.replace('.png', '_condition_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+    
     def plot_betas_GRID_2D(self, DF_betas_GRID_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', collapse_ecc = True,
                                 max_ecc_ext = 5.5, fig_name = None, bar_color2plot = None, transpose_fig = False, flipped_trials = False,
                                 vmin = -1.5, vmax = 1.5):

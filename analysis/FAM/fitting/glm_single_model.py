@@ -1872,7 +1872,6 @@ class GLMsingle_Model(Model):
 
         return ECC_betas_GRID_coord
 
-
     def rotate_prf_coordinates(self, DF_betas_bar_coord = None, og_orientation_bars = 'parallel_horizontal'):
 
         """
@@ -1892,3 +1891,78 @@ class GLMsingle_Model(Model):
             NEW_DF_betas_bar_coord['prf_y_coord'] = new_y
 
         return NEW_DF_betas_bar_coord
+    
+    def get_mean_betas_grid(self, DF_betas_GRID_coord = None, roi_name = 'V1'):
+        
+        """
+        Get mean betas across y coordinate (collapse over bar ecc)
+        given a df with beta values binned (grid) in x,y screen coordinates
+        will return df with mean betas and sem for each condition - and its reverse case 
+        for the participant/group
+        """
+        
+        ## get y coordinates for plotting
+        y_coord_grid = DF_betas_GRID_coord.screen_y_coord.unique()
+        y_coord_grid = np.sort(y_coord_grid)
+        
+        # dict of bar ecc position --> to label conditions
+        abs_dist_dict = {'far': np.arange(5)+1, 'middle': np.arange(3)+1, 'near': np.arange(1)+1}
+        pos_ecc_rect_dict = {'far': 1, 'middle': 2, 'near': 3}
+
+        flipped_condition_dict = {0: 'Att_ecc_label', 1:'UAtt_ecc_label'}
+
+        ## make a df with mean betas across y
+        # per trial and flipped condition
+        mean_betas_df = pd.DataFrame()
+
+        for flipped_trials in flipped_condition_dict.keys():
+            for Att_bar_ecc in abs_dist_dict.keys(): # for each attended bar distance     
+                for abs_dist in abs_dist_dict[Att_bar_ecc]: # for each inter bar distance
+                    
+                    GRIDdf2plot = DF_betas_GRID_coord[(DF_betas_GRID_coord['ROI'] == roi_name) &\
+                                        (DF_betas_GRID_coord['flipped_condition'] == int(flipped_trials)) &\
+                                        (DF_betas_GRID_coord[flipped_condition_dict[int(flipped_trials)]] == Att_bar_ecc) &\
+                                        (DF_betas_GRID_coord['abs_inter_bar_dist'] == abs_dist)]
+
+                    if not GRIDdf2plot.empty: # if dataframe not empty
+
+                        # if more than 1 participant (GROUP)
+                        if len(GRIDdf2plot.sj.unique()) > 1:
+                            
+                            ## average for same grid screen coordinates
+                            mean_GRIDdf2plot = GRIDdf2plot.groupby(['sj', 'ROI', 'abs_inter_bar_dist', 'screen_x_coord', 
+                                                                'screen_y_coord', 'flipped_condition']).mean().reset_index()
+                            
+                            # get sem and mean per x coords for plotting
+                            mean_betas = mean_GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().betas.values
+                            sem_betas = mean_GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).sem().betas.values
+                            x_pos = mean_GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().index.values
+                        else:
+                            # get mean over across y coordinates to plot average line + SEM
+                            mean_betas = GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().betas.values
+                            sem_betas = GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).sem().betas.values
+                            x_pos = GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().index.values
+
+                        # also store bar position for plotting
+                        if int(flipped_trials) == 0:   
+                            bar_pos = y_coord_grid[pos_ecc_rect_dict[Att_bar_ecc]]
+                        else:
+                            bar_pos = y_coord_grid[pos_ecc_rect_dict[Att_bar_ecc] + abs_dist]
+                            
+                        ## concat
+                        mean_betas_df = pd.concat((mean_betas_df, 
+                                                pd.DataFrame({'ROI': np.repeat(roi_name, len(x_pos)),
+                                                            'flipped_condition': np.repeat(int(flipped_trials), len(x_pos)),
+                                                            'bar_pos': np.repeat(bar_pos, len(x_pos)),
+                                                            'Att_bar_ecc': np.repeat(Att_bar_ecc, len(x_pos)),
+                                                            'abs_dist': np.repeat(abs_dist, len(x_pos)),
+                                                            'x_pos': x_pos,
+                                                            'mean_betas': mean_betas,
+                                                            'sem_betas': sem_betas})), 
+                                                ignore_index = True)
+                        
+        return mean_betas_df
+
+                        
+        
+        

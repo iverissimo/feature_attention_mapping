@@ -2752,19 +2752,19 @@ class FAViewer(Viewer):
                     fig_name = fig_name.replace('.png', '_masked.png')
 
                 
-                self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
-                                    orientation_bars = orientation_bars, as_heatmap = False, 
-                                    max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], 
-                                    bar_color2plot = cn, 
-                                    transpose_fig = False,
-                                    fig_name = fig_name) 
-                # also plot as heatmap
-                self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
-                                    orientation_bars = orientation_bars, as_heatmap = True, 
-                                    max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], 
-                                    bar_color2plot = cn, 
-                                    transpose_fig = False,
-                                    fig_name = fig_name.replace('betas2D', 'betas2D_heatmap')) 
+                # self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
+                #                     orientation_bars = orientation_bars, as_heatmap = False, 
+                #                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], 
+                #                     bar_color2plot = cn, 
+                #                     transpose_fig = False,
+                #                     fig_name = fig_name) 
+                # # also plot as heatmap
+                # self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
+                #                     orientation_bars = orientation_bars, as_heatmap = True, 
+                #                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], 
+                #                     bar_color2plot = cn, 
+                #                     transpose_fig = False,
+                #                     fig_name = fig_name.replace('betas2D', 'betas2D_heatmap')) 
                 
             ## 2D plot betas heatmap for collapsed eccentricitties (thus gives unique condition + their flipped version)
 
@@ -2777,16 +2777,16 @@ class FAViewer(Viewer):
             # concatenate for group
             DF_betas_GRID_coord_GROUP = pd.concat((DF_betas_GRID_coord_GROUP, DF_betas_GRID_coord), ignore_index = True)
             
-            ## do same for bigger grid, 
-            # to use in countour plots
-            DF_betas_bigGRID_coord = self.FAModelObj.get_betas_grid_coord_df(DF_betas_bar_coord = DF_betas_bar_coord, 
-                                                                        collapse_ecc = True, 
-                                                                        orientation_bars = orientation_bars,
-                                                                        grid_num = 17)
+            # ## do same for bigger grid, 
+            # # to use in countour plots
+            # DF_betas_bigGRID_coord = self.FAModelObj.get_betas_grid_coord_df(DF_betas_bar_coord = DF_betas_bar_coord, 
+            #                                                             collapse_ecc = True, 
+            #                                                             orientation_bars = orientation_bars,
+            #                                                             grid_num = 17)
             
-            # concatenate for group
-            DF_betas_bigGRID_coord_GROUP = pd.concat((DF_betas_bigGRID_coord_GROUP, 
-                                                    DF_betas_bigGRID_coord), ignore_index = True)
+            # # concatenate for group
+            # DF_betas_bigGRID_coord_GROUP = pd.concat((DF_betas_bigGRID_coord_GROUP, 
+            #                                         DF_betas_bigGRID_coord), ignore_index = True)
 
             for cn in color2plot2D_list:
 
@@ -2821,21 +2821,29 @@ class FAViewer(Viewer):
                 #                             transpose_fig = False,
                 #                             fig_name = fig_name)
                 
-                ## plot 3D
-                self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord, 
-                                        DF_betas_bigGRID_coord = DF_betas_bigGRID_coord,
-                                        ROI_list = ROI_list, 
-                                        orientation_bars = orientation_bars, 
-                                        flipped_trials = False,
-                                        transpose_fig = False,
-                                        fig_name = fig_name.replace('heatmap', '3D')) 
-                self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord, 
-                                        DF_betas_bigGRID_coord = DF_betas_bigGRID_coord,
-                                        ROI_list = ROI_list, 
-                                        orientation_bars = orientation_bars, 
-                                        flipped_trials = True,
-                                        transpose_fig = False,
-                                        fig_name = fig_name.replace('heatmap', '3D')) 
+                # ## plot 3D
+                # self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord, 
+                #                         DF_betas_bigGRID_coord = DF_betas_bigGRID_coord,
+                #                         ROI_list = ROI_list, 
+                #                         orientation_bars = orientation_bars, 
+                #                         flipped_trials = False,
+                #                         transpose_fig = False,
+                #                         fig_name = fig_name.replace('heatmap', '3D')) 
+                # self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord, 
+                #                         DF_betas_bigGRID_coord = DF_betas_bigGRID_coord,
+                #                         ROI_list = ROI_list, 
+                #                         orientation_bars = orientation_bars, 
+                #                         flipped_trials = True,
+                #                         transpose_fig = False,
+                #                         fig_name = fig_name.replace('heatmap', '3D')) 
+                
+                ## plot mean betas
+                self.plot_mean_betas(DF_betas_GRID_coord = DF_betas_GRID_coord, 
+                                    ROI_list = ROI_list, 
+                                    orientation_bars = orientation_bars,
+                                    transpose_fig = False,
+                                    fig_name = fig_name.replace('heatmap', 'mean1D'),
+                                    vmin = -.9, vmax = .9)
                 
             
             # ## plot betas over 1D coordinates --> all values (messy, might remove later)
@@ -2924,16 +2932,16 @@ class FAViewer(Viewer):
                 if mask_betas:
                     fig_name = fig_name.replace('.png', '_masked.png')
                 
-                # plot as heatmap
-                self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord_GROUP, 
-                                ROI_list = ROI_list, 
-                                #DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP,
-                                orientation_bars = orientation_bars, 
-                                as_heatmap = True, 
-                                max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = participant_list[0])], 
-                                bar_color2plot = cn, 
-                                transpose_fig = False,
-                                fig_name = fig_name.replace('betas2D', 'betas2D_heatmap')) 
+                # # plot as heatmap
+                # self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord_GROUP, 
+                #                 ROI_list = ROI_list, 
+                #                 #DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP,
+                #                 orientation_bars = orientation_bars, 
+                #                 as_heatmap = True, 
+                #                 max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = participant_list[0])], 
+                #                 bar_color2plot = cn, 
+                #                 transpose_fig = False,
+                #                 fig_name = fig_name.replace('betas2D', 'betas2D_heatmap')) 
                 
             ## 2D plot betas heatmap for collapsed eccentricitties (thus gives unique condition + their flipped version)
             for cn in color2plot2D_list:
@@ -2969,21 +2977,29 @@ class FAViewer(Viewer):
                 #                             transpose_fig = False,
                 #                             fig_name = fig_name)
                 
-                ## plot 3D
-                self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, 
-                                        DF_betas_bigGRID_coord = DF_betas_bigGRID_coord_GROUP,
-                                        ROI_list = ROI_list, 
-                                        orientation_bars = orientation_bars, 
-                                        flipped_trials = False,
-                                        transpose_fig = False,
-                                        fig_name = fig_name.replace('heatmap', '3D')) 
-                self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, 
-                                        DF_betas_bigGRID_coord = DF_betas_bigGRID_coord_GROUP,
-                                        ROI_list = ROI_list, 
-                                        orientation_bars = orientation_bars, 
-                                        flipped_trials = True,
-                                        transpose_fig = False,
-                                        fig_name = fig_name.replace('heatmap', '3D')) 
+                # ## plot 3D
+                # self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, 
+                #                         DF_betas_bigGRID_coord = DF_betas_bigGRID_coord_GROUP,
+                #                         ROI_list = ROI_list, 
+                #                         orientation_bars = orientation_bars, 
+                #                         flipped_trials = False,
+                #                         transpose_fig = False,
+                #                         fig_name = fig_name.replace('heatmap', '3D')) 
+                # self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, 
+                #                         DF_betas_bigGRID_coord = DF_betas_bigGRID_coord_GROUP,
+                #                         ROI_list = ROI_list, 
+                #                         orientation_bars = orientation_bars, 
+                #                         flipped_trials = True,
+                #                         transpose_fig = False,
+                #                         fig_name = fig_name.replace('heatmap', '3D')) 
+                
+                ## plot mean betas
+                self.plot_mean_betas(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, 
+                                    ROI_list = ROI_list, 
+                                    orientation_bars = orientation_bars,
+                                    transpose_fig = False,
+                                    fig_name = fig_name.replace('heatmap', 'mean1D'),
+                                    vmin = -.9, vmax = .9)
 
                 
     def plot_att_modulation(self, participant_list = [], model_type = 'D', mask_bool_df = None, stim_on_screen = [], mask_arr = True, rsq_threshold = .1,
@@ -3778,6 +3794,139 @@ class FAViewer(Viewer):
                     fig.savefig(fig_name.replace('.png', '_flipped_condition_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
                 else:
                     fig.savefig(fig_name.replace('.png', '_condition_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+    
+    def plot_mean_betas(self, DF_betas_GRID_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', collapse_ecc = True,
+                                max_ecc_ext = 5.5, fig_name = None, bar_color2plot = None, transpose_fig = False, 
+                                vmin = -1.5, vmax = 1.5):
+
+        """
+        Plot mean betas across y coordinate (collapse over bar ecc) per condition and its reverse case
+        given a df with beta values binned (grid) in x,y screen coordinates
+        will plot 1D line with shading indicating SEM
+        
+        Parameters
+        ----------
+        DF_betas_bar_coord: dataframe
+            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+        orientation_bars: str
+            string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        ROI_list: list/arr
+            list with ROI names to plot
+        max_ecc_ext: float
+            eccentricity limit (screen) for plotting
+        fig_name: str
+            if given, will save plot with absolute figure name
+        bar_color2plot: str
+            attended bar color. if given, will plot betas for that bar color, else will average across colors
+        """
+
+        # if no ROI specified, then plot all
+        if len(ROI_list) == 0:
+            ROI_list = DF_betas_GRID_coord.ROI.unique()
+            
+        ## for bars going left to right (vertical orientation)
+        if orientation_bars == 'parallel_vertical' or orientation_bars == 'parallel':
+            coord_list = self.FAModelObj.bar_x_coords_pix
+        elif orientation_bars == 'parallel_horizontal':
+            coord_list = self.FAModelObj.bar_y_coords_pix
+        else:
+            raise ValueError('Cross sections not implemented yet')
+        
+        for roi_name in ROI_list:
+            
+            ## get mean betas df for ROI
+            mean_betas_df = self.FAModelObj.get_mean_betas_grid(DF_betas_GRID_coord = DF_betas_GRID_coord, 
+                                                                roi_name = roi_name)
+        
+            ## make figure
+            fig, axs = plt.subplots(nrows= len(coord_list), ncols=len(coord_list), figsize=(4.5 * len(coord_list), 4.5 * len(coord_list)), sharex=False, sharey=False)
+
+            ## make array with figure axis positions (6*6 = 36x2)
+            position_matrix = np.array(np.meshgrid(np.arange(len(coord_list)),np.arange(len(coord_list)))).T.reshape(-1,2)
+
+            # if we DO NOT want to transpose figure over diagonal
+            if not transpose_fig:
+                position_matrix = np.array([np.flip(pair) for pair in position_matrix])
+
+            ## new position matrix, which ends up being triangle (1/4 of original 6x6 matrix)
+            # not very clean, but good enough for now
+            new_position_matrix = np.concatenate((position_matrix[:5],position_matrix[(5+2):10]))
+            new_position_matrix = np.concatenate((new_position_matrix, position_matrix[(10+4):15]))
+            
+            # dict of bar ecc position --> to label heatmap
+            abs_dist_dict = {'far': np.arange(5)+1, 'middle': np.arange(3)+1, 'near': np.arange(1)+1}
+            pos_ecc_rect_dict = {'far': 1, 'middle': 2, 'near': 3}
+
+            # counter
+            counter = 0
+
+            flipped_condition_dict = {0: 'Att_ecc_label', 1:'UAtt_ecc_label'}
+
+            for Att_bar_ecc in abs_dist_dict.keys(): # for each attended bar distance
+                
+                for abs_dist in abs_dist_dict[Att_bar_ecc]: # for each inter bar distance
+                    
+                    ## select df to plot (for specific ecc and interbar distance)
+                    df2plot = mean_betas_df[(mean_betas_df['Att_bar_ecc'] == Att_bar_ecc) &\
+                                            (mean_betas_df['abs_dist'] == abs_dist)]
+                                            
+                    if not df2plot.empty: # if dataframe not empty
+                        
+                        ## actually plot 
+                        # plot reference bar positions
+                        # for one bar
+                        axs[tuple(new_position_matrix[counter])].bar(df2plot[df2plot['flipped_condition'] == 0].bar_pos.values[0], 
+                                                                    3, width = self.FAModelObj.bar_width_deg[0], bottom = vmin, 
+                                                                    color = 'purple', alpha = .3)
+                        # for the other bar
+                        axs[tuple(new_position_matrix[counter])].bar(df2plot[df2plot['flipped_condition'] == 1].bar_pos.values[0], 
+                                                                    3, width = self.FAModelObj.bar_width_deg[0], bottom = vmin, 
+                                                                    color = 'green', alpha = .3)
+                        
+                        # plot condition
+                        axs[tuple(new_position_matrix[counter])].plot(df2plot[df2plot['flipped_condition'] == 0].x_pos.values, 
+                                                                        df2plot[df2plot['flipped_condition'] == 0].mean_betas.values, 
+                                                                        color = 'purple', lw=2.5, zorder=10)
+                        axs[tuple(new_position_matrix[counter])].fill_between(df2plot[df2plot['flipped_condition'] == 0].x_pos.values, 
+                                                                            df2plot[df2plot['flipped_condition'] == 0].mean_betas.values + df2plot[df2plot['flipped_condition'] == 0].sem_betas.values, 
+                                                                            df2plot[df2plot['flipped_condition'] == 0].mean_betas.values - df2plot[df2plot['flipped_condition'] == 0].sem_betas.values, 
+                                                                            color = 'purple', alpha=0.5)
+                        # plot flipped condition
+                        axs[tuple(new_position_matrix[counter])].plot(df2plot[df2plot['flipped_condition'] == 1].x_pos.values, 
+                                                                    df2plot[df2plot['flipped_condition'] == 1].mean_betas.values, 
+                                                                    color = 'green', lw=2.5, zorder=10)
+                        axs[tuple(new_position_matrix[counter])].fill_between(df2plot[df2plot['flipped_condition'] == 1].x_pos.values, 
+                                                                                df2plot[df2plot['flipped_condition'] == 1].mean_betas.values + df2plot[df2plot['flipped_condition'] == 0].sem_betas.values, 
+                                                                                df2plot[df2plot['flipped_condition'] == 1].mean_betas.values - df2plot[df2plot['flipped_condition'] == 0].sem_betas.values, 
+                                                                                color = 'green', alpha=0.5)
+
+                        # set plot limits
+                        axs[tuple(new_position_matrix[counter])].set_xlim([df2plot[df2plot['flipped_condition'] == 0].x_pos.values[0], 
+                                                                    df2plot[df2plot['flipped_condition'] == 0].x_pos.values[-1]])
+                        axs[tuple(new_position_matrix[counter])].set_ylim([vmin, vmax])
+
+                        # plot zero lines
+                        axs[tuple(new_position_matrix[counter])].hlines(0,  *axs[tuple(new_position_matrix[counter])].get_xlim(), 
+                                                                        color = 'k', lw=1.5, zorder=0, ls='--')
+                        axs[tuple(new_position_matrix[counter])].vlines(0, *axs[tuple(new_position_matrix[counter])].get_ylim(), 
+                                                                        color = 'k', lw=1.5, zorder=0, ls='--')
+
+                        # add legend
+                        handleA = mpatches.Patch(facecolor = 'purple', edgecolor = 'k', label = 'target')
+                        handleB = mpatches.Patch( facecolor = 'green', edgecolor = 'k', label = 'target')
+                        leg = axs[tuple(new_position_matrix[counter])].legend(handles = [handleA,handleB], loc = 'upper right')
+
+                    counter +=1
+
+            # remove other axis from plot 
+            for pos_arr in position_matrix:
+                if not np.any(np.all(pos_arr == new_position_matrix, axis=1)):
+                    axs[tuple(pos_arr)].set_visible(False)
+                    axs[tuple(pos_arr)].set_axis_off()
+
+            if fig_name:
+                os.makedirs(op.split(fig_name)[0], exist_ok=True)
+                fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
     
     def plot_betas_GRID_2D(self, DF_betas_GRID_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', collapse_ecc = True,
                                 max_ecc_ext = 5.5, fig_name = None, bar_color2plot = None, transpose_fig = False, flipped_trials = False,

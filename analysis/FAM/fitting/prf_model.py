@@ -841,7 +841,8 @@ class pRF_model(Model):
         return constraints
 
     def load_pRF_model_estimates(self, participant_list = [], ses = 'mean', run_type = 'mean', model_name = None, 
-                                    iterative = True, fit_hrf = False, mask_bool_df = None, stim_on_screen = [], total_chunks = None):
+                                    iterative = True, fit_hrf = False, mask_bool_df = None, stim_on_screen = [], total_chunks = None,
+                                    mask_arr = True, rsq_threshold = .1, positive_rf = True, size_std = 2.5):
 
         """
         Load pRF model estimates
@@ -863,6 +864,8 @@ class pRF_model(Model):
             if dataframe given, will be used to mask design matrix given behavioral performance
         stim_on_screen: arr
             boolean array with moments where stim was on screen
+        mask_arr: bool
+            if true, will mask estimates according to screen limits etc
         """
 
         # if model name to load not given, use the one set in the class
@@ -910,8 +913,27 @@ class pRF_model(Model):
                                                                                                                     acq = self.MRIObj.acq,
                                                                                                                     rt = run_type),
                                                         fit_hrf = fit_hrf, iterative = iterative, crossval = crossval, total_chunks = total_chunks)
-                
-        return pp_prf_est_dict, pp_prf_models
+        # mask the estimates, if such is the case
+        if mask_arr:
+            print('masking prf estimates')
+            
+            # get estimate keys
+            keys = self.get_prf_estimate_keys(prf_model_name = self.model_type['pRF'])
+
+            # get screen lim for all participants
+            max_ecc_ext = {'sub-{sj}'.format(sj = pp): pp_prf_models['sub-{sj}'.format(sj = pp)]['ses-{s}'.format(s = ses)]['prf_stim'].screen_size_degrees/2 for pp in participant_list}
+
+            pp_prf_estimates = {'sub-{sj}'.format(sj = pp): self.mask_pRF_model_estimates(pp_prf_est_dict['sub-{sj}'.format(sj = pp)], 
+                                                                                            estimate_keys = keys,
+                                                                                            x_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
+                                                                                            y_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
+                                                                                            rsq_threshold = rsq_threshold,
+                                                                                            positive_rf = positive_rf,
+                                                                                            size_std = size_std) for pp in participant_list}
+        else:
+            pp_prf_estimates = pp_prf_est_dict
+
+        return pp_prf_estimates, pp_prf_models
     
     def load_pRF_model_hemis(self, fit_path, fit_model = 'css', fit_hrf = False, basefilename = None, 
                                     overwrite = False, iterative = True, crossval = False):

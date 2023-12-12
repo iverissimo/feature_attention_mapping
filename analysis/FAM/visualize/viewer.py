@@ -484,12 +484,12 @@ class Viewer:
 
         ## write command
         working_string = """#!/bin/bash
-
-export SUBJECTS_DIR=$DATADIR
-
-cd $DATADIR
-
-freeview -f """
+        
+        export SUBJECTS_DIR=$DATADIR
+        
+        cd $DATADIR
+        
+        freeview -f """
 
         for stype in surf_type: # iterate over surface types
 

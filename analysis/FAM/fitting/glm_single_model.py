@@ -804,6 +804,73 @@ class GLMsingle_Model(Model):
         np.save(pRFcorr_filename, corr_pRF)
         np.save(FAcorr_filename, corr_FA)
 
+    def load_betas_coord(self, participant_list = [], ROIs_dict = {}, model_type = 'D', prf_bar_coords_dict = None,
+                                att_color_ses_run_dict = {}, betas_per_color = False, file_ext = '_cropped.npy', 
+                                orientation_bars = 'parallel_vertical', demean = False, rotate_bars = True, prf_estimates = {}):
+        
+        """
+        Load beta estimates dataframe for all participants in participant list 
+        
+        Parameters
+        ----------
+        participant_list: list
+            list with participant ID
+        ROIs_dict: dict
+            dictionary with participant ROI vertices
+        model_type: str
+            name of GLM single model to load betas from
+        prf_bar_coords_dict: dict
+            if given, will use pRF bar coordinates as reference to mask FA trials where bar not visible
+        att_color_ses_run_dict: dict
+            dict with info for each participant, indicating session and run number for same attended color
+        betas_per_color: bool
+            if we want to load betas separately per attended color
+        demean: bool
+            if we want to demean betas in 2D space
+        rotate_bars: bool
+            if we want to rotate bars (when orientation calls for that)
+        prf_estimates: dict
+            dict with prf estimates for all participants in participant list
+        file_ext: str
+            name of data file extent used for fitting
+        """
+        
+        DF_betas_bar_coord_GROUP = []
+        
+        # iterate over participant list
+        for pp in participant_list:
+
+            # select ROI dict for participant
+            pp_ROI_dict = {} if 'sub-{sj}'.format(sj = pp) not in list(ROIs_dict.keys()) else ROIs_dict['sub-{sj}'.format(sj = pp)]
+            
+            # load GLMsingle estimates dict
+            GLMsing_estimates_dict = self.load_estimates(pp, model_type = model_type)
+
+            # load single trial DM
+            single_trl_DM = self.load_single_trl_DM(pp)
+            
+            # if we want to load separately per attended color
+            if ('sub-{sj}'.format(sj = pp) in list(att_color_ses_run_dict.keys())) and betas_per_color:
+                att_color_ses_run = att_color_ses_run_dict['sub-{sj}'.format(sj = pp)]
+            else:
+                att_color_ses_run = None
+                
+            DF_betas_bar_coord_GROUP.append(self.get_betas_coord_df(pp, betas_arr = GLMsing_estimates_dict['betasmd'], 
+                                                                single_trl_DM = single_trl_DM, 
+                                                                att_color_ses_run = att_color_ses_run, 
+                                                                file_ext = file_ext, 
+                                                                demean = demean,
+                                                                prf_bar_coords_dict = prf_bar_coords_dict,
+                                                                rotate_bars = rotate_bars,
+                                                                ROIs_dict = pp_ROI_dict, 
+                                                                prf_estimates = prf_estimates, 
+                                                                orientation_bars = orientation_bars)
+            )
+            
+        ## concatenate to convert into data frame
+        DF_betas_bar_coord_GROUP = pd.concat(DF_betas_bar_coord_GROUP)
+                
+    
     def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, 
                                 demean = False, rotate_bars = True, prf_bar_coords_dict = None,
                                 file_ext = '_cropped.npy', ROIs_dict = {}, prf_estimates = {}, orientation_bars = 'parallel_vertical'):
@@ -1637,7 +1704,6 @@ class GLMsingle_Model(Model):
 
         return DF_betas_bar_avg1D
     
-
     def demean_betas_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', 
                                     bar_color = None):
 

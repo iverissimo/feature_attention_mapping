@@ -2665,27 +2665,12 @@ class FAViewer(Viewer):
                                                                     model_name = self.pRFModelObj.model_type['pRF'], 
                                                                     iterative = True,
                                                                     mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
-                                                                    fit_hrf = self.pRFModelObj.fit_hrf)
+                                                                    fit_hrf = self.pRFModelObj.fit_hrf,
+                                                                    mask_arr = mask_arr,
+                                                                    rsq_threshold = rsq_threshold,
+                                                                    positive_rf = positive_rf,
+                                                                    size_std = size_std)
 
-        ## mask the estimates, if such is the case
-        if mask_arr:
-            print('masking estimates')
-
-            # get estimate keys
-            keys = self.pRFModelObj.get_prf_estimate_keys(prf_model_name = self.pRFModelObj.model_type['pRF'])
-
-            # get screen lim for all participants
-            max_ecc_ext = {'sub-{sj}'.format(sj = pp): group_prf_models['sub-{sj}'.format(sj = pp)]['ses-{s}'.format(s = 'mean')]['prf_stim'].screen_size_degrees/2 for pp in participant_list}
-
-            prf_estimates = {'sub-{sj}'.format(sj = pp): self.pRFModelObj.mask_pRF_model_estimates(group_prf_estimates['sub-{sj}'.format(sj = pp)], 
-                                                                                            estimate_keys = keys,
-                                                                                            x_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
-                                                                                            y_ecc_lim = np.array([- 1, 1]) * max_ecc_ext['sub-{sj}'.format(sj = pp)],
-                                                                                            rsq_threshold = rsq_threshold,
-                                                                                            positive_rf = positive_rf,
-                                                                                            size_std = size_std) for pp in participant_list}
-        else:
-            prf_estimates = group_prf_estimates
 
         ## concatenate group
         DF_betas_GRID_coord_GROUP = pd.DataFrame()

@@ -2817,7 +2817,7 @@ class FAViewer(Viewer):
                                     orientation_bars = orientation_bars,
                                     transpose_fig = False,
                                     fig_name = fig_name.replace('heatmap', 'mean1D'),
-                                    vmin = -.9, vmax = .9)
+                                    vmin = -.4, vmax = 1.3)
                 
             
             # ## plot betas over 1D coordinates --> all values (messy, might remove later)
@@ -3591,6 +3591,10 @@ class FAViewer(Viewer):
         
         ### now plot all combinations (rows - unattended bar pos changes, column, attend bar pos changes)
         for roi_name in ROI_list:
+            
+            ## get mean betas df for ROI
+            mean_betas_df = self.FAModelObj.get_mean_betas_grid(DF_betas_GRID_coord = DF_betas_GRID_coord, 
+                                                                roi_name = roi_name)
         
             fig, axs = plt.subplots(nrows= len(coord_list), ncols=len(coord_list), figsize=(4.5 * len(coord_list), 4.5 * len(coord_list)), sharex=False, sharey=False,
                                     subplot_kw={'projection': '3d'})
@@ -3631,55 +3635,38 @@ class FAViewer(Viewer):
                                                 (DF_betas_bigGRID_coord[flipped_condition_dict[int(flipped_trials)]] == Att_bar_ecc) &\
                                                 (DF_betas_bigGRID_coord['abs_inter_bar_dist'] == abs_dist)]
                     
+                    mean_GRIDdf2plot = mean_betas_df[(mean_betas_df['ROI'] == roi_name) &\
+                                                    (mean_betas_df['flipped_condition'] == int(flipped_trials)) &\
+                                                    (mean_betas_df['Att_bar_ecc'] == Att_bar_ecc) &\
+                                                    (mean_betas_df['abs_dist'] == abs_dist)]
+                    
                     if not GRIDdf2plot.empty: # if dataframe not empty
                         
-                        ## average for same grid screen coordinates
-                        mean_GRIDdf2plot = GRIDdf2plot.groupby(['sj', 'ROI', 'abs_inter_bar_dist', 'screen_x_coord', 'screen_y_coord', 'flipped_condition']).mean().reset_index()
-                        mean_bigGRIDdf2plot = bigGRIDdf2plot.groupby(['sj', 'ROI', 'abs_inter_bar_dist', 'screen_x_coord', 'screen_y_coord', 'flipped_condition']).mean().reset_index()
-
-                        # get mean over across y coordinates to plot average line + SEM
-                        mean_betas = GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().betas.values
-                        sem_betas = GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).sem().betas.values
-                        x_pos = GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().index.values
-
-                        # if more than 1 participant (GROUP)
-                        if len(GRIDdf2plot.sj.unique()) > 1:
-                            # get sem and mean per x coords for plotting
-                            mean_betas = mean_GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().betas.values
-                            sem_betas = mean_GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).sem().betas.values
-                            x_pos = mean_GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().index.values
-                        
-                            # and average again 
-                            mean_GRIDdf2plot = mean_GRIDdf2plot.groupby(['ROI', 'abs_inter_bar_dist', 'screen_x_coord', 'screen_y_coord', 'flipped_condition']).mean().reset_index()
-                            mean_bigGRIDdf2plot = mean_bigGRIDdf2plot.groupby(['ROI', 'abs_inter_bar_dist', 'screen_x_coord', 'screen_y_coord', 'flipped_condition']).mean().reset_index()
-
                         ## make 2D arrays for GRID plotting
-
-                        # initialize at zero
-                        GRID_Xcoord2D = np.zeros((len(y_coord_grid),len(y_coord_grid)))
-                        GRID_Ycoord2D = np.zeros((len(y_coord_grid),len(y_coord_grid)))
-                        GRID_Betas2D = np.zeros((len(y_coord_grid),len(y_coord_grid)))
-
-                        # loop over y coordinates
-                        for ind, y_coord in enumerate(y_coord_grid):
-                            coord_df = mean_GRIDdf2plot[mean_GRIDdf2plot['screen_y_coord'] == y_coord].sort_values(by=['screen_x_coord'])
-                            GRID_Ycoord2D[ind][:] = y_coord
-                            GRID_Xcoord2D[ind][:] = y_coord_grid 
-                            GRID_Betas2D[ind][:len(coord_df)] = coord_df.betas.values
-                            
-                        ## make 2D arrays for GRID plotting
+                        pivot_grid_df = pd.pivot_table(GRIDdf2plot, 
+                                                    values = 'betas', 
+                                                    index = ['screen_y_coord'],
+                                                    columns = ['screen_x_coord'], 
+                                                    aggfunc = 'mean', fill_value = 0).groupby(['screen_y_coord']).mean()
+                        # sort index
+                        pivot_grid_df.sort_index(axis='columns', ascending=True, inplace=True)
+                        pivot_grid_df.sort_index(level=0, ascending=True, inplace=True)
                         
-                        # initialize at zero
-                        bigGRID_Xcoord2D = np.zeros((len(y_coord_bgrid),len(y_coord_bgrid)))
-                        bigGRID_Ycoord2D = np.zeros((len(y_coord_bgrid),len(y_coord_bgrid)))
-                        bigGRID_Betas2D = np.zeros((len(y_coord_bgrid),len(y_coord_bgrid)))
+                        GRID_Betas2D = pivot_grid_df.values
+                        GRID_Xcoord2D, GRID_Ycoord2D = np.meshgrid(pivot_grid_df.columns, pivot_grid_df.index)
 
-                        # loop over y coordinates
-                        for ind, y_coord in enumerate(y_coord_bgrid):
-                            coord_df = mean_bigGRIDdf2plot[mean_bigGRIDdf2plot['screen_y_coord'] == y_coord].sort_values(by=['screen_x_coord'])
-                            bigGRID_Ycoord2D[ind][:] = y_coord
-                            bigGRID_Xcoord2D[ind][:] = y_coord_bgrid 
-                            bigGRID_Betas2D[ind][:len(coord_df)] = coord_df.betas.values  
+                        ## repeat for bigger grid 
+                        pivot_bgrid_df = pd.pivot_table(bigGRIDdf2plot, 
+                                                    values = 'betas', 
+                                                    index = ['screen_y_coord'],
+                                                    columns = ['screen_x_coord'], 
+                                                    aggfunc = 'mean', fill_value = 0).groupby(['screen_y_coord']).mean()
+                        # sort index
+                        pivot_bgrid_df.sort_index(axis='columns', ascending=True, inplace=True)
+                        pivot_bgrid_df.sort_index(level=0, ascending=True, inplace=True)
+                        
+                        bigGRID_Betas2D = pivot_bgrid_df.values
+                        bigGRID_Xcoord2D, bigGRID_Ycoord2D = np.meshgrid(pivot_bgrid_df.columns, pivot_bgrid_df.index)
                             
                         ## settings depending on which condition we are plotting
                         if int(flipped_trials) == 1:
@@ -3712,13 +3699,14 @@ class FAViewer(Viewer):
                                                                             levels = 50)
                         
                         # plot average line at the back plane
-                        axs[tuple(new_position_matrix[counter])].plot(x_pos, np.repeat(y_coord_bgrid[-1], len(x_pos)), 
-                                                                        mean_betas,
+                        axs[tuple(new_position_matrix[counter])].plot(mean_GRIDdf2plot.x_pos.values, 
+                                                                      np.repeat(y_coord_bgrid[-1], len(mean_GRIDdf2plot.x_pos.values)), 
+                                                                        mean_GRIDdf2plot.mean_betas.values,
                                                                         color = 'k', lw=2.5, zorder=5)
                         # and error bars (shading)
-                        axs[tuple(new_position_matrix[counter])].add_collection3d(axs[tuple(new_position_matrix[counter])].fill_between(x_pos, 
-                                                                                    mean_betas + sem_betas, 
-                                                                                    mean_betas - sem_betas, 
+                        axs[tuple(new_position_matrix[counter])].add_collection3d(axs[tuple(new_position_matrix[counter])].fill_between(mean_GRIDdf2plot.x_pos.values, 
+                                                                                    mean_GRIDdf2plot.mean_betas.values + mean_GRIDdf2plot.sem_betas.values, 
+                                                                                    mean_GRIDdf2plot.mean_betas.values - mean_GRIDdf2plot.sem_betas.values, 
                                                                                     color = target_color_rect, alpha=0.5), zs=y_coord_bgrid[-1], zdir='y')
 
                         # plot 0 line

@@ -120,7 +120,15 @@ class Viewer:
             plt.rcParams['axes.prop_cycle'] = self.ghibli_palettes[palette]
         except:
             raise Exception('Palette not available.')
-
+        
+    def load_group_ROIs(self, participant_list = []):
+        
+        """
+        Load ROIs dict for all participants in participant list
+        """
+        
+        [self.load_ROIs_dict(sub_id = pp) for pp in participant_list]
+        
     def load_ROIs_dict(self, sub_id = None, hemisphere = 'BH'):
 
         """

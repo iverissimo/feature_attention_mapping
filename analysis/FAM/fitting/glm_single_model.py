@@ -804,7 +804,7 @@ class GLMsingle_Model(Model):
         np.save(pRFcorr_filename, corr_pRF)
         np.save(FAcorr_filename, corr_FA)
 
-    def load_betas_coord(self, participant_list = [], ROIs_dict = {}, model_type = 'D', prf_bar_coords_dict = None,
+    def load_betas_coord(self, participant_list = [], ROIs_dict = {}, model_type = 'D', prf_bar_coords_dict = {},
                                 att_color_ses_run_dict = {}, betas_per_color = False, file_ext = '_cropped.npy', 
                                 orientation_bars = 'parallel_vertical', demean = False, rotate_bars = True, prf_estimates = {}):
         
@@ -855,12 +855,14 @@ class GLMsingle_Model(Model):
             else:
                 att_color_ses_run = None
                 
+            pp_prf_bar_coord = None if 'sub-{sj}'.format(sj = pp) not in list(prf_bar_coords_dict.keys()) else prf_bar_coords_dict['sub-{sj}'.format(sj = pp)]
+                
             DF_betas_bar_coord_GROUP.append(self.get_betas_coord_df(pp, betas_arr = GLMsing_estimates_dict['betasmd'], 
                                                                 single_trl_DM = single_trl_DM, 
                                                                 att_color_ses_run = att_color_ses_run, 
                                                                 file_ext = file_ext, 
                                                                 demean = demean,
-                                                                prf_bar_coords_dict = prf_bar_coords_dict,
+                                                                prf_bar_coords_dict = pp_prf_bar_coord,
                                                                 rotate_bars = rotate_bars,
                                                                 ROIs_dict = pp_ROI_dict, 
                                                                 prf_estimates = prf_estimates, 
@@ -868,9 +870,8 @@ class GLMsingle_Model(Model):
             )
             
         ## concatenate to convert into data frame
-        DF_betas_bar_coord_GROUP = pd.concat(DF_betas_bar_coord_GROUP)
+        return pd.concat(DF_betas_bar_coord_GROUP)
                 
-    
     def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, 
                                 demean = False, rotate_bars = True, prf_bar_coords_dict = None,
                                 file_ext = '_cropped.npy', ROIs_dict = {}, prf_estimates = {}, orientation_bars = 'parallel_vertical'):
@@ -903,7 +904,7 @@ class GLMsingle_Model(Model):
             if given, will use pRF bar coordinates as reference to mask FA trials where bar not visible
         """
 
-        output_df = pd.DataFrame()
+        output_df = []
         
         # check which bar orientations to load
         if isinstance(orientation_bars, str):
@@ -928,9 +929,9 @@ class GLMsingle_Model(Model):
                 ori_betas_df = self.rotate_prf_coordinates(DF_betas_bar_coord = ori_betas_df, 
                                                             og_orientation_bars = ori_bars)
             
-            output_df = pd.concat((output_df, ori_betas_df), ignore_index=True)
-
-        return output_df
+            output_df.append(ori_betas_df)
+            
+        return pd.concat(output_df)
     
     def get_orientation_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, 
                                             demean = False, prf_bar_coords_dict = None,

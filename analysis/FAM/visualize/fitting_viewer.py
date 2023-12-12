@@ -2670,8 +2670,19 @@ class FAViewer(Viewer):
                                                                     rsq_threshold = rsq_threshold,
                                                                     positive_rf = positive_rf,
                                                                     size_std = size_std)
-
-
+        
+        # if we want to mask betas according to pRF behavior
+        if mask_betas:
+            prf_bar_coords_dict = self.pRFModelObj.get_masked_bar_coords(participant_list = participant_list, 
+                                                                        ses = 'mean', 
+                                                                        mask_bool_df = mask_bool_df, 
+                                                                        bar_direction = None)
+        else:
+            prf_bar_coords_dict = None
+            
+        ## load ROIs dict for all participants
+        self.load_group_ROIs(participant_list = participant_list)
+        
         ## concatenate group
         DF_betas_GRID_coord_GROUP = pd.DataFrame()
         DF_betas_bigGRID_coord_GROUP = pd.DataFrame()

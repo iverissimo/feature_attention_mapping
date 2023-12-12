@@ -1694,7 +1694,7 @@ class pRF_model(Model):
 
         return bar_coord_per_TR
     
-    def get_masked_bar_coords(self, participant, ses = 'mean', mask_bool_df = None, bar_direction = None):
+    def get_masked_bar_coords(self, participant_list = [], ses = 'mean', mask_bool_df = None, bar_direction = None):
 
         """
         Get dict with unique pRF bar coordinates (for horizontal and vertical bar passes)
@@ -1702,8 +1702,8 @@ class pRF_model(Model):
 
         Parameters
         ----------
-        participant : str
-            participant number
+        participant_list: list
+            list with participant ID
         ses : str
             session number (default mean)
         mask_bool_df: dataframe
@@ -1714,34 +1714,39 @@ class pRF_model(Model):
 
         if isinstance(ses, str) and 'ses' in ses: # to account for differences in input
             ses = re.search(r'(?<=ses-).*', ses)[0]
-
-        # if we set a specific session, then select that one, else combine
-        if ses == 'mean':
-            mask_bool = mask_bool_df[mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant)]['mask_bool'].values
-        else:
-            mask_bool = mask_bool_df[(mask_bool_df['ses'] == 'ses-{s}'.format(s = ses)) & \
-                                (mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant))]['mask_bool'].values 
-        mask_bool = np.prod(mask_bool, axis = 0)
             
-        # iterate over bar directions
-        if bar_direction is None:
-            bar_direction_list = ['vertical', 'horizontal']
-        elif isinstance(bar_direction, str):
-            bar_direction_list = [bar_direction]
-
         bar_coords_dict = {}
-        
-        for bd_key in bar_direction_list:
+            
+        # loop over participant
+        for participant in participant_list:
 
-            ## get pRF bar center coordinates per TR for bar pass direction
-            bar_coords_masked = self.get_pRF_bar_coords_per_TR(bar_direction = bd_key).copy()
-            bar_coords_masked[np.where((mask_bool == 0))[0]] = np.nan
+            # if we set a specific session, then select that one, else combine
+            if ses == 'mean':
+                mask_bool = mask_bool_df[mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant)]['mask_bool'].values
+            else:
+                mask_bool = mask_bool_df[(mask_bool_df['ses'] == 'ses-{s}'.format(s = ses)) & \
+                                    (mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant))]['mask_bool'].values 
+            mask_bool = np.prod(mask_bool, axis = 0)
+                
+            # iterate over bar directions
+            if bar_direction is None:
+                bar_direction_list = ['vertical', 'horizontal']
+            elif isinstance(bar_direction, str):
+                bar_direction_list = [bar_direction]
 
-            # get unique coordinates
-            uniq_bar_coords = np.unique(bar_coords_masked)
-            uniq_bar_coords = np.array([val for val in uniq_bar_coords if ~np.isnan(val)])
+            bar_coords_dict['sub-{sj}'.format(sj = participant)] = {}
+            
+            for bd_key in bar_direction_list:
 
-            bar_coords_dict[bd_key] = uniq_bar_coords
+                ## get pRF bar center coordinates per TR for bar pass direction
+                bar_coords_masked = self.get_pRF_bar_coords_per_TR(bar_direction = bd_key).copy()
+                bar_coords_masked[np.where((mask_bool == 0))[0]] = np.nan
+
+                # get unique coordinates
+                uniq_bar_coords = np.unique(bar_coords_masked)
+                uniq_bar_coords = np.array([val for val in uniq_bar_coords if ~np.isnan(val)])
+
+                bar_coords_dict['sub-{sj}'.format(sj = participant)][bd_key] = uniq_bar_coords
 
         return bar_coords_dict
                     

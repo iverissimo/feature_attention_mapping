@@ -1999,13 +1999,29 @@ class GLMsingle_Model(Model):
                         if len(GRIDdf2plot.sj.unique()) > 1:
                             
                             ## average for same grid screen coordinates
-                            mean_GRIDdf2plot = GRIDdf2plot.groupby(['sj', 'ROI', 'abs_inter_bar_dist', 'screen_x_coord', 
-                                                                'screen_y_coord', 'flipped_condition']).mean().reset_index()
+                            mean_GRIDdf2plot = GRIDdf2plot.groupby(['sj', 'ROI', 'abs_inter_bar_dist', 'screen_x_coord', 'flipped_condition']).mean().reset_index()
                             
-                            # get sem and mean per x coords for plotting
-                            mean_betas = mean_GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().betas.values
-                            sem_betas = mean_GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).sem().betas.values
-                            x_pos = mean_GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().index.values
+                            # Divide each sj response by norm
+                            norm_data = []
+                            for (cols, g) in mean_GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['sj']):
+                                sd = g.copy()
+                                sd.loc[:, 'norm'] = np.linalg.norm(sd['betas'])
+                                sd.loc[:, 'betas_norm'] = sd['betas'] / sd['norm']
+                                norm_data.append(sd)
+                            norm_data = pd.concat(norm_data)
+                            
+                            # Average across subjects and multiply by average norm to get units back
+                            mean_norm_data = norm_data.groupby(['screen_x_coord']).mean().reset_index()
+                            mean_norm_data.loc[:, 'sem_betas_norm'] = norm_data.groupby(['screen_x_coord']).sem().betas_norm.values
+                            mean_norm_data['betas_adj'] = mean_norm_data['betas_norm'] * mean_norm_data['norm']
+                            mean_norm_data['sem_adj'] = mean_norm_data['sem_betas_norm'] * mean_norm_data['norm'] # rescaling sem by the same constant as mean
+                            #mean_norm_data = mean_norm_data.drop(columns=['norm', 'betas_norm'])
+                            
+                            # store mean
+                            mean_betas = mean_norm_data.betas_adj.values
+                            x_pos = mean_norm_data.screen_x_coord.values
+                            # store sem
+                            sem_betas = mean_norm_data.sem_adj.values
                         else:
                             # get mean over across y coordinates to plot average line + SEM
                             mean_betas = GRIDdf2plot.sort_values(by=['screen_x_coord']).groupby(['screen_x_coord']).mean().betas.values

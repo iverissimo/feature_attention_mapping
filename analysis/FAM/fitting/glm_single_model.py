@@ -870,7 +870,7 @@ class GLMsingle_Model(Model):
             )
             
         ## concatenate to convert into data frame
-        return pd.concat(DF_betas_bar_coord_GROUP)
+        return pd.concat(DF_betas_bar_coord_GROUP, ignore_index = True)
                 
     def get_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, 
                                 demean = False, rotate_bars = True, prf_bar_coords_dict = None,
@@ -931,7 +931,7 @@ class GLMsingle_Model(Model):
             
             output_df.append(ori_betas_df)
             
-        return pd.concat(output_df)
+        return pd.concat(output_df, ignore_index = True)
     
     def get_orientation_betas_coord_df(self, participant, betas_arr = [], single_trl_DM = [], att_color_ses_run = {}, 
                                             demean = False, prf_bar_coords_dict = None,
@@ -1759,7 +1759,7 @@ class GLMsingle_Model(Model):
             new_df['attend_color'] = np.nan
 
         return new_df
-
+    
     def get_betas_grid_coord_df(self, DF_betas_bar_coord = {}, collapse_ecc = False, orientation_bars = 'parallel_vertical', grid_num = None):
 
         """
@@ -1772,11 +1772,13 @@ class GLMsingle_Model(Model):
         Parameters
         ----------
         DF_betas_bar_coord: dataframe
-            FA beta values dataframe for a participant, with relevant prf estimates (x,y,r2)
+            FA beta values dataframe for a/all participant, with relevant prf estimates (x,y,r2)
         collapse_ecc: bool
             if we want to collapse over eccentricity (will still keep reversed condition)
         orientation_bars: str
             string with descriptor for bar orientations (crossed, parallel_vertical or parallel_horizontal)
+        grid_num: int
+            if provided, will bin screen coordinates into given number 
         """
 
         ## when parallel assumes that we have already combined parallel vertical with rotated parallel horizontal in betas dataframe

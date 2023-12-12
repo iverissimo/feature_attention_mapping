@@ -2683,53 +2683,45 @@ class FAViewer(Viewer):
         ## load ROIs dict for all participants
         self.load_group_ROIs(participant_list = participant_list)
         
-        ## concatenate group
-        DF_betas_GRID_coord_GROUP = pd.DataFrame()
-        DF_betas_bigGRID_coord_GROUP = pd.DataFrame()
-        DF_betas_bar_coord_GROUP = pd.DataFrame()
-
+        # if we want to mask betas according to pRF behavior
+        if mask_betas:
+            prf_bar_coords_dict = self.pRFModelObj.get_masked_bar_coords(participant_list = participant_list, 
+                                                                        ses = 'mean', 
+                                                                        mask_bool_df = mask_bool_df, 
+                                                                        bar_direction = None)
+        else:
+            prf_bar_coords_dict = {}
+            
+        ## load betas dataframe for all participants in list
+        DF_betas_bar_coord_GROUP = self.FAModelObj.load_betas_coord(participant_list = participant_list, 
+                                                        ROIs_dict = self.ROIs_dict, model_type = model_type, 
+                                                        prf_bar_coords_dict = prf_bar_coords_dict,
+                                                        att_color_ses_run_dict = att_color_ses_run_dict, 
+                                                        betas_per_color = betas_per_color, 
+                                                        file_ext = file_ext, 
+                                                        orientation_bars = orientation_bars, 
+                                                        demean = demean, rotate_bars = rotate_bars, 
+                                                        prf_estimates = group_prf_estimates)
+        
+        ## get DF with betas and coordinates
+        # labeled by screen bar-centered grid 
+        DF_betas_GRID_coord_GROUP = self.FAModelObj.get_betas_grid_coord_df(DF_betas_bar_coord = DF_betas_bar_coord_GROUP, 
+                                                                            collapse_ecc = True, 
+                                                                            orientation_bars = orientation_bars)
+        
+        ## do same for bigger grid, 
+        # to use in countour plots
+        DF_betas_bigGRID_coord_GROUP = self.FAModelObj.get_betas_grid_coord_df(DF_betas_bar_coord = DF_betas_bar_coord_GROUP, 
+                                                                                collapse_ecc = True, 
+                                                                                orientation_bars = orientation_bars,
+                                                                                grid_num = 17)
+        
         # iterate over participant list
         for pp in participant_list:
-
-            ## load ROI dict for participant
-            pp_ROI_dict = self.load_ROIs_dict(sub_id = pp)
 
             ## output path to save plots for participants
             sub_figures_pth = op.join(output_pth, 'sub-{sj}'.format(sj = pp))
             os.makedirs(sub_figures_pth, exist_ok=True)
-
-            ## load GLMsingle estimates dict
-            GLMsing_estimates_dict = self.FAModelObj.load_estimates(pp, model_type = model_type)
-
-            ## load single trial DM
-            single_trl_DM = self.FAModelObj.load_single_trl_DM(pp)
-
-            # if we want to mask betas according to pRF behavior
-            if mask_betas:
-                prf_bar_coords_dict = self.pRFModelObj.get_masked_bar_coords(pp, 
-                                                                ses = 'mean', 
-                                                                mask_bool_df = mask_bool_df, 
-                                                                bar_direction = None)
-            else:
-                prf_bar_coords_dict = None
-
-            ## get DF with betas and coordinates - for vertical parallel bar positions
-            # if we want to plot separately per attended color
-            att_color_ses_run = att_color_ses_run_dict['sub-{sj}'.format(sj = pp)] if betas_per_color else None
-            # load average betas
-            DF_betas_bar_coord = self.FAModelObj.get_betas_coord_df(pp, betas_arr = GLMsing_estimates_dict['betasmd'], 
-                                                                single_trl_DM = single_trl_DM, 
-                                                                att_color_ses_run = att_color_ses_run, 
-                                                                file_ext = file_ext, 
-                                                                demean = demean,
-                                                                prf_bar_coords_dict = prf_bar_coords_dict,
-                                                                rotate_bars = rotate_bars,
-                                                                ROIs_dict = pp_ROI_dict, 
-                                                                prf_estimates = prf_estimates, 
-                                                                orientation_bars = orientation_bars)
-            
-            # concatenate for group
-            DF_betas_bar_coord_GROUP = pd.concat((DF_betas_bar_coord_GROUP, DF_betas_bar_coord), ignore_index = True)
 
             ## 2D plot betas for each attended bar color separately + averaged
             for cn in color2plot2D_list:
@@ -2747,43 +2739,27 @@ class FAViewer(Viewer):
                 if mask_betas:
                     fig_name = fig_name.replace('.png', '_masked.png')
 
+                self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord_GROUP[DF_betas_bar_coord_GROUP['sj'] == 'sub-{sj}'.format(sj = pp)], 
+                                ROI_list = ROI_list, 
+                                orientation_bars = orientation_bars, 
+                                as_heatmap = False, 
+                                max_ecc_ext = group_prf_models['sub-{sj}'.format(sj = pp)]['ses-{s}'.format(s = 'mean')]['prf_stim'].screen_size_degrees/2, 
+                                bar_color2plot = cn, 
+                                transpose_fig = False,
+                                fig_name = fig_name) 
                 
-                # self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
-                #                     orientation_bars = orientation_bars, as_heatmap = False, 
-                #                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], 
-                #                     bar_color2plot = cn, 
-                #                     transpose_fig = False,
-                #                     fig_name = fig_name) 
                 # # also plot as heatmap
-                # self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord, ROI_list = ROI_list, 
-                #                     orientation_bars = orientation_bars, as_heatmap = True, 
-                #                     max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], 
-                #                     bar_color2plot = cn, 
-                #                     transpose_fig = False,
-                #                     fig_name = fig_name.replace('betas2D', 'betas2D_heatmap')) 
+                # self.plot_betas_2D(DF_betas_bar_coord = DF_betas_bar_coord_GROUP[DF_betas_bar_coord_GROUP['sj'] == 'sub-{sj}'.format(sj = pp)], 
+                #                 ROI_list = ROI_list, 
+                #                 orientation_bars = orientation_bars, 
+                #                 as_heatmap = True, 
+                #                 max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], 
+                #                 bar_color2plot = cn, 
+                #                 transpose_fig = False,
+                #                 fig_name = fig_name.replace('betas2D', 'betas2D_heatmap')) 
                 
+            
             ## 2D plot betas heatmap for collapsed eccentricitties (thus gives unique condition + their flipped version)
-
-            ## get DF with betas and coordinates
-            # labeled by screen bar-centered grid 
-            DF_betas_GRID_coord = self.FAModelObj.get_betas_grid_coord_df(DF_betas_bar_coord = DF_betas_bar_coord, 
-                                                                        collapse_ecc = True, 
-                                                                        orientation_bars = orientation_bars)
-            
-            # concatenate for group
-            DF_betas_GRID_coord_GROUP = pd.concat((DF_betas_GRID_coord_GROUP, DF_betas_GRID_coord), ignore_index = True)
-            
-            # ## do same for bigger grid, 
-            # # to use in countour plots
-            # DF_betas_bigGRID_coord = self.FAModelObj.get_betas_grid_coord_df(DF_betas_bar_coord = DF_betas_bar_coord, 
-            #                                                             collapse_ecc = True, 
-            #                                                             orientation_bars = orientation_bars,
-            #                                                             grid_num = 17)
-            
-            # # concatenate for group
-            # DF_betas_bigGRID_coord_GROUP = pd.concat((DF_betas_bigGRID_coord_GROUP, 
-            #                                         DF_betas_bigGRID_coord), ignore_index = True)
-
             for cn in color2plot2D_list:
 
                 # absolute figure name
@@ -2799,16 +2775,18 @@ class FAViewer(Viewer):
                 if mask_betas:
                     fig_name = fig_name.replace('.png', '_masked.png')
                 
-                # self.plot_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord, ROI_list = ROI_list, 
-                #                         orientation_bars = orientation_bars, 
-                #                         flipped_trials = False,
-                #                         transpose_fig = False,
-                #                         fig_name = fig_name) 
-                # self.plot_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord, ROI_list = ROI_list, 
-                #                         orientation_bars = orientation_bars, 
-                #                         flipped_trials = True,
-                #                         transpose_fig = False,
-                #                         fig_name = fig_name) 
+                self.plot_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP[DF_betas_GRID_coord_GROUP['sj'] == 'sub-{sj}'.format(sj = pp)], 
+                                        ROI_list = ROI_list, 
+                                        orientation_bars = orientation_bars, 
+                                        flipped_trials = False,
+                                        transpose_fig = False,
+                                        fig_name = fig_name) 
+                self.plot_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP[DF_betas_GRID_coord_GROUP['sj'] == 'sub-{sj}'.format(sj = pp)], 
+                                        ROI_list = ROI_list, 
+                                        orientation_bars = orientation_bars, 
+                                        flipped_trials = True,
+                                        transpose_fig = False,
+                                        fig_name = fig_name) 
                 
                 # ## plot subtraction
                 # self.plot_diff_betas_GRID_2D(DF_betas_GRID_coord = DF_betas_GRID_coord, ROI_list = ROI_list, 
@@ -2817,24 +2795,24 @@ class FAViewer(Viewer):
                 #                             transpose_fig = False,
                 #                             fig_name = fig_name)
                 
-                # ## plot 3D
-                # self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord, 
-                #                         DF_betas_bigGRID_coord = DF_betas_bigGRID_coord,
-                #                         ROI_list = ROI_list, 
-                #                         orientation_bars = orientation_bars, 
-                #                         flipped_trials = False,
-                #                         transpose_fig = False,
-                #                         fig_name = fig_name.replace('heatmap', '3D')) 
-                # self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord, 
-                #                         DF_betas_bigGRID_coord = DF_betas_bigGRID_coord,
-                #                         ROI_list = ROI_list, 
-                #                         orientation_bars = orientation_bars, 
-                #                         flipped_trials = True,
-                #                         transpose_fig = False,
-                #                         fig_name = fig_name.replace('heatmap', '3D')) 
+                ## plot 3D
+                self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP[DF_betas_GRID_coord_GROUP['sj'] == 'sub-{sj}'.format(sj = pp)], 
+                                        DF_betas_bigGRID_coord = DF_betas_bigGRID_coord_GROUP[DF_betas_bigGRID_coord_GROUP['sj'] == 'sub-{sj}'.format(sj = pp)], 
+                                        ROI_list = ROI_list, 
+                                        orientation_bars = orientation_bars, 
+                                        flipped_trials = False,
+                                        transpose_fig = False,
+                                        fig_name = fig_name.replace('heatmap', '3D')) 
+                self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP[DF_betas_GRID_coord_GROUP['sj'] == 'sub-{sj}'.format(sj = pp)], 
+                                        DF_betas_bigGRID_coord = DF_betas_bigGRID_coord_GROUP[DF_betas_bigGRID_coord_GROUP['sj'] == 'sub-{sj}'.format(sj = pp)], 
+                                        ROI_list = ROI_list, 
+                                        orientation_bars = orientation_bars, 
+                                        flipped_trials = True,
+                                        transpose_fig = False,
+                                        fig_name = fig_name.replace('heatmap', '3D')) 
                 
                 ## plot mean betas
-                self.plot_mean_betas(DF_betas_GRID_coord = DF_betas_GRID_coord, 
+                self.plot_mean_betas(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP[DF_betas_GRID_coord_GROUP['sj'] == 'sub-{sj}'.format(sj = pp)], 
                                     ROI_list = ROI_list, 
                                     orientation_bars = orientation_bars,
                                     transpose_fig = False,
@@ -2973,21 +2951,21 @@ class FAViewer(Viewer):
                 #                             transpose_fig = False,
                 #                             fig_name = fig_name)
                 
-                # ## plot 3D
-                # self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, 
-                #                         DF_betas_bigGRID_coord = DF_betas_bigGRID_coord_GROUP,
-                #                         ROI_list = ROI_list, 
-                #                         orientation_bars = orientation_bars, 
-                #                         flipped_trials = False,
-                #                         transpose_fig = False,
-                #                         fig_name = fig_name.replace('heatmap', '3D')) 
-                # self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, 
-                #                         DF_betas_bigGRID_coord = DF_betas_bigGRID_coord_GROUP,
-                #                         ROI_list = ROI_list, 
-                #                         orientation_bars = orientation_bars, 
-                #                         flipped_trials = True,
-                #                         transpose_fig = False,
-                #                         fig_name = fig_name.replace('heatmap', '3D')) 
+                ## plot 3D
+                self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, 
+                                        DF_betas_bigGRID_coord = DF_betas_bigGRID_coord_GROUP,
+                                        ROI_list = ROI_list, 
+                                        orientation_bars = orientation_bars, 
+                                        flipped_trials = False,
+                                        transpose_fig = False,
+                                        fig_name = fig_name.replace('heatmap', '3D')) 
+                self.plot_betas_GRID_3D(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, 
+                                        DF_betas_bigGRID_coord = DF_betas_bigGRID_coord_GROUP,
+                                        ROI_list = ROI_list, 
+                                        orientation_bars = orientation_bars, 
+                                        flipped_trials = True,
+                                        transpose_fig = False,
+                                        fig_name = fig_name.replace('heatmap', '3D')) 
                 
                 ## plot mean betas
                 self.plot_mean_betas(DF_betas_GRID_coord = DF_betas_GRID_coord_GROUP, 

@@ -2678,7 +2678,7 @@ class FAViewer(Viewer):
                                                                         mask_bool_df = mask_bool_df, 
                                                                         bar_direction = None)
         else:
-            prf_bar_coords_dict = None
+            prf_bar_coords_dict = {}
             
         ## load ROIs dict for all participants
         self.load_group_ROIs(participant_list = participant_list)
@@ -2694,13 +2694,15 @@ class FAViewer(Viewer):
             
         ## load betas dataframe for all participants in list
         DF_betas_bar_coord_GROUP = self.FAModelObj.load_betas_coord(participant_list = participant_list, 
-                                                        ROIs_dict = self.ROIs_dict, model_type = model_type, 
+                                                        ROIs_dict = self.ROIs_dict, 
+                                                        model_type = model_type, 
                                                         prf_bar_coords_dict = prf_bar_coords_dict,
                                                         att_color_ses_run_dict = att_color_ses_run_dict, 
                                                         betas_per_color = betas_per_color, 
                                                         file_ext = file_ext, 
                                                         orientation_bars = orientation_bars, 
-                                                        demean = demean, rotate_bars = rotate_bars, 
+                                                        demean = demean, 
+                                                        rotate_bars = rotate_bars, 
                                                         prf_estimates = group_prf_estimates)
         
         ## get DF with betas and coordinates
@@ -2715,6 +2717,8 @@ class FAViewer(Viewer):
                                                                                 collapse_ecc = True, 
                                                                                 orientation_bars = orientation_bars,
                                                                                 grid_num = 17)
+        
+        ## actual plotting ##
         
         # iterate over participant list
         for pp in participant_list:
@@ -2753,7 +2757,7 @@ class FAViewer(Viewer):
                 #                 ROI_list = ROI_list, 
                 #                 orientation_bars = orientation_bars, 
                 #                 as_heatmap = True, 
-                #                 max_ecc_ext = max_ecc_ext['sub-{sj}'.format(sj = pp)], 
+                #                 max_ecc_ext = group_prf_models['sub-{sj}'.format(sj = pp)]['ses-{s}'.format(s = 'mean')]['prf_stim'].screen_size_degrees/2, 
                 #                 bar_color2plot = cn, 
                 #                 transpose_fig = False,
                 #                 fig_name = fig_name.replace('betas2D', 'betas2D_heatmap')) 
@@ -3799,6 +3803,10 @@ class FAViewer(Viewer):
             ## get mean betas df for ROI
             mean_betas_df = self.FAModelObj.get_mean_betas_grid(DF_betas_GRID_coord = DF_betas_GRID_coord, 
                                                                 roi_name = roi_name)
+            
+            ## replace vmin and vmax with data driven limits (per roi)
+            vmin = np.round(np.min(mean_betas_df.mean_betas.values[mean_betas_df.mean_betas.values < 0])- .1, 1) 
+            vmax = np.round(np.max(mean_betas_df.mean_betas.values[mean_betas_df.mean_betas.values > 0]) + .1, 1) 
         
             ## make figure
             fig, axs = plt.subplots(nrows= len(coord_list), ncols=len(coord_list), figsize=(4.5 * len(coord_list), 4.5 * len(coord_list)), sharex=False, sharey=False)

@@ -1998,7 +1998,7 @@ class GLMsingle_Model(Model):
                         # if more than 1 participant (GROUP)
                         if len(GRIDdf2plot.sj.unique()) > 1:
                             
-                            ## average for same grid screen coordinates
+                            ## average for same grid screen x coordinates
                             mean_GRIDdf2plot = GRIDdf2plot.groupby(['sj', 'ROI', 'abs_inter_bar_dist', 'screen_x_coord', 'flipped_condition']).mean().reset_index()
                             
                             # Divide each sj response by norm

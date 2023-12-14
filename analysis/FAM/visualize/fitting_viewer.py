@@ -1821,7 +1821,8 @@ class FAViewer(Viewer):
                                 DF_betas_GRID_coord = pd.concat((DF_betas_GRID_coord,
                                                                  self.FAModelObj.get_betas_grid_coord_df(DF_betas_bar_coord = DF_betas_bar_coord[DF_betas_bar_coord['sj'] == pp], 
                                                                                                         collapse_ecc = False, 
-                                                                                                        orientation_bars = orientation_bars)
+                                                                                                        orientation_bars = orientation_bars,
+                                                                                                        mirror_symetric = True)
                                                                 ), ignore_index=True)
                             
                         df2plot = DF_betas_GRID_coord[(DF_betas_GRID_coord['ROI'] == roi_name) &\
@@ -2709,14 +2710,16 @@ class FAViewer(Viewer):
         # labeled by screen bar-centered grid 
         DF_betas_GRID_coord_GROUP = self.FAModelObj.get_betas_grid_coord_df(DF_betas_bar_coord = DF_betas_bar_coord_GROUP, 
                                                                             collapse_ecc = True, 
-                                                                            orientation_bars = orientation_bars)
+                                                                            orientation_bars = orientation_bars,
+                                                                            mirror_symetric = True)
         
         ## do same for bigger grid, 
         # to use in countour plots
         DF_betas_bigGRID_coord_GROUP = self.FAModelObj.get_betas_grid_coord_df(DF_betas_bar_coord = DF_betas_bar_coord_GROUP, 
                                                                                 collapse_ecc = True, 
                                                                                 orientation_bars = orientation_bars,
-                                                                                grid_num = 17)
+                                                                                grid_num = 17,
+                                                                                mirror_symetric = True)
         
         ## actual plotting ##
         

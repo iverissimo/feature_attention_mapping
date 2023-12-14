@@ -1760,7 +1760,8 @@ class GLMsingle_Model(Model):
 
         return new_df
     
-    def get_betas_grid_coord_df(self, DF_betas_bar_coord = {}, collapse_ecc = False, orientation_bars = 'parallel_vertical', grid_num = None):
+    def get_betas_grid_coord_df(self, DF_betas_bar_coord = {}, collapse_ecc = False, orientation_bars = 'parallel_vertical', grid_num = None,
+                                    mirror_symetric = True):
 
         """
         convert dataframe of betas coordinates, into grid betas coord 
@@ -1788,10 +1789,11 @@ class GLMsingle_Model(Model):
         return self.get_orientation_betas_grid_coord_df(DF_betas_bar_coord = DF_betas_bar_coord, 
                                                         collapse_ecc = collapse_ecc, 
                                                         orientation_bars = grid_orientation_bars,
-                                                        grid_num = grid_num)
+                                                        grid_num = grid_num,
+                                                        mirror_symetric = mirror_symetric)
 
     def get_orientation_betas_grid_coord_df(self, DF_betas_bar_coord = {}, collapse_ecc = False, orientation_bars = 'parallel_vertical', 
-                                                grid_num = None):
+                                                grid_num = None, mirror_symetric = True):
 
         """
         convert dataframe of betas coordinates, into grid betas coord 
@@ -1860,14 +1862,16 @@ class GLMsingle_Model(Model):
                     # while keeping flipped trial types
                     ECC_betas_GRID_coord = self.collapse_conditions_ecc(DF_betas_bar_coord = ROI_betas_GRID_coord,
                                                                         orientation_bars = orientation_bars,
-                                                                        collapse_coord_key = collapse_coord_key)
+                                                                        collapse_coord_key = collapse_coord_key,
+                                                                        mirror_symetric = mirror_symetric)
                     
                     ## concat!
                     DF_betas_GRID_coord = pd.concat((DF_betas_GRID_coord, ECC_betas_GRID_coord), ignore_index=True)
 
         return DF_betas_GRID_coord
 
-    def collapse_conditions_ecc(self, DF_betas_bar_coord = None, orientation_bars = 'parallel_vertical', collapse_coord_key = None):
+    def collapse_conditions_ecc(self, DF_betas_bar_coord = None, orientation_bars = 'parallel_vertical', collapse_coord_key = None,
+                                    mirror_symetric = True):
 
         """
         quick function to collapse conditions over eccentricity (will still keep reversed condition)
@@ -1890,7 +1894,7 @@ class GLMsingle_Model(Model):
 
         # collapsing same eccentricities of attended and unattended bar
         # while keeping flipped trial types
-        ECC_betas_GRID_coord = pd.DataFrame()
+        ECC_betas_GRID_coord = []
                 
         for Att_ecc_label in abs_dist_dict.keys():
             for abs_dist in abs_dist_dict[Att_ecc_label]:
@@ -1905,8 +1909,9 @@ class GLMsingle_Model(Model):
                     Att_bar_coord_list = distance_ecc_df.Att_bar_coord.unique()
                     Att_bar_coord_list = np.sort(Att_bar_coord_list) # and sort
 
-                    # if simetrical case (bars equidistant to fixation) then there's nothing to collapse across ecc
-                    if (Att_bar_coord_list[-1] == distance_ecc_df[distance_ecc_df['Att_bar_coord'] == Att_bar_coord_list[0]].UAtt_bar_coord.values[0]) | (Att_ecc_label == 'near'):
+                    # if simetrical case (bars equidistant to fixation) 
+                    # then there's nothing to collapse across ecc () unless we want to
+                    if mirror_symetric == False and not distance_ecc_df[distance_ecc_df['Att_ecc_label'] == distance_ecc_df['UAtt_ecc_label']].empty:
                         Att_bar_coord_list = Att_bar_coord_list[:1]
 
                      # actually collapse
@@ -1936,9 +1941,11 @@ class GLMsingle_Model(Model):
                         ATT_df[['flipped_condition']] = np.zeros(len(ATT_df)).reshape(-1,1)
                         UATT_df[['flipped_condition']] = np.ones(len(UATT_df)).reshape(-1,1)
 
-                        ECC_betas_GRID_coord = pd.concat((ECC_betas_GRID_coord, ATT_df), ignore_index=True)
-                        ECC_betas_GRID_coord = pd.concat((ECC_betas_GRID_coord, UATT_df), ignore_index=True)
-
+                        ECC_betas_GRID_coord.append(ATT_df)
+                        ECC_betas_GRID_coord.append(UATT_df)
+                        
+        ECC_betas_GRID_coord = pd.concat(ECC_betas_GRID_coord, ignore_index = True)
+        
         return ECC_betas_GRID_coord
 
     def rotate_prf_coordinates(self, DF_betas_bar_coord = None, og_orientation_bars = 'parallel_horizontal'):

@@ -1959,7 +1959,7 @@ class FAViewer(Viewer):
                 
             if fig_name:
                 os.makedirs(op.split(fig_name)[0], exist_ok=True)
-                fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+                fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 100, bbox_inches="tight")
     
     def plot_betas_1D(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical',
                             max_ecc_ext = 5.5, fig_name = None, bar_color2plot = None, bin_size = None, bin_bool = True, error_type = 'std',
@@ -3760,9 +3760,9 @@ class FAViewer(Viewer):
             if fig_name:
                 os.makedirs(op.split(fig_name)[0], exist_ok=True)
                 if flipped_trials:
-                    fig.savefig(fig_name.replace('.png', '_flipped_condition_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+                    fig.savefig(fig_name.replace('.png', '_flipped_condition_{rn}.png'.format(rn = roi_name)), dpi = 100, bbox_inches="tight")
                 else:
-                    fig.savefig(fig_name.replace('.png', '_condition_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+                    fig.savefig(fig_name.replace('.png', '_condition_{rn}.png'.format(rn = roi_name)), dpi = 100, bbox_inches="tight")
     
     def plot_mean_betas(self, DF_betas_GRID_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', collapse_ecc = True,
                                 max_ecc_ext = 5.5, fig_name = None, bar_color2plot = None, transpose_fig = False, 
@@ -3808,11 +3808,18 @@ class FAViewer(Viewer):
                                                                 roi_name = roi_name)
             
             ## replace vmin and vmax with data driven limits (per roi)
-            vmin = np.round(np.min(mean_betas_df.mean_betas.values[mean_betas_df.mean_betas.values < 0])- .1, 1) 
-            vmax = np.round(np.max(mean_betas_df.mean_betas.values[mean_betas_df.mean_betas.values > 0]) + .1, 1) 
+            if len(mean_betas_df.mean_betas.values[mean_betas_df.mean_betas.values < 0]) > 0:
+                vmin = np.round(np.min(mean_betas_df.mean_betas.values[mean_betas_df.mean_betas.values < 0])- .1, 1) 
+            else:
+                vmin = 0
+        
+            if len(mean_betas_df.mean_betas.values[mean_betas_df.mean_betas.values > 0]) > 0:
+                vmax = np.round(np.max(mean_betas_df.mean_betas.values[mean_betas_df.mean_betas.values > 0]) + .1, 1) 
+            else:
+                vmax = 0
         
             ## make figure
-            fig, axs = plt.subplots(nrows= len(coord_list), ncols=len(coord_list), figsize=(4.5 * len(coord_list), 4.5 * len(coord_list)), sharex=False, sharey=False)
+            fig, axs = plt.subplots(nrows= len(coord_list), ncols=len(coord_list), figsize=(4.5 * len(coord_list), 4.5 * len(coord_list)), sharex=True, sharey=True)
 
             ## make array with figure axis positions (6*6 = 36x2)
             position_matrix = np.array(np.meshgrid(np.arange(len(coord_list)),np.arange(len(coord_list)))).T.reshape(-1,2)
@@ -3888,6 +3895,12 @@ class FAViewer(Viewer):
                         handleA = mpatches.Patch(facecolor = 'purple', edgecolor = 'k', label = 'target')
                         handleB = mpatches.Patch( facecolor = 'green', edgecolor = 'k', label = 'target')
                         leg = axs[tuple(new_position_matrix[counter])].legend(handles = [handleA,handleB], loc = 'upper right')
+                        
+                        # add roi in title
+                        axs[tuple(new_position_matrix[counter])].set_title(roi_name, fontweight = 'bold')
+                        axs[tuple(new_position_matrix[counter])].set_xlabel('X coordinates')
+                        axs[tuple(new_position_matrix[counter])].set_ylabel('Betas (PSC)')
+                        axs[tuple(new_position_matrix[counter])].tick_params(axis='both', labelsize=14)
 
                     counter +=1
 
@@ -3899,7 +3912,7 @@ class FAViewer(Viewer):
 
             if fig_name:
                 os.makedirs(op.split(fig_name)[0], exist_ok=True)
-                fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+                fig.savefig(fig_name.replace('.png', '_{rn}.png'.format(rn = roi_name)), dpi = 100, bbox_inches="tight")
     
     def plot_betas_GRID_2D(self, DF_betas_GRID_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', collapse_ecc = True,
                                 max_ecc_ext = 5.5, fig_name = None, bar_color2plot = None, transpose_fig = False, flipped_trials = False,
@@ -4067,9 +4080,9 @@ class FAViewer(Viewer):
             if fig_name:
                 os.makedirs(op.split(fig_name)[0], exist_ok=True)
                 if flipped_trials:
-                    fig.savefig(fig_name.replace('.png', '_flipped_condition_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+                    fig.savefig(fig_name.replace('.png', '_flipped_condition_{rn}.png'.format(rn = roi_name)), dpi = 100, bbox_inches="tight")
                 else:
-                    fig.savefig(fig_name.replace('.png', '_condition_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+                    fig.savefig(fig_name.replace('.png', '_condition_{rn}.png'.format(rn = roi_name)), dpi = 100, bbox_inches="tight")
 
     def plot_diff_betas_GRID_2D(self, DF_betas_GRID_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', collapse_ecc = True,
                                 max_ecc_ext = 5.5, fig_name = None, bar_color2plot = None, transpose_fig = False, flipped_trials = False,
@@ -4232,7 +4245,7 @@ class FAViewer(Viewer):
 
             if fig_name:
                 os.makedirs(op.split(fig_name)[0], exist_ok=True)
-                fig.savefig(fig_name.replace('.png', '_DIFFcondition_{rn}.png'.format(rn = roi_name)), dpi = 200, bbox_inches="tight")
+                fig.savefig(fig_name.replace('.png', '_DIFFcondition_{rn}.png'.format(rn = roi_name)), dpi = 100, bbox_inches="tight")
 
     def plot_singlevert_FA(self, participant, 
                                 ses = 1, run_type = '1', vertex = None, ROI = None,

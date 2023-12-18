@@ -969,8 +969,7 @@ class GLMsingle_Model(Model):
         else:
             att_color_keys = list(att_color_ses_run.keys())
 
-        DF_betas_bar_coord = pd.DataFrame({'sj': [], 'ROI': [], 'betas': [], 'prf_rsq_coord': [], 'prf_index_coord': [],
-                                            'prf_x_coord': [], 'prf_y_coord': [], 'attend_color': []})
+        DF_betas_bar_coord = []
 
         ## for bars going left to right (vertical orientation)
         if orientation_bars == 'parallel_vertical':
@@ -1026,34 +1025,35 @@ class GLMsingle_Model(Model):
                         # iterate over ROIs
                         for rname in ROIs_dict.keys():
 
-                            DF_betas_bar_coord = pd.concat((DF_betas_bar_coord,
-                                                        pd.DataFrame({'sj': np.tile('sub-{sj}'.format(sj = participant), len(ROIs_dict[rname])), 
-                                                            'ROI': np.tile(rname, len(ROIs_dict[rname])), 
-                                                            'betas': avg_betas[0,:,c][ROIs_dict[rname]], 
-                                                            'attend_color': np.tile(color_name, len(ROIs_dict[rname])),
-                                                            'Att_bar_coord': np.tile(Att_bar_coord, len(ROIs_dict[rname])),
-                                                            'UAtt_bar_coord': np.tile(UAtt_bar_coord, len(ROIs_dict[rname])),
-                                                            'inter_bar_dist': np.tile(inter_bar_dist, len(ROIs_dict[rname])),
-                                                            'abs_inter_bar_dist': np.tile(np.absolute(inter_bar_dist), len(ROIs_dict[rname])),
-                                                            'contralateral_bars': np.tile(contralateral_bars_bool, len(ROIs_dict[rname])),
-                                                            'contralateral_Attbar_pRF': Att_bar_contralateral_RF_bool[ROIs_dict[rname]],
-                                                            'Att_ecc_label': np.tile(ecc_label, len(ROIs_dict[rname])),
-                                                            'UAtt_ecc_label': np.tile(distr_ecc_label, len(ROIs_dict[rname])),
-                                                            'prf_index_coord': ROIs_dict[rname],
-                                                            'prf_rsq_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['r2'][ROIs_dict[rname]],
-                                                            'prf_x_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['x'][ROIs_dict[rname]], 
-                                                            'prf_y_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['y'][ROIs_dict[rname]]})
-                                                            )) 
-
-        output_df = DF_betas_bar_coord.dropna(subset=['prf_rsq_coord', 'prf_x_coord', 'prf_y_coord'])               
+                            DF_betas_bar_coord.append(pd.DataFrame({'sj': np.tile('sub-{sj}'.format(sj = participant), len(ROIs_dict[rname])), 
+                                                                    'ROI': np.tile(rname, len(ROIs_dict[rname])), 
+                                                                    'betas': avg_betas[0,:,c][ROIs_dict[rname]], 
+                                                                    'attend_color': np.tile(color_name, len(ROIs_dict[rname])),
+                                                                    'Att_bar_coord': np.tile(Att_bar_coord, len(ROIs_dict[rname])),
+                                                                    'UAtt_bar_coord': np.tile(UAtt_bar_coord, len(ROIs_dict[rname])),
+                                                                    'inter_bar_dist': np.tile(inter_bar_dist, len(ROIs_dict[rname])),
+                                                                    'abs_inter_bar_dist': np.tile(np.absolute(inter_bar_dist), len(ROIs_dict[rname])),
+                                                                    'contralateral_bars': np.tile(contralateral_bars_bool, len(ROIs_dict[rname])),
+                                                                    'contralateral_Attbar_pRF': Att_bar_contralateral_RF_bool[ROIs_dict[rname]],
+                                                                    'Att_ecc_label': np.tile(ecc_label, len(ROIs_dict[rname])),
+                                                                    'UAtt_ecc_label': np.tile(distr_ecc_label, len(ROIs_dict[rname])),
+                                                                    'prf_index_coord': ROIs_dict[rname],
+                                                                    'prf_rsq_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['r2'][ROIs_dict[rname]],
+                                                                    'prf_x_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['x'][ROIs_dict[rname]], 
+                                                                    'prf_y_coord': prf_estimates['sub-{sj}'.format(sj = participant)]['y'][ROIs_dict[rname]]})
+                                                                    )
+                            
+        DF_betas_bar_coord = pd.concat(DF_betas_bar_coord, ignore_index = True)
+        DF_betas_bar_coord = DF_betas_bar_coord.dropna(subset=['prf_rsq_coord', 'prf_x_coord', 'prf_y_coord'])               
         
         # if we want to demean betas, per trial type and ROI
         if demean:
-            output_df = self.demean_betas_df(DF_betas_bar_coord = DF_betas_bar_coord.dropna(subset=['prf_rsq_coord', 'prf_x_coord', 'prf_y_coord']), 
-                                            ROI_list = list(ROIs_dict.keys()), orientation_bars = orientation_bars, 
+            DF_betas_bar_coord = self.demean_betas_df(DF_betas_bar_coord = DF_betas_bar_coord, 
+                                            ROI_list = list(ROIs_dict.keys()), 
+                                            orientation_bars = orientation_bars, 
                                             bar_color = None) ## HARDCODED, change later to go through different colors if wanted
-                            
-        return output_df
+            
+        return DF_betas_bar_coord
     
     def get_betas_1D_df(self, DF_betas_bar_coord = {}, ROI_list = [], orientation_bars = 'parallel_vertical', bar_color2bin = None,
                                 max_ecc_ext = 5.5, bin_size = .5, center_bin = False, avg_bool = True, bin_bool = False):
@@ -1824,51 +1824,44 @@ class GLMsingle_Model(Model):
         else:
             raise ValueError('Cross sections not implemented yet')
 
-        DF_betas_GRID_coord = pd.DataFrame()
-
-        for sj in DF_betas_bar_coord.sj.unique():
-            for roi_name in DF_betas_bar_coord.ROI.unique():
+        DF_betas_GRID_coord = []
+        
+        for (cols, tdf) in DF_betas_bar_coord.groupby(['sj', 'ROI', 'Att_bar_coord', 'UAtt_bar_coord']):
+            
+            trial_df = tdf.copy()
+            
+            ## label prf coordinates to
+            # screen binned coords
+            x_deg_arr, y_deg_arr = self.convert_coord_pRF2screen_grid(prf_x_coord = trial_df.prf_x_coord.values, 
+                                                                        prf_y_coord = trial_df.prf_y_coord.values,
+                                                                        grid_num = grid_num)
+            
+            ## keep some information on the attended bar, for bookeeping --> need to multiindex
+            df_betas_heatmap = trial_df.loc[:, ['sj', 'ROI', 'betas', 'prf_index_coord', 'Att_bar_coord', 'UAtt_bar_coord', 
+                                                'inter_bar_dist', 'abs_inter_bar_dist', 'Att_ecc_label', 'UAtt_ecc_label']]
+            df_betas_heatmap[['screen_x_coord', 'screen_y_coord']] = np.vstack((x_deg_arr, y_deg_arr)).T
+            
+            DF_betas_GRID_coord.append(df_betas_heatmap)
+        output_df = pd.concat(DF_betas_GRID_coord, ignore_index = True)
+        
+        # collapsing same eccentricities of attended and unattended bar
+        # while keeping flipped trial types
+        if collapse_ecc:
+            
+            ecc_df = []
+            
+            for (cols, rdf) in output_df.groupby(['sj', 'ROI']): # per participant and ROI
                 
-                ROI_betas_GRID_coord = pd.DataFrame()
+                ROI_betas_GRID_coord = rdf.copy()
 
-                for Att_bar_coord in DF_betas_bar_coord.Att_bar_coord.unique():
-                    for UAtt_bar_coord in DF_betas_bar_coord.UAtt_bar_coord.unique():
-
-                        trial_df = DF_betas_bar_coord[(DF_betas_bar_coord['sj'] == sj) &\
-                                                    (DF_betas_bar_coord['ROI'] == roi_name) &\
-                                                    (DF_betas_bar_coord['Att_bar_coord'] == Att_bar_coord) &\
-                                                    (DF_betas_bar_coord['UAtt_bar_coord'] == UAtt_bar_coord)]
-                        
-                        ## label prf coordinates to
-                        # screen binned coords
-                        x_deg_arr, y_deg_arr = self.convert_coord_pRF2screen_grid(prf_x_coord = trial_df.prf_x_coord.values, 
-                                                                                    prf_y_coord = trial_df.prf_y_coord.values,
-                                                                                    grid_num = grid_num)
-
-                        ## keep some information on the attended bar, for bookeeping --> need to multiindex
-                        df_betas_heatmap = trial_df.loc[:, ['sj', 'ROI', 'betas', 'prf_index_coord', 'Att_bar_coord', 'UAtt_bar_coord', 
-                                                            'inter_bar_dist', 'abs_inter_bar_dist', 'Att_ecc_label', 'UAtt_ecc_label']]
-                        df_betas_heatmap[['screen_x_coord', 'screen_y_coord']] = np.vstack((x_deg_arr, y_deg_arr)).T
-
-                        ## concat within roi
-                        ROI_betas_GRID_coord = pd.concat((ROI_betas_GRID_coord, df_betas_heatmap), ignore_index=True)
-                        
-                if not collapse_ecc:
-                    ## concat!
-                    DF_betas_GRID_coord = pd.concat((DF_betas_GRID_coord, ROI_betas_GRID_coord), ignore_index=True)
-
-                else:
-                    # collapsing same eccentricities of attended and unattended bar
-                    # while keeping flipped trial types
-                    ECC_betas_GRID_coord = self.collapse_conditions_ecc(DF_betas_bar_coord = ROI_betas_GRID_coord,
-                                                                        orientation_bars = orientation_bars,
-                                                                        collapse_coord_key = collapse_coord_key,
-                                                                        mirror_symetric = mirror_symetric)
-                    
-                    ## concat!
-                    DF_betas_GRID_coord = pd.concat((DF_betas_GRID_coord, ECC_betas_GRID_coord), ignore_index=True)
-
-        return DF_betas_GRID_coord
+                ecc_df.append(self.collapse_conditions_ecc(DF_betas_bar_coord = ROI_betas_GRID_coord,
+                                                                    orientation_bars = orientation_bars,
+                                                                    collapse_coord_key = collapse_coord_key,
+                                                                    mirror_symetric = mirror_symetric))
+            ecc_df = pd.concat(ecc_df, ignore_index = True)
+            output_df = ecc_df.copy()
+            
+        return output_df
 
     def collapse_conditions_ecc(self, DF_betas_bar_coord = None, orientation_bars = 'parallel_vertical', collapse_coord_key = None,
                                     mirror_symetric = True):
@@ -2038,14 +2031,17 @@ class GLMsingle_Model(Model):
                         # also store bar position for plotting
                         if int(flipped_trials) == 0:   
                             bar_pos = y_coord_grid[pos_ecc_rect_dict[Att_bar_ecc]]
+                            distractor_pos = y_coord_grid[pos_ecc_rect_dict[Att_bar_ecc] + abs_dist]
                         else:
                             bar_pos = y_coord_grid[pos_ecc_rect_dict[Att_bar_ecc] + abs_dist]
+                            distractor_pos = y_coord_grid[pos_ecc_rect_dict[Att_bar_ecc]]
                             
                         ## concat
                         mean_betas_df = pd.concat((mean_betas_df, 
                                                 pd.DataFrame({'ROI': np.repeat(roi_name, len(x_pos)),
                                                             'flipped_condition': np.repeat(int(flipped_trials), len(x_pos)),
                                                             'bar_pos': np.repeat(bar_pos, len(x_pos)),
+                                                            'distractor_pos': np.repeat(distractor_pos, len(x_pos)),
                                                             'Att_bar_ecc': np.repeat(Att_bar_ecc, len(x_pos)),
                                                             'abs_dist': np.repeat(abs_dist, len(x_pos)),
                                                             'x_pos': x_pos,

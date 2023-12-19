@@ -10,6 +10,8 @@ import itertools
 import glob
 import struct
 
+import subprocess
+
 ## imaging, processing, stats packages
 import nibabel as nib
 
@@ -548,7 +550,10 @@ class MRIUtils(Utils):
                 print('making %s'%output_file)
                 
                 data = np.load(input_file,allow_pickle=True)
-                crop_data = data[:,num_TR_crop:] 
+                if len(data.shape) == 4: # if working with niftis
+                    crop_data = data[...,num_TR_crop:] 
+                else:
+                    crop_data = data[:,num_TR_crop:] 
                         
                 print('new file with shape %s' %str(crop_data.shape))
                     
@@ -616,23 +621,33 @@ class MRIUtils(Utils):
                 print('making %s'%output_file)
                 
                 data = np.load(input_file,allow_pickle=True)
+                
+                if len(data.shape) == 4: # if working with niftis
+                    
+                    orig_shape = data.shape # keep original shape to use later
+                    
+                    n_voxels = np.prod(data[...,0].shape)
+                    n_trs = data.shape[-1]
+                    new_data = data.reshape(n_voxels, n_trs) # (voxels by time)
+                else:
+                    new_data = data.copy()
     
                 ### implement filter types, by calling their specific functions
                 if filter_type == 'HPgauss':
 
-                    data_filt = self.gausskernel_data(data, TR = TR, cut_off_hz = cut_off_hz)
+                    data_filt = self.gausskernel_data(new_data, TR = TR, cut_off_hz = cut_off_hz)
                     
                 elif filter_type == 'sg':
 
-                    data_filt = self.savgol_data(data, window_length = window_length, polyorder = polyorder)
+                    data_filt = self.savgol_data(new_data, window_length = window_length, polyorder = polyorder)
 
                 elif filter_type == 'dc': 
 
-                    data_filt = self.dc_data(data, first_modes_to_remove = first_modes_to_remove) 
+                    data_filt = self.dc_data(new_data, first_modes_to_remove = first_modes_to_remove) 
 
                 elif filter_type == 'LinDetrend':
 
-                    data_filt = self.detrend_data(data, detrend_type = 'linear', TR = TR, 
+                    data_filt = self.detrend_data(new_data, detrend_type = 'linear', TR = TR, 
                                                         baseline_inter1 = baseline_inter1, baseline_inter2 = baseline_inter2)
                     
                 else:
@@ -642,11 +657,11 @@ class MRIUtils(Utils):
                 # to compare the difference
                 if plot_vert:
 
-                    tsnr = self.get_tsnr(data, return_mean=False)
+                    tsnr = self.get_tsnr(new_data, return_mean=False)
                     
                     ind2plot = np.where(tsnr == np.nanmax(tsnr))[0][0]
                     fig = plt.figure()
-                    plt.plot(data[ind2plot,...], color='dimgray',label='Original data')
+                    plt.plot(new_data[ind2plot,...], color='dimgray',label='Original data')
                     plt.plot(data_filt[ind2plot,...], color='mediumseagreen',label='Filtered data')
 
                     plt.xlabel('Time (TR)')
@@ -656,6 +671,9 @@ class MRIUtils(Utils):
                     fig.savefig(output_file.replace(file_extension,'_vertex_%i.png'%ind2plot))
                 
                 ## save filtered file
+                if len(data.shape) == 4: # if working with niftis
+                    data_filt = data_filt.reshape(orig_shape)
+                
                 np.save(output_file,data_filt)
 
             # append out files
@@ -1206,6 +1224,57 @@ class MRIUtils(Utils):
 
         return outfiles
     
+    def convert_npz_nifti(self, file = None, nifti_path = None):
+        
+        """Load numpy file array (or list of) and save as nifit,
+        given affine and shape of original nifti
+        """
+        
+        # check if single filename or list of filenames
+        if isinstance(file, list) or isinstance(file, np.ndarray): 
+            file_list = file  
+        else:
+            file_list = [file]
+            
+        # store output filename in list
+        outfiles = []
+        
+        # for each file, do the same
+        for input_file in file_list:
+            
+            # set output filename
+            output_file = input_file.replace('.npy', '.nii.gz')
+            
+            # if file already exists, skip
+            if op.exists(output_file): 
+                print('already exists, skipping %s'%output_file)
+            else:
+                print('making %s'%output_file)  
+                
+                # load data
+                data = np.load(input_file, allow_pickle=True)
+            
+                # get file reference string, to find original nifti
+                file_reference = re.findall("(.*?)bold_nii", op.split(input_file)[-1])[0]
+                nifti_ref = op.join(nifti_path, file_reference+'bold.nii.gz')
+                
+                print('Loading affine from %s'%nifti_ref)
+                img = nib.load(nifti_ref)
+                
+                # make new nifti and save
+                new_img = nib.Nifti1Image(data, img.affine, img.header)
+                nib.save(new_img, output_file)
+                
+            # append out files
+            outfiles.append(output_file)
+            
+        # if input file was not list, then return output that is also not list
+        if not isinstance(file, list): 
+            outfiles = outfiles[0] 
+
+        return outfiles
+        
+    
     def select_confounds(self, file, outdir = None, reg_names = ['a_comp_cor','cosine','framewise_displacement'],
                         CumulativeVarianceExplained = 0.4, num_TR_crop = 5, select = 'num', num_components = 5):
         
@@ -1643,6 +1712,73 @@ class MRIUtils(Utils):
         f.write(b2)
         f.write(b3)
 
+    def get_register_dat(self, freesurfer_mri_pth = None, mov_file = 'rawavg.mgz', 
+                                targ_file = 'orig.mgz', overwrite = False):
+        
+        """Create freesurfer register.dat file 
+        for a given participant with tkregisterfv
+        """
+        
+        ## get FS orig files (structural mgz files)
+        mov = op.join(freesurfer_mri_pth, mov_file)
+        targ = op.join(freesurfer_mri_pth, targ_file)
+
+        # where to save register.dat file
+        out_file = op.join(op.dirname(targ), 'register.dat')
+
+        ## check if register.dat file already in dir
+        if op.isfile(out_file) and overwrite == False:
+            print('will not overwrite register.dat file')
+        else:
+            ## write command for tkregisterfv
+            cmd = f"tkregisterfv --mov {mov} --targ {targ} --reg {out_file} --no-config --regheader".format(mov = mov,
+                                                                                                    targ = targ,
+                                                                                                    out_file = out_file)
+            os.system(cmd)
+            
+        ## actually read file
+        with open(out_file) as f:
+            d = f.readlines()[4:-1]
+        regist_arr = np.array([[float(s) for s in dd.split() if s] for dd in d])
+        
+        return regist_arr
+        
+    def get_vox2ras_tkr(self, mov = None):
+        
+        """Get transform vox2ras-tkr matrix from an image (Torig/Tmov on the FreeSurfer wiki)
+        """
+        
+        mri_cmd = ('mri_info', '--vox2ras-tkr', mov)
+        print(mri_cmd)
+        
+        # get torig matrix
+        L = subprocess.check_output(mri_cmd).splitlines()
+        torig = np.array([[np.float(s) for s in ll.split() if s] for ll in L])
+
+        return torig
+    
+    def get_ras2vox(self, img = None):
+
+        """
+        fetch the ras2vox matrix from an image (Rorig on the FreeSurfer wiki)
+        """
+
+        cmd = ('mri_info', '--ras2vox', img)
+        L = subprocess.check_output(cmd).splitlines()
+        rorig = np.array([[np.float(s) for s in ll.split() if s] for ll in L])
+
+        return rorig
+    
+    def get_vox2ras(self, img = None):
+
+        """fetch the vox2ras matrix from an image (Norig on the FreeSurfer wiki)"""
+
+        cmd = ('mri_info', '--vox2ras', img)
+        L = subprocess.check_output(cmd).splitlines()
+        norig = np.array([[np.float(s) for s in ll.split() if s] for ll in L])
+
+        return norig
+        
 
     def CV_FA(voxel,dm,betas):
         

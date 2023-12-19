@@ -1048,6 +1048,11 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
 
                     proc_files = self.MRIObj.mri_utils.crop_epi(bold_files, outdir = output_pth, num_TR_crop = crop_TR)
 
+                    if self.MRIObj.sj_space == 'T1w': # if working with niftis
+                        # convert back to nifti
+                        nifti_files = self.MRIObj.mri_utils.convert_npz_nifti(file = proc_files, 
+                                                                              nifti_path = fmriprep_pth)
+                        
                     ## first sub select confounds that we are using, and store in output dir
                     # even if we dont filter them out now, we might want to use them later in GLM
                     confounds_list = self.MRIObj.mri_utils.select_confounds(confound_files, outdir = output_pth, reg_names = self.MRIObj.params['mri']['confounds']['regs'],
@@ -1083,7 +1088,12 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                     # if output path doesn't exist, create it
                     os.makedirs(final_output_dir, exist_ok = True)
                     print('saving FINAL processed files in %s'%final_output_dir)
-
+                    
+                    if self.MRIObj.sj_space == 'T1w': # if working with niftis
+                        # convert back to nifti
+                        nifti_files = self.MRIObj.mri_utils.convert_npz_nifti(file = proc_files, 
+                                                                              nifti_path = fmriprep_pth)
+                        
                     ## average all runs for pRF task
                     if tsk == 'pRF':
                         
@@ -1104,7 +1114,7 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                         for f in proc_files:
                             copyfile(f, op.join(final_output_dir,op.split(f)[-1]))
 
-    def get_mrifile_ext(self):
+    def get_mrifile_ext(self, nifti_file = False):
 
         """
         Helper script to get processed (post fmriprep) file extension
@@ -1125,7 +1135,11 @@ echo "Job $SLURM_JOBID finished at `date`" | mail $USER -s "Job $SLURM_JOBID"
                 file_ext[tsk] += '_{name}'.format(name = self.MRIObj.params['mri']['filtering']['type'][tsk])
             # type of standardization 
             file_ext[tsk] += '_{name}'.format(name = self.MRIObj.params[tsk]['standardize'])
-            # don't forget its a numpy array
-            file_ext[tsk] += '.npy'
+            
+            # don't forget its a numpy array/nifti
+            if nifti_file:
+                file_ext[tsk] += '.nii.gz'
+            else:
+                file_ext[tsk] += '.npy'
 
         return file_ext

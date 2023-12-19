@@ -741,11 +741,16 @@ class pRF_model(Model):
                  
         return fitpar_dict
 
-    def get_pp_fit_dir(self, participant, run_type = 'mean', ses = 'mean', iterative = True, model_name = 'gauss'):
+    def get_pp_fit_dir(self, participant, run_type = 'mean', ses = 'mean', iterative = True, model_name = 'gauss',
+                            sj_space = None):
 
         """
         Helper func to get participant prf fit dir
         """
+        
+        # if we didnt explicitly define subject space of prf fits
+        if sj_space is None:
+            sj_space = self.MRIObj.sj_space 
 
         # if we want to load iterative results, or grid (iterative = False)
         if iterative:
@@ -755,10 +760,10 @@ class pRF_model(Model):
 
         ## path to estimates
         if 'loo_' in run_type:
-            pRFdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type, est_folder)
+            pRFdir = op.join(self.outputdir, sj_space, 'sub-{sj}'.format(sj = participant), run_type, est_folder)
             crossval = True
         else:
-            pRFdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses), est_folder)
+            pRFdir = op.join(self.outputdir, sj_space, 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses), est_folder)
             crossval = False
 
         return pRFdir
@@ -842,7 +847,8 @@ class pRF_model(Model):
 
     def load_pRF_model_estimates(self, participant_list = [], ses = 'mean', run_type = 'mean', model_name = None, 
                                     iterative = True, fit_hrf = False, mask_bool_df = None, stim_on_screen = [], total_chunks = None,
-                                    mask_arr = True, rsq_threshold = .1, positive_rf = True, size_std = 2.5):
+                                    mask_arr = True, rsq_threshold = .1, positive_rf = True, size_std = 2.5,
+                                    sj_space = None):
 
         """
         Load pRF model estimates
@@ -886,6 +892,10 @@ class pRF_model(Model):
                                         ses2model = ses, mask_bool_df = mask_bool_df,
                                         stim_on_screen = stim_on_screen)
         
+        # if we didnt explicitly define subject space of prf fits
+        if sj_space is None:
+            sj_space = self.MRIObj.sj_space 
+        
         # empty dict where we'll store all participant estimates
         pp_prf_est_dict = {}
 
@@ -894,19 +904,20 @@ class pRF_model(Model):
 
             ## path to estimates
             if 'loo_' in run_type:
-                pRFdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), run_type, est_folder)
+                pRFdir = op.join(self.outputdir, sj_space, 'sub-{sj}'.format(sj = participant), run_type, est_folder)
                 crossval = True
             else:
-                pRFdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses), est_folder)
+                pRFdir = op.join(self.outputdir, sj_space, 'sub-{sj}'.format(sj = participant), 'ses-{s}'.format(s = ses), est_folder)
                 crossval = False
 
             # append
-            if self.MRIObj.sj_space in ['fsnative']:
+            if sj_space in ['fsnative']:
                 pp_prf_est_dict['sub-{sj}'.format(sj=participant)] = self.load_pRF_model_hemis(pRFdir, fit_model = model_name,
                                                         basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
                                                                                                                     acq = self.MRIObj.acq,
                                                                                                                     rt = run_type),
-                                                        fit_hrf = fit_hrf, iterative = iterative, crossval = crossval)
+                                                        fit_hrf = fit_hrf, iterative = iterative, crossval = crossval,
+                                                        sj_space = sj_space)
             else:
                 pp_prf_est_dict['sub-{sj}'.format(sj=participant)] = self.load_pRF_model_chunks(pRFdir, fit_model = model_name,
                                                         basefilename = 'sub-{sj}_task-pRF_acq-{acq}_runtype-{rt}'.format(sj = participant,
@@ -936,7 +947,7 @@ class pRF_model(Model):
         return pp_prf_estimates, pp_prf_models
     
     def load_pRF_model_hemis(self, fit_path, fit_model = 'css', fit_hrf = False, basefilename = None, 
-                                    overwrite = False, iterative = True, crossval = False):
+                                    overwrite = False, iterative = True, crossval = False, sj_space = None):
         
         """ 
         combine all both hemispheres from fsnative fit
@@ -957,8 +968,12 @@ class pRF_model(Model):
         estimates : npz 
             numpy array of estimates
         """
+        
+        # if we didnt explicitly define subject space of prf fits
+        if sj_space is None:
+            sj_space = self.MRIObj.sj_space 
 
-        if not self.MRIObj.sj_space in ['fsnative']:
+        if not sj_space in ['fsnative']:
             raise NameError('Not using fsnative surface, used other function')
 
         # if we are fitting HRF, then we want to look for those files

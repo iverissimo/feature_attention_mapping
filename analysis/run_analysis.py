@@ -171,6 +171,7 @@ hemis2fit = [hemisphere]
 if FAM_data.sj_space in ['fsnative', 'fsaverage'] and hemisphere == 'BH':
     hemis2fit = ['hemi-L', 'hemi-R']
 
+
 ## run specific steps ##
 match task:
 
@@ -213,6 +214,12 @@ match task:
     case 'FA':
 
         if py_cmd == 'fitmodel': # fit FA model
+            
+            # if using niftis, then load prf estimates from fsnative --> FOR NOW
+            if FAM_mri.MRIObj.sj_space == 'T1w':
+                prf_sj_space = 'fsnative'
+            else:
+                prf_sj_space = FAM_mri.MRIObj.sj_space
 
             print('Loading pRF {mn} model estimates\n'.format(mn = prf_model_name))
             print('fit HRF params set to {op}\n'.format(op = fit_hrf))
@@ -220,6 +227,7 @@ match task:
             ## load pRF estimates - implies pRF model was already fit (should change to fit pRF model on the spot if needed)
             pp_prf_estimates, pp_prf_models = FAM_pRF.load_pRF_model_estimates(participant_list = FAM_data.sj_num, 
                                                                             ses = 'mean', run_type = 'mean', 
+                                                                            sj_space = prf_sj_space,
                                                                             model_name = prf_model_name, iterative = True, 
                                                                             fit_hrf = fit_hrf,
                                                                             mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
@@ -247,13 +255,17 @@ match task:
 
                         # get participant bar positions for FA task
                         pp_bar_pos_df = FAM_beh.load_FA_bar_position(pp, ses_num = None, ses_type = 'func', run_num = None)
+                        
+                        if FAM_mri.MRIObj.sj_space == 'T1w': # if using nifti, then flag it for other funcs
+                            nifti_bool = True
 
                         for hemi in hemis2fit: # iterate over hemispheres
 
                             _ = FAM_FA.fit_data(pp, pp_prf_estimates['sub-{sj}'.format(sj = pp)], 
                                                 pp_prf_models['sub-{sj}'.format(sj = pp)]['ses-mean']['{mname}_model'.format(mname = prf_model_name)],  
                                                 file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 99, 
-                                                file_extent_nm = FAM_mri.get_mrifile_ext(), fit_hrf = False,
+                                                file_extent_nm = FAM_mri.get_mrifile_ext(nifti_file=nifti_bool), 
+                                                fit_hrf = False,
                                                 pp_bar_pos_df = pp_bar_pos_df, hemisphere = hemi) 
                             
                 case 'gain':

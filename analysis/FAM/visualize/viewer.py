@@ -7,6 +7,8 @@ import pandas as pd
 import seaborn as sns
 import yaml
 
+import nibabel as nib
+
 import ptitprince as pt # raincloud plots
 import matplotlib.patches as mpatches
 from  matplotlib.ticker import FuncFormatter
@@ -121,6 +123,31 @@ class Viewer:
         except:
             raise Exception('Palette not available.')
         
+    def load_ROIs_RAScoords(self, sub_id = None, ROI_list = [], surfname = 'midthickness'):
+        
+        """Load ROIs dict with surface coordinates (vertex RAS)
+        """
+        
+        ## load ROIs dict for participant
+        # separated by hemisphere
+        hemi_pp_ROI_dict = {}
+        hemi_pp_ROI_dict['lh'] = self.load_ROIs_dict(sub_id = sub_id, hemisphere = 'LH')
+        hemi_pp_ROI_dict['rh'] = self.load_ROIs_dict(sub_id = sub_id, hemisphere = 'RH', index_hemi = True)
+        
+        ## get RAS coordinates of surf vertices 
+        coords_ras = {}
+        coords_ras['lh'], _ = nib.freesurfer.io.read_geometry(op.join(self.MRIObj.freesurfer_pth, 
+                                                    'sub-{sj}'.format(sj = sub_id), 
+                                                    'surf', 'lh.{s}'.format(s = surfname))) #f'lh.white'))
+        coords_ras['rh'], _ = nib.freesurfer.io.read_geometry(op.join(self.MRIObj.freesurfer_pth, 
+                                                    'sub-{sj}'.format(sj = sub_id), 
+                                                    'surf','rh.{s}'.format(s = surfname))) # f'rh.white'))
+        
+        ## get coordinates RAS for each ROI dicts
+        ROIS_ras = {key: {roi_name: (coords_ras[key][hemi_pp_ROI_dict[key][roi_name],:]) for roi_name in ROI_list} for key in ['lh','rh']}
+
+        return ROIS_ras
+        
     def load_group_ROIs(self, participant_list = []):
         
         """
@@ -129,7 +156,7 @@ class Viewer:
         
         [self.load_ROIs_dict(sub_id = pp) for pp in participant_list]
         
-    def load_ROIs_dict(self, sub_id = None, hemisphere = 'BH'):
+    def load_ROIs_dict(self, sub_id = None, hemisphere = 'BH', index_hemi = False):
 
         """
         Load ROIs dict, for the participant
@@ -139,6 +166,10 @@ class Viewer:
         ----------
         sub_id : str
             participant ID
+        hemisphere:
+            if we want to return dict with vertex number splitted by hesmisphere (LH/RH) or merged (BH)
+        index_hemi: bool
+            if true, will return vertex number specific for hemisphere
         """
 
         if isinstance(self.use_atlas, str): # if we are using atlas ROIs
@@ -165,8 +196,13 @@ class Viewer:
 
             # iterate over rois and get vertices
             hemi_pp_ROI_dict = {Rkey: (verts[np.where(verts < hemi_vert_num)[0]] if hemisphere == 'LH' else verts[np.where(verts >= hemi_vert_num)[0]]) for Rkey, verts in pp_ROI_dict.items()}
-
-            return hemi_pp_ROI_dict
+            
+            # if we want indices to be hemisphere specific
+            if index_hemi and hemisphere == 'RH':
+                new_dict = {Rkey: (hemi_pp_ROI_dict[Rkey] - hemi_vert_num) for Rkey, _ in pp_ROI_dict.items()}
+                return new_dict  
+            else:           
+                return hemi_pp_ROI_dict
 
     def get_pysub_name(self, sub_id = None):
 

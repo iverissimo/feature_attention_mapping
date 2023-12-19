@@ -629,7 +629,7 @@ class GLMsingle_Model(Model):
     def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', 
                         smooth_nm = True, perc_thresh_nm = 95, n_jobs = 8,
                         seed_num = 2023, kernel = 3, nr_iter = 3, normalize = False,
-                        pp_bar_pos_df = {}, fit_hrf = False, hemisphere = 'BH',
+                        pp_bar_pos_df = {}, fit_hrf = False, hemisphere = 'BH', use_corr_mask = True,
                         file_extent_nm = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_LinDetrend_psc.npy'}):
 
         """
@@ -672,6 +672,11 @@ class GLMsingle_Model(Model):
 
         os.makedirs(outdir, exist_ok = True)
         print('saving files in %s'%outdir)
+        
+        # if fitting niftis, need to make some changes
+        if self.MRIObj.sj_space == 'T1w':
+            use_corr_mask = False
+            file_ext = file_ext.replace('.npy', '.nii.gz')
 
         ## get list of files to load
         bold_filelist = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'FA', ses = 'all', file_ext = file_ext,
@@ -694,33 +699,34 @@ class GLMsingle_Model(Model):
         ## get average hrf
         hrf_final = self.get_average_hrf(pp_prf_estimates, prf_modelobj, rsq_threshold = self.prf_rsq_threshold)
         
-        ### make mask array of pRF high fitting voxels,
-        # to give as input to glmsingle (excluding them from noise pool)
-        pRFcorr_filename = op.join(outdir, 'spcorrelation_task-pRF.npy')
+        if use_corr_mask:
+            ### make mask array of pRF high fitting voxels,
+            # to give as input to glmsingle (excluding them from noise pool)
+            pRFcorr_filename = op.join(outdir, 'spcorrelation_task-pRF.npy')
 
-        binary_prf_mask = self.get_correlation_mask(participant, task = 'pRF', ses = 'mean', 
-                                                    file_ext = file_extent_nm['pRF'], n_jobs = n_jobs, 
-                                                    seed_num = seed_num, perc_thresh_nm = perc_thresh_nm, 
-                                                    smooth = smooth_nm, kernel = kernel, nr_iter = nr_iter, 
-                                                    normalize = normalize, hemisphere = hemisphere,
-                                                    filename = pRFcorr_filename)
-        # load correlation array - glmsingle deletes files in folder, should fix later
-        corr_pRF = np.load(pRFcorr_filename, allow_pickle=True)
+            binary_prf_mask = self.get_correlation_mask(participant, task = 'pRF', ses = 'mean', 
+                                                        file_ext = file_extent_nm['pRF'], n_jobs = n_jobs, 
+                                                        seed_num = seed_num, perc_thresh_nm = perc_thresh_nm, 
+                                                        smooth = smooth_nm, kernel = kernel, nr_iter = nr_iter, 
+                                                        normalize = normalize, hemisphere = hemisphere,
+                                                        filename = pRFcorr_filename)
+            # load correlation array - glmsingle deletes files in folder, should fix later
+            corr_pRF = np.load(pRFcorr_filename, allow_pickle=True)
 
-        ## now do the same correlation mask for the FA runs
-        FAcorr_filename = pRFcorr_filename.replace('-pRF', '-FA')
+            ## now do the same correlation mask for the FA runs
+            FAcorr_filename = pRFcorr_filename.replace('-pRF', '-FA')
 
-        binary_fa_mask = self.get_correlation_mask(participant, task = 'FA', ses = 'mean', 
-                                                    file_ext = file_extent_nm['FA'], n_jobs = n_jobs, 
-                                                    seed_num = int(seed_num * 2), perc_thresh_nm = perc_thresh_nm, 
-                                                    smooth = smooth_nm, kernel = kernel, nr_iter = nr_iter, 
-                                                    normalize = normalize, hemisphere = hemisphere,
-                                                    filename = FAcorr_filename)
-        # load correlation array - glmsingle deletes files in folder, should fix later
-        corr_FA = np.load(FAcorr_filename, allow_pickle=True)
+            binary_fa_mask = self.get_correlation_mask(participant, task = 'FA', ses = 'mean', 
+                                                        file_ext = file_extent_nm['FA'], n_jobs = n_jobs, 
+                                                        seed_num = int(seed_num * 2), perc_thresh_nm = perc_thresh_nm, 
+                                                        smooth = smooth_nm, kernel = kernel, nr_iter = nr_iter, 
+                                                        normalize = normalize, hemisphere = hemisphere,
+                                                        filename = FAcorr_filename)
+            # load correlation array - glmsingle deletes files in folder, should fix later
+            corr_FA = np.load(FAcorr_filename, allow_pickle=True)
 
-        ### final mask is multiplication of the two
-        final_mask = binary_fa_mask * binary_prf_mask
+            ### final mask is multiplication of the two
+            final_mask = binary_fa_mask * binary_prf_mask
 
         # create a directory for saving GLMsingle outputs
         opt = dict()
@@ -736,7 +742,8 @@ class GLMsingle_Model(Model):
             opt['hrftoassume'] = hrf_final
         opt['hrfonset'] = 0 # already setting onset in hrf
 
-        opt['brainexclude'] = final_mask.astype(int)
+        if use_corr_mask:
+            opt['brainexclude'] = final_mask.astype(int)
         opt['sessionindicator'] = self.ses_num_arr 
         opt['brainthresh'] = [99, 0] # which allows all voxels to pass the intensity threshold --> we use surface data
         opt['brainR2'] = 100 # not using on-off model for noise pool
@@ -797,12 +804,13 @@ class GLMsingle_Model(Model):
         trial_combinations_df.to_csv(op.join(outdir, 'trial_combinations_df.csv'), sep='\t', index=False)#, quoting=csv.QUOTE_ALL)
         
         # also save binary mask, to later check
-        np.save(pRFcorr_filename.replace('spcorrelation', 'binary_mask_spcorrelation'), binary_prf_mask)
-        np.save(FAcorr_filename.replace('spcorrelation', 'binary_mask_spcorrelation'), binary_fa_mask)
+        if use_corr_mask:
+            np.save(pRFcorr_filename.replace('spcorrelation', 'binary_mask_spcorrelation'), binary_prf_mask)
+            np.save(FAcorr_filename.replace('spcorrelation', 'binary_mask_spcorrelation'), binary_fa_mask)
 
-        # save correlations again
-        np.save(pRFcorr_filename, corr_pRF)
-        np.save(FAcorr_filename, corr_FA)
+            # save correlations again
+            np.save(pRFcorr_filename, corr_pRF)
+            np.save(FAcorr_filename, corr_FA)
 
     def load_betas_coord(self, participant_list = [], ROIs_dict = {}, model_type = 'D', prf_bar_coords_dict = {},
                                 att_color_ses_run_dict = {}, betas_per_color = False, file_ext = '_cropped.npy', 

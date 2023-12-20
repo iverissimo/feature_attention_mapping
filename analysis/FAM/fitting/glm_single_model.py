@@ -676,7 +676,7 @@ class GLMsingle_Model(Model):
         # if fitting niftis, need to make some changes
         if self.MRIObj.sj_space == 'T1w':
             use_corr_mask = False
-            file_ext = file_ext.replace('.npy', '.nii.gz')
+            #file_ext = file_ext.replace('.npy', '.nii.gz')
 
         ## get list of files to load
         bold_filelist = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'FA', ses = 'all', file_ext = file_ext,
@@ -745,8 +745,8 @@ class GLMsingle_Model(Model):
         if use_corr_mask:
             opt['brainexclude'] = final_mask.astype(int)
         opt['sessionindicator'] = self.ses_num_arr 
-        opt['brainthresh'] = [99, 0] # which allows all voxels to pass the intensity threshold --> we use surface data
-        opt['brainR2'] = 100 # not using on-off model for noise pool
+        #opt['brainthresh'] = [99, 0] # which allows all voxels to pass the intensity threshold --> we use surface data
+        #opt['brainR2'] = 100 # not using on-off model for noise pool
 
         # define polynomials to project out from data (we only want to use intercept and slope)
         opt['maxpolydeg'] = [[0, 1] for _ in range(data.shape[0])]

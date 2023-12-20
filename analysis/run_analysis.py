@@ -170,7 +170,7 @@ FAM_pRF.fit_hrf = fit_hrf
 hemis2fit = [hemisphere]
 if FAM_data.sj_space in ['fsnative', 'fsaverage'] and hemisphere == 'BH':
     hemis2fit = ['hemi-L', 'hemi-R']
-
+nifti_bool = False
 
 ## run specific steps ##
 match task:

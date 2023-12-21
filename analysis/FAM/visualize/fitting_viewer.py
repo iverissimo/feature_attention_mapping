@@ -8,7 +8,7 @@ import pandas as pd
 import seaborn as sns
 import yaml
 
-import ptitprince as pt # raincloud plots
+#import ptitprince as pt # raincloud plots
 import matplotlib.patches as mpatches
 from  matplotlib.ticker import FuncFormatter
 from matplotlib.lines import Line2D
@@ -2683,15 +2683,6 @@ class FAViewer(Viewer):
             
         ## load ROIs dict for all participants
         self.load_group_ROIs(participant_list = participant_list)
-        
-        # if we want to mask betas according to pRF behavior
-        if mask_betas:
-            prf_bar_coords_dict = self.pRFModelObj.get_masked_bar_coords(participant_list = participant_list, 
-                                                                        ses = 'mean', 
-                                                                        mask_bool_df = mask_bool_df, 
-                                                                        bar_direction = None)
-        else:
-            prf_bar_coords_dict = {}
             
         ## load betas dataframe for all participants in list
         DF_betas_bar_coord_GROUP = self.FAModelObj.load_betas_coord(participant_list = participant_list, 

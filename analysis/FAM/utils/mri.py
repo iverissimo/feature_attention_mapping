@@ -65,81 +65,139 @@ class MRIUtils(Utils):
         """
         
     def create_T1mask_from_label(self, sub_id = None, freesurfer_pth = None, sourcedata_pth = None,
-                                 roi_name = 'V1', index_arr = []):
+                                 roi_name = 'V1', index_arr = [], filename = None):
         
         """Convert T1w image mask object from custom ROI label files
         Can also mask further in we provide value array (ex: index of prf fit vertices)
         """
         
-        ## load T1w image for reference
-
-        # path for sourcedata anat files of that participant
-        anat_pth = glob.glob(op.join(sourcedata_pth, 'sub-{sj}'.format(sj = sub_id), 
-                                     'ses-*', 'anat'))[0]
-        T1_filename = [op.join(anat_pth,val) for val in os.listdir(anat_pth) if val.endswith('.nii.gz') and 'T1w' in val][0]
-        T1_img = neuropythy.io.load(T1_filename)
-
-        # clear image of data, because we will fill it with mask values
-        T1_img_empty = neuropythy.mri.to_image(neuropythy.mri.image_clear(T1_img, fill=0.0), 
-                                                                            dtype=np.int32)
-
-        ## import freesurfer subject
-        fs_sub = neuropythy.freesurfer.subject(op.join(freesurfer_pth, 
-                                                       'sub-{sj}'.format(sj = sub_id)))
-        
-        # get path to FS labels 
-        # and make generic base path str that can be update later
-        sub_label_str = op.join(freesurfer_pth, 'sub-{sj}'.format(sj = sub_id), 
-                                'label', '{hemi}.custom.{roi}.label')
-        
-        # get mask of ROI indices
-        mask_ix_l = nilearn.surface.load_surf_data(sub_label_str.format(hemi = 'lh', roi = roi_name))
-        mask_ix_r = nilearn.surface.load_surf_data(sub_label_str.format(hemi = 'rh', roi = roi_name))
-        
-        # join hemi masks
-        mask_l = np.zeros(fs_sub.LH.values()['vertex_count'])
-        mask_l[mask_ix_l] = 1
-        mask_r = np.zeros(fs_sub.RH.values()['vertex_count'])
-        mask_r[mask_ix_r] = 1
-        mask_data = [mask_l, mask_r]
-        
-        # if we provided an index array, mask out vertices that are not relevant
-        if len(index_arr) > 0:
-            
-            mask_data = np.concatenate(mask_data)
-            
-            # create index mask
-            index_mask = np.zeros(mask_data.shape)
-            index_mask[list(index_arr)] = 1
-            
-            # actually mask
-            mask_data[index_mask == 0] = 0 
-            mask_tuple = tuple([mask_data[:fs_sub.LH.values()['vertex_count']],
-                                mask_data[fs_sub.LH.values()['vertex_count']:]])
+        if filename is not None and op.isfile(filename):
+            print('Loading %s'%filename)
+            mask_img = neuropythy.io.load(filename) 
         else:
-            mask_tuple = tuple(mask_data)
+            print('Making T1w mask for ROI %s'%roi_name)
+        
+            ## load T1w image for reference
+            # path for sourcedata anat files of that participant
+            anat_pth = glob.glob(op.join(sourcedata_pth, 'sub-{sj}'.format(sj = sub_id), 
+                                        'ses-*', 'anat'))[0]
+            T1_filename = [op.join(anat_pth,val) for val in os.listdir(anat_pth) if val.endswith('.nii.gz') and 'T1w' in val][0]
+            T1_img = neuropythy.io.load(T1_filename)
+
+            # clear image of data, because we will fill it with mask values
+            T1_img_empty = neuropythy.mri.to_image(neuropythy.mri.image_clear(T1_img, fill=0.0), 
+                                                                                dtype=np.int32)
+
+            ## import freesurfer subject
+            fs_sub = neuropythy.freesurfer.subject(op.join(freesurfer_pth, 
+                                                        'sub-{sj}'.format(sj = sub_id)))
             
-        # make volume mask image
-        print('Generating volume...')
-        mask_img = fs_sub.cortex_to_image(mask_tuple,
-                                        T1_img_empty,
-                                        hemi = None,
-                                        method = 'nearest',
-                                        fill = 0.0)
+            # get path to FS labels 
+            # and make generic base path str that can be update later
+            sub_label_str = op.join(freesurfer_pth, 'sub-{sj}'.format(sj = sub_id), 
+                                    'label', '{hemi}.custom.{roi}.label')
+            
+            # get mask of ROI indices
+            mask_ix_l = nilearn.surface.load_surf_data(sub_label_str.format(hemi = 'lh', roi = roi_name))
+            mask_ix_r = nilearn.surface.load_surf_data(sub_label_str.format(hemi = 'rh', roi = roi_name))
+            
+            # join hemi masks
+            mask_l = np.zeros(fs_sub.LH.values()['vertex_count'])
+            mask_l[mask_ix_l] = 1
+            mask_r = np.zeros(fs_sub.RH.values()['vertex_count'])
+            mask_r[mask_ix_r] = 1
+            mask_data = [mask_l, mask_r]
+            
+            # if we provided an index array, mask out vertices that are not relevant
+            if len(index_arr) > 0:
+                
+                mask_data = np.concatenate(mask_data)
+                
+                # create index mask
+                index_mask = np.zeros(mask_data.shape)
+                index_mask[list(index_arr)] = 1
+                
+                # actually mask
+                mask_data[index_mask == 0] = 0 
+                mask_tuple = tuple([mask_data[:fs_sub.LH.values()['vertex_count']],
+                                    mask_data[fs_sub.LH.values()['vertex_count']:]])
+            else:
+                mask_tuple = tuple(mask_data)
+                
+            # make volume mask image
+            print('Generating volume...')
+            mask_img = fs_sub.cortex_to_image(mask_tuple,
+                                            T1_img_empty,
+                                            hemi = None,
+                                            method = 'nearest',
+                                            fill = 0.0)
+            
+            # save file
+            if filename is not None:
+                print('saving %s'%filename)
+                os.makedirs(op.dirname(filename), exist_ok=True)
+                neuropythy.io.save(filename, mask_img)
         
         return mask_img
+    
+    def resample_T1mask_to_func(self, mask_img = None, bold_filename = None, filename = None):
         
-    def get_masked_timeseries(self, mask_img = None, bold_filename = None):
+        """Resample mask image to func data format
+        """
+        if filename is not None and op.isfile(filename):
+            print('Loading %s'%filename)
+            mask_img = neuropythy.io.load(filename) 
+        else:
+            print('Resampling T1w mask to func dim')
+            
+            mask_img = nilearn.image.resample_to_img(mask_img, 
+                                                    bold_filename, interpolation='nearest')
+            
+            # save file
+            if filename is not None:
+                print('saving %s'%filename)
+                os.makedirs(op.dirname(filename), exist_ok=True)
+                neuropythy.io.save(filename, mask_img)
+                
+        return mask_img
+        
+    def get_masked_timeseries(self, mask_img = None, bold_filename = None, resample_mask = True,
+                                    filename = None, return_arr = True):
         
         """Resample mask image to func data format
         and then apply mask to get 2D array
+        (save data as pd dataframe)
         """
-        mask_img = nilearn.image.resample_to_img(mask_img, 
-                                                bold_filename, interpolation='nearest')
         
-        masked_data = nilearn.masking.apply_mask(bold_filename, mask_img)
+        if filename is not None and op.isfile(filename):
+            print('Loading %s'%filename)
+            masked_data_df = pd.read_csv(filename, sep='\t', index_col=['time'], compression='gzip').astype(np.float32)
+        else:
+            print('Masking data file')
         
-        return masked_data
+            if resample_mask: 
+                print('resampling mask image first')
+                mask_img = nilearn.image.resample_to_img(mask_img, 
+                                                        bold_filename, interpolation='nearest')
+                
+            masked_data = nilearn.masking.apply_mask(bold_filename, mask_img)
+            
+            # convert to dataframe
+            masked_data_df = pd.DataFrame(masked_data, 
+                                        index=pd.Index(np.arange(len(masked_data)), name='time'),
+                                        columns = pd.Index(range(masked_data.shape[1]), name='source')).astype(np.float32)
+
+            # save dataframe
+            if filename is not None:
+                print('saving %s'%filename)
+                os.makedirs(op.dirname(filename), exist_ok=True)
+                masked_data_df.to_csv(filename, sep='\t', header = True, index = True)
+           
+        # if we want data as array     
+        if return_arr:
+            return masked_data_df.to_numpy()
+        else:
+            return masked_data_df
         
 
     def create_atlas_df(self, annot_filename = '', pysub = 'hcp_999999', atlas_name = 'glasser'):

@@ -399,6 +399,95 @@ class Model:
                                                         distance_cm = self.MRIObj.params['monitor']['distance'], 
                                                         vert_res_pix = self.MRIObj.screen_res[1])
 
-                    
+    def get_ROImask_data(self, participant, file_list = None, task = 'pRF', run_type = 'mean', ses = 'mean', 
+                            roi_name = 'V1', index_arr = []):
+        
+        """load data from file list of given participant
+        will subselect files from filelist depending on run/session/task at hand
+        
+        and get ROI masked data (from FS labels turned volume image) 
+        """
+        
+        # if loading specific run
+        if isinstance(run_type, int) or (isinstance(run_type, str) and 'loo_' not in run_type and len(re.findall(r'\d{1,10}', run_type))>0):
 
+            if not isinstance(ses, int) or not (isinstance(ses, str) and len(re.findall(r'\d{1,10}', ses))>0):
+                raise ValueError('Want to run specific run but did not provide session number!')
+            else:
+                run = re.findall(r'\d{1,10}', str(run_type))[0]
+                print('Loading run-{r} from ses-{s}'.format(r = run, s = ses))
 
+                file_list = [file for file in file_list if 'run-{r}'.format(r = run) in file and 'ses-{s}'.format(s = ses) in file]
+
+        # if leaving one run out
+        elif 'loo_' in run_type:
+            
+            print('Leave-one out runs ({r})'.format(r = run_type))
+            _, file_list = self.MRIObj.mri_utils.get_loo_filename(file_list, loo_key=run_type)               
+
+        ## first get label mask for ROI
+        # (store in derivatives)
+        out_dir_ROI_mask = op.join(self.MRIObj.derivatives_pth, 'ROI_masks', 'sub-{sj}'.format(sj = participant))
+        
+        # get mask in T1w image space
+        T1_im_mask = self.MRIObj.mri_utils.create_T1mask_from_label(sub_id = participant, 
+                                                            freesurfer_pth = self.MRIObj.freesurfer_pth,
+                                                            sourcedata_pth = self.MRIObj.sourcedata_pth,
+                                                            roi_name = roi_name,
+                                                            index_arr = index_arr,
+                                                            filename = op.join(out_dir_ROI_mask, 
+                                                                            '{roi}_mask_T1w.nii.gz'.format(roi = roi_name)))
+
+        # resample mask to func image space
+        func_im_mask = self.MRIObj.mri_utils.resample_T1mask_to_func(mask_img = T1_im_mask, 
+                                                                  bold_filename = file_list[0],
+                                                                  filename = op.join(out_dir_ROI_mask, 
+                                                                            '{roi}_mask_bold.nii.gz'.format(roi = roi_name)))
+
+        # now actually load and mask data
+        # and save as dataframe
+        out_dir_ROI_mask_data = op.join(self.MRIObj.derivatives_pth, 'masked_data', 'sub-{sj}'.format(sj = participant))
+        
+        masked_data_all = [] 
+        for r, file in enumerate(file_list):
+            
+            ## get run number, and ses number in list of ints
+            # useful for when fitting several runs at same time
+            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(file)
+            
+            # make filename
+            csv_filename = op.join(out_dir_ROI_mask_data, 
+                                   'sub-{sj}_task-{tsk}_ses-{session}_run-{run}_{roi}_timeseries.tsv.gz'.format(sj = participant,
+                                                                                                                tsk = task,
+                                                                                                                session = file_sn,
+                                                                                                                run = file_rn,
+                                                                                                                roi = roi_name))
+            
+            # append data arrays
+            masked_data = self.MRIObj.mri_utils.get_masked_timeseries(mask_img = func_im_mask, 
+                                                                    bold_filename = file,
+                                                                    resample_mask = False,
+                                                                    filename = csv_filename,
+                                                                    return_arr = True)
+            # transpose to have (runs, voxel, TR)
+            masked_data_all.append(masked_data.T[np.newaxis, ...])
+        masked_data_all = np.vstack(masked_data_all)
+
+        # if we want to average across runs
+        if ses == 'mean':
+            out_data = np.mean(masked_data_all, axis = 0)
+            # transpose back and save
+            out_data = out_data.T
+            
+            # convert to dataframe
+            out_data_df = pd.DataFrame(out_data, 
+                                        index=pd.Index(np.arange(len(out_data)), name='time'),
+                                        columns = pd.Index(range(out_data.shape[1]), name='source')).astype(np.float32)
+
+            mean_csv_filename = csv_filename.replace('ses-{session}_run-{run}'.format(session = file_sn,
+                                                                                      run = file_rn),
+                                                     'ses-mean')
+            print('saving %s'%mean_csv_filename)
+            out_data_df.to_csv(mean_csv_filename, sep='\t', header = True, index = True)
+        
+            return out_data_df

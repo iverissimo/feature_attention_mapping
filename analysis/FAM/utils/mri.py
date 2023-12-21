@@ -20,6 +20,7 @@ from scipy.signal import savgol_filter, fftconvolve
 from scipy import fft, interpolate
 from scipy.stats import t, norm, linregress
 
+import nilearn
 from nilearn import surface, signal
 
 from nilearn.glm.first_level.hemodynamic_models import spm_hrf, spm_time_derivative, spm_dispersion_derivative
@@ -52,6 +53,8 @@ from nilearn.glm.first_level.design_matrix import _cosine_drift as discrete_cosi
 
 from FAM.utils.general import Utils
 
+import neuropythy
+
 class MRIUtils(Utils):
 
     def __init__(self):
@@ -60,6 +63,84 @@ class MRIUtils(Utils):
         constructor for utilities mri class 
             
         """
+        
+    def create_T1mask_from_label(self, sub_id = None, freesurfer_pth = None, sourcedata_pth = None,
+                                 roi_name = 'V1', index_arr = []):
+        
+        """Convert T1w image mask object from custom ROI label files
+        Can also mask further in we provide value array (ex: index of prf fit vertices)
+        """
+        
+        ## load T1w image for reference
+
+        # path for sourcedata anat files of that participant
+        anat_pth = glob.glob(op.join(sourcedata_pth, 'sub-{sj}'.format(sj = sub_id), 
+                                     'ses-*', 'anat'))[0]
+        T1_filename = [op.join(anat_pth,val) for val in os.listdir(anat_pth) if val.endswith('.nii.gz') and 'T1w' in val][0]
+        T1_img = neuropythy.io.load(T1_filename)
+
+        # clear image of data, because we will fill it with mask values
+        T1_img_empty = neuropythy.mri.to_image(neuropythy.mri.image_clear(T1_img, fill=0.0), 
+                                                                            dtype=np.int32)
+
+        ## import freesurfer subject
+        fs_sub = neuropythy.freesurfer.subject(op.join(freesurfer_pth, 
+                                                       'sub-{sj}'.format(sj = sub_id)))
+        
+        # get path to FS labels 
+        # and make generic base path str that can be update later
+        sub_label_str = op.join(freesurfer_pth, 'sub-{sj}'.format(sj = sub_id), 
+                                'label', '{hemi}.custom.{roi}.label')
+        
+        # get mask of ROI indices
+        mask_ix_l = nilearn.surface.load_surf_data(sub_label_str.format(hemi = 'lh', roi = roi_name))
+        mask_ix_r = nilearn.surface.load_surf_data(sub_label_str.format(hemi = 'rh', roi = roi_name))
+        
+        # join hemi masks
+        mask_l = np.zeros(fs_sub.LH.values()['vertex_count'])
+        mask_l[mask_ix_l] = 1
+        mask_r = np.zeros(fs_sub.RH.values()['vertex_count'])
+        mask_r[mask_ix_r] = 1
+        mask_data = [mask_l, mask_r]
+        
+        # if we provided an index array, mask out vertices that are not relevant
+        if len(index_arr) > 0:
+            
+            mask_data = np.concatenate(mask_data)
+            
+            # create index mask
+            index_mask = np.zeros(mask_data.shape)
+            index_mask[list(index_arr)] = 1
+            
+            # actually mask
+            mask_data[index_mask == 0] = 0 
+            mask_tuple = tuple([mask_data[:fs_sub.LH.values()['vertex_count']],
+                                mask_data[fs_sub.LH.values()['vertex_count']:]])
+        else:
+            mask_tuple = tuple(mask_data)
+            
+        # make volume mask image
+        print('Generating volume...')
+        mask_img = fs_sub.cortex_to_image(mask_tuple,
+                                        T1_img_empty,
+                                        hemi = None,
+                                        method = 'nearest',
+                                        fill = 0.0)
+        
+        return mask_img
+        
+    def get_masked_timeseries(self, mask_img = None, bold_filename = None):
+        
+        """Resample mask image to func data format
+        and then apply mask to get 2D array
+        """
+        mask_img = nilearn.image.resample_to_img(mask_img, 
+                                                bold_filename, interpolation='nearest')
+        
+        masked_data = nilearn.masking.apply_mask(bold_filename, mask_img)
+        
+        return masked_data
+        
 
     def create_atlas_df(self, annot_filename = '', pysub = 'hcp_999999', atlas_name = 'glasser'):
 
@@ -1274,7 +1355,6 @@ class MRIUtils(Utils):
 
         return outfiles
         
-    
     def select_confounds(self, file, outdir = None, reg_names = ['a_comp_cor','cosine','framewise_displacement'],
                         CumulativeVarianceExplained = 0.4, num_TR_crop = 5, select = 'num', num_components = 5):
         

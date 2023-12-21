@@ -116,7 +116,7 @@ mri: # refers to the Psychopy SyncGenerator class
 
   dummy_TR: 5 # we used extra 5 TRs in beginning that should be disregarded
 
-  space: 'T1w' #'fsnative' #'fsnative' #'fsLR_den-170k' #'fsaverage' # space of the files to be used in analysis
+  space: 'T1w' #'fsnative' #'fsLR_den-170k' #'fsaverage' # space of the files to be used in analysis
 
   file_ext:  {'fsLR_den-170k': '_bold.dtseries.nii', 
               'fsnative': '_bold.func.gii',
@@ -317,6 +317,7 @@ plotting:
   
   ROIs: {'fsaverage': ['V1','V2','V3','V3AB','hV4','LO','IPS0','IPS1','IPS2+','sPCS','iPCS'], 
         'fsnative': ['V1','V2','V3','V3AB','LO', 'hV4'], #['V1'], #
+        'T1w': ['V1','V2','V3','V3AB','LO', 'hV4'], #['V1'], #
         'fsLR_den-170k': ['V1','V2','V3','V3AB','LO','TO', 'hV4', 'VO', 'IPS', 'sIPS'], 
         'glasser': {'V1': ['V1'], 
                     'V2': ['V2'],

@@ -428,6 +428,9 @@ class Model:
         ## first get label mask for ROI
         # (store in derivatives)
         out_dir_ROI_mask = op.join(self.MRIObj.derivatives_pth, 'ROI_masks', 'sub-{sj}'.format(sj = participant))
+        mask_name = op.join(out_dir_ROI_mask, '{roi}_mask_T1w.nii.gz'.format(roi = roi_name))
+        if len(index_arr) > 0:
+            mask_name = mask_name.replace('_mask_T1w', '_index_mask_T1w')
         
         # get mask in T1w image space
         T1_im_mask = self.MRIObj.mri_utils.create_T1mask_from_label(sub_id = participant, 
@@ -435,20 +438,22 @@ class Model:
                                                             sourcedata_pth = self.MRIObj.sourcedata_pth,
                                                             roi_name = roi_name,
                                                             index_arr = index_arr,
-                                                            filename = op.join(out_dir_ROI_mask, 
-                                                                            '{roi}_mask_T1w.nii.gz'.format(roi = roi_name)))
+                                                            filename = mask_name)
+        
+        # new filename for bold
+        mask_name = mask_name.replace('_mask_T1w', '_mask_bold')
 
         # resample mask to func image space
         func_im_mask = self.MRIObj.mri_utils.resample_T1mask_to_func(mask_img = T1_im_mask, 
                                                                   bold_filename = file_list[0],
-                                                                  filename = op.join(out_dir_ROI_mask, 
-                                                                            '{roi}_mask_bold.nii.gz'.format(roi = roi_name)))
+                                                                  filename = mask_name)
 
         # now actually load and mask data
         # and save as dataframe
         out_dir_ROI_mask_data = op.join(self.MRIObj.derivatives_pth, 'masked_data', 'sub-{sj}'.format(sj = participant))
         
         masked_data_all = [] 
+        masked_data_filenames = []
         for r, file in enumerate(file_list):
             
             ## get run number, and ses number in list of ints
@@ -462,6 +467,8 @@ class Model:
                                                                                                                 session = file_sn,
                                                                                                                 run = file_rn,
                                                                                                                 roi = roi_name))
+            if len(index_arr) > 0:
+                csv_filename = csv_filename.replace('_timeseries', '_index_timeseries')
             
             # append data arrays
             masked_data = self.MRIObj.mri_utils.get_masked_timeseries(mask_img = func_im_mask, 
@@ -469,8 +476,10 @@ class Model:
                                                                     resample_mask = False,
                                                                     filename = csv_filename,
                                                                     return_arr = True)
-            # transpose to have (runs, voxel, TR)
+            # append
+            masked_data_filenames.append(csv_filename)
             masked_data_all.append(masked_data.T[np.newaxis, ...])
+            
         masked_data_all = np.vstack(masked_data_all)
 
         # if we want to average across runs
@@ -491,3 +500,5 @@ class Model:
             out_data_df.to_csv(mean_csv_filename, sep='\t', header = True, index = True)
         
             return out_data_df
+        else:
+            return masked_data_filenames

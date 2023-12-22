@@ -20,6 +20,9 @@ import time
 import cortex
 import matplotlib.pyplot as plt
 
+import nibabel as nib
+import neuropythy
+
 
 class GLMsingle_Model(Model):
 
@@ -99,6 +102,174 @@ class GLMsingle_Model(Model):
         y_coords_deg = np.concatenate(([self.bar_y_coords_pix[0] - self.bar_width_pix[1]], self.bar_y_coords_pix))
         y_coords_deg = np.concatenate((y_coords_deg, [self.bar_y_coords_pix[-1] + self.bar_width_pix[1]]))
         self.y_coords_deg = self.convert_pix2dva(y_coords_deg)
+        
+    def get_visual_DM_dict(self, participant, filelist = None, pp_bar_pos_df = None):
+    
+        """
+        Given participant ID and filelist of runs to fit,
+        will return dict for each run in list,
+        with visual DM for each type of regressor (attended bar, unattended bar, overlap, both bars, etc)
+        
+        ex:
+        out_dict['r1s1'] = {'att_bar': [trial, x,y], 'unatt_bar': [trial,x,y], ...}
+
+        Parameters
+        ----------
+        participant : str
+            participant ID
+        filelist : list
+            list with absolute filenames to fit)
+        """ 
+        
+        # set empty dicts
+        out_dict = {}
+        
+        ## loop over files
+        for ind, file in enumerate(filelist):
+            
+            ## append run number, and ses number in list of ints
+            # useful for when fitting several runs at same time
+            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(file)
+            
+            out_dict['r{r}s{s}'.format(r = file_rn, s = file_sn)] = {}
+            
+            ## get bar position df for run
+            run_bar_pos_df = pp_bar_pos_df['ses-{s}'.format(s = file_sn)]['run-{r}'.format(r=file_rn)]
+            print('loading bar positions for ses-{s}, run-{r}'. format(s = file_sn, r=file_rn))
+
+            ## get run bar midpoint and direction values
+            # for each bar type (arrays will have len == total number of trial types)
+            AttBar_bar_midpoint, AttBar_bar_pass_direction = run_bar_pos_df.loc[(run_bar_pos_df['attend_condition'] == 1), 
+                                                                                ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
+            UnattBar_bar_midpoint, UnattBar_bar_pass_direction = run_bar_pos_df.loc[(run_bar_pos_df['attend_condition'] == 0), 
+                                                                                ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
+
+            ## GET DM FOR ATTENDED BAR
+            out_dict['r{r}s{s}'.format(r = file_rn, 
+                                        s = file_sn)]['att_bar'] = self.get_bar_visual_dm(midpoint_bar = AttBar_bar_midpoint, 
+                                                                                          direction_bar = AttBar_bar_pass_direction, 
+                                                                                          res_scaling = .1)
+            ## GET DM FOR UNATTENDED BAR
+            out_dict['r{r}s{s}'.format(r = file_rn, 
+                                        s = file_sn)]['unatt_bar'] = self.get_bar_visual_dm(midpoint_bar = UnattBar_bar_midpoint, 
+                                                                                          direction_bar = UnattBar_bar_pass_direction, 
+                                                                                          res_scaling = .1)
+
+            ## GET DM FOR OVERLAP OF BARS
+            out_dict['r{r}s{s}'.format(r = file_rn, 
+                                        s = file_sn)]['overlap'] = self.MRIObj.mri_utils.get_bar_overlap_dm(np.stack((out_dict['r{r}s{s}'.format(r = file_rn, s = file_sn)]['att_bar'],
+                                                                                                            out_dict['r{r}s{s}'.format(r = file_rn, s = file_sn)]['unatt_bar'])))
+
+            ## GET DM FOR BOTH BARS COMBINED (FULL STIM THAT WAS ON SCREEN)
+            stimulus_dm = np.sum(np.stack((out_dict['r{r}s{s}'.format(r = file_rn, s = file_sn)]['att_bar'],
+                                            out_dict['r{r}s{s}'.format(r = file_rn, s = file_sn)]['unatt_bar'])), axis = 0)
+            stimulus_dm[stimulus_dm >=1] = 1
+            
+            out_dict['r{r}s{s}'.format(r = file_rn, 
+                                        s = file_sn)]['full_stim'] = stimulus_dm
+
+            if ind == 0:
+                # get keys for each condition
+                condition_dm_keys = [name for name in out_dict['r{r}s{s}'.format(r = file_rn, s = file_sn)].keys()]
+                
+        return out_dict, condition_dm_keys
+        
+    def get_bar_visual_dm(self, midpoint_bar = None, direction_bar = None, res_scaling = .1):
+        
+        """Make visual design matrix, for a specific bar
+        returns array of (trials, x, y)
+        """
+        
+        # save screen display for each trial
+        visual_dm_array = np.zeros((len(direction_bar), 
+                            round(self.MRIObj.screen_res[0] * res_scaling), 
+                            round(self.MRIObj.screen_res[1] * res_scaling)))
+        
+        for trl, bar_center in enumerate(midpoint_bar): # loop over trials
+
+            img = Image.new('RGB', tuple(self.MRIObj.screen_res)) # background image
+
+            if direction_bar[trl] == 'vertical':
+                coordenates_bars = {'upLx': 0, 
+                                    'upLy': self.MRIObj.screen_res[1]/2-bar_center[-1]+0.5*self.MRIObj.bar_width['FA']*self.MRIObj.screen_res[1],
+                                    'lowRx': self.MRIObj.screen_res[0], 
+                                    'lowRy': self.MRIObj.screen_res[1]/2-bar_center[-1]-0.5*self.MRIObj.bar_width['FA']*self.MRIObj.screen_res[1]}
+
+
+            elif direction_bar[trl] == 'horizontal':
+
+                coordenates_bars = {'upLx': self.MRIObj.screen_res[0]/2+bar_center[0]-0.5*self.MRIObj.bar_width['FA']*self.MRIObj.screen_res[0], 
+                                    'upLy': self.MRIObj.screen_res[1],
+                                    'lowRx': self.MRIObj.screen_res[0]/2+bar_center[0]+0.5*self.MRIObj.bar_width['FA']*self.MRIObj.screen_res[0], 
+                                    'lowRy': 0}
+
+            # set draw method for image
+            draw = ImageDraw.Draw(img)
+            # add bar, coordinates (upLx, upLy, lowRx, lowRy)
+            draw.rectangle(tuple([coordenates_bars['upLx'],coordenates_bars['upLy'],
+                                coordenates_bars['lowRx'],coordenates_bars['lowRy']]), 
+                        fill = (255,255,255),
+                        outline = (255,255,255))
+
+            ## save in array - takes into account stim dur in seconds
+            visual_dm_array[int(trl), ...] = np.array(img)[::round(1/res_scaling),::round(1/res_scaling),0][np.newaxis,...]
+        
+        ## and swap positions to get (time, x, y)
+        visual_dm_array = np.rollaxis(visual_dm_array, 2, 1)
+
+        return self.MRIObj.mri_utils.normalize(visual_dm_array)
+        
+    def convert_betas_volume(self, participant, model_type = 'D', file_ext = '_cropped.nii.gz', trial_num = 132):
+        
+        """Convert beta estimates from GLMsingle into nii files
+        to use later in volume analysis
+        
+        return list with filenames
+        """
+        
+        ## load FA bold files
+
+        ## get list of files to load
+        bold_filelist = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'FA', ses = 'all', 
+                                                                file_ext = file_ext,
+                                                                postfmriprep_pth = self.MRIObj.postfmriprep_pth, 
+                                                                acq_name = self.MRIObj.acq, 
+                                                                hemisphere = 'BH')
+        
+        # load GLMsingle estimates dict
+        GLMsing_estimates_dict = self.load_estimates(participant, model_type = model_type)
+        
+        # get GLMsingle fit path, where we will store niftis
+        fitpath = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant))
+        
+        all_files = []
+        
+        for ind, file in enumerate(bold_filelist):
+            
+            # nifti filename
+            betas_filename = op.join(fitpath,
+                                     op.split(file)[-1].replace('.nii.gz', 
+                                                                '_model-{mod_name}_betas.nii.gz'.format(mod_name = model_type))
+                                     )
+            
+            if not op.isfile(betas_filename):
+                
+                # select betas relative to run
+                betas_run = GLMsing_estimates_dict['betasmd'][...,int(ind*trial_num):int((ind+1)*trial_num)]
+                
+                # load func image to get affine
+                func_img = neuropythy.io.load(file)
+                
+                # create betas image
+                betas_img = nib.Nifti1Image(betas_run, func_img.affine)
+                
+                print('saving %s'%betas_filename)
+                nib.save(betas_img, betas_filename)
+            
+            # append to use later
+            all_files.append(betas_filename)
+        
+        return  all_files   
 
     def convert_coord_pRF2screen_grid(self, prf_x_coord = np.array([]), prf_y_coord = np.array([]), grid_num = None):
 
@@ -344,7 +515,7 @@ class GLMsingle_Model(Model):
 
         return single_trl_DM, trial_combinations_df
 
-    def get_average_hrf(self, pp_prf_estimates, prf_modelobj, rsq_threshold = None):
+    def get_average_hrf(self, pp_prf_estimates, prf_modelobj, rsq_threshold = None, stim_dur = None):
 
         """
         Make average HRF to give as input to glm single model
@@ -380,7 +551,8 @@ class GLMsingle_Model(Model):
 
         ## convolve to get the predicted response 
         # to the desired stimulus duration
-        stim_dur = self.MRIObj.FA_bars_phase_dur # duration of bar presentation in seconds
+        if stim_dur is None:
+            stim_dur = self.MRIObj.FA_bars_phase_dur # duration of bar presentation in seconds
         res_step = self.MRIObj.TR/(self.MRIObj.TR * self.osf) # resolution of upsampled HRF
 
         hrf_stim_convolved = np.convolve(avg_hrf, np.ones(int(np.max([1, np.round(stim_dur/res_step)]))))

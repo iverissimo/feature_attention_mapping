@@ -62,10 +62,10 @@ class pRF_model(Model):
 
                 
     def get_DM(self, participant, ses = 'mean', mask_bool_df = None, filename = None, 
-                    osf = 1, res_scaling = .1, stim_on_screen = []):
+                    osf = 1, res_scaling = .1, stim_on_screen = [], transpose_dm = True):
 
         """
-        Get pRF Design matrix
+        Get pRF Design matrix 
 
         Parameters
         ----------
@@ -83,6 +83,8 @@ class pRF_model(Model):
             boolean array with moments where stim was on screen
         mask_bool_df: dataframe
             if dataframe given, will be used to mask design matrix given behavioral performance
+        transpose_dm: bool
+            if True, will return [y,x,t] array (as used in prfpy)
         """ 
 
         visual_dm = None
@@ -163,8 +165,11 @@ class pRF_model(Model):
                 ## save in array, and apply mask
                 visual_dm_array[int(trl*osf):int(trl*osf + osf), ...] = np.array(img)[::round(1/res_scaling),::round(1/res_scaling),0][np.newaxis,...] * stim_on_screen[trl]
 
-            # swap axis to have time in last axis [x,y,t]
-            visual_dm = visual_dm_array.transpose([1,2,0])
+            if transpose_dm:
+                # swap axis to have time in last axis [y,x,t]
+                visual_dm = visual_dm_array.transpose([1,2,0])
+            else:
+                visual_dm = visual_dm_array.copy()
 
             if save_dm:
                 # save design matrix

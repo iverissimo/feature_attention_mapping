@@ -8,6 +8,7 @@ import glob
 
 import itertools
 from scipy.interpolate import pchip
+import scipy
 
 from PIL import Image, ImageDraw
 
@@ -20,6 +21,8 @@ from glmsingle.glmsingle import getcanonicalhrf
 import time
 import cortex
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import seaborn as sns
 
 import nibabel as nib
 import neuropythy
@@ -173,8 +176,302 @@ class Decoding_Model(GLMsingle_Model):
         
         return prf_stimulus_dm, prf_grid_coordinates
     
+    def make_df_run_bar_pos(self, run_df = None):
+        
+        """make data frame with bar positions and indices for each trial
+        for a given run (in a summarized way)
+        """
+        
+        ## find parallel + crossed bar trial indices
+        parallel_bar_ind = np.where((run_df[run_df['attend_condition'] == 1].bar_pass_direction_at_TR.values[0] == run_df[run_df['attend_condition'] == 0].bar_pass_direction_at_TR.values[0]))[0]
+        crossed_bar_ind = np.where((run_df[run_df['attend_condition'] == 1].bar_pass_direction_at_TR.values[0] != run_df[run_df['attend_condition'] == 0].bar_pass_direction_at_TR.values[0]))[0]
+
+        ## make summary dataframe 
+        position_df = []
+
+        for keys, ind_arr in {'parallel': parallel_bar_ind, 'crossed': crossed_bar_ind}.items():
+            for att_bool in [0,1]:
+                tmp_df = pd.DataFrame({'x_pos': run_df[run_df['attend_condition'] == att_bool].bar_midpoint_at_TR.values[0][ind_arr][:,0],
+                                    'y_pos': run_df[run_df['attend_condition'] == att_bool].bar_midpoint_at_TR.values[0][ind_arr][:,1],
+                                    'trial_ind': ind_arr})
+                tmp_df['attend_condition'] = bool(att_bool)
+                tmp_df['bars_pos'] = keys
+                position_df.append(tmp_df)
+        position_df = pd.concat(position_df, ignore_index = True)
+        
+        ## add interbar distance (only for parallel bars)
+        # for x
+        inds_uatt = position_df[((position_df['attend_condition'] == 0) &\
+                                (position_df['bars_pos'] == 'parallel') &\
+                    ((position_df['x_pos'] != 0)))].sort_values('trial_ind').index
+        inds_att = position_df[((position_df['attend_condition'] == 1) &\
+                                (position_df['bars_pos'] == 'parallel') &\
+                    ((position_df['x_pos'] != 0)))].sort_values('trial_ind').index
+        inter_bar_dist = (position_df.iloc[inds_uatt].x_pos.values - position_df.iloc[inds_att].x_pos.values)/self.bar_width_pix[0]
+
+        position_df.loc[inds_uatt,'inter_bar_dist'] = inter_bar_dist
+        position_df.loc[inds_att,'inter_bar_dist'] = inter_bar_dist
+
+        # for y
+        inds_uatt = position_df[((position_df['attend_condition'] == 0) &\
+                                (position_df['bars_pos'] == 'parallel') &\
+                    ((position_df['y_pos'] != 0)))].sort_values('trial_ind').index
+        inds_att = position_df[((position_df['attend_condition'] == 1) &\
+                                (position_df['bars_pos'] == 'parallel') &\
+                    ((position_df['y_pos'] != 0)))].sort_values('trial_ind').index
+        inter_bar_dist = (position_df.iloc[inds_uatt].y_pos.values - position_df.iloc[inds_att].y_pos.values)/self.bar_width_pix[0]
+
+        position_df.loc[inds_uatt,'inter_bar_dist'] = inter_bar_dist
+        position_df.loc[inds_att,'inter_bar_dist'] = inter_bar_dist
+        
+        ## add bar eccentricity
+        ecc_dict = {'far': self.bar_x_coords_pix[0::5], 'middle': self.bar_x_coords_pix[1::3], 'near': self.bar_x_coords_pix[2:4]}
+
+        for ecc_key in ecc_dict.keys():
+            inds = position_df[((position_df['x_pos'].isin(ecc_dict[ecc_key])) |\
+                        (position_df['y_pos'].isin(ecc_dict[ecc_key])))].sort_values('trial_ind').index
+            position_df.loc[inds,'bar_ecc'] = ecc_key
+            
+        ## also add absolute distance
+        position_df.loc[:,'abs_inter_bar_dist'] = np.absolute(position_df.inter_bar_dist.values)
+   
+        return position_df
+    
+    def get_trl_ecc_dist_df(self, position_df = None, bars_pos = 'parallel', bar_ecc = 'far', abs_inter_bar_dist = 5):
+        
+        """Given a data frame with bar positions and indices for each trial for a given run,
+        return dataframe with trial indices that all have a specific attended ecc,
+        inter bar distance, and bar position (ex: parallel vs crossed)
+        
+        this can later be used to transform 'collapsable' trials and average across stim
+        """
+        
+        if bars_pos == 'parallel':
+            
+            t_ind_list = []
+            for index, row in position_df[(position_df['attend_condition'] == True) &\
+                                        (position_df['bar_ecc'] == bar_ecc) &\
+                                        (position_df['abs_inter_bar_dist'] == abs_inter_bar_dist)].iterrows():
+                
+                trl_df = position_df[(position_df['trial_ind'] == row['trial_ind'])]
+                
+                if (trl_df[trl_df['attend_condition'] == True].x_pos.values[0] < 0) &\
+                (trl_df[trl_df['attend_condition'] == True].x_pos.values[0] < trl_df[trl_df['attend_condition'] == False].x_pos.values[0]):
+                    
+                    t_ind_list.append(row['trial_ind'])
+                
+                elif (trl_df[trl_df['attend_condition'] == True].x_pos.values[0] > 0) &\
+                (trl_df[trl_df['attend_condition'] == True].x_pos.values[0] > trl_df[trl_df['attend_condition'] == False].x_pos.values[0]):
+                    
+                    t_ind_list.append(row['trial_ind'])
+                elif (trl_df[trl_df['attend_condition'] == True].y_pos.values[0] > 0) &\
+                (trl_df[trl_df['attend_condition'] == True].y_pos.values[0] > trl_df[trl_df['attend_condition'] == False].y_pos.values[0]):
+                    
+                    t_ind_list.append(row['trial_ind'])
+                elif (trl_df[trl_df['attend_condition'] == True].y_pos.values[0] < 0) &\
+                (trl_df[trl_df['attend_condition'] == True].y_pos.values[0] < trl_df[trl_df['attend_condition'] == False].y_pos.values[0]):
+                    
+                    t_ind_list.append(row['trial_ind'])
+    
+            output_df = position_df[(position_df['attend_condition'] == True) &\
+                                    (position_df['trial_ind'].isin(t_ind_list))]
+        else:
+            output_df = None ## not implemented yet
+            
+        return output_df
+        
+        
+    def plot_decoded_stim(self,reconstructed_stimulus = None, frame = 0, vmin = 0, vmax = None, cmap = 'viridis',
+                                xticklabels = True, yticklabels = True, square = True):
+        
+        """Quick func to plot reconstructed stimulus (for easy checking of outputs)
+        """
+        
+        if vmax is None:
+            vmax = np.quantile(reconstructed_stimulus.values.ravel(), 0.97)
+        
+        return sns.heatmap(reconstructed_stimulus.stack('y').loc[frame].iloc[::-1, :], vmin = vmin, vmax = vmax, cmap = cmap,
+                           xticklabels = xticklabels, yticklabels = yticklabels, square = square)
+        
+    def get_run_trial_pairs(self, DM_arr = None):
+        
+        """find trials where attended bar and unattended bar in same position
+        to correlate with each other
+        """
+        n_trials = DM_arr.shape[0]
+        same_bar_pos_ind = []
+
+        for i in range(n_trials):
+
+            ind_list = np.where((DM_arr.reshape(132, -1) == DM_arr[i].ravel()).all(-1))[0]
+            same_bar_pos_ind.append(ind_list)
+        same_bar_pos_ind = np.vstack(same_bar_pos_ind)
+        
+        # get unique
+        same_bar_pos_ind = np.unique(same_bar_pos_ind, axis=0)
+        
+        return same_bar_pos_ind
+    
+    def get_flipped_trial_ind(self, trl_ind = None, DM_arr = None):
+        
+        """ find the flipped trial (same positions, different attended bar)
+        """
+    
+        ## find trials where attended bar and unattended bar in same position
+        # to correlate with each other
+        same_bar_pos_ind = self.get_run_trial_pairs(DM_arr = DM_arr)
+        
+        # find which other trial bars are in same location
+        pairs_arr = [np.where(same_bar_pos_ind == trl_ind)[0][0], np.where(same_bar_pos_ind == trl_ind)[-1][0]]
+
+        if pairs_arr[-1] == 1:
+            flip_trl_ind = same_bar_pos_ind[pairs_arr[0], 0]
+        else:
+            flip_trl_ind = same_bar_pos_ind[pairs_arr[0], 1]
+            
+        return flip_trl_ind
+    
+    def get_parallel_average_stim(self, reconstructed_stimulus = None, position_df = None, bar_ecc = 'far', abs_inter_bar_dist = 5, 
+                                        flipped_stim = False, DM_arr = None):
+        
+        """Get average (reconstructed) stimulus
+        for parallel bar trials with specific distance and bar distance
+        can also return flipped case (same bar pos, different attended bar)
+        """
+        
+        # flag if symmetrical trial
+        if (bar_ecc == 'far' and abs_inter_bar_dist == 5) | (bar_ecc == 'middle' and abs_inter_bar_dist == 3) | (bar_ecc == 'near' and abs_inter_bar_dist == 1):
+            sym_trial = True
+        else:
+            sym_trial = False
+        
+        # get collapsable trials
+        df_ecc_dist = self.get_trl_ecc_dist_df(position_df = position_df, bars_pos = 'parallel', 
+                                               bar_ecc = bar_ecc, abs_inter_bar_dist = abs_inter_bar_dist)
+        
+        ## rotate all stim in such a way that we can average across
+        # reference will be vertical bars with attended bar on the left visual field
+
+        ## get trial indices
+        ref_trl_ind = df_ecc_dist.query('x_pos < 0').trial_ind.values[0] # reference trial (stays the same)
+        flip_hor_trl_ind = df_ecc_dist.query('x_pos > 0').trial_ind.values[0] # trial to be flipped horizontally (this is mirrored left and right)
+        rot90_CCW_trl_ind = df_ecc_dist.query('y_pos > 0').trial_ind.values[0] # trial to be rotated 90deg CCW
+        rot90_CW_trl_ind = df_ecc_dist.query('y_pos < 0').trial_ind.values[0] # trial to be rotated 90deg CW
+        
+        # if we want the flipped case, and conditions are not symmetrical
+        if flipped_stim == True and sym_trial == False:
+            ref_trl_ind = self.get_flipped_trial_ind(trl_ind = ref_trl_ind, DM_arr = DM_arr)
+            flip_hor_trl_ind = self.get_flipped_trial_ind(trl_ind = flip_hor_trl_ind, DM_arr = DM_arr)
+            rot90_CCW_trl_ind = self.get_flipped_trial_ind(trl_ind = rot90_CCW_trl_ind, DM_arr = DM_arr)
+            rot90_CW_trl_ind = self.get_flipped_trial_ind(trl_ind = rot90_CW_trl_ind, DM_arr = DM_arr)
+
+        ## stack stim
+        average_stim = reconstructed_stimulus.stack('y').loc[ref_trl_ind].iloc[::-1, :].to_numpy()
+        average_stim = np.stack((average_stim,
+                                np.flip(reconstructed_stimulus.stack('y').loc[flip_hor_trl_ind].iloc[::-1, :].to_numpy(),
+                                axis = 1)))
+        average_stim = np.vstack((average_stim,
+                                np.rot90(reconstructed_stimulus.stack('y').loc[rot90_CCW_trl_ind].iloc[::-1, :].to_numpy(),
+                                axes=(0, 1))[np.newaxis, ...]))                    
+        average_stim = np.vstack((average_stim,
+                                np.rot90(reconstructed_stimulus.stack('y').loc[rot90_CW_trl_ind].iloc[::-1, :].to_numpy(),
+                                axes=(1, 0))[np.newaxis, ...]))  
+        
+        # and average (median)
+        average_stim = np.median(average_stim, axis = 0)
+
+        # if we want the flipped trials for symmetrical cases
+        if flipped_stim == True and sym_trial == True:
+            average_stim = np.flip(average_stim, axis = 1)
+            
+        return average_stim
+    
+    def get_decoder_grid_coords(self):
+        
+        """Get grid coordinates for FA task, to use in decoder (8x8 grid)
+        """
+        new_y, new_x = np.meshgrid(np.flip(self.y_coords_deg), 
+                                    self.x_coords_deg)
+        fa_grid_coordinates = pd.DataFrame({'x':new_x.ravel(), 'y': new_y.ravel()}).astype(np.float32)
+        
+        return fa_grid_coordinates
+    
+    def downsample_DM(self, DM_arr = None):
+        
+        """downsample FA FAM to 8x8 grid
+        to correlate with reconstructed image
+        """
+        
+        ## reduce dimensionality 
+        downsample_FA_DM = scipy.ndimage.zoom(DM_arr, (1, 8/108., 8/108.))
+        # binarize again
+        downsample_FA_DM[downsample_FA_DM > .5] = 1
+        downsample_FA_DM[downsample_FA_DM<.5] = 0
+        
+        return downsample_FA_DM
+    
+    def plot_avg_parallel_stim(self, average_stim = None, flip_average_stim = None, DM_trl_ind = None,
+                                    bar_ecc = None, bar_dist = None, downsample_FA_DM = None, 
+                                    vmin = 0, vmax = .4, cmap = 'magma', filename = None):
+        
+        """Make 4x4 plot of recontruscted stim, averaged across conditions
+        (and also reverse case)
+        followed by the corresponding downsampled DM for inspection
+        """
+        
+        ## correlate each reconstructed average condition with stim position
+
+        # note - here we transpose the DM array when correlating because the average_stim we calculated
+        # has a different format than the reconstructed stim outputted by brain decoder
+        avg_corr, avg_pval = scipy.stats.pearsonr(average_stim.ravel(), 
+                                                  downsample_FA_DM[DM_trl_ind].T.ravel())
+        flip_avg_corr, flip_avg_pval = scipy.stats.pearsonr(flip_average_stim.ravel(), 
+                                                            downsample_FA_DM[DM_trl_ind].T.ravel())
+                
+        bar_ecc_ind = {'far': 1, 'middle': 2, 'near': 3}
+        
+        # plot figure
+        fig, axes = plt.subplots(nrows=2, ncols=2, figsize = (10,10))
+
+        ## attended leftmost
+        sns.heatmap(average_stim, cmap = cmap, ax = axes[0][0], square = True, cbar = False,
+                    annot=True, annot_kws={"size": 7},
+                    vmin = vmin, vmax = vmax)
+        axes[0][0].set_title('%s ecc, dist = %i (attended left bar)'%(bar_ecc, bar_dist))
+
+        ## DM
+        axes[1][0].imshow(downsample_FA_DM[DM_trl_ind].T, cmap = 'binary_r', vmax = 1.5)
+        # Add the patch to the Axes
+        axes[1][0].add_patch(patches.Rectangle((bar_ecc_ind[bar_ecc] - .5, -.5), 1, 8, 
+                                            linewidth = 2, edgecolor='purple', 
+                                            facecolor='purple', hatch = '///'))
+        # annotate correlation between reconstructed stim and DM
+        axes[1][0].set_title(r"$\rho$ = {r}".format(r = '%.2f'%(avg_corr))+\
+                                '   pval = {p}'.format(p = "{:.2e}".format(avg_pval)))
+
+        ## attended rightmost
+        sns.heatmap(flip_average_stim, cmap = 'magma', ax = axes[0][1], square = True, cbar = False,
+                annot=True, annot_kws={"size": 7},
+                vmin = vmin, vmax = vmax)
+        axes[0][1].set_title('flipped case (attended right bar)')
+
+        ## DM
+        axes[1][1].imshow(downsample_FA_DM[DM_trl_ind].T, cmap = 'binary_r', vmax = 1.5)
+        # Add the patch to the Axes
+        axes[1][1].add_patch(patches.Rectangle((bar_ecc_ind[bar_ecc] - .5 + bar_dist, -.5), 1, 8, 
+                                            linewidth = 2, edgecolor='green', 
+                                            facecolor='green', hatch = '///'))
+        # annotate correlation between reconstructed stim and DM
+        axes[1][1].set_title(r"$\rho$ = {r}".format(r = '%.2f'%(flip_avg_corr))+\
+                                '   pval = {p}'.format(p = "{:.2e}".format(flip_avg_pval)))
+
+        # save figure
+        if filename is not None:
+            fig.savefig(filename, dpi= 200)
+    
     
         
+            
         
         
         

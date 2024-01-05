@@ -65,13 +65,13 @@ class MRIUtils(Utils):
         """
         
     def create_T1mask_from_label(self, sub_id = None, freesurfer_pth = None, sourcedata_pth = None,
-                                 roi_name = 'V1', index_arr = [], filename = None):
+                                 roi_name = 'V1', index_arr = [], filename = None, overwrite = False):
         
         """Convert T1w image mask object from custom ROI label files
         Can also mask further in we provide value array (ex: index of prf fit vertices)
         """
         
-        if filename is not None and op.isfile(filename):
+        if filename is not None and op.isfile(filename) and overwrite == False:
             print('Loading %s'%filename)
             mask_img = neuropythy.io.load(filename) 
         else:
@@ -140,11 +140,11 @@ class MRIUtils(Utils):
         
         return mask_img
     
-    def resample_T1mask_to_func(self, mask_img = None, bold_filename = None, filename = None):
+    def resample_T1mask_to_func(self, mask_img = None, bold_filename = None, filename = None, overwrite = False):
         
         """Resample mask image to func data format
         """
-        if filename is not None and op.isfile(filename):
+        if filename is not None and op.isfile(filename) and overwrite == False:
             print('Loading %s'%filename)
             mask_img = neuropythy.io.load(filename) 
         else:
@@ -162,14 +162,14 @@ class MRIUtils(Utils):
         return mask_img
         
     def get_masked_timeseries(self, mask_img = None, bold_filename = None, resample_mask = True,
-                                    filename = None, return_arr = True):
+                                    filename = None, return_arr = True, overwrite = False):
         
         """Resample mask image to func data format
         and then apply mask to get 2D array
         (save data as pd dataframe)
         """
         
-        if filename is not None and op.isfile(filename):
+        if filename is not None and op.isfile(filename) and overwrite == False:
             print('Loading %s'%filename)
             masked_data_df = pd.read_csv(filename, sep='\t', index_col=['time'], compression='gzip').astype(np.float32)
         else:

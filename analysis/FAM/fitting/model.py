@@ -400,7 +400,7 @@ class Model:
                                                         vert_res_pix = self.MRIObj.screen_res[1])
 
     def get_ROImask_data(self, participant, file_list = None, task = 'pRF', run_type = 'mean', ses = 'mean', 
-                            roi_name = 'V1', index_arr = []):
+                            roi_name = 'V1', index_arr = [], overwrite = False):
         
         """load data from file list of given participant
         will subselect files from filelist depending on run/session/task at hand
@@ -438,7 +438,8 @@ class Model:
                                                             sourcedata_pth = self.MRIObj.sourcedata_pth,
                                                             roi_name = roi_name,
                                                             index_arr = index_arr,
-                                                            filename = mask_name)
+                                                            filename = mask_name,
+                                                            overwrite = overwrite)
         
         # new filename for bold
         mask_name = mask_name.replace('_mask_T1w', '_mask_bold')
@@ -446,7 +447,8 @@ class Model:
         # resample mask to func image space
         func_im_mask = self.MRIObj.mri_utils.resample_T1mask_to_func(mask_img = T1_im_mask, 
                                                                   bold_filename = file_list[0],
-                                                                  filename = mask_name)
+                                                                  filename = mask_name,
+                                                                  overwrite = overwrite)
 
         # now actually load and mask data
         # and save as dataframe
@@ -475,7 +477,8 @@ class Model:
                                                                     bold_filename = file,
                                                                     resample_mask = False,
                                                                     filename = csv_filename,
-                                                                    return_arr = True)
+                                                                    return_arr = True,
+                                                                    overwrite = overwrite)
             # append
             masked_data_filenames.append(csv_filename)
             masked_data_all.append(masked_data.T[np.newaxis, ...])

@@ -335,7 +335,7 @@ class Decoding_Model(GLMsingle_Model):
                                         flipped_stim = False, DM_arr = None):
         
         """Get average (reconstructed) stimulus
-        for parallel bar trials with specific distance and bar distance
+        for parallel bar trials of specific ecc and bar distance
         can also return flipped case (same bar pos, different attended bar)
         """
         
@@ -386,6 +386,110 @@ class Decoding_Model(GLMsingle_Model):
             
         return average_stim
     
+    def get_crossed_average_stim(self, reconstructed_stimulus = None, position_df = None, bar_ecc = 'far', same_ecc = True, 
+                                        flipped_stim = False, DM_arr = None):
+        
+        """Get average (reconstructed) stimulus
+        for crossed bar trials of specific ecc. 
+        Note, for each attended ecc there are 2 cases:
+            a) both bars at the same ecc
+            b) Att and Unatt bars at different eccs [far, near] or [middle, far] or [near, middle]
+            
+        can also return flipped case (same bar pos, different attended bar)
+        """
+        
+        # select trials with crossed bars at that ecc
+        bar_ecc_df = position_df[(position_df['bar_ecc'] == bar_ecc) &\
+                                (position_df['bars_pos'] == 'crossed')]
+        
+        ### a) stack trials where both bars at the same ecc
+        if same_ecc:
+        
+            # first find the indices where both attended bar and unattended bar are at the same ecc
+            trial_ind_same_ecc = np.array([val for val in bar_ecc_df[(bar_ecc_df['attend_condition'] == True)].trial_ind.values if val in bar_ecc_df[(bar_ecc_df['attend_condition'] == False)].trial_ind.values])
+
+            # filter df for those trials (keep attended and unattended to collapse)
+            df_cross_same_ecc = bar_ecc_df[(bar_ecc_df['trial_ind'].isin(trial_ind_same_ecc))]
+            
+            ## rotate all stim in such a way that we can average across
+            # get dfs with main trial types
+            
+            cond_ind = []
+            # reference trial and it's flipped case 
+            # attended bar vertical, on the left. unattended bar horizontal, upper meridian
+            ref_trl_df = df_cross_same_ecc[(df_cross_same_ecc['trial_ind'].isin(df_cross_same_ecc.query('x_pos < 0').trial_ind.values)) &\
+                                            (df_cross_same_ecc['y_pos'] > 0)]
+            cond_ind.append([ref_trl_df.query('~ attend_condition').trial_ind.values[0],
+                            ref_trl_df.query('attend_condition').trial_ind.values[0]])
+
+            # trial to be flipped horizontally (this is mirrored left and right) and its flipped case
+            flip_hor_trl_df = df_cross_same_ecc[(df_cross_same_ecc['trial_ind'].isin(df_cross_same_ecc.query('x_pos > 0').trial_ind.values)) &\
+                                                (df_cross_same_ecc['y_pos'] > 0)]
+            cond_ind.append([flip_hor_trl_df.query('~ attend_condition').trial_ind.values[0],
+                            flip_hor_trl_df.query('attend_condition').trial_ind.values[0]])
+            
+            # trial to be rotated 90deg CW and its flipped case
+            rot90_CW_trl_df = df_cross_same_ecc[(df_cross_same_ecc['trial_ind'].isin(df_cross_same_ecc.query('y_pos < 0').trial_ind.values)) &\
+                                                    (df_cross_same_ecc['x_pos'] < 0)]
+            cond_ind.append([rot90_CW_trl_df.query('~ attend_condition').trial_ind.values[0],
+                             rot90_CW_trl_df.query('attend_condition').trial_ind.values[0]])
+            
+            # trial to be diagonally mirrored (this is rotated 90deg CCW + flipped horizontally) and its flipped case
+            rot90_CCW_flip_hor_trl_df = df_cross_same_ecc[(df_cross_same_ecc['trial_ind'].isin(df_cross_same_ecc.query('y_pos < 0').trial_ind.values)) &\
+                                                    (df_cross_same_ecc['x_pos'] > 0)]
+            cond_ind.append([rot90_CCW_flip_hor_trl_df.query('~ attend_condition').trial_ind.values[0],
+                            rot90_CCW_flip_hor_trl_df.query('attend_condition').trial_ind.values[0]])
+            
+            cond_ind = np.vstack(cond_ind)
+            
+            ## stack stim
+            # relative to reference stim
+            average_stim = reconstructed_stimulus.stack('y').loc[cond_ind[:,0][0]].iloc[::-1, :].to_numpy()
+            average_stim = np.stack((average_stim,
+                                    self.get_diag_mirror_arr(reconstructed_stimulus.stack('y').loc[cond_ind[:,1][0]].iloc[::-1, :].to_numpy(), 
+                                                            diag_type = 'major')
+                                    ))
+            # relative to flip-horizontal stim
+            average_stim = np.vstack((average_stim,
+                                    self.flip_arr(reconstructed_stimulus.stack('y').loc[cond_ind[:,0][1]].iloc[::-1, :].to_numpy(),
+                                                flip_type='lr')[np.newaxis, ...]
+                                    ))     
+            average_stim = np.vstack((average_stim,
+                                    self.get_diag_mirror_arr(self.flip_arr(reconstructed_stimulus.stack('y').loc[cond_ind[:,1][1]].iloc[::-1, :].to_numpy(),
+                                                                                    flip_type='lr'), 
+                                                            diag_type = 'major')[np.newaxis, ...]
+                                    )) 
+            # relative to 90deg CW stim
+            average_stim = np.vstack((average_stim,
+                                    np.rot90(reconstructed_stimulus.stack('y').loc[cond_ind[:,0][2]].iloc[::-1, :].to_numpy(),
+                                            axes=(1, 0))[np.newaxis, ...]
+                                    ))    
+            average_stim = np.vstack((average_stim,
+                                    self.get_diag_mirror_arr(np.rot90(reconstructed_stimulus.stack('y').loc[cond_ind[:,1][2]].iloc[::-1, :].to_numpy(),
+                                                                                axes=(1, 0)), 
+                                                            diag_type = 'major')[np.newaxis, ...]
+                                    )) 
+            
+            # relative to 90deg CCW + flip horizontal stim
+            average_stim = np.vstack((average_stim,
+                                    self.get_diag_mirror_arr(reconstructed_stimulus.stack('y').loc[cond_ind[:,0][3]].iloc[::-1, :].to_numpy(), 
+                                                            diag_type = 'minor')[np.newaxis, ...]
+                                    )) 
+            average_stim = np.vstack((average_stim,
+                                    self.get_diag_mirror_arr(self.get_diag_mirror_arr(reconstructed_stimulus.stack('y').loc[cond_ind[:,1][3]].iloc[::-1, :].to_numpy(), 
+                                                                                    diag_type = 'minor'), 
+                                                            diag_type = 'major')[np.newaxis, ...]
+                                    ))    
+            
+        # and average (median)
+        average_stim = np.median(average_stim, axis = 0)
+
+        # if we want the flipped trials for symmetrical cases
+        if flipped_stim == True and same_ecc == True:
+            average_stim = self.get_diag_mirror_arr(average_stim, diag_type = 'major')
+            
+        return average_stim
+    
     def get_decoder_grid_coords(self):
         
         """Get grid coordinates for FA task, to use in decoder (8x8 grid)
@@ -395,6 +499,26 @@ class Decoding_Model(GLMsingle_Model):
         fa_grid_coordinates = pd.DataFrame({'x':new_x.ravel(), 'y': new_y.ravel()}).astype(np.float32)
         
         return fa_grid_coordinates
+    
+    def get_diag_mirror_arr(self, og_arr = None, diag_type = 'major'):
+        
+        """
+        return diagonally mirrored version of array (relative to major \ or minor / diagonal)
+        """  
+        if diag_type == 'major':
+            return np.flip(np.rot90(og_arr, axes =(0,1)), axis = 0)
+        elif diag_type == 'minor':
+            return np.flip(np.rot90(og_arr, axes =(0,1)), axis = 1)
+        
+    def flip_arr(self, og_arr = None, flip_type = 'lr'):
+        
+        """
+        return flipped version of array (left-right vs up-down)
+        """ 
+        if flip_type == 'lr':
+            return np.flip(og_arr, axis = 1)
+        elif flip_type == 'ud':
+            return np.flip(og_arr, axis = 0)
     
     def downsample_DM(self, DM_arr = None):
         

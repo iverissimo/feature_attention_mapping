@@ -279,8 +279,7 @@ class Decoding_Model(GLMsingle_Model):
             output_df = None ## not implemented yet
             
         return output_df
-        
-        
+          
     def plot_decoded_stim(self,reconstructed_stimulus = None, frame = 0, vmin = 0, vmax = None, cmap = 'viridis',
                                 xticklabels = True, yticklabels = True, square = True):
         
@@ -344,39 +343,44 @@ class Decoding_Model(GLMsingle_Model):
             sym_trial = True
         else:
             sym_trial = False
-        
+                    
         # get collapsable trials
         df_ecc_dist = self.get_trl_ecc_dist_df(position_df = position_df, bars_pos = 'parallel', 
                                                bar_ecc = bar_ecc, abs_inter_bar_dist = abs_inter_bar_dist)
-        
-        ## rotate all stim in such a way that we can average across
+           
+        ## iterate over trials, rotate stim as needed and stack
         # reference will be vertical bars with attended bar on the left visual field
+        average_stim = []
 
-        ## get trial indices
-        ref_trl_ind = df_ecc_dist.query('x_pos < 0').trial_ind.values[0] # reference trial (stays the same)
-        flip_hor_trl_ind = df_ecc_dist.query('x_pos > 0').trial_ind.values[0] # trial to be flipped horizontally (this is mirrored left and right)
-        rot90_CCW_trl_ind = df_ecc_dist.query('y_pos > 0').trial_ind.values[0] # trial to be rotated 90deg CCW
-        rot90_CW_trl_ind = df_ecc_dist.query('y_pos < 0').trial_ind.values[0] # trial to be rotated 90deg CW
-        
-        # if we want the flipped case, and conditions are not symmetrical
-        if flipped_stim == True and sym_trial == False:
-            ref_trl_ind = self.get_flipped_trial_ind(trl_ind = ref_trl_ind, DM_arr = DM_arr)
-            flip_hor_trl_ind = self.get_flipped_trial_ind(trl_ind = flip_hor_trl_ind, DM_arr = DM_arr)
-            rot90_CCW_trl_ind = self.get_flipped_trial_ind(trl_ind = rot90_CCW_trl_ind, DM_arr = DM_arr)
-            rot90_CW_trl_ind = self.get_flipped_trial_ind(trl_ind = rot90_CW_trl_ind, DM_arr = DM_arr)
-
-        ## stack stim
-        average_stim = reconstructed_stimulus.stack('y').loc[ref_trl_ind].iloc[::-1, :].to_numpy()
-        average_stim = np.stack((average_stim,
-                                np.flip(reconstructed_stimulus.stack('y').loc[flip_hor_trl_ind].iloc[::-1, :].to_numpy(),
-                                axis = 1)))
-        average_stim = np.vstack((average_stim,
-                                np.rot90(reconstructed_stimulus.stack('y').loc[rot90_CCW_trl_ind].iloc[::-1, :].to_numpy(),
-                                axes=(0, 1))[np.newaxis, ...]))                    
-        average_stim = np.vstack((average_stim,
-                                np.rot90(reconstructed_stimulus.stack('y').loc[rot90_CW_trl_ind].iloc[::-1, :].to_numpy(),
-                                axes=(1, 0))[np.newaxis, ...]))  
-        
+        for ind in df_ecc_dist.trial_ind.unique():
+                
+            trl_df = position_df[position_df['trial_ind'] == ind]
+            
+            # if we want the flipped case, and conditions are not symmetrical
+            if flipped_stim == True and sym_trial == False:
+                trl_ind = self.get_flipped_trial_ind(trl_ind = ind, DM_arr = DM_arr)
+            else:
+                trl_ind = ind
+            
+            # reference trial (stays the same)
+            if not trl_df.query('x_pos < 0').empty:
+                trl_stim = reconstructed_stimulus.stack('y').loc[trl_ind].iloc[::-1, :].to_numpy()
+            # trial to be flipped horizontally (this is mirrored left and right)
+            elif not trl_df.query('x_pos > 0').empty:
+                trl_stim = self.flip_arr(reconstructed_stimulus.stack('y').loc[trl_ind].iloc[::-1, :].to_numpy(),
+                                         flip_type='lr')
+            # trial to be rotated 90deg CCW
+            elif not trl_df.query('y_pos > 0').empty:
+                trl_stim = np.rot90(reconstructed_stimulus.stack('y').loc[trl_ind].iloc[::-1, :].to_numpy(),
+                                    axes=(0, 1))
+            # trial to be rotated 90deg CW
+            elif not trl_df.query('y_pos < 0').empty:
+                trl_stim = np.rot90(reconstructed_stimulus.stack('y').loc[trl_ind].iloc[::-1, :].to_numpy(),
+                                    axes=(1, 0))
+                
+            average_stim.append(trl_stim)
+        average_stim = np.stack(average_stim)
+                        
         # and average (median)
         average_stim = np.median(average_stim, axis = 0)
 
@@ -401,9 +405,10 @@ class Decoding_Model(GLMsingle_Model):
         # make reference dict with unique conditions of attended and unattend
         uniq_cond_dict = {'far': 'near', 'near': 'middle', 'middle': 'far'}
         
+        flip_att_bool = 0
+        
         ### a) stack trials where both bars at the same ecc
-        if same_ecc:
-            
+        if same_ecc: 
             # select trials with crossed bars at that ecc
             bar_ecc_df = position_df[(position_df['bar_ecc'] == bar_ecc) &\
                                     (position_df['bars_pos'] == 'crossed')]
@@ -412,77 +417,8 @@ class Decoding_Model(GLMsingle_Model):
             trial_ind_same_ecc = np.array([val for val in bar_ecc_df[(bar_ecc_df['attend_condition'] == True)].trial_ind.values if val in bar_ecc_df[(bar_ecc_df['attend_condition'] == False)].trial_ind.values])
 
             # filter df for those trials (keep attended and unattended to collapse)
-            df_cross_same_ecc = bar_ecc_df[(bar_ecc_df['trial_ind'].isin(trial_ind_same_ecc))]
-            
-            ## rotate all stim in such a way that we can average across
-            # get dfs with main trial types
-            
-            cond_ind = []
-            # reference trial and it's flipped case 
-            # attended bar vertical, on the left. unattended bar horizontal, upper meridian
-            ref_trl_df = df_cross_same_ecc[(df_cross_same_ecc['trial_ind'].isin(df_cross_same_ecc.query('x_pos < 0').trial_ind.values)) &\
-                                            (df_cross_same_ecc['y_pos'] > 0)]
-            cond_ind.append([ref_trl_df.query('~ attend_condition').trial_ind.values[0],
-                            ref_trl_df.query('attend_condition').trial_ind.values[0]])
-
-            # trial to be flipped horizontally (this is mirrored left and right) and its flipped case
-            flip_hor_trl_df = df_cross_same_ecc[(df_cross_same_ecc['trial_ind'].isin(df_cross_same_ecc.query('x_pos > 0').trial_ind.values)) &\
-                                                (df_cross_same_ecc['y_pos'] > 0)]
-            cond_ind.append([flip_hor_trl_df.query('~ attend_condition').trial_ind.values[0],
-                            flip_hor_trl_df.query('attend_condition').trial_ind.values[0]])
-            
-            # trial to be rotated 90deg CW and its flipped case
-            rot90_CW_trl_df = df_cross_same_ecc[(df_cross_same_ecc['trial_ind'].isin(df_cross_same_ecc.query('y_pos < 0').trial_ind.values)) &\
-                                                    (df_cross_same_ecc['x_pos'] < 0)]
-            cond_ind.append([rot90_CW_trl_df.query('~ attend_condition').trial_ind.values[0],
-                             rot90_CW_trl_df.query('attend_condition').trial_ind.values[0]])
-            
-            # trial to be diagonally mirrored (this is rotated 90deg CCW + flipped horizontally) and its flipped case
-            rot90_CCW_flip_hor_trl_df = df_cross_same_ecc[(df_cross_same_ecc['trial_ind'].isin(df_cross_same_ecc.query('y_pos < 0').trial_ind.values)) &\
-                                                    (df_cross_same_ecc['x_pos'] > 0)]
-            cond_ind.append([rot90_CCW_flip_hor_trl_df.query('~ attend_condition').trial_ind.values[0],
-                            rot90_CCW_flip_hor_trl_df.query('attend_condition').trial_ind.values[0]])
-            
-            cond_ind = np.vstack(cond_ind)
-            
-            ## stack stim
-            # relative to reference stim
-            average_stim = reconstructed_stimulus.stack('y').loc[cond_ind[:,0][0]].iloc[::-1, :].to_numpy()
-            average_stim = np.stack((average_stim,
-                                    self.get_diag_mirror_arr(reconstructed_stimulus.stack('y').loc[cond_ind[:,1][0]].iloc[::-1, :].to_numpy(), 
-                                                            diag_type = 'major')
-                                    ))
-            # relative to flip-horizontal stim
-            average_stim = np.vstack((average_stim,
-                                    self.flip_arr(reconstructed_stimulus.stack('y').loc[cond_ind[:,0][1]].iloc[::-1, :].to_numpy(),
-                                                flip_type='lr')[np.newaxis, ...]
-                                    ))     
-            average_stim = np.vstack((average_stim,
-                                    self.get_diag_mirror_arr(self.flip_arr(reconstructed_stimulus.stack('y').loc[cond_ind[:,1][1]].iloc[::-1, :].to_numpy(),
-                                                                                    flip_type='lr'), 
-                                                            diag_type = 'major')[np.newaxis, ...]
-                                    )) 
-            # relative to 90deg CW stim
-            average_stim = np.vstack((average_stim,
-                                    np.rot90(reconstructed_stimulus.stack('y').loc[cond_ind[:,0][2]].iloc[::-1, :].to_numpy(),
-                                            axes=(1, 0))[np.newaxis, ...]
-                                    ))    
-            average_stim = np.vstack((average_stim,
-                                    self.get_diag_mirror_arr(np.rot90(reconstructed_stimulus.stack('y').loc[cond_ind[:,1][2]].iloc[::-1, :].to_numpy(),
-                                                                                axes=(1, 0)), 
-                                                            diag_type = 'major')[np.newaxis, ...]
-                                    )) 
-            
-            # relative to 90deg CCW + flip horizontal stim
-            average_stim = np.vstack((average_stim,
-                                    self.get_diag_mirror_arr(reconstructed_stimulus.stack('y').loc[cond_ind[:,0][3]].iloc[::-1, :].to_numpy(), 
-                                                            diag_type = 'minor')[np.newaxis, ...]
-                                    )) 
-            average_stim = np.vstack((average_stim,
-                                    self.get_diag_mirror_arr(self.get_diag_mirror_arr(reconstructed_stimulus.stack('y').loc[cond_ind[:,1][3]].iloc[::-1, :].to_numpy(), 
-                                                                                    diag_type = 'minor'), 
-                                                            diag_type = 'major')[np.newaxis, ...]
-                                    ))      
+            df_cross_ecc = bar_ecc_df[(bar_ecc_df['trial_ind'].isin(trial_ind_same_ecc))]
+        
         else:
             # get relevant trials indices
             trial_ind_diff_ecc = np.array([val for val in position_df[(position_df['attend_condition'] == True) &\
@@ -491,64 +427,61 @@ class Decoding_Model(GLMsingle_Model):
                                                                                                                             (position_df['bars_pos'] == 'crossed') &\
                                                                                                                         (position_df['bar_ecc'] == uniq_cond_dict[bar_ecc])].trial_ind.values])
             # filter df for those trials
-            df_cross_diff_ecc = position_df[(position_df['trial_ind'].isin(trial_ind_diff_ecc))]
-            
-            ## iterate over trials, rotate stim as needed and stack
-            average_stim = []
+            df_cross_ecc = position_df[(position_df['trial_ind'].isin(trial_ind_diff_ecc))]
+                
+        ## iterate over trials, rotate stim as needed and stack
+        average_stim = []
 
-            for ind in df_cross_diff_ecc.trial_ind.unique():
+        for ind in df_cross_ecc.trial_ind.unique():
+                        
+            if flipped_stim == True and same_ecc == False:
+                ind = self.get_flipped_trial_ind(trl_ind = ind, DM_arr = DM_arr)
+                flip_att_bool = 1
                 
-                trl_stim = []
+            trl_df = position_df[position_df['trial_ind'] == ind]
+            #print(ind)
+            
+            # reference trial
+            # attended bar vertical, on the left. unattended bar horizontal, upper meridian
+            if not trl_df[(trl_df['x_pos'] < 0) & (trl_df['attend_condition'] == bool(np.abs(1 - flip_att_bool)))].empty: 
                 
-                if flipped_stim:
-                    ind = self.get_flipped_trial_ind(trl_ind = ind, DM_arr = DM_arr)
-                    flip_att_bool = 1
-                else:
-                    flip_att_bool = 0
+                trl_stim = reconstructed_stimulus.stack('y').loc[ind].iloc[::-1, :].to_numpy()
                 
-                trl_df = position_df[position_df['trial_ind'] == ind]
+                # trial to also be flipped vertically (this is mirrored up and down) 
+                if not trl_df[(trl_df['y_pos'] < 0) & (trl_df['attend_condition'] == bool(np.abs(0 - flip_att_bool)))].empty:
+                    trl_stim = self.flip_arr(trl_stim, flip_type='ud')
                 
-                # reference trial
-                # attended bar vertical, on the left. unattended bar horizontal, upper meridian
-                if not trl_df[(trl_df['x_pos'] < 0) & (trl_df['attend_condition'] == bool(np.abs(1 - flip_att_bool)))].empty: 
-                    
-                    trl_stim = reconstructed_stimulus.stack('y').loc[ind].iloc[::-1, :].to_numpy()
-                    
-                    # trial to also be flipped vertically (this is mirrored up and down) 
-                    if not trl_df[(trl_df['y_pos'] < 0) & (trl_df['attend_condition'] == bool(np.abs(0 - flip_att_bool)))].empty:
-                        trl_stim = self.flip_arr(trl_stim, flip_type='ud')
-                    
-                # trial to be flipped horizontally (this is mirrored left and right) 
-                elif not trl_df[(trl_df['x_pos'] > 0) & (trl_df['attend_condition'] == bool(np.abs(1 - flip_att_bool)))].empty:
-                    
-                    trl_stim = self.flip_arr(reconstructed_stimulus.stack('y').loc[ind].iloc[::-1, :].to_numpy(),
-                                                    flip_type='lr')
-                    
-                    # trial to also be flipped vertically (this is mirrored up and down) 
-                    if not trl_df[(trl_df['y_pos'] < 0) & (trl_df['attend_condition'] == bool(np.abs(0 - flip_att_bool)))].empty:
-                        trl_stim = self.flip_arr(trl_stim, flip_type='ud')
-                    
-                # trial to be rotated 90deg CW
-                elif not trl_df[(trl_df['x_pos'] < 0) & (trl_df['attend_condition'] == bool(np.abs(0 - flip_att_bool)))].empty: 
-                    
+            # trial to be flipped horizontally (this is mirrored left and right) 
+            elif not trl_df[(trl_df['x_pos'] > 0) & (trl_df['attend_condition'] == bool(np.abs(1 - flip_att_bool)))].empty:
+                
+                trl_stim = self.flip_arr(reconstructed_stimulus.stack('y').loc[ind].iloc[::-1, :].to_numpy(),
+                                                flip_type='lr')
+                
+                # trial to also be flipped vertically (this is mirrored up and down) 
+                if not trl_df[(trl_df['y_pos'] < 0) & (trl_df['attend_condition'] == bool(np.abs(0 - flip_att_bool)))].empty:
+                    trl_stim = self.flip_arr(trl_stim, flip_type='ud')
+                
+            # trial to be rotated 90deg CW
+            elif not trl_df[(trl_df['x_pos'] < 0) & (trl_df['attend_condition'] == bool(np.abs(0 - flip_att_bool)))].empty: 
+                
+                trl_stim = np.rot90(reconstructed_stimulus.stack('y').loc[ind].iloc[::-1, :].to_numpy(),
+                                                        axes=(1, 0))
+                
+                if not trl_df[(trl_df['y_pos'] > 0) & (trl_df['attend_condition'] == bool(np.abs(1 - flip_att_bool)))].empty:
+                    trl_stim = self.flip_arr(trl_stim, flip_type='lr')
+            
+            # trial to be rotated 90deg CCW + flip horizontally
+            elif not trl_df[(trl_df['x_pos'] > 0) & (trl_df['attend_condition'] == bool(np.abs(0 - flip_att_bool)))].empty: 
+                
+                trl_stim = self.get_diag_mirror_arr(reconstructed_stimulus.stack('y').loc[ind].iloc[::-1, :].to_numpy(),
+                                                        diag_type = 'minor')
+                
+                if not trl_df[(trl_df['y_pos'] > 0) & (trl_df['attend_condition'] == bool(np.abs(1 - flip_att_bool)))].empty:
                     trl_stim = np.rot90(reconstructed_stimulus.stack('y').loc[ind].iloc[::-1, :].to_numpy(),
-                                                            axes=(1, 0))
-                    
-                    if not trl_df[(trl_df['y_pos'] > 0) & (trl_df['attend_condition'] == bool(np.abs(1 - flip_att_bool)))].empty:
-                        trl_stim = self.flip_arr(trl_stim, flip_type='lr')
-                
-                # trial to be rotated 90deg CCW + flip horizontally
-                elif not trl_df[(trl_df['x_pos'] > 0) & (trl_df['attend_condition'] == bool(np.abs(0 - flip_att_bool)))].empty: 
-                    
-                    trl_stim = self.get_diag_mirror_arr(reconstructed_stimulus.stack('y').loc[ind].iloc[::-1, :].to_numpy(),
-                                                            diag_type = 'minor')
-                    
-                    if not trl_df[(trl_df['y_pos'] > 0) & (trl_df['attend_condition'] == bool(np.abs(1 - flip_att_bool)))].empty:
-                        trl_stim = np.rot90(reconstructed_stimulus.stack('y').loc[ind].iloc[::-1, :].to_numpy(),
-                                                            axes=(0, 1))
-                
-                average_stim.append(trl_stim)
-            average_stim = np.stack(average_stim)
+                                                        axes=(0, 1))
+            
+            average_stim.append(trl_stim)
+        average_stim = np.stack(average_stim)
                         
         # and average (median)
         average_stim = np.median(average_stim, axis = 0)

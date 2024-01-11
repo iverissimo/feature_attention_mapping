@@ -355,26 +355,33 @@ class Decoding_Model(GLMsingle_Model):
         for ind in df_ecc_dist.trial_ind.unique():
                 
             trl_df = position_df[position_df['trial_ind'] == ind]
-            
-            # if we want the flipped case, and conditions are not symmetrical
-            if flipped_stim == True and sym_trial == False:
-                trl_ind = self.get_flipped_trial_ind(trl_ind = ind, DM_arr = DM_arr)
-            else:
-                trl_ind = ind
+            trl_ind = ind
             
             # reference trial (stays the same)
-            if not trl_df.query('x_pos < 0').empty:
+            if not trl_df.query('x_pos < 0 & attend_condition').empty:
+                # if we want the flipped case, and conditions are not symmetrical
+                if flipped_stim == True and sym_trial == False:
+                    trl_ind = self.get_flipped_trial_ind(trl_ind = ind, DM_arr = DM_arr)
                 trl_stim = reconstructed_stimulus.stack('y').loc[trl_ind].iloc[::-1, :].to_numpy()
             # trial to be flipped horizontally (this is mirrored left and right)
-            elif not trl_df.query('x_pos > 0').empty:
+            elif not trl_df.query('x_pos > 0 & attend_condition').empty:
+                # if we want the flipped case, and conditions are not symmetrical
+                if flipped_stim == True and sym_trial == False:
+                    trl_ind = self.get_flipped_trial_ind(trl_ind = ind, DM_arr = DM_arr)
                 trl_stim = self.flip_arr(reconstructed_stimulus.stack('y').loc[trl_ind].iloc[::-1, :].to_numpy(),
                                          flip_type='lr')
             # trial to be rotated 90deg CCW
-            elif not trl_df.query('y_pos > 0').empty:
+            elif not trl_df.query('y_pos > 0 & attend_condition').empty:
+                # if we want the flipped case, and conditions are not symmetrical
+                if flipped_stim == True and sym_trial == False:
+                    trl_ind = self.get_flipped_trial_ind(trl_ind = ind, DM_arr = DM_arr)
                 trl_stim = np.rot90(reconstructed_stimulus.stack('y').loc[trl_ind].iloc[::-1, :].to_numpy(),
                                     axes=(0, 1))
             # trial to be rotated 90deg CW
-            elif not trl_df.query('y_pos < 0').empty:
+            elif not trl_df.query('y_pos < 0 & attend_condition').empty:
+                # if we want the flipped case, and conditions are not symmetrical
+                if flipped_stim == True and sym_trial == False:
+                    trl_ind = self.get_flipped_trial_ind(trl_ind = ind, DM_arr = DM_arr)
                 trl_stim = np.rot90(reconstructed_stimulus.stack('y').loc[trl_ind].iloc[::-1, :].to_numpy(),
                                     axes=(1, 0))
                 
@@ -594,6 +601,114 @@ class Decoding_Model(GLMsingle_Model):
         # save figure
         if filename is not None:
             fig.savefig(filename, dpi= 200)
+            
+    def plot_avg_crossed_stim(self, average_stim = None, flip_average_stim = None, DM_trl_ind = None,
+                                    bar_ecc = None, same_ecc = None, downsample_FA_DM = None, 
+                                    vmin = 0, vmax = .4, cmap = 'magma', filename = None):
+        
+        """Make 4x4 plot of recontruscted stim, averaged across conditions
+        (and also reverse case)
+        followed by the corresponding downsampled DM for inspection
+        """
+        
+        ## correlate each reconstructed average condition with stim position
+
+        # note - here we transpose the DM array when correlating because the average_stim we calculated
+        # has a different format than the reconstructed stim outputted by brain decoder
+        avg_corr, avg_pval = scipy.stats.pearsonr(average_stim.ravel(), 
+                                                  downsample_FA_DM[DM_trl_ind].T.ravel())
+        flip_avg_corr, flip_avg_pval = scipy.stats.pearsonr(flip_average_stim.ravel(), 
+                                                            downsample_FA_DM[DM_trl_ind].T.ravel())
+                
+        bar_ecc_ind = {'far': 1, 'middle': 2, 'near': 3}
+        
+        # make reference dict with unique conditions of attended and unattend
+        uniq_cond_dict = {'far': 'near', 'near': 'middle', 'middle': 'far'}
+
+        # bar ecc list of attended and unattended bar
+        bar_ecc_list = [bar_ecc, bar_ecc] if same_ecc == True else [bar_ecc, uniq_cond_dict[bar_ecc]]
+        
+        # plot figure
+        fig, axes = plt.subplots(nrows=2, ncols=2, figsize = (10,10))
+
+        ## attended leftmost, vertical
+        sns.heatmap(average_stim, cmap = cmap, ax = axes[0][0], square = True, cbar = False,
+                    annot=True, annot_kws={"size": 7},
+                    vmin = vmin, vmax = vmax)
+        axes[0][0].set_title('attend %s ecc, unattend %s ecc'%(bar_ecc_list[0], bar_ecc_list[1]))
+
+        ## DM
+        axes[1][0].imshow(downsample_FA_DM[DM_trl_ind].T, cmap = 'binary_r', vmax = 1.5)
+        # Add the patch to the Axes
+        axes[1][0].add_patch(patches.Rectangle((bar_ecc_ind[bar_ecc_list[0]] - .5, -.5), 1, 8, 
+                                            linewidth = 2, edgecolor='purple', 
+                                            facecolor='purple', hatch = '///'))
+        # annotate correlation between reconstructed stim and DM
+        axes[1][0].set_title(r"$\rho$ = {r}".format(r = '%.2f'%(avg_corr))+\
+                                '   pval = {p}'.format(p = "{:.2e}".format(avg_pval)))
+
+        ## attended rightmost
+        sns.heatmap(flip_average_stim, cmap = 'magma', ax = axes[0][1], square = True, cbar = False,
+                annot=True, annot_kws={"size": 7},
+                vmin = vmin, vmax = vmax)
+        axes[0][1].set_title('flipped case')
+
+        ## DM
+        axes[1][1].imshow(downsample_FA_DM[DM_trl_ind].T, cmap = 'binary_r', vmax = 1.5)
+        # Add the patch to the Axes
+        axes[1][1].add_patch(patches.Rectangle((-.5, bar_ecc_ind[bar_ecc_list[1]] - .5), 8, 1, 
+                                            angle=0.0,
+                                            linewidth = 2, edgecolor='green', 
+                                            facecolor='green', hatch = '///'))
+        # annotate correlation between reconstructed stim and DM
+        axes[1][1].set_title(r"$\rho$ = {r}".format(r = '%.2f'%(flip_avg_corr))+\
+                                '   pval = {p}'.format(p = "{:.2e}".format(flip_avg_pval)))
+
+        # save figure
+        if filename is not None:
+            fig.savefig(filename, dpi= 200)
+                 
+    def get_uniq_cond_trl_ind(self, position_df = None, bar_ecc = 'far', bars_pos = 'crossed', same_ecc = False,
+                                    bar_dist = 5):
+    
+        """Get trial indices of unique conditions
+        for bar trials of specific ecc. 
+        *crossed bar trials*
+        -> for each attended ecc there are 2 cases:
+            a) both bars at the same ecc
+            b) Att and Unatt bars at different eccs [far, near] or [middle, far] or [near, middle]
+
+        can also return flipped case (same bar pos, different attended bar)
+        """
+        
+        if bars_pos == 'crossed':
+        
+            # make reference dict with unique conditions of attended and unattend
+            uniq_cond_dict = {'far': 'near', 'near': 'middle', 'middle': 'far'}
+            
+            # bar ecc list of attended and unattended bar
+            bar_ecc_list = [bar_ecc, bar_ecc] if same_ecc == True else [bar_ecc, uniq_cond_dict[bar_ecc]]
+            
+            # filter bar position df
+            masked_df = position_df[(position_df['bars_pos'] == 'crossed') &\
+                            (((position_df['bar_ecc'] == bar_ecc_list[0]) & (position_df['x_pos'] < 0) &\
+                                ((position_df['attend_condition'] == True)))|\
+                                ((position_df['bar_ecc'] == bar_ecc_list[1]) & (position_df['y_pos'] > 0) &\
+                                ((position_df['attend_condition'] == False))))]
+            
+            # get trial ind
+            trl_ind = masked_df[masked_df.duplicated(subset=['trial_ind'])].trial_ind.values[0]
+            
+        elif bars_pos == 'parallel':
+            
+            # filter bar position df
+            df_ecc_dist = self.get_trl_ecc_dist_df(position_df = position_df, bars_pos = bars_pos, 
+                                                bar_ecc = bar_ecc, abs_inter_bar_dist = bar_dist)
+            
+            # get trial ind
+            trl_ind = df_ecc_dist.query('x_pos < 0').trial_ind.values[0]
+            
+        return trl_ind
     
     
         

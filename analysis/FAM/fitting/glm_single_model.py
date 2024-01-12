@@ -841,9 +841,15 @@ class GLMsingle_Model(Model):
         outdir = op.join(self.outputdir, self.MRIObj.sj_space, 'sub-{sj}'.format(sj = participant))
         if hemisphere != 'BH':
             outdir = op.join(outdir, 'hemi-L') if hemisphere in ['LH', 'hemi-L', 'left'] else op.join(outdir, 'hemi-R')
-
         os.makedirs(outdir, exist_ok = True)
         print('saving files in %s'%outdir)
+        
+        ## make figure dir
+        figuredir = op.join(self.outputdir, self.MRIObj.sj_space, 'figures', 'sub-{sj}'.format(sj = participant))
+        if hemisphere != 'BH':
+            outdir = op.join(figuredir, 'hemi-L') if hemisphere in ['LH', 'hemi-L', 'left'] else op.join(figuredir, 'hemi-R')
+        os.makedirs(figuredir, exist_ok = True)
+        print('GLMsingle fit figures in %s'%figuredir)
         
         # if fitting niftis, need to make some changes
         if self.MRIObj.sj_space == 'T1w':
@@ -953,7 +959,8 @@ class GLMsingle_Model(Model):
                                             data_list,
                                             self.MRIObj.FA_bars_phase_dur,
                                             self.MRIObj.TR,
-                                            outputdir = outdir)
+                                            outputdir = outdir,
+                                            figuredir = figuredir)
 
         elapsed_time = time.time() - start_time
 
@@ -983,6 +990,15 @@ class GLMsingle_Model(Model):
             # save correlations again
             np.save(pRFcorr_filename, corr_pRF)
             np.save(FAcorr_filename, corr_FA)
+            
+        # if fitting niftis, convert betas to nii for inspection
+        # only of final model
+        if self.MRIObj.sj_space == 'T1w':
+            betas_filelist = self.convert_betas_volume(participant, model_type = 'D', 
+                                             file_ext = file_ext.replace('.npy', '.nii.gz'), 
+                                             trial_num = 132)
+            
+            print('saved %i beta volume files'%len(betas_filelist))
 
     def load_betas_coord(self, participant_list = [], ROIs_dict = {}, model_type = 'D', prf_bar_coords_dict = {},
                                 att_color_ses_run_dict = {}, betas_per_color = False, file_ext = '_cropped.npy', 

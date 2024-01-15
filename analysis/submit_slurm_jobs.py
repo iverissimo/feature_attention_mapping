@@ -93,6 +93,7 @@ parser.add_argument("--n_jobs",
                     )
 parser.add_argument("--n_tasks", 
                     type = int, 
+                    default = 16,
                     help = "If given, sets number of processes"
                     )
 
@@ -198,7 +199,7 @@ def submit_jobs(participant_list = [], step_type = 'fitmodel', run_time = '10:00
         
         # set general analysis command 
         fit_cmd = """python process_data.py --subject $SJ_NR --step post_fmriprep --dir slurm """
-        fit_cmd += """\n\n"""
+        fit_cmd += """\n"""
         
         # bash file name
         js_name = op.join(batch_dir, 'post_fmriprep_sub-$SJ_NR_FAM.sh')
@@ -213,15 +214,15 @@ def submit_jobs(participant_list = [], step_type = 'fitmodel', run_time = '10:00
 
         print(working_string)
         
-        #of = open(js_name.replace('$SJ_NR', pp), 'w')
-        #of.write(working_string)
-        #of.close()
+        of = open(js_name.replace('$SJ_NR', pp), 'w')
+        of.write(working_string)
+        of.close()
 
         print('submitting ' + js_name.replace('$SJ_NR', pp) + ' to queue')
-        #os.system('sbatch ' + js_name.replace('$SJ_NR', pp))
+        os.system('sbatch ' + js_name.replace('$SJ_NR', pp))
 
         # wait a bit, to give stuff time to start running
-        #time.sleep(.2)
+        time.sleep(.2)
 
 
 def call_fitmodel_jobs(participant_list = [], chunk_data = True, run_time = '10:00:00', task = 'pRF',
@@ -356,16 +357,12 @@ def make_SLURM_script(step_type = 'fitmodel', run_time = '10:00:00', logfilename
         if we want to send email when jobs starts/finishes
     """
 
-    slurm_cmd = """#!/bin/bash
-    
-    #SBATCH -t {rtime}
-    #SBATCH -N {n_nodes}
-    #SBATCH -v
-    #SBATCH --ntasks-per-node={ntasks}
-    #SBATCH --cpus-per-task={n_cpus_task}
-    #SBATCH --output=$BD/{logfilename}_%A.out\n""".format(rtime = run_time, logfilename = logfilename, 
-                                                            n_nodes = n_nodes, n_cpus_task = n_cpus_task, 
-                                                            ntasks = n_tasks)
+    slurm_cmd = """#!/bin/bash\n#SBATCH -t {rtime}\n#SBATCH -N {n_nodes}\n"""+ \
+    """#SBATCH -v\n#SBATCH --ntasks-per-node={ntasks}\n"""+ \
+    """#SBATCH --cpus-per-task={n_cpus_task}\n"""+ \
+    """#SBATCH --output=$BD/{logfilename}_%A.out\n\n"""
+    slurm_cmd = slurm_cmd.format(rtime = run_time, logfilename = logfilename, 
+                                n_nodes = n_nodes, n_cpus_task = n_cpus_task, ntasks = n_tasks)
     
     # if we want a specific node/partition
     if partition_name is not None:
@@ -384,52 +381,26 @@ def make_SLURM_script(step_type = 'fitmodel', run_time = '10:00:00', logfilename
     if step_type == 'fitmodel':
         
         if task == 'pRF':
-            fit_cmd = """mkdir -p $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR
-
-            wait
-
-            if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ] 
-            then
-                rsync -chavzP --exclude=".*" $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR
-            fi
-
-            wait
-
-            """
+            fit_cmd = """mkdir -p $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR\n\nwait\n\n"""+ \
+            """if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ]\nthen\n"""+ \
+            """    rsync -chavzP --exclude=".*" $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR\nfi\n\nwait\n\n"""
             
         elif task == 'FA':
             # if we are fitting FA, then also need to copy pRF estimates to scratch
-            fit_cmd = """mkdir -p $TMPDIR/derivatives/$FITFOLDER,$PRFFITFOLDER/$SPACE/sub-$SJ_NR
-
-            wait
-
-            if [ -d "$DERIV_DIR/$PRFFITFOLDER/$SPACE/sub-$SJ_NR" ] 
-            then
-                rsync -chavzP --exclude=".*" $DERIV_DIR/$PRFFITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$PRFFITFOLDER/$SPACE/sub-$SJ_NR
-            fi
-
-            if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ] 
-            then
-                rsync -chavzP --exclude=".*" $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR
-            fi
-
-            wait
-
-            """.replace('$PRFFITFOLDER', FAM_data.params['mri']['fitting']['pRF']['fit_folder'])
+            fit_cmd = """mkdir -p $TMPDIR/derivatives/{$FITFOLDER,$PRFFITFOLDER}/$SPACE/sub-$SJ_NR\n\nwait\n\n"""+ \
+            """if [ -d "$DERIV_DIR/$PRFFITFOLDER/$SPACE/sub-$SJ_NR" ]\nthen\n"""+ \
+            """    rsync -chavzP --exclude=".*" $DERIV_DIR/$PRFFITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$PRFFITFOLDER/$SPACE/sub-$SJ_NR\nfi\n\n"""+ \
+            """if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ]\nthen\n"""+ \
+            """    rsync -chavzP --exclude=".*" $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR\nfi\n\n"""+ \
+            """wait\n\n"""
+            fit_cmd = fit_cmd.replace('$PRFFITFOLDER', FAM_data.params['mri']['fitting']['pRF']['fit_folder'])
         
         slurm_cmd += fit_cmd
         
     ## call final part (with actual command)
-    bash_string = slurm_cmd + """$PY_CMD
-
-    wait          # wait until programs are finished
-
-    rsync -chavzP --exclude=".*" $TMPDIR/derivatives/ $DERIV_DIR
-
-    wait          # wait until programs are finished
-
-    $END_EMAIL
-    """
+    bash_string = slurm_cmd + \
+        """$PY_CMD\n\nwait # wait until programs are finished\n\n"""+ \
+            """rsync -chavzP --exclude=".*" $TMPDIR/derivatives/ $DERIV_DIR\n\nwait\n\n$END_EMAIL\n"""
     
     ## if we want to send email
     if send_email:
@@ -450,29 +421,16 @@ def rsync_deriv():
     """General script for rsyncing postfmriprep derivatives
     """
     
-    cmd = """# call the programs
-    $START_EMAIL
-
-    # make derivatives dir in node and sourcedata because we want to access behav files
-    mkdir -p $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR
-    mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR
-
-    wait
-
-    rsync -chavzP --exclude=".*" $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR
-
-    wait
-
-    rsync -chavzP --exclude=".*" $SOURCE_DIR/sub-$SJ_NR/ $TMPDIR/sourcedata/sub-$SJ_NR
-
-    wait
-
-    """
+    cmd = """# call the programs\n$START_EMAIL\n\n"""+\
+    """# make derivatives dir in node and sourcedata because we want to access behav files\n"""+ \
+    """mkdir -p $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR\n"""+ \
+    """mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR\n\nwait\n\n"""+\
+    """rsync -chavzP --exclude=".*" $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR\n\nwait\n\n"""+\
+    """rsync -chavzP --exclude=".*" $SOURCE_DIR/sub-$SJ_NR/ $TMPDIR/sourcedata/sub-$SJ_NR\n\nwait\n\n"""
     
     return cmd
         
-
-      
+  
 main()      
         
         

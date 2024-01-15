@@ -465,7 +465,7 @@ def make_concurrent_job(participant_list = [], step_type = 'fitmodel', run_time 
         
         # set general analysis command 
         fit_cmd = """declare -a pp_arr=($PP_LIST)
-for i in 'seq 1 $SLURM_NTASKS'; do
+for ((i = 1; i <= ${#pp_arr[@]}; i++)); do
 (
     python process_data.py --subject ${pp_arr[$i]} --step post_fmriprep --dir slurm
 ) &

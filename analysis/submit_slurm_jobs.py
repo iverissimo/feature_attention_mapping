@@ -174,7 +174,12 @@ print('Subject list is {l}'.format(l=str(FAM_data.sj_num)))
 
 ## submit jobs
 def main():
-    submit_jobs(participant_list = FAM_data.sj_num, step_type = pycmd, task = task, run_time = run_time, 
+    #submit_jobs(participant_list = FAM_data.sj_num, step_type = pycmd, task = task, run_time = run_time, 
+    #            partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
+    #            n_tasks = n_tasks, n_nodes = n_nodes, n_cpus_task = n_cpus_task,
+    #            send_email = send_email)
+    
+    make_concurrent_job(participant_list = FAM_data.sj_num, step_type = pycmd, task = task, run_time = run_time, 
                 partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
                 n_tasks = n_tasks, n_nodes = n_nodes, n_cpus_task = n_cpus_task,
                 send_email = send_email)
@@ -331,7 +336,7 @@ def call_fitmodel_jobs(participant_list = [], chunk_data = True, run_time = '10:
 
 def make_SLURM_script(step_type = 'fitmodel', run_time = '10:00:00', logfilename = '', partition_name = None, node_name = None, 
                     batch_mem_Gib = None, task = 'pRF', n_tasks = 16, n_nodes = 1, n_cpus_task = 4,
-                    batch_dir = '/home/inesv/batch', send_email = False):
+                    batch_dir = '/home/inesv/batch', send_email = False, group_bool = False):
 
     """
     Set up bash script, with generic structure 
@@ -375,7 +380,7 @@ def make_SLURM_script(step_type = 'fitmodel', run_time = '10:00:00', logfilename
         slurm_cmd += '#SBATCH --mem={mem}G\n'.format(mem=batch_mem_Gib)
         
     # rsync general folders that should be needed for 
-    slurm_cmd += rsync_deriv()
+    slurm_cmd += rsync_deriv(group_bool = group_bool)
         
     # join command specific lines
     if step_type == 'fitmodel':
@@ -416,19 +421,79 @@ def make_SLURM_script(step_type = 'fitmodel', run_time = '10:00:00', logfilename
 
     return bash_string
               
-def rsync_deriv():
+def rsync_deriv(group_bool = False):
     
     """General script for rsyncing postfmriprep derivatives
     """
     
-    cmd = """# call the programs\n$START_EMAIL\n\n"""+\
-    """# make derivatives dir in node and sourcedata because we want to access behav files\n"""+ \
-    """mkdir -p $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR\n"""+ \
-    """mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR\n\nwait\n\n"""+\
-    """rsync -chavP --exclude=".*" $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR --no-compress\n\nwait\n\n"""+\
-    """rsync -chavP --exclude=".*" $SOURCE_DIR/sub-$SJ_NR/ $TMPDIR/sourcedata/sub-$SJ_NR --no-compress\n\nwait\n\n"""
-    
+    # if we want to run it for the group, then copy dir for all participants
+    if group_bool:
+        cmd = """# call the programs\n$START_EMAIL\n\n"""+\
+        """# make derivatives dir in node and sourcedata because we want to access behav files\n"""+ \
+        """mkdir -p $TMPDIR/derivatives/post_fmriprep/$SPACE\n"""+ \
+        """mkdir -p $TMPDIR/sourcedata\n\nwait\n\n"""+\
+        """rsync -chavP --exclude=".*" $DERIV_DIR/post_fmriprep/$SPACE/ $TMPDIR/derivatives/post_fmriprep/$SPACE --no-compress\n\nwait\n\n"""+\
+        """rsync -chavP --exclude=".*" $SOURCE_DIR/ $TMPDIR/sourcedata --no-compress\n\nwait\n\n"""
+    else:
+        cmd = """# call the programs\n$START_EMAIL\n\n"""+\
+        """# make derivatives dir in node and sourcedata because we want to access behav files\n"""+ \
+        """mkdir -p $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR\n"""+ \
+        """mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR\n\nwait\n\n"""+\
+        """rsync -chavP --exclude=".*" $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR --no-compress\n\nwait\n\n"""+\
+        """rsync -chavP --exclude=".*" $SOURCE_DIR/sub-$SJ_NR/ $TMPDIR/sourcedata/sub-$SJ_NR --no-compress\n\nwait\n\n"""
+        
     return cmd
+
+def make_concurrent_job(participant_list = [], step_type = 'fitmodel', run_time = '10:00:00', partition_name = None, node_name = None, 
+                batch_mem_Gib = None, task = 'pRF', n_tasks = 16, n_nodes = 1, n_cpus_task = 4,
+                batch_dir = '/home/inesv/batch', send_email = False):
+    
+    """execute the same pipeline (or single program) on different samples of data.
+    """
+    
+    n_tasks = len(participant_list)
+    
+    if step_type == 'post_fmriprep':
+        
+        # get base format for bash script
+        bash_basetxt = make_SLURM_script(step_type = step_type, run_time = run_time, 
+                                        logfilename = 'slurm_FAM_{st}_proc'.format(st = step_type), 
+                                        partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
+                                        task = task, batch_dir = batch_dir, send_email = send_email, 
+                                        n_tasks = n_tasks, n_nodes=n_nodes, n_cpus_task = n_cpus_task,
+                                        group_bool = True)
+        
+        # set general analysis command 
+        fit_cmd = """declare -a pp_arr=($PP_LIST)
+for i in 'seq 1 $SLURM_NTASKS'; do
+(
+    python process_data.py --subject ${pp_arr[$i]} --step post_fmriprep --dir slurm
+) &
+done
+wait\n\n"""
+
+        # bash file name
+        js_name = op.join(batch_dir, 'post_fmriprep_sub-GROUP_FAM.sh')
+        
+    ## replace command and scratch dir in base string
+    working_string = bash_basetxt.replace('$PY_CMD', fit_cmd)
+    working_string = working_string.replace('$TMPDIR', '/scratch-shared/$USER/FAM') 
+    
+    # replace list of participants
+    working_string = working_string.replace('$PP_LIST', ' '.join(participant_list))
+
+
+    print(working_string)
+    
+    of = open(js_name, 'w')
+    of.write(working_string)
+    of.close()
+
+    print('submitting ' + js_name + ' to queue')
+    os.system('sbatch ' + js_name)
+
+    
+    
         
   
 main()      

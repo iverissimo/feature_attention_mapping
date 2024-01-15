@@ -383,15 +383,15 @@ def make_SLURM_script(step_type = 'fitmodel', run_time = '10:00:00', logfilename
         if task == 'pRF':
             fit_cmd = """mkdir -p $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR\n\nwait\n\n"""+ \
             """if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ]\nthen\n"""+ \
-            """    rsync -chavzP --exclude=".*" $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR\nfi\n\nwait\n\n"""
+            """    rsync -chavP --exclude=".*" $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR --no-compress\nfi\n\nwait\n\n"""
             
         elif task == 'FA':
             # if we are fitting FA, then also need to copy pRF estimates to scratch
             fit_cmd = """mkdir -p $TMPDIR/derivatives/{$FITFOLDER,$PRFFITFOLDER}/$SPACE/sub-$SJ_NR\n\nwait\n\n"""+ \
             """if [ -d "$DERIV_DIR/$PRFFITFOLDER/$SPACE/sub-$SJ_NR" ]\nthen\n"""+ \
-            """    rsync -chavzP --exclude=".*" $DERIV_DIR/$PRFFITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$PRFFITFOLDER/$SPACE/sub-$SJ_NR\nfi\n\n"""+ \
+            """    rsync -chavP --exclude=".*" $DERIV_DIR/$PRFFITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$PRFFITFOLDER/$SPACE/sub-$SJ_NR --no-compress\nfi\n\n"""+ \
             """if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ]\nthen\n"""+ \
-            """    rsync -chavzP --exclude=".*" $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR\nfi\n\n"""+ \
+            """    rsync -chavP --exclude=".*" $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR --no-compress\nfi\n\n"""+ \
             """wait\n\n"""
             fit_cmd = fit_cmd.replace('$PRFFITFOLDER', FAM_data.params['mri']['fitting']['pRF']['fit_folder'])
         
@@ -400,7 +400,7 @@ def make_SLURM_script(step_type = 'fitmodel', run_time = '10:00:00', logfilename
     ## call final part (with actual command)
     bash_string = slurm_cmd + \
         """$PY_CMD\n\nwait # wait until programs are finished\n\n"""+ \
-            """rsync -chavzP --exclude=".*" $TMPDIR/derivatives/ $DERIV_DIR\n\nwait\n\n$END_EMAIL\n"""
+            """rsync -chavP --exclude=".*" $TMPDIR/derivatives/ $DERIV_DIR --no-compress\n\nwait\n\n$END_EMAIL\n"""
     
     ## if we want to send email
     if send_email:
@@ -425,8 +425,8 @@ def rsync_deriv():
     """# make derivatives dir in node and sourcedata because we want to access behav files\n"""+ \
     """mkdir -p $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR\n"""+ \
     """mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR\n\nwait\n\n"""+\
-    """rsync -chavzP --exclude=".*" $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR\n\nwait\n\n"""+\
-    """rsync -chavzP --exclude=".*" $SOURCE_DIR/sub-$SJ_NR/ $TMPDIR/sourcedata/sub-$SJ_NR\n\nwait\n\n"""
+    """rsync -chavP --exclude=".*" $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR --no-compress\n\nwait\n\n"""+\
+    """rsync -chavP --exclude=".*" $SOURCE_DIR/sub-$SJ_NR/ $TMPDIR/sourcedata/sub-$SJ_NR --no-compress\n\nwait\n\n"""
     
     return cmd
         

@@ -172,10 +172,11 @@ FAM_data = load_exp_settings.MRIData(params, sj,
 print('Subject list is {l}'.format(l=str(FAM_data.sj_num)))
 
 ## submit jobs
-submit_jobs(participant_list = FAM_data.sj_num, step_type = pycmd, task = task, run_time = run_time, 
-            partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
-            n_tasks = n_tasks, n_nodes = n_nodes, n_cpus_task = n_cpus_task,
-            send_email = send_email)
+def main():
+    submit_jobs(participant_list = FAM_data.sj_num, step_type = pycmd, task = task, run_time = run_time, 
+                partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
+                n_tasks = n_tasks, n_nodes = n_nodes, n_cpus_task = n_cpus_task,
+                send_email = send_email)
 
 
 def submit_jobs(participant_list = [], step_type = 'fitmodel', run_time = '10:00:00', partition_name = None, node_name = None, 
@@ -470,8 +471,8 @@ def rsync_deriv():
     
     return cmd
         
-        
-        
-        
+
+      
+main()      
         
         

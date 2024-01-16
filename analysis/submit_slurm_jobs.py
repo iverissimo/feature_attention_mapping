@@ -110,6 +110,11 @@ parser.add_argument("--dry_run",
                     action = 'store_true',
                     help="if option called, make job without exactly running it"
                     )
+parser.add_argument("--username", 
+                    type = 'str',
+                    required = True,
+                    help="SLURM username"
+                    )
 
 # analysis specific
 parser.add_argument("--chunk_data", 
@@ -170,6 +175,7 @@ n_tasks = args.n_tasks
 concurrent_job = args.concurrent_job
 use_rsync = args.use_rsync
 dry_run = args.dry_run
+username = args.username
 
 # analysis specific
 chunk_data = args.chunk_data
@@ -200,5 +206,5 @@ FAM_SLURM.submit_jobs(participant_list = FAM_data.sj_num,
                 step_type = pycmd, taskname = task, concurrent_job = concurrent_job,
                 n_jobs = n_jobs, n_batches = n_batches, chunk_data = None, fit_hrf = fit_hrf, use_rsync = use_rsync, 
                 prf_model_name = prf_model_name, fa_model_name = fa_model_name, run_type = run_type, ses2fit = ses2fit,
-                dry_run = dry_run)
+                dry_run = dry_run, username = username)
 

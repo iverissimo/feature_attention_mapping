@@ -106,7 +106,7 @@ parser.add_argument("--use_rsync",
                     )
 parser.add_argument("--dry_run", 
                     action = 'store_true',
-                    help="if option called, make jib without exactly running it"
+                    help="if option called, make job without exactly running it"
                     )
 
 # analysis specific
@@ -531,7 +531,7 @@ def make_concurrent_job(participant_list = [], step_type = 'fitmodel', run_time 
     of.close()
 
     # if just want to see how it looks, then dont actually run script
-    if dry_run:
+    if dry_run == False:
         print('submitting ' + js_name + ' to queue')
         os.system('sbatch ' + js_name)
   

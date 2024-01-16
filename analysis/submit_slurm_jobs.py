@@ -96,17 +96,17 @@ parser.add_argument("--n_tasks",
                     default = 16,
                     help = "If given, sets number of processes"
                     )
-parser.add_argument("--concurrent_pp", 
+parser.add_argument("--concurrent_job", 
                     action = 'store_true',
-                    help="if option called, run analysis concurrently for all participants"
-                    )
-parser.add_argument("--concurrent_data", 
-                    action = 'store_true',
-                    help="if option called, run analysis concurrently for all chunks of data of 1 participant (ex: prf fitting)"
+                    help="if option called, run analysis concurrently for all participants/all chunks of data of 1 participant (ex: prf fitting)"
                     )
 parser.add_argument("--use_rsync", 
                     action = 'store_true',
                     help="if option called, use rsync to copy to node (instead of cp)"
+                    )
+parser.add_argument("--dry_run", 
+                    action = 'store_true',
+                    help="if option called, make jib without exactly running it"
                     )
 
 # analysis specific
@@ -165,9 +165,9 @@ n_batches = args.n_batches
 n_cpus_task = args.n_cpus_task
 n_jobs = args.n_jobs
 n_tasks = args.n_tasks
-concurrent_pp = args.concurrent_pp
-concurrent_data = args.concurrent_data
+concurrent_job = args.concurrent_job
 use_rsync = args.use_rsync
+dry_run = args.dry_run
 
 # analysis specific
 chunk_data = args.chunk_data
@@ -187,16 +187,15 @@ FAM_data = load_exp_settings.MRIData(params, sj,
 
 print('Subject list is {l}'.format(l=str(FAM_data.sj_num)))
 
-def main(concurrent_pp = False, concurrent_data = False, **kwargs):
+def main(concurrent_job = False, **kwargs):
     
     """Main caller for job submission
     """
-    if concurrent_pp or concurrent_data:
-        
+    if concurrent_job:
         make_concurrent_job(participant_list = FAM_data.sj_num, step_type = pycmd, task = task, run_time = run_time, 
                     partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
                     n_tasks = n_tasks, n_nodes = n_nodes, n_cpus_task = n_cpus_task,
-                    send_email = send_email, use_rsync = use_rsync)
+                    send_email = send_email, use_rsync = use_rsync, dry_run = dry_run)
     else:
         submit_jobs(participant_list = FAM_data.sj_num, step_type = pycmd, task = task, run_time = run_time, 
                 partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 

@@ -111,7 +111,7 @@ parser.add_argument("--dry_run",
                     help="if option called, make job without exactly running it"
                     )
 parser.add_argument("--username", 
-                    type = 'str',
+                    type = str.lower, 
                     required = True,
                     help="SLURM username"
                     )

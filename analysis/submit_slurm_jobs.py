@@ -187,7 +187,7 @@ FAM_data = load_exp_settings.MRIData(params, sj,
 
 print('Subject list is {l}'.format(l=str(FAM_data.sj_num)))
 
-def main(concurrent_job = False, **kwargs):
+def main(concurrent_job = False, dry_run = False, **kwargs):
     
     """Main caller for job submission
     """
@@ -537,6 +537,6 @@ def make_concurrent_job(participant_list = [], step_type = 'fitmodel', run_time 
   
   
 ## actually submit jobs
-main(concurrent_job = concurrent_job)      
+main(concurrent_job = concurrent_job, dry_run = dry_run)      
         
         

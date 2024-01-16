@@ -96,6 +96,18 @@ parser.add_argument("--n_tasks",
                     default = 16,
                     help = "If given, sets number of processes"
                     )
+parser.add_argument("--concurrent_pp", 
+                    action = 'store_true',
+                    help="if option called, run analysis concurrently for all participants"
+                    )
+parser.add_argument("--concurrent_data", 
+                    action = 'store_true',
+                    help="if option called, run analysis concurrently for all chunks of data of 1 participant (ex: prf fitting)"
+                    )
+parser.add_argument("--use_rsync", 
+                    action = 'store_true',
+                    help="if option called, use rsync to copy to node (instead of cp)"
+                    )
 
 # analysis specific
 parser.add_argument("--chunk_data", 
@@ -153,6 +165,9 @@ n_batches = args.n_batches
 n_cpus_task = args.n_cpus_task
 n_jobs = args.n_jobs
 n_tasks = args.n_tasks
+concurrent_pp = args.concurrent_pp
+concurrent_data = args.concurrent_data
+use_rsync = args.use_rsync
 
 # analysis specific
 chunk_data = args.chunk_data
@@ -172,14 +187,18 @@ FAM_data = load_exp_settings.MRIData(params, sj,
 
 print('Subject list is {l}'.format(l=str(FAM_data.sj_num)))
 
-## submit jobs
-def main():
-    #submit_jobs(participant_list = FAM_data.sj_num, step_type = pycmd, task = task, run_time = run_time, 
-    #            partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
-    #            n_tasks = n_tasks, n_nodes = n_nodes, n_cpus_task = n_cpus_task,
-    #            send_email = send_email)
+def main(concurrent_pp = False, concurrent_data = False, **kwargs):
     
-    make_concurrent_job(participant_list = FAM_data.sj_num, step_type = pycmd, task = task, run_time = run_time, 
+    """Main caller for job submission
+    """
+    if concurrent_pp or concurrent_data:
+        
+        make_concurrent_job(participant_list = FAM_data.sj_num, step_type = pycmd, task = task, run_time = run_time, 
+                    partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
+                    n_tasks = n_tasks, n_nodes = n_nodes, n_cpus_task = n_cpus_task,
+                    send_email = send_email, use_rsync = use_rsync)
+    else:
+        submit_jobs(participant_list = FAM_data.sj_num, step_type = pycmd, task = task, run_time = run_time, 
                 partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
                 n_tasks = n_tasks, n_nodes = n_nodes, n_cpus_task = n_cpus_task,
                 send_email = send_email)
@@ -228,7 +247,6 @@ def submit_jobs(participant_list = [], step_type = 'fitmodel', run_time = '10:00
 
         # wait a bit, to give stuff time to start running
         time.sleep(.2)
-
 
 def call_fitmodel_jobs(participant_list = [], chunk_data = True, run_time = '10:00:00', task = 'pRF',
                 model_name = 'gauss', partition_name = None, node_name = None, batch_mem_Gib = None, 
@@ -336,7 +354,7 @@ def call_fitmodel_jobs(participant_list = [], chunk_data = True, run_time = '10:
 
 def make_SLURM_script(step_type = 'fitmodel', run_time = '10:00:00', logfilename = '', partition_name = None, node_name = None, 
                     batch_mem_Gib = None, task = 'pRF', n_tasks = 16, n_nodes = 1, n_cpus_task = 4,
-                    batch_dir = '/home/inesv/batch', send_email = False, group_bool = False):
+                    batch_dir = '/home/inesv/batch', send_email = False, group_bool = False, use_rsync = False):
 
     """
     Set up bash script, with generic structure 
@@ -362,6 +380,7 @@ def make_SLURM_script(step_type = 'fitmodel', run_time = '10:00:00', logfilename
         if we want to send email when jobs starts/finishes
     """
 
+    ## initialize batch script, with general node specs
     slurm_cmd = """#!/bin/bash\n#SBATCH -t {rtime}\n#SBATCH -N {n_nodes}\n"""+ \
     """#SBATCH -v\n#SBATCH --ntasks-per-node={ntasks}\n"""+ \
     """#SBATCH --cpus-per-task={n_cpus_task}\n"""+ \
@@ -369,18 +388,21 @@ def make_SLURM_script(step_type = 'fitmodel', run_time = '10:00:00', logfilename
     slurm_cmd = slurm_cmd.format(rtime = run_time, logfilename = logfilename, 
                                 n_nodes = n_nodes, n_cpus_task = n_cpus_task, ntasks = n_tasks)
     
-    # if we want a specific node/partition
+    ## if we want a specific node/partition
     if partition_name is not None:
         slurm_cmd += '#SBATCH --partition={p}\n'.format(p=partition_name)
     if node_name is not None:
         slurm_cmd += '#SBATCH -w {n}\n'.format(n=node_name)
 
-    # add memory for node
+    ## add memory for node
     if batch_mem_Gib is not None:
         slurm_cmd += '#SBATCH --mem={mem}G\n'.format(mem=batch_mem_Gib)
         
     # rsync general folders that should be needed for 
-    slurm_cmd += rsync_deriv(group_bool = group_bool)
+    if use_rsync:
+        slurm_cmd += rsync_deriv(group_bool = group_bool)
+    else:
+        slurm_cmd += cp_deriv(group_bool = group_bool) # or copy if more efficient
         
     # join command specific lines
     if step_type == 'fitmodel':
@@ -444,14 +466,38 @@ def rsync_deriv(group_bool = False):
         
     return cmd
 
-def make_concurrent_job(participant_list = [], step_type = 'fitmodel', run_time = '10:00:00', partition_name = None, node_name = None, 
-                batch_mem_Gib = None, task = 'pRF', n_tasks = 16, n_nodes = 1, n_cpus_task = 4,
-                batch_dir = '/home/inesv/batch', send_email = False):
+def cp_deriv(group_bool = False):
+    
+    """General script for cp postfmriprep derivatives
+    """
+    
+    # if we want to run it for the group, then copy dir for all participants
+    if group_bool:
+        cmd = """# call the programs\n$START_EMAIL\n\n"""+\
+        """# make derivatives dir in node and sourcedata because we want to access behav files\n"""+ \
+        """mkdir -p $TMPDIR/derivatives/post_fmriprep/$SPACE\n"""+ \
+        """mkdir -p $TMPDIR/sourcedata\n\nwait\n\n"""+\
+        """cp -r $DERIV_DIR/post_fmriprep/$SPACE/ $TMPDIR/derivatives/post_fmriprep/$SPACE\n\nwait\n\n"""+\
+        """cp -r $SOURCE_DIR/ $TMPDIR/sourcedata\n\nwait\n\n"""
+    else:
+        cmd = """# call the programs\n$START_EMAIL\n\n"""+\
+        """# make derivatives dir in node and sourcedata because we want to access behav files\n"""+ \
+        """mkdir -p $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR\n"""+ \
+        """mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR\n\nwait\n\n"""+\
+        """cp -r $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR\n\nwait\n\n"""+\
+        """cp -r $SOURCE_DIR/sub-$SJ_NR/ $TMPDIR/sourcedata/sub-$SJ_NR\n\nwait\n\n"""
+        
+    return cmd
+
+def make_concurrent_job(participant_list = [], step_type = 'fitmodel', run_time = '10:00:00', 
+                        partition_name = None, node_name = None, 
+                        batch_mem_Gib = None, task = 'pRF', n_tasks = 16, n_nodes = 1, n_cpus_task = 4,
+                        batch_dir = '/home/inesv/batch', send_email = False, use_rsync = False, dry_run = False):
     
     """execute the same pipeline (or single program) on different samples of data.
     """
     
-    n_tasks = len(participant_list)
+    #n_tasks = len(participant_list)
     
     if step_type == 'post_fmriprep':
         
@@ -461,19 +507,16 @@ def make_concurrent_job(participant_list = [], step_type = 'fitmodel', run_time 
                                         partition_name = partition_name, node_name = node_name, batch_mem_Gib = batch_mem_Gib, 
                                         task = task, batch_dir = batch_dir, send_email = send_email, 
                                         n_tasks = n_tasks, n_nodes=n_nodes, n_cpus_task = n_cpus_task,
-                                        group_bool = True)
+                                        group_bool = True, use_rsync = use_rsync)
         
-        # set general analysis command 
-        fit_cmd = """declare -a pp_arr=($PP_LIST)
-for ((i = 0; i < ${#pp_arr[@]}; i++)); do
-(
-    python process_data.py --subject ${pp_arr[$i]} --step post_fmriprep --dir slurm
-) &
-done
-wait\n\n"""
+        # set general analysis command iterating over participant list
+        fit_cmd = """declare -a pp_arr=($PP_LIST)\n"""+ \
+            """for ((i = 0; i < ${#pp_arr[@]}; i++)); do\n"""+ \
+            """(\n  python process_data.py --subject ${pp_arr[$i]} --step post_fmriprep --dir slurm\n) &\n"""+ \
+            """done\n\nwait\n\n"""
 
-        # bash file name
-        js_name = op.join(batch_dir, 'post_fmriprep_sub-GROUP_FAM.sh')
+    # bash file name
+    js_name = op.join(batch_dir, '{skey}_sub-GROUP_FAM.sh'.format(skey = step_type))
         
     ## replace command and scratch dir in base string
     working_string = bash_basetxt.replace('$PY_CMD', fit_cmd)
@@ -482,20 +525,19 @@ wait\n\n"""
     # replace list of participants
     working_string = working_string.replace('$PP_LIST', ' '.join(participant_list))
 
-
     print(working_string)
     
     of = open(js_name, 'w')
     of.write(working_string)
     of.close()
 
-    print('submitting ' + js_name + ' to queue')
-    os.system('sbatch ' + js_name)
-
-    
-    
-        
+    # if just want to see how it looks, then dont actually run script
+    if dry_run:
+        print('submitting ' + js_name + ' to queue')
+        os.system('sbatch ' + js_name)
   
-main()      
+  
+## actually submit jobs
+main(concurrent_pp = concurrent_pp, concurrent_data = concurrent_data)      
         
         

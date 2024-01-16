@@ -271,14 +271,14 @@ class Batcher:
             elif task == 'FA':
                 # if we are fitting FA, then also need to copy pRF estimates to scratch
                 if use_rsync:
-                    fit_cmd = """mkdir -p $TMPDIR/derivatives/{$FITFOLDER,$PRFFITFOLDER}/{$SPACE, $PRFSPACE}/\n\nwait\n\n"""+ \
+                    fit_cmd = """mkdir -p $TMPDIR/derivatives/{$FITFOLDER,$PRFFITFOLDER}/{$SPACE,$PRFSPACE}/\n\nwait\n\n"""+ \
                     """if [ -d "$DERIV_DIR/$PRFFITFOLDER/$PRFSPACE/" ]\nthen\n"""+ \
                     """    rsync -chavP --exclude=".*" $DERIV_DIR/$PRFFITFOLDER/$PRFSPACE/ $TMPDIR/derivatives/$PRFFITFOLDER/$PRFSPACE--no-compress\nfi\n\n"""+ \
                     """if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE" ]\nthen\n"""+ \
                     """    rsync -chavP --exclude=".*" $DERIV_DIR/$FITFOLDER/$SPACE/ $TMPDIR/derivatives/$FITFOLDER/$SPACE --no-compress\nfi\n\n"""+ \
                     """wait\n\n"""
                 else:
-                    fit_cmd = """mkdir -p $TMPDIR/derivatives/{$FITFOLDER,$PRFFITFOLDER}/{$SPACE, $PRFSPACE}/\n\nwait\n\n"""+ \
+                    fit_cmd = """mkdir -p $TMPDIR/derivatives/{$FITFOLDER,$PRFFITFOLDER}/{$SPACE,$PRFSPACE}/\n\nwait\n\n"""+ \
                     """if [ -d "$DERIV_DIR/$PRFFITFOLDER/$PRFSPACE" ]\nthen\n"""+ \
                     """    cp -r $DERIV_DIR/$PRFFITFOLDER/$PRFSPACE $TMPDIR/derivatives/$PRFFITFOLDER/\nfi\n\n"""+ \
                     """if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE" ]\nthen\n"""+ \
@@ -299,14 +299,14 @@ class Batcher:
             elif task == 'FA':
                 # if we are fitting FA, then also need to copy pRF estimates to scratch
                 if use_rsync:
-                    fit_cmd = """mkdir -p $TMPDIR/derivatives/{$FITFOLDER,$PRFFITFOLDER}/{$SPACE, $PRFSPACE}/sub-$SJ_NR\n\nwait\n\n"""+ \
+                    fit_cmd = """mkdir -p $TMPDIR/derivatives/{$FITFOLDER,$PRFFITFOLDER}/{$SPACE,$PRFSPACE}/sub-$SJ_NR\n\nwait\n\n"""+ \
                     """if [ -d "$DERIV_DIR/$PRFFITFOLDER/$PRFSPACE/sub-$SJ_NR" ]\nthen\n"""+ \
                     """    rsync -chavP --exclude=".*" $DERIV_DIR/$PRFFITFOLDER/$PRFSPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$PRFFITFOLDER/$PRFSPACE/sub-$SJ_NR --no-compress\nfi\n\n"""+ \
                     """if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ]\nthen\n"""+ \
                     """    rsync -chavP --exclude=".*" $DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/$FITFOLDER/$SPACE/sub-$SJ_NR --no-compress\nfi\n\n"""+ \
                     """wait\n\n"""
                 else:
-                    fit_cmd = """mkdir -p $TMPDIR/derivatives/{$FITFOLDER,$PRFFITFOLDER}/{$SPACE, $PRFSPACE}/sub-$SJ_NR\n\nwait\n\n"""+ \
+                    fit_cmd = """mkdir -p $TMPDIR/derivatives/{$FITFOLDER,$PRFFITFOLDER}/{$SPACE,$PRFSPACE}/sub-$SJ_NR\n\nwait\n\n"""+ \
                     """if [ -d "$DERIV_DIR/$PRFFITFOLDER/$PRFSPACE/sub-$SJ_NR" ]\nthen\n"""+ \
                     """    cp -r $DERIV_DIR/$PRFFITFOLDER/$PRFSPACE/sub-$SJ_NR $TMPDIR/derivatives/$PRFFITFOLDER/$PRFSPACE/\nfi\n\n"""+ \
                     """if [ -d "$DERIV_DIR/$FITFOLDER/$SPACE/sub-$SJ_NR" ]\nthen\n"""+ \

@@ -27,10 +27,15 @@ import seaborn as sns
 import nibabel as nib
 import neuropythy
 
+import braincoder
+from braincoder.models import GaussianPRF2DWithHRF, GaussianPRF2D
+from braincoder.hrf import SPMHRFModel
+from braincoder.optimize import ParameterFitter, ResidualFitter, StimulusFitter
+
 
 class Decoding_Model(GLMsingle_Model):
 
-    def __init__(self, MRIObj, outputdir = None, pysub = 'hcp_999999', use_atlas = None):
+    def __init__(self, MRIObj, pRFModelObj = None, outputdir = None, pysub = 'hcp_999999', use_atlas = None):
         
         """__init__
         constructor for class 
@@ -49,8 +54,13 @@ class Decoding_Model(GLMsingle_Model):
         # need to initialize parent class (Model), indicating output infos
         super().__init__(MRIObj = MRIObj, outputdir = outputdir, pysub = pysub, use_atlas = use_atlas)
         
+        # prf sj space to define ROIs will be surface space
+        self.prf_sj_space = 'fsnative'
+        self.decoder_dir = op.join(self.MRIObj.derivatives_pth, 'decoder')
+        self.pRFModelObj = pRFModelObj
         
-    def load_prf_estimates(self, pRFModelObj = None, participant_list = [], ses = 'mean', run_type = 'mean', model_name = None, 
+        
+    def load_prf_estimates(self, participant_list = [], ses = 'mean', run_type = 'mean', model_name = None, 
                                 fit_hrf = False, rsq_threshold = .1, positive_rf = True, size_std = 2.5,
                                 mask_bool_df = None, stim_on_screen = [], mask_arr = True):
         
@@ -59,15 +69,13 @@ class Decoding_Model(GLMsingle_Model):
         Returns dataframe with estimates for all participants in participant list
         """
         
-        prf_sj_space = 'fsnative'
-        
         ## load pRF estimates and models for all participants 
         print('Loading iterative estimates')
-        group_estimates, group_prf_models = pRFModelObj.load_pRF_model_estimates(participant_list = participant_list,
+        group_estimates, group_prf_models = self.pRFModelObj.load_pRF_model_estimates(participant_list = participant_list,
                                                                     ses = ses, run_type = run_type, 
                                                                     model_name = model_name, 
                                                                     iterative = True,
-                                                                    sj_space = prf_sj_space,
+                                                                    sj_space = self.prf_sj_space,
                                                                     mask_bool_df = mask_bool_df, 
                                                                     stim_on_screen = stim_on_screen,
                                                                     fit_hrf = fit_hrf)
@@ -83,7 +91,7 @@ class Decoding_Model(GLMsingle_Model):
 
         return group_estimates_df, group_prf_models
     
-    def get_prf_vertex_index(self, pRFModelObj = None, participant_list = [], ses = 'mean', run_type = 'mean', model_name = None, 
+    def get_prf_vertex_index(self, participant_list = [], ses = 'mean', run_type = 'mean', model_name = None, 
                                     fit_hrf = False, rsq_threshold = .1, positive_rf = True, size_std = 2.5,
                                     mask_bool_df = None, stim_on_screen = [], mask_arr = True, num_vert = None):
         
@@ -93,7 +101,7 @@ class Decoding_Model(GLMsingle_Model):
         """
         
         # first get prf estimates for participant list
-        group_estimates_df, _ = self.load_prf_estimates(pRFModelObj = pRFModelObj, participant_list = participant_list, 
+        group_estimates_df, _ = self.load_prf_estimates(participant_list = participant_list, 
                                                         ses = ses, run_type = run_type, model_name = model_name, 
                                                         fit_hrf = fit_hrf, positive_rf = positive_rf, size_std = size_std,
                                                         mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen, 
@@ -145,14 +153,14 @@ class Decoding_Model(GLMsingle_Model):
         
         return masked_data_df
     
-    def get_prf_stim_grid(self, pRFModelObj = None, participant = None, ses = 'mean', mask_bool_df = None, stim_on_screen = [], 
+    def get_prf_stim_grid(self, participant = None, ses = 'mean', mask_bool_df = None, stim_on_screen = [], 
                             osf = 1, res_scaling = .1):
         
         """Get prf stimulus array and grid coordinates for participant
         """
         
         ## get stimulus array (time, y, x)
-        prfpy_dm = pRFModelObj.get_DM(participant, 
+        prfpy_dm = self.pRFModelObj.get_DM(participant, 
                                     ses = ses, 
                                     mask_bool_df = mask_bool_df, 
                                     stim_on_screen = stim_on_screen,
@@ -710,16 +718,184 @@ class Decoding_Model(GLMsingle_Model):
             
         return trl_ind
     
-    
+    def fit_decoder(self, participant_list = [], ROI_list = ['V1'], overwrite = False,
+                        prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean',
+                        mask_bool_df = None, stim_on_screen = []):
         
+        """
+        Fit decoder across participants
+        and ROIs
+        """
+        
+        # iterate over ROIs
+        for roi_name in ROI_list:
             
+            # iterate over participants
+            for pp in participant_list:
+                
+                # make dir to save estimates
+                pp_outdir = op.join(self., 'sub-{sj}'.format(sj = pp))
+                os.makedirs(pp_outdir, exist_ok = True)
+                print('saving files in %s'%pp_outdir)
+                                
+                # get masked ROI data, averaged across runs
+                prf_masked_data_df = self.get_prf_ROI_data(participant = pp, 
+                                                            roi_name = roi_name, 
+                                                            index_arr = [], 
+                                                            overwrite = overwrite, 
+                                                            file_ext = prf_file_ext)
+            
+                # get prf stimulus DM and grid coordinates
+                prf_stimulus_dm, prf_grid_coordinates = self.get_prf_stim_grid(participant = pp, 
+                                                                                ses = ses, 
+                                                                                mask_bool_df = mask_bool_df, 
+                                                                                stim_on_screen = stim_on_screen)
+                    
+                ## fit prf data with decoder model
+                prf_decoder_model, pars_gd = self.fit_encoding_model(model_type = 'gauss_hrf', data = prf_masked_data_df,
+                                                                    grid_coordinates = prf_grid_coordinates, paradigm = prf_stimulus_dm)
+                
+                ## need to select best voxels 
+                # and then fit residuals
+                
+    def get_best_voxels(self, pars_gd = None,  sd_lim = [0.3, 8]):
         
-        
-        
+        """
+        Get best voxels to then use in fitter
+        """   
 
+        print('to be implemented')
         
+                   
+    def fit_encoding_model(self, data = None, grid_coordinates = None, model_type = 'gauss_hrf',
+                                paradigm = None):
         
+        """
+        Fit PRF parameters (encoding model)
+        """
         
+        # set hrf model
+        hrf_model = SPMHRFModel(tr = self.MRIObj.TR, onset = -self.MRIObj.TR/2)
         
+        ## set prf model 
+        if model_type == 'gauss_hrf':
+            # (gauss with HRF)
+            prf_decoder_model = GaussianPRF2DWithHRF(data = data,
+                                                    grid_coordinates = grid_coordinates, 
+                                                    paradigm = paradigm,
+                                                    hrf_model = hrf_model,
+                                                    flexible_hrf_parameters = False)
+            
+        # We set up a parameter fitter
+        par_fitter = ParameterFitter(model = prf_decoder_model, 
+                                    data = data, 
+                                    paradigm = paradigm)
+
+        # We set up a grid of parameters to search over
+        x = np.linspace(-6, 6, 20) 
+        y = np.linspace(-6, 6, 20) 
+        sd = np.linspace(.25, 5, 20) 
+
+        # For now, we only use one amplitude and baseline, because we
+        # use a correlation cost function, which is indifferent to
+        # the overall scaling of the model
+        # We can easily estimate these later using OLS
+        amplitudes = [1.0]
+        baseline = [0.0]
+
+        # Note that the grids should be given in the correct order (can be found back in
+        # model.parameter_labels)
+        grid_pars = par_fitter.fit_grid(x, y, sd, baseline, amplitudes, use_correlation_cost=True)
+
+        # Once we have the best parameters from the grid, we can optimize the baseline
+        # and amplitude
+        refined_grid_pars = par_fitter.refine_baseline_and_amplitude(grid_pars)
+
+        # Now we use gradient descent to further optimize the parameters
+        pars_gd = par_fitter.fit(init_pars=refined_grid_pars, learning_rate=1e-2, max_n_iterations=5000,
+                                        min_n_iterations=100,
+                                        r2_atol=0.0001)
+        
+        ## plot diagnostic figure 
+        self.plot_prf_diagnostics(pars_grid = grid_pars, pars_gd = pars_gd, pars_fitter = par_fitter,
+                                    par_keys=['ols', 'gd'], figurename = None)
+        
+        ## now fit the hrf
+        if 'hrf' in model_type:
+            
+            # redefine model
+            if model_type == 'gauss_hrf':
+                # (gauss with HRF)
+                prf_decoder_model = GaussianPRF2DWithHRF(data = data,
+                                                        grid_coordinates = grid_coordinates, 
+                                                        paradigm = paradigm,
+                                                        hrf_model = hrf_model,
+                                                        flexible_hrf_parameters=True)
+            
+            # and fitter
+            par_fitter = ParameterFitter(model = prf_decoder_model, 
+                                        data = data, 
+                                        paradigm = paradigm)
+
+            # We set hrf_delay and hrf_dispersion to standard values
+            pars_gd['hrf_delay'] = 6
+            pars_gd['hrf_dispersion'] = 1
+
+            pars_gd_hrf = par_fitter.fit(init_pars=pars_gd, learning_rate=1e-2, max_n_iterations=5000,
+                                            min_n_iterations=100,
+                                            r2_atol=0.0001)
+            
+            ## plot diagnostic figure 
+            self.plot_prf_diagnostics(pars_grid = pars_gd, pars_gd = pars_gd_hrf, pars_fitter = par_fitter,
+                                    par_keys=['gd', 'gd_hrf'], figurename = None)
+            
+            return prf_decoder_model, pars_gd_hrf
+        else:
+            return prf_decoder_model, pars_gd
+                      
+    def plot_prf_diagnostics(self, pars_grid = None, pars_gd = None, pars_fitter = None, 
+                                prf_decoder_model = None, data = None, 
+                                par_keys=['ols', 'gd'], figurename = None):
+        
+        """
+        plot some diagnostic figures
+        """
+        
+        ## compare r2 of grid and iterative (or iterative and hrf) 
+        r2_ols = pars_fitter.get_rsq(pars_grid)
+        r2_gd = pars_fitter.get_rsq(pars_gd)
+        r2_both = pd.concat((r2_ols, r2_gd), keys=['r2_%s'par_keys[0], 
+                                                   'r2_%s'par_keys[1]], axis=1)
+
+        sns.relplot(x='r2_%s'par_keys[0], y='r2_%s'par_keys[1], 
+                    data=r2_both.reset_index(), kind='scatter')
+        plt.plot([0, 1], [0, 1], 'k--')
+        plt.show()
+        
+        ## Let's plot the location of gradient descent PRFs
+        sns.relplot(x='x', y='y', hue='r2', data=pars_gd.join(r2_gd.to_frame('r2')), 
+                    size='sd', sizes=(10, 100), palette='viridis')
+        plt.title('PRF locations')
+        plt.show()
+        
+        ## plot a few voxels with highest r2 improvement
+        improvement = r2_gd - r2_ols
+        largest_improvements = improvement.sort_values(ascending=False).index[:9]
+        print(improvement.sort_values(ascending=False).loc[largest_improvements])
+
+        pred_grid= prf_decoder_model.predict(parameters=pars_grid)
+        pred_gd = prf_decoder_model.predict(parameters=pars_gd)
+
+        pred = pd.concat((data.loc[:, largest_improvements], 
+                        pred_grid.loc[:, largest_improvements], 
+                        pred_gd.loc[:, largest_improvements]), axis=1, 
+                        keys=['data', par_keys[0], par_keys[1]], names=['model'])
+
+        #
+        tmp = pred.stack(['model', 'source']).to_frame('value')
+        sns.relplot(x='level_0', y='value', hue='model', col='source', data=tmp.reset_index(), kind='line', col_wrap=3,
+                palette = sns.color_palette(['black', 'orange', 'green'], 3))
+        plt.show()      
+                
         
         

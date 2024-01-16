@@ -90,6 +90,7 @@ parser.add_argument("--n_cpus_task",
                     )
 parser.add_argument("--n_jobs", 
                     type = int, 
+                    default = 8,
                     help = "If given, sets number of jobs for parallel"
                     )
 parser.add_argument("--n_tasks", 

@@ -89,7 +89,7 @@ class Batcher:
     def submit_jobs(self, participant_list = [], step_type = 'fitmodel', taskname = 'pRF', concurrent_job = True,
                         n_jobs = 8, n_batches = 10, chunk_data = None, fit_hrf = True, use_rsync = False, 
                         dry_run = False, prf_model_name = 'gauss', fa_model_name = 'glmsingle',
-                        run_type = 'mean', ses2fit = 'mean'):
+                        run_type = 'mean', ses2fit = 'mean', username = ''):
         
         """script to actually submit the jobs
         """
@@ -129,15 +129,18 @@ class Batcher:
         # iterate over jobs, print them for inspection and submit  
         for i in range(len(job_file_list)):
             
-            print(working_str_list[i])
+            ws = working_str_list[i].replace('$USER', username)
+            jf = job_file_list[i].replace('$USER', username)
+            
+            print(ws)
             
             if dry_run == False:
-                of = open(job_file_list[i], 'w')
-                of.write(working_str_list[i])
+                of = open(jf, 'w')
+                of.write(ws)
                 of.close()
                 
-                print('submitting ' + job_file_list[i] + ' to queue')
-                os.system('sbatch ' + job_file_list[i])
+                print('submitting ' + jf + ' to queue')
+                os.system('sbatch ' + jf)
         
     def make_step_script(self, participant_list = [], step_type = 'fitmodel', concurrent_job = True,
                             n_jobs = 8, n_batches = 10, chunk_data = None, fit_hrf = True):

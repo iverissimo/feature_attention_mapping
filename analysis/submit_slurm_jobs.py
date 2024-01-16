@@ -537,6 +537,6 @@ def make_concurrent_job(participant_list = [], step_type = 'fitmodel', run_time 
   
   
 ## actually submit jobs
-main(concurrent_pp = concurrent_pp, concurrent_data = concurrent_data)      
+main(concurrent_job = concurrent_job)      
         
         

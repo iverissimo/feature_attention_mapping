@@ -166,7 +166,8 @@ class Batcher:
             if concurrent_job:
                 fit_cmd = """declare -a pp_arr=($PP_LIST)\n"""+ \
                     """for ((i = 0; i < ${#pp_arr[@]}; i++)); do\n"""+ \
-                    """(\n  python run_analysis.py --subject ${pp_arr[$i]} --cmd fitmodel --task $TASK --dir slurm """+ \
+                    """(\n  python run_analysis.py --subject ${pp_arr[$i]} """+ \
+                    """--cmd {cmd} --task $TASK --dir slurm """.format(cmd = step_type)+ \
                     """--ses2fit $SES --run_type $RUN --prf_model_name $PRFMODEL """+ \
                     """--fa_model_name $FAMODEL """+ \
                     """--n_jobs {n_jobs} --n_batches {n_batches} """.format(n_jobs = n_jobs, n_batches = n_batches)+ \
@@ -184,7 +185,7 @@ class Batcher:
                     """done\n\nwait"""
             else:
                 # set fitting model command 
-                fit_cmd = """python run_analysis.py --subject $SJ_NR --cmd fitmodel --task $TASK --dir slurm """+ \
+                fit_cmd = """python run_analysis.py --subject $SJ_NR --cmd {cmd} --task $TASK --dir slurm """.format(cmd = step_type)+ \
                     """--ses2fit $SES --run_type $RUN --prf_model_name $PRFMODEL """+ \
                     """--fa_model_name $FAMODEL """+ \
                     """--n_jobs {n_jobs} --n_batches {n_batches} """.format(n_jobs = n_jobs, n_batches = n_batches)+ \

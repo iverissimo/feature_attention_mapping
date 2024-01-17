@@ -54,7 +54,7 @@ class Batcher:
         bash_basetxt = self.make_base_script(use_rsync = use_rsync)
         
         # if fitting model, we also need to copy fit folder from derivatives
-        if step_type == 'fitmodel':
+        if step_type in ['fitmodel', 'fitdecoder']:
             copy_cmd = self.copy_fit_deriv(use_rsync = use_rsync, task = taskname, use_fs_label = use_fs_label)
         else:
             copy_cmd = ''
@@ -160,7 +160,7 @@ class Batcher:
                 fit_cmd = """python process_data.py --subject $SJ_NR --step post_fmriprep --dir slurm --wf_dir $TMPDIR\n"""+ \
                     """\nwait\n\n"""
                 
-        elif step_type == 'fitmodel':
+        elif step_type in ['fitmodel', 'fitdecoder']:
             
             # set general analysis command iterating over participant list
             if concurrent_job:

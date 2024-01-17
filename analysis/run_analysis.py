@@ -10,6 +10,7 @@ from FAM.processing import load_exp_settings, preproc_mridata, preproc_behdata
 from FAM.fitting.prf_model import pRF_model
 from FAM.fitting.glm_single_model import GLMsingle_Model
 from FAM.fitting.feature_model import Gain_model, GLM_model, FullStim_model
+from FAM.fitting.decoding_model import Decoding_Model
 
 # load settings from yaml
 with open('exp_params.yml', 'r') as f_in:
@@ -166,6 +167,9 @@ FAM_pRF = pRF_model(FAM_data, use_atlas = use_atlas)
 FAM_pRF.model_type['pRF'] = prf_model_name
 FAM_pRF.fit_hrf = fit_hrf
 
+## load FA Decoding model class
+FAM_Decoder = Decoding_Model(FAM_data, use_atlas = use_atlas, pRFModelObj = FAM_pRF)
+
 # make list of hemispheres to be fitted (useful for when using giftis)
 hemis2fit = [hemisphere]
 if FAM_data.sj_space in ['fsnative', 'fsaverage'] and hemisphere == 'BH':
@@ -212,8 +216,37 @@ match task:
             print('Fitting finished, total time = {tempo}!'.format(tempo = time.time() - start_time))
 
     case 'FA':
+        
+        if py_cmd == 'fitdecoder': # fit FA betas decoder
+            
+            ## load FA model class
+            FAM_FA = GLMsingle_Model(FAM_data, use_atlas = use_atlas)
+            
+            group_bar_pos_df = {}
+            for pp in FAM_data.sj_num:
+                # get participant bar positions for FA task
+                group_bar_pos_df['sub-{sj}'.format(sj = pp)] = FAM_beh.load_FA_bar_position(pp, 
+                                                                                            ses_num = None, 
+                                                                                            ses_type = 'func', 
+                                                                                            run_num = None)        
+            ## actually fit
+            print('Fitting started!')
+            FAM_Decoder.fit_decoder(participant_list = FAM_data.sj_num, 
+                                    ROI_list = ['V1'], 
+                                    overwrite = True, 
+                                    model_type = 'gauss_hrf',
+                                    ses = 'mean', 
+                                    prf_file_ext =  FAM_mri.get_mrifile_ext(nifti_file = True)['pRF'], 
+                                    fa_file_ext = '_cropped.nii.gz',
+                                    mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                                            crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                            shift = FAM_data.shift_TRs_num), 
+                                    stim_on_screen = FAM_beh.get_stim_on_screen(task = task, 
+                                                                                crop_nr = FAM_data.task_nr_cropTR[task], 
+                                                                                shift = FAM_data.shift_TRs_num), 
+                                    group_bar_pos_df = group_bar_pos_df)
 
-        if py_cmd == 'fitmodel': # fit FA model
+        elif py_cmd == 'fitmodel': # fit FA model
             
             # if using niftis, then load prf estimates from fsnative --> FOR NOW
             if FAM_mri.MRIObj.sj_space == 'T1w':

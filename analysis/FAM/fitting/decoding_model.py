@@ -719,8 +719,8 @@ class Decoding_Model(GLMsingle_Model):
         return trl_ind
     
     def fit_decoder(self, participant_list = [], ROI_list = ['V1'], overwrite = False, model_type = 'gauss_hrf',
-                        prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean',
-                        mask_bool_df = None, stim_on_screen = []):
+                        prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean', fa_file_ext = '_cropped.nii.gz',
+                        mask_bool_df = None, stim_on_screen = [], group_bar_pos_df = []):
         
         """
         Fit decoder across participants
@@ -733,7 +733,8 @@ class Decoding_Model(GLMsingle_Model):
             for roi_name in ROI_list:
                 self.decode_ROI(participant = pp, roi_name = roi_name, overwrite = overwrite, prf_file_ext = prf_file_ext, 
                                 ses = ses, mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
-                                model_type = model_type)
+                                model_type = model_type, fa_file_ext = fa_file_ext, 
+                                pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = pp)])
                 
                 
     def decode_ROI(self, participant = None, roi_name = 'V1', overwrite = False, model_type = 'gauss_hrf',
@@ -809,9 +810,94 @@ class Decoding_Model(GLMsingle_Model):
                                                                 glmsingle_model = 'D', 
                                                                 trial_num = 132)
         
+        ## decode over runs
+        # save stim as HDF5 file, to later load
+        decoded_stim_filename = op.join(pp_outdir, 
+                            'sub-{sj}_task-FA_ROI-{rname}_model-{dmod}_reconstructed_stim.h5'.format(sj = participant,
+                                                                                                    rname = roi_name,
+                                                                                                    dmod = model_type))
+        decoded_stim_filename = decoded_stim_filename.replace('_task', '_{snrnkey}_task') # make generic to save per run
         
+        reconstructed_stim_dict = {}
+        lowres_DM_dict = {}
         
+        for ind, df_key in enumerate(masked_FAdata_dict):
+    
+            print('decoding data from %s'%df_key)
+            
+            masked_data_df = masked_FAdata_dict[df_key]
+    
+            reconstructed_stimulus = self.decode_FA_stim(data = masked_data_df, 
+                                                        grid_coordinates = fa_grid_coordinates,  
+                                                        parameters = pars_gd,
+                                                        omega = omega, 
+                                                        dof = dof,
+                                                        best_voxels = best_voxels, 
+                                                        filename = decoded_stim_filename.format(snrnkey = df_key))
+            
+            reconstructed_stim_dict[df_key] = reconstructed_stimulus
+            
+            # downsample DM to check correlation
+            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(df_key)
+            
+            print('downsampling FA DM for ses-{sn}, run-{rn}'.format(sn = file_sn, rn=file_rn))
+            lowres_DM = self.downsample_DM(DM_arr = FA_DM_dict['r{rn}s{sn}'.format(sn = file_sn, 
+                                                                                   rn = file_rn)]['full_stim'])
+            ## correlate reconstructed stim with downsampled DM
+            corr, pval = scipy.stats.pearsonr(reconstructed_stimulus.values.ravel(), 
+                                            lowres_DM.ravel())
+            print('correlation between reconstructed stim and DM is %.2f, %.2f'%(corr, pval))
+            
+            lowres_DM_dict[df_key] = lowres_DM
+            
+            ## save run position df (for convenience)
+            #print('making df with bar position info for ses-{s}, run-{r}'. format(s = file_sn, r=file_rn)) 
+            #run_position_df = self.make_df_run_bar_pos(run_df = pp_bar_pos_df['ses-{s}'.format(s = file_sn)]['run-{r}'.format(r=file_rn)])
         
+        return lowres_DM_dict, reconstructed_stim_dict
+            
+        
+    def decode_FA_stim(self, data = None, grid_coordinates = None,  parameters = None, omega = None, dof = None,
+                            best_voxels = None, filename = None):
+        
+        """Decode FA betas for a given run
+        and save reconstructed stim as hdf5 file
+        """
+        
+        print('using params from %i best voxels'%(len(best_voxels)))
+
+        # if there is a pars file already, just load it
+        if filename is not None and op.isfile(filename):
+            print('Loading reconstructed stim from %s'%filename)
+            reconstructed_stimulus = pd.read_hdf(filename).astype(np.float32)  
+        else:
+            model_single_trial = GaussianPRF2D(grid_coordinates = grid_coordinates,
+                                            paradigm = None,
+                                            data = data.loc[:, best_voxels],
+                                            parameters = parameters.loc[best_voxels],
+                                            weights = None,
+                                            omega = omega,
+                                            dof = dof)
+            
+            stim_fitter = StimulusFitter(data = data.loc[:, best_voxels], 
+                                    model = model_single_trial, 
+                                    omega = omega,
+                                    dof = dof)
+
+            # Legacy Adam is a bit faster than the default Adam optimizer on M1
+            # Learning rate of 1.0 is a bit high, but works well here
+            reconstructed_stimulus = stim_fitter.fit(legacy_adam=False, 
+                                                    min_n_iterations=200, 
+                                                    max_n_iterations=5000, 
+                                                    learning_rate = .01,
+                                                    l2_norm = .01)
+            
+            if filename is not None:
+                print('Saving reconstructed stim in %s'%filename)
+                reconstructed_stimulus.to_hdf(filename, key='df_stim', mode='w', index = False)  
+        
+        return reconstructed_stimulus
+         
     def get_FA_stim_grid(self, participant = None, ses = 'mean', pp_bar_pos_df = None,
                                 glmsingle_model = 'D', file_ext = '_cropped.nii.gz', trial_num = 132):
         
@@ -832,11 +918,11 @@ class Decoding_Model(GLMsingle_Model):
         # to actually be able to fit on CPU
 
         ## get grid coordinates (8x8)
-        fa_grid_coordinates = FAM_Decoder.get_decoder_grid_coords()
+        fa_grid_coordinates = self.get_decoder_grid_coords()
         
         return FA_DM_dict, fa_grid_coordinates
         
-    def get_FA_ROI_data(self, participant = None, roi_name = 'V1', index_arr = [], overwrite = False, file_ext = None,
+    def get_FA_ROI_data(self, participant = None, roi_name = 'V1', index_arr = [], overwrite = False,
                             glmsingle_model = 'D', file_ext = '_cropped.nii.gz', trial_num = 132):
         
         """Get FA data (beta values) for the ROI of a participant, for all runs,
@@ -862,7 +948,7 @@ class Decoding_Model(GLMsingle_Model):
         for filename in masked_FAdata_df_filelist:
             
             # get file run and ses number
-            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(file)
+            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(filename)
             
             # load df
             masked_df = pd.read_csv(filename, sep='\t', index_col=['time'], 

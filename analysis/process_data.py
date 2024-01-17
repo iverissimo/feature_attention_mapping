@@ -30,6 +30,10 @@ parser.add_argument("--dir",
                     default = 'local',
                     help = "System we are making plots in - local [default] vs slurm (snellius)"
                     )
+parser.add_argument("--wf_dir", 
+                    type = str, 
+                    help="Path to workflow dir, if such if not standard root dirs (None [default] vs /scratch)"
+                    )
 parser.add_argument("--data_type", 
                     type = str.lower, 
                     default = 'func',
@@ -87,6 +91,7 @@ sj = args.subject[0] if len(args.subject) == 1 else args.subject # for situation
 step = args.step # what step of pipeline we want to run
 exclude_sj = args.exclude_sj # list of excluded subjects
 system_dir = args.dir
+wf_dir = args.wf_dir
 data_type = args.data_type
 T2_file = args.use_T2
 node_name = args.node_name # node name to submit slurm job 
@@ -103,7 +108,7 @@ print("Preprocessing {data} data for subject {sj}!".format(data=data_type, sj=sj
 
 FAM_data = load_exp_settings.MRIData(params, sj, 
                                     repo_pth = op.split(load_exp_settings.__file__)[0], 
-                                    base_dir = system_dir, exclude_sj = exclude_sj)
+                                    base_dir = system_dir, exclude_sj = exclude_sj, wf_dir = wf_dir)
 
 print('Subject list to vizualize is {l}'.format(l=str(FAM_data.sj_num)))
 

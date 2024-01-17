@@ -154,11 +154,11 @@ class Batcher:
             if concurrent_job:
                 fit_cmd = """declare -a pp_arr=($PP_LIST)\n"""+ \
                     """for ((i = 0; i < ${#pp_arr[@]}; i++)); do\n"""+ \
-                    """(\n  python process_data.py --subject ${pp_arr[$i]} --step post_fmriprep --dir slurm\n) &\n"""+ \
+                    """(\n  python process_data.py --subject ${pp_arr[$i]} --step post_fmriprep --dir slurm --wf_dir $TMPDIR\n) &\n"""+ \
                     """done\n\nwait\n\n"""
             else:
-                fit_cmd = """python process_data.py --subject $SJ_NR --step post_fmriprep --dir slurm\n"""+ \
-                    """done\n\nwait\n\n"""
+                fit_cmd = """python process_data.py --subject $SJ_NR --step post_fmriprep --dir slurm --wf_dir $TMPDIR\n"""+ \
+                    """\nwait\n\n"""
                 
         elif step_type == 'fitmodel':
             

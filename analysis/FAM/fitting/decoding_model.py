@@ -880,9 +880,9 @@ class Decoding_Model(GLMsingle_Model):
                                         min_n_iterations=100,
                                         r2_atol=0.0001)
         
-        ## plot diagnostic figure 
-        self.plot_prf_diagnostics(pars_grid = grid_pars, pars_gd = pars_gd, pars_fitter = par_fitter,
-                                    par_keys=['ols', 'gd'], figurename = None)
+        # ## plot diagnostic figure 
+        # self.plot_prf_diagnostics(pars_grid = grid_pars, pars_gd = pars_gd, pars_fitter = par_fitter,
+        #                             par_keys=['ols', 'gd'], figurename = None)
         
         ## now fit the hrf, if such is the case
         if 'hrf' in model_type:
@@ -909,9 +909,9 @@ class Decoding_Model(GLMsingle_Model):
                                             min_n_iterations=100,
                                             r2_atol=0.0001)
             
-            ## plot diagnostic figure 
-            self.plot_prf_diagnostics(pars_grid = pars_gd, pars_gd = pars_gd_hrf, pars_fitter = par_fitter,
-                                    par_keys=['gd', 'gd_hrf'], figurename = None)
+            # ## plot diagnostic figure 
+            # self.plot_prf_diagnostics(pars_grid = pars_gd, pars_gd = pars_gd_hrf, pars_fitter = par_fitter,
+            #                         par_keys=['gd', 'gd_hrf'], figurename = None)
             
             return prf_decoder_model, pars_gd_hrf
         else:

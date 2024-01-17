@@ -359,14 +359,16 @@ class Batcher:
             """# make derivatives dir in node and sourcedata because we want to access behav files\n"""+ \
             """mkdir -p $TMPDIR/derivatives/post_fmriprep/$SPACE\n"""+ \
             """mkdir -p $TMPDIR/sourcedata\n\nwait\n\n"""+\
-            """rsync -chavP --exclude=".*" $DERIV_DIR/post_fmriprep/$SPACE/ $TMPDIR/derivatives/post_fmriprep/$SPACE --no-compress\n\nwait\n\n"""+\
+            """if [ -d "$DERIV_DIR/post_fmriprep/$SPACE/" ]\nthen\n"""+ \
+            """    rsync -chavP --exclude=".*" $DERIV_DIR/post_fmriprep/$SPACE/ $TMPDIR/derivatives/post_fmriprep/$SPACE --no-compress\nfi\nwait\n""" 
             """rsync -chavP --exclude=".*" $SOURCE_DIR/ $TMPDIR/sourcedata --no-compress\n\nwait\n\n"""
         else:
             cmd = """# call the programs\n$START_EMAIL\n\n"""+\
             """# make derivatives dir in node and sourcedata because we want to access behav files\n"""+ \
             """mkdir -p $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR\n"""+ \
             """mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR\n\nwait\n\n"""+\
-            """rsync -chavP --exclude=".*" $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR --no-compress\n\nwait\n\n"""+\
+            """if [ -d "$DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR/" ]\nthen\n"""+ \
+            """    rsync -chavP --exclude=".*" $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR/ $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR --no-compress\nfi\nwait\n""" 
             """rsync -chavP --exclude=".*" $SOURCE_DIR/sub-$SJ_NR/ $TMPDIR/sourcedata/sub-$SJ_NR --no-compress\n\nwait\n\n"""
             
         return cmd
@@ -382,14 +384,16 @@ class Batcher:
             """# make derivatives dir in node and sourcedata because we want to access behav files\n"""+ \
             """mkdir -p $TMPDIR/derivatives/post_fmriprep/$SPACE\n"""+ \
             """mkdir -p $TMPDIR/sourcedata\n\nwait\n\n"""+\
-            """cp -r $DERIV_DIR/post_fmriprep/$SPACE $TMPDIR/derivatives/post_fmriprep/\n\nwait\n\n"""+\
+            """if [ -d "$DERIV_DIR/post_fmriprep/$SPACE" ]\nthen\n"""+ \
+            """    cp -r $DERIV_DIR/post_fmriprep/$SPACE $TMPDIR/derivatives/post_fmriprep/\nfi\nwait\n""" 
             """cp -r $SOURCE_DIR/ $TMPDIR/\n\nwait\n\n"""
         else:
             cmd = """# call the programs\n$START_EMAIL\n\n"""+\
             """# make derivatives dir in node and sourcedata because we want to access behav files\n"""+ \
             """mkdir -p $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR\n"""+ \
             """mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR\n\nwait\n\n"""+\
-            """cp -r $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/post_fmriprep/$SPACE/\n\nwait\n\n"""+\
+            """if [ -d "$DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR" ]\nthen\n"""+ \
+            """    cp -r $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/post_fmriprep/$SPACE\nfi\nwait\n""" 
             """cp -r $SOURCE_DIR/sub-$SJ_NR $TMPDIR/sourcedata/\n\nwait\n\n"""
             
         return cmd

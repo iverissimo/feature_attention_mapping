@@ -718,7 +718,7 @@ class Decoding_Model(GLMsingle_Model):
             
         return trl_ind
     
-    def fit_decoder(self, participant_list = [], ROI_list = ['V1'], overwrite = False,
+    def fit_decoder(self, participant_list = [], ROI_list = ['V1'], overwrite = False, model_type = 'gauss_hrf',
                         prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean',
                         mask_bool_df = None, stim_on_screen = []):
         
@@ -727,45 +727,109 @@ class Decoding_Model(GLMsingle_Model):
         and ROIs
         """
         
-        # iterate over ROIs
-        for roi_name in ROI_list:
+        # iterate over participants
+        for pp in participant_list:
+            # iterate over ROIs
+            for roi_name in ROI_list:
+                self.decode_ROI(participant = pp, roi_name = roi_name, overwrite = overwrite, prf_file_ext = prf_file_ext, 
+                                ses = ses, mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
+                                model_type = model_type)
+                
+                
+    def decode_ROI(self, participant = None, roi_name = 'V1', overwrite = False, model_type = 'gauss_hrf',
+                        prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean',
+                        mask_bool_df = None, stim_on_screen = [], save_estimates = True):
+        
+        """For a given participant and ROI,
+        run decoder analysis
+        """
+        
+        # make dir to save estimates
+        pp_outdir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = participant))
+        os.makedirs(pp_outdir, exist_ok = True)
+        print('saving files in %s'%pp_outdir)
+                        
+        # get masked ROI data, averaged across runs
+        prf_masked_data_df = self.get_prf_ROI_data(participant = participant, 
+                                                    roi_name = roi_name, 
+                                                    index_arr = [], 
+                                                    overwrite = overwrite, 
+                                                    file_ext = prf_file_ext)
+    
+        # get prf stimulus DM and grid coordinates
+        prf_stimulus_dm, prf_grid_coordinates = self.get_prf_stim_grid(participant = participant, 
+                                                                        ses = ses, 
+                                                                        mask_bool_df = mask_bool_df, 
+                                                                        stim_on_screen = stim_on_screen)
             
-            # iterate over participants
-            for pp in participant_list:
-                
-                # make dir to save estimates
-                pp_outdir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = pp))
-                os.makedirs(pp_outdir, exist_ok = True)
-                print('saving files in %s'%pp_outdir)
-                                
-                # get masked ROI data, averaged across runs
-                prf_masked_data_df = self.get_prf_ROI_data(participant = pp, 
-                                                            roi_name = roi_name, 
-                                                            index_arr = [], 
-                                                            overwrite = overwrite, 
-                                                            file_ext = prf_file_ext)
+        ## fit prf data with decoder model
+        prf_decoder_model, pars_gd = self.fit_encoding_model(model_type = model_type, 
+                                                            data = prf_masked_data_df,
+                                                            grid_coordinates = prf_grid_coordinates, 
+                                                            paradigm = prf_stimulus_dm)
+        
+        ## need to select best voxels 
+        # get rsq
+        prf_decoder_fitter = ParameterFitter(model = prf_decoder_model, 
+                                    data = prf_masked_data_df, 
+                                    paradigm = prf_stimulus_dm)
+        r2_gd = prf_decoder_fitter.get_rsq(pars_gd)
+        
+        best_voxels = self.get_best_voxels(pars_gd = pars_gd, r2_gd = r2_gd,  
+                                           sd_lim = [0.3, 8], n_vox = 300)
+        
+        # and then fit residuals
+        omega, dof  = self.fit_residuals(model = prf_decoder_model, 
+                                        data = prf_masked_data_df, 
+                                        paradigm = prf_stimulus_dm, 
+                                        parameters = pars_gd, 
+                                        fit_method = 't', 
+                                        best_vox = best_voxels)
+        
+        
+    def fit_residuals(self, model = None, data = None, paradigm = None, parameters = None, fit_method = 't', 
+                            best_vox = None):
+        
+        """Fit noise model on residuals
+        """
+        if best_vox is None:
+            train_data =  data
+            train_pars = parameters.astype(np.float32)
+        else:
+            train_data =  data.loc[:, best_vox]
+            train_pars = parameters.loc[best_vox].astype(np.float32)
             
-                # get prf stimulus DM and grid coordinates
-                prf_stimulus_dm, prf_grid_coordinates = self.get_prf_stim_grid(participant = pp, 
-                                                                                ses = ses, 
-                                                                                mask_bool_df = mask_bool_df, 
-                                                                                stim_on_screen = stim_on_screen)
-                    
-                ## fit prf data with decoder model
-                prf_decoder_model, pars_gd = self.fit_encoding_model(model_type = 'gauss_hrf', data = prf_masked_data_df,
-                                                                    grid_coordinates = prf_grid_coordinates, paradigm = prf_stimulus_dm)
+        paradigm = paradigm.astype(np.float32)
+        
+        resid_fitter = ResidualFitter(model = model,
+                                    data = train_data, 
+                                    paradigm = paradigm, 
+                                    parameters = train_pars)
+        omega, dof = resid_fitter.fit(method=fit_method)
+        
+        return omega, dof 
+        
                 
-                ## need to select best voxels 
-                # and then fit residuals
-                
-    def get_best_voxels(self, pars_gd = None,  sd_lim = [0.3, 8]):
+    def get_best_voxels(self, pars_gd = None, r2_gd = None,  sd_lim = [0.3, 8], n_vox = 300):
         
         """
         Get best voxels to then use in fitter
         """   
-
-        print('to be implemented')
         
+        # sort indices according to r2 values
+        sort_ind = r2_gd.sort_values(ascending=False).index
+        
+        # mask for pRF SD (not too small or big)
+        masked_voxels = pars_gd[(pars_gd['sd'] > .3) & (pars_gauss_gd['sd'] < 6.5)].index
+        
+        # of those, get best voxels
+        best_voxels = np.array([val for val in sort_ind if val in masked_voxels])
+        
+        # select a subset
+        if isinstance(n_vox, int):
+            best_voxels = best_voxels[:n_vox]
+        
+        return best_voxels
                    
     def fit_encoding_model(self, data = None, grid_coordinates = None, model_type = 'gauss_hrf',
                                 paradigm = None):
@@ -779,7 +843,7 @@ class Decoding_Model(GLMsingle_Model):
         
         ## set prf model 
         if model_type == 'gauss_hrf':
-            # (gauss with HRF)
+            # (gauss with HRF) -> first without hrf
             prf_decoder_model = GaussianPRF2DWithHRF(data = data,
                                                     grid_coordinates = grid_coordinates, 
                                                     paradigm = paradigm,
@@ -820,12 +884,12 @@ class Decoding_Model(GLMsingle_Model):
         self.plot_prf_diagnostics(pars_grid = grid_pars, pars_gd = pars_gd, pars_fitter = par_fitter,
                                     par_keys=['ols', 'gd'], figurename = None)
         
-        ## now fit the hrf
+        ## now fit the hrf, if such is the case
         if 'hrf' in model_type:
             
             # redefine model
             if model_type == 'gauss_hrf':
-                # (gauss with HRF)
+                # (gauss with HRF) 
                 prf_decoder_model = GaussianPRF2DWithHRF(data = data,
                                                         grid_coordinates = grid_coordinates, 
                                                         paradigm = paradigm,

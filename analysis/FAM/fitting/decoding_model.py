@@ -734,7 +734,7 @@ class Decoding_Model(GLMsingle_Model):
             for pp in participant_list:
                 
                 # make dir to save estimates
-                pp_outdir = op.join(self., 'sub-{sj}'.format(sj = pp))
+                pp_outdir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = pp))
                 os.makedirs(pp_outdir, exist_ok = True)
                 print('saving files in %s'%pp_outdir)
                                 
@@ -864,10 +864,10 @@ class Decoding_Model(GLMsingle_Model):
         ## compare r2 of grid and iterative (or iterative and hrf) 
         r2_ols = pars_fitter.get_rsq(pars_grid)
         r2_gd = pars_fitter.get_rsq(pars_gd)
-        r2_both = pd.concat((r2_ols, r2_gd), keys=['r2_%s'par_keys[0], 
-                                                   'r2_%s'par_keys[1]], axis=1)
+        r2_both = pd.concat((r2_ols, r2_gd), keys=['r2_%s'%par_keys[0], 
+                                                   'r2_%s'%par_keys[1]], axis=1)
 
-        sns.relplot(x='r2_%s'par_keys[0], y='r2_%s'par_keys[1], 
+        sns.relplot(x='r2_%s'%par_keys[0], y='r2_%s'%par_keys[1], 
                     data=r2_both.reset_index(), kind='scatter')
         plt.plot([0, 1], [0, 1], 'k--')
         plt.show()

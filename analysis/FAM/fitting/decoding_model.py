@@ -805,7 +805,8 @@ class Decoding_Model(GLMsingle_Model):
                                                 trial_num = 132)
         ## get FA DM and grid coordinates (8x8)
         FA_DM_dict, fa_grid_coordinates = self.get_FA_stim_grid(participant = participant, 
-                                                                ses = ses, pp_bar_pos_df = pp_bar_pos_df,
+                                                                ses = ses, 
+                                                                pp_bar_pos_df = pp_bar_pos_df,
                                                                 file_ext = fa_file_ext,
                                                                 glmsingle_model = 'D', 
                                                                 trial_num = 132)
@@ -855,8 +856,7 @@ class Decoding_Model(GLMsingle_Model):
             #run_position_df = self.make_df_run_bar_pos(run_df = pp_bar_pos_df['ses-{s}'.format(s = file_sn)]['run-{r}'.format(r=file_rn)])
         
         return lowres_DM_dict, reconstructed_stim_dict
-            
-        
+               
     def decode_FA_stim(self, data = None, grid_coordinates = None,  parameters = None, omega = None, dof = None,
                             best_voxels = None, filename = None):
         

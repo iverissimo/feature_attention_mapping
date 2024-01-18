@@ -232,7 +232,7 @@ match task:
             ## actually fit
             print('Fitting started!')
             FAM_Decoder.fit_decoder(participant_list = FAM_data.sj_num, 
-                                    ROI_list = ['V1'], 
+                                    ROI_list = ['V1','V2','V3','V3AB','LO','hV4'], #['V1'], 
                                     overwrite = True, 
                                     model_type = 'gauss_hrf',
                                     ses = 'mean', 

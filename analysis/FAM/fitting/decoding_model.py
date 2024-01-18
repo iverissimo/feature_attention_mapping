@@ -783,10 +783,11 @@ class Decoding_Model(GLMsingle_Model):
                                     paradigm = prf_stimulus_dm)
         r2_gd = prf_decoder_fitter.get_rsq(pars_gd)
         
+        # get array with best voxel indices 
         best_voxels = self.get_best_voxels(pars_gd = pars_gd, r2_gd = r2_gd,  
                                            sd_lim = [0.3, 8], n_vox = 300)
         
-        # and then fit residuals
+        ## fit residuals on prf data
         omega, dof  = self.fit_residuals(model = prf_decoder_model, 
                                         data = prf_masked_data_df, 
                                         paradigm = prf_stimulus_dm, 
@@ -795,7 +796,7 @@ class Decoding_Model(GLMsingle_Model):
                                         best_vox = best_voxels,
                                         filename = pars_filename.replace('_pars.h5', '_resid.npz'))
         
-        # now get masked FA ROI data, all runs
+        ## now get masked FA ROI data, all runs
         masked_FAdata_dict = self.get_FA_ROI_data(participant = participant, 
                                                 roi_name = roi_name, 
                                                 index_arr = [], 
@@ -812,22 +813,24 @@ class Decoding_Model(GLMsingle_Model):
                                                                 trial_num = 132)
         
         ## decode over runs
-        # save stim as HDF5 file, to later load
+        # save reconstructed stim as HDF5 file, to later load
         decoded_stim_filename = op.join(pp_outdir, 
                             'sub-{sj}_task-FA_ROI-{rname}_model-{dmod}_reconstructed_stim.h5'.format(sj = participant,
                                                                                                     rname = roi_name,
                                                                                                     dmod = model_type))
-        decoded_stim_filename = decoded_stim_filename.replace('_task', '_{snrnkey}_task') # make generic to save per run
+        # make filename generic to save per run
+        decoded_stim_filename = decoded_stim_filename.replace('_task', '_{snrnkey}_task') 
         
         reconstructed_stim_dict = {}
         lowres_DM_dict = {}
-        
         for ind, df_key in enumerate(masked_FAdata_dict):
     
             print('decoding data from %s'%df_key)
             
+            # get run ROI dataframe
             masked_data_df = masked_FAdata_dict[df_key]
-    
+
+            # get reconstructed stim as df
             reconstructed_stimulus = self.decode_FA_stim(data = masked_data_df, 
                                                         grid_coordinates = fa_grid_coordinates,  
                                                         parameters = pars_gd,
@@ -835,20 +838,22 @@ class Decoding_Model(GLMsingle_Model):
                                                         dof = dof,
                                                         best_voxels = best_voxels, 
                                                         filename = decoded_stim_filename.format(snrnkey = df_key))
-            
+            # append to dict
             reconstructed_stim_dict[df_key] = reconstructed_stimulus
             
-            # downsample DM to check correlation
+            ## downsample DM to check correlation
             file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(df_key)
             
             print('downsampling FA DM for ses-{sn}, run-{rn}'.format(sn = file_sn, rn=file_rn))
             lowres_DM = self.downsample_DM(DM_arr = FA_DM_dict['r{rn}s{sn}'.format(sn = file_sn, 
                                                                                    rn = file_rn)]['full_stim'])
-            ## correlate reconstructed stim with downsampled DM
+            
+            # correlate reconstructed stim with downsampled DM
             corr, pval = scipy.stats.pearsonr(reconstructed_stimulus.values.ravel(), 
                                             lowres_DM.ravel())
             print('correlation between reconstructed stim and DM is %.2f, %.2f'%(corr, pval))
             
+            # append to dict
             lowres_DM_dict[df_key] = lowres_DM
             
             ## save run position df (for convenience)
@@ -992,8 +997,8 @@ class Decoding_Model(GLMsingle_Model):
             omega, dof = resid_fitter.fit(method=fit_method)
             
             if filename is not None:
-                print('Storing omega and dof in %s'%filename)
-                np.savez(filename, omega=omega, dof=[dof])
+                print('Storing omega, dof and best voxel indices in %s'%filename)
+                np.savez(filename, omega=omega, dof=[dof], best_voxels = best_vox)
         
         return omega, dof 
                 
@@ -1036,6 +1041,13 @@ class Decoding_Model(GLMsingle_Model):
         if filename is not None and op.isfile(filename):
             print('Loading pRF fit parameters stored in %s'%filename)
             output_pars = pd.read_hdf(filename).astype(np.float32)  
+            
+            # if we fitted the hrf, then reload prf model accordingly
+            if 'hrf' in model_type:
+                prf_decoder_model = self.setup_prf_model(data = data, grid_coordinates = grid_coordinates, 
+                                                model_type = model_type,
+                                                paradigm = paradigm, 
+                                                fit_hrf = True) 
         else:
             # We set up a parameter fitter
             par_fitter = ParameterFitter(model = prf_decoder_model, 

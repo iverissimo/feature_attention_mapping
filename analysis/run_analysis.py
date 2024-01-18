@@ -241,8 +241,8 @@ match task:
                                     mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
                                                                             crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                             shift = FAM_data.shift_TRs_num), 
-                                    stim_on_screen = FAM_beh.get_stim_on_screen(task = task, 
-                                                                                crop_nr = FAM_data.task_nr_cropTR[task], 
+                                    stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                                                crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                                 shift = FAM_data.shift_TRs_num), 
                                     group_bar_pos_df = group_bar_pos_df)
 

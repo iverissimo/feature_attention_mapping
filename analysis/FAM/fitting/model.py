@@ -441,14 +441,8 @@ class Model:
                                                             filename = mask_name,
                                                             overwrite = overwrite)
         
-        # new filename for bold
-        mask_name = mask_name.replace('_mask_T1w', '_mask_bold')
-
-        # resample mask to func image space
-        func_im_mask = self.MRIObj.mri_utils.resample_T1mask_to_func(mask_img = T1_im_mask, 
-                                                                  bold_filename = file_list[0],
-                                                                  filename = mask_name,
-                                                                  overwrite = overwrite)
+        # new filename for bold (make masks per bold file, to make sure affine is ok)
+        mask_name = mask_name.replace('_mask_T1w', '_task-{tsk}_ses-{session}_run-{run}_mask_bold')
 
         # now actually load and mask data
         # and save as dataframe
@@ -461,6 +455,14 @@ class Model:
             ## get run number, and ses number in list of ints
             # useful for when fitting several runs at same time
             file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(file)
+            
+            # resample mask to func image space
+            func_im_mask = self.MRIObj.mri_utils.resample_T1mask_to_func(mask_img = T1_im_mask, 
+                                                                    bold_filename = file,
+                                                                    filename = mask_name.format(tsk = task,
+                                                                                                session = file_sn,
+                                                                                                run = file_rn),
+                                                                    overwrite = overwrite)
             
             # make filename
             csv_filename = op.join(out_dir_ROI_mask_data, 

@@ -1162,7 +1162,7 @@ class Decoding_Model(GLMsingle_Model):
         largest_improvements = improvement.sort_values(ascending=False).index[:9]
         print(improvement.sort_values(ascending=False).loc[largest_improvements])
 
-        pred_grid= prf_decoder_model.predict(parameters=pars_grid)
+        pred_grid = prf_decoder_model.predict(parameters=pars_grid)
         pred_gd = prf_decoder_model.predict(parameters=pars_gd)
 
         pred = pd.concat((data.loc[:, largest_improvements], 

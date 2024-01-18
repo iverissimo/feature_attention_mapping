@@ -735,8 +735,7 @@ class Decoding_Model(GLMsingle_Model):
                                 ses = ses, mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
                                 model_type = model_type, fa_file_ext = fa_file_ext, 
                                 pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = pp)])
-                
-                
+                       
     def decode_ROI(self, participant = None, roi_name = 'V1', overwrite = False, model_type = 'gauss_hrf',
                         prf_file_ext = '_cropped_dc_psc.nii.gz', fa_file_ext = '_cropped.nii.gz', ses = 'mean',
                         mask_bool_df = None, stim_on_screen = [], save_estimates = True, pp_bar_pos_df = None):
@@ -1109,7 +1108,158 @@ class Decoding_Model(GLMsingle_Model):
                 output_pars.to_hdf(filename, key='df_pars', mode='w', index = False)  
         
         return prf_decoder_model, output_pars
-     
+    
+    def load_encoding_model_pars(self, participant = None, task = 'pRF', roi_name = 'V1', model_type = 'gauss_hrf'):
+        
+        """Load previously fitted parameters
+        """
+        
+        # dir where estimates where saved 
+        pp_outdir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = participant))
+
+        # save parameters as HDF5 file, to later load
+        pars_filename = op.join(pp_outdir, 
+                            'sub-{sj}_task-{tsk}_ROI-{rname}_model-{dmod}_pars.h5'.format(sj = participant,
+                                                                                        tsk = task,
+                                                                                        rname = roi_name,
+                                                                                        dmod = model_type))
+
+        # if there is no pars file
+        if not op.isfile(pars_filename):
+           print('Could not find %s'%pars_filename)
+           pars_gd = None
+        else:
+            pars_gd = pd.read_hdf(pars_filename).astype(np.float32)  
+        
+        return pars_gd
+    
+    def load_reconstructed_stim_dict(self, participant = None, task = 'FA', roi_name = 'V1', model_type = 'gauss_hrf',
+                                    data_keys = ['ses-1_run-1']):
+        
+        """Load previously save reconstructed stim
+        """
+        
+        # dir where estimates where saved 
+        pp_outdir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = participant))
+        
+        # get reconstructed stim file name
+        decoded_stim_filename = op.join(pp_outdir, 
+                            'sub-{sj}_task-{tsk}_ROI-{rname}_model-{dmod}_reconstructed_stim.h5'.format(sj = participant,
+                                                                                                    tsk = task,
+                                                                                                    rname = roi_name,
+                                                                                                    dmod = model_type))
+        # make filename generic to load per run
+        decoded_stim_filename = decoded_stim_filename.replace('_task', '_{snrnkey}_task') 
+        
+        ## iterate over runs
+        reconstructed_stim_dict = {}
+
+        for ind, df_key in enumerate(data_keys):
+            
+            # get run number and session, to avoid mistakes 
+            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(df_key)
+            
+            # load stim
+            reconstructed_stimulus = pd.read_hdf(decoded_stim_filename.format(snrnkey = df_key))
+            
+            # append to dict
+            reconstructed_stim_dict[df_key] = reconstructed_stimulus
+            
+        return reconstructed_stim_dict
+    
+    def get_lowresDM_dict(self, DM_dict = None, data_keys = ['ses-1_run-1']):
+        
+        """downsample FA DM and append to dicts, for later plotting
+        """
+    
+        ## iterate over runs
+        lowres_DM_dict = {'full_stim': {}, 'att_bar': {}, 'unatt_bar': {}}
+
+        for ind, df_key in enumerate(data_keys):
+            
+            # get run number and session, to avoid mistakes 
+            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(df_key)
+            
+            # downsample DM and append to dicts, for later plotting
+            lowres_DM_dict['full_stim'][df_key] = self.downsample_DM(DM_arr = DM_dict['r{rn}s{sn}'.format(sn = file_sn, 
+                                                                                    rn = file_rn)]['full_stim'])
+            lowres_DM_dict['att_bar'][df_key] = self.downsample_DM(DM_arr = DM_dict['r{rn}s{sn}'.format(sn = file_sn, 
+                                                                                    rn = file_rn)]['att_bar'])
+            lowres_DM_dict['unatt_bar'][df_key] = self.downsample_DM(DM_arr = DM_dict['r{rn}s{sn}'.format(sn = file_sn, 
+                                                                                    rn = file_rn)]['unatt_bar'])
+                    
+        return lowres_DM_dict
+    
+    def get_same_bar_pos_ind_dict(self, lowresDM_dict = None, data_keys = ['ses-1_run-1']):
+        
+        """find trials where attended bar and unattended bar in same position
+        """
+        
+        same_bar_pos_ind_dict = {}
+        
+        for ind, df_key in enumerate(data_keys):
+            
+            same_bar_pos_ind_dict[df_key] = self.get_run_trial_pairs(DM_arr = lowresDM_dict['full_stim'][df_key])
+            
+        return same_bar_pos_ind_dict
+    
+    def get_run_position_df_dict(self, pp_bar_pos_df = None,  data_keys = ['ses-1_run-1']):
+        
+        """make data frame with bar positions and indices in trial
+        """
+        
+        run_position_df_dict = {}
+
+        for ind, df_key in enumerate(data_keys):
+            
+            print('making df with bar position info for %s'%df_key)
+            # get run number and session, to avoid mistakes 
+            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(df_key)
+            
+            run_position_df_dict[df_key] = self.make_df_run_bar_pos(run_df = pp_bar_pos_df['ses-{s}'.format(s = file_sn)]['run-{r}'.format(r=file_rn)])
+
+        return run_position_df_dict
+        
+    
+    def get_encoding_fitter(self, data = None, grid_coordinates = None, model_type = 'gauss_hrf',
+                                paradigm = None):
+        
+        """Get encoding model fitter object
+        """
+        
+        if 'hrf' in model_type:
+            fit_hrf = True
+            
+        ## get prf model 
+        prf_decoder_model = self.setup_prf_model(data = data, 
+                                                grid_coordinates = grid_coordinates, 
+                                                model_type = model_type,
+                                                paradigm = paradigm, 
+                                                fit_hrf = fit_hrf)  
+            
+        # set fitter
+        prf_decoder_fitter = ParameterFitter(model = prf_decoder_model, 
+                                            data = data, 
+                                            paradigm = paradigm)
+        
+        return prf_decoder_fitter
+        
+    def get_encoding_r2(self, data = None, grid_coordinates = None, model_type = 'gauss_hrf',
+                                paradigm = None, pars_gd = None):
+        
+        """Get encoding model rsq
+        """
+        
+        # set fitter
+        prf_decoder_fitter = self.get_encoding_fitter(data = data, 
+                                                    grid_coordinates = grid_coordinates, 
+                                                    model_type = model_type,
+                                                    paradigm = paradigm)
+        
+        r2_gd = prf_decoder_fitter.get_rsq(pars_gd)
+
+        return r2_gd
+         
     def setup_prf_model(self, data = None, grid_coordinates = None, model_type = 'gauss_hrf',
                             paradigm = None, fit_hrf = False):
         

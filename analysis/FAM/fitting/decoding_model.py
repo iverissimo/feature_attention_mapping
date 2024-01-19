@@ -1220,7 +1220,106 @@ class Decoding_Model(GLMsingle_Model):
 
         return run_position_df_dict
         
-    
+    def get_pp_average_stim_dict(self, reconstructed_stim_dict = None, run_position_df_dict = None, lowres_DM_dict = None, bar_type = 'parallel'):
+        
+        """Get average reconstructed stim dict for a participant
+        """
+        
+        # save results in dict
+        average_stim_dict = {}
+        flip_average_stim_dict = {}
+        
+        if bar_type == 'parallel':
+
+            bar_dist_dict = {'far': np.arange(5)+1, 'middle': np.arange(3)+1, 'near': np.arange(1)+1}
+            
+            # iterate over bar distances and ecc
+            for bar_ecc, bar_dist_list in bar_dist_dict.items():
+                
+                average_stim_dict[bar_ecc] = {}
+                flip_average_stim_dict[bar_ecc] = {}
+            
+                for bar_dist in bar_dist_list:
+                    
+                    ## average over runs
+                    average_stim_all = []
+                    flip_average_stim_all = []
+                    
+                    ## stack all runs
+                    for snrn_key, snrn_stim in reconstructed_stim_dict.items():
+                        
+                        average_stim_all.append(self.get_parallel_average_stim(reconstructed_stimulus = snrn_stim, 
+                                                                            position_df = run_position_df_dict[snrn_key], 
+                                                                            bar_ecc = bar_ecc, 
+                                                                            abs_inter_bar_dist = bar_dist, 
+                                                                            flipped_stim = False, 
+                                                                            DM_arr = lowres_DM_dict['full_stim'][snrn_key]))
+
+                        # also get average flipped case
+                        flip_average_stim_all.append(self.get_parallel_average_stim(reconstructed_stimulus = snrn_stim, 
+                                                                            position_df = run_position_df_dict[snrn_key], 
+                                                                            bar_ecc = bar_ecc, 
+                                                                            abs_inter_bar_dist = bar_dist, 
+                                                                            flipped_stim = True, 
+                                                                            DM_arr = lowres_DM_dict['full_stim'][snrn_key]))
+                    average_stim_all = np.stack(average_stim_all)
+                    flip_average_stim_all = np.stack(flip_average_stim_all)
+                    
+                    ## average over runs
+                    average_stim = np.mean(average_stim_all, axis = 0)
+                    flip_average_stim = np.mean(flip_average_stim_all, axis = 0)
+                    
+                    # save in dict
+                    average_stim_dict[bar_ecc][bar_dist] = average_stim
+                    flip_average_stim_dict[bar_ecc][bar_dist] = flip_average_stim
+                    
+        elif bar_type == 'crossed':
+            
+            uniq_cond_dict = {'far': 'near', 'middle': 'far', 'near': 'middle'}
+            
+            # iterate over ecc
+            for bar_ecc in uniq_cond_dict.keys():
+                
+                average_stim_dict[bar_ecc] = {}
+                flip_average_stim_dict[bar_ecc] = {}
+                
+                # and if crossed bars where equidistant to center or not
+                for same_ecc in [True, False]:
+                    
+                    ## average over runs
+                    average_stim_all = []
+                    flip_average_stim_all = []
+                    
+                    ## stack all runs
+                    for snrn_key, snrn_stim in reconstructed_stim_dict.items():
+                        
+                        average_stim_all.append(self.get_crossed_average_stim(reconstructed_stimulus = snrn_stim, 
+                                                                            position_df = run_position_df_dict[snrn_key], 
+                                                                            bar_ecc = bar_ecc, 
+                                                                            same_ecc = same_ecc,  
+                                                                            flipped_stim = False, 
+                                                                            DM_arr = lowres_DM_dict['full_stim'][snrn_key]))
+
+                        # also get average flipped case
+                        flip_average_stim_all.append(self.get_crossed_average_stim(reconstructed_stimulus = snrn_stim, 
+                                                                            position_df = run_position_df_dict[snrn_key], 
+                                                                            bar_ecc = bar_ecc, 
+                                                                            same_ecc = same_ecc, 
+                                                                            flipped_stim = True, 
+                                                                            DM_arr = lowres_DM_dict['full_stim'][snrn_key]))
+                    average_stim_all = np.stack(average_stim_all)
+                    flip_average_stim_all = np.stack(flip_average_stim_all)
+                    
+                    ## average over runs
+                    average_stim = np.mean(average_stim_all, axis = 0)
+                    flip_average_stim = np.mean(flip_average_stim_all, axis = 0)
+                
+                    # save in dict
+                    average_stim_dict[bar_ecc][int(same_ecc)] = average_stim
+                    flip_average_stim_dict[bar_ecc][int(same_ecc)] = flip_average_stim
+                    
+        return average_stim_dict, flip_average_stim_dict
+        
     def get_encoding_fitter(self, data = None, grid_coordinates = None, model_type = 'gauss_hrf',
                                 paradigm = None):
         

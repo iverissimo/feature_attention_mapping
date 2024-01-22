@@ -507,3 +507,53 @@ class Model:
             return out_data_df
         else:
             return masked_data_filenames
+
+    def get_ROImask_filenames(self, participant, file_list = None, task = 'pRF', run_type = 'mean', ses = 'mean', 
+                            roi_name = 'V1', index_arr = []):
+        
+        """ get ROI masked data filenames (from FS labels turned volume image) 
+        """
+        
+        # if loading specific run
+        if isinstance(run_type, int) or (isinstance(run_type, str) and 'loo_' not in run_type and len(re.findall(r'\d{1,10}', run_type))>0):
+
+            if not isinstance(ses, int) or not (isinstance(ses, str) and len(re.findall(r'\d{1,10}', ses))>0):
+                raise ValueError('Want to run specific run but did not provide session number!')
+            else:
+                run = re.findall(r'\d{1,10}', str(run_type))[0]
+                print('Loading run-{r} from ses-{s}'.format(r = run, s = ses))
+
+                file_list = [file for file in file_list if 'run-{r}'.format(r = run) in file and 'ses-{s}'.format(s = ses) in file]
+
+        # if leaving one run out
+        elif 'loo_' in run_type:
+            
+            print('Leave-one out runs ({r})'.format(r = run_type))
+            _, file_list = self.MRIObj.mri_utils.get_loo_filename(file_list, loo_key=run_type)               
+
+        ## dir where masks are stored
+        out_dir_ROI_mask_data = op.join(self.MRIObj.derivatives_pth, 
+                                        'masked_data', 
+                                        'sub-{sj}'.format(sj = participant))
+        
+        masked_data_filenames = []
+        for r, file in enumerate(file_list):
+            
+            ## get run number, and ses number in list of ints
+            # useful for when fitting several runs at same time
+            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(file)
+                    
+            # make filename
+            csv_filename = op.join(out_dir_ROI_mask_data, 
+                                   'sub-{sj}_task-{tsk}_ses-{session}_run-{run}_{roi}_timeseries.tsv.gz'.format(sj = participant,
+                                                                                                                tsk = task,
+                                                                                                                session = file_sn,
+                                                                                                                run = file_rn,
+                                                                                                                roi = roi_name))
+            if len(index_arr) > 0:
+                csv_filename = csv_filename.replace('_timeseries', '_index_timeseries')
+            
+            # append
+            masked_data_filenames.append(csv_filename)
+            
+        return masked_data_filenames

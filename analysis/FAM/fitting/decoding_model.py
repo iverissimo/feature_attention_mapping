@@ -396,8 +396,8 @@ class Decoding_Model(GLMsingle_Model):
             average_stim.append(trl_stim)
         average_stim = np.stack(average_stim)
                         
-        # and average (median)
-        average_stim = np.median(average_stim, axis = 0)
+        # and average
+        average_stim = np.mean(average_stim, axis = 0)
 
         # if we want the flipped trials for symmetrical cases
         if flipped_stim == True and sym_trial == True:
@@ -498,8 +498,8 @@ class Decoding_Model(GLMsingle_Model):
             average_stim.append(trl_stim)
         average_stim = np.stack(average_stim)
                         
-        # and average (median)
-        average_stim = np.median(average_stim, axis = 0)
+        # and average 
+        average_stim = np.mean(average_stim, axis = 0)
 
         # if we want the flipped trials for symmetrical cases
         if flipped_stim == True and same_ecc == True:
@@ -553,7 +553,7 @@ class Decoding_Model(GLMsingle_Model):
     
     def plot_avg_parallel_stim(self, average_stim = None, flip_average_stim = None, DM_trl_ind = None,
                                     bar_ecc = None, bar_dist = None, downsample_FA_DM = None, 
-                                    vmin = 0, vmax = .4, cmap = 'magma', filename = None):
+                                    vmin = 0, vmax = .4, cmap = 'magma', filename = None, annot = True):
         
         """Make 4x4 plot of recontruscted stim, averaged across conditions
         (and also reverse case)
@@ -576,7 +576,7 @@ class Decoding_Model(GLMsingle_Model):
 
         ## attended leftmost
         sns.heatmap(average_stim, cmap = cmap, ax = axes[0][0], square = True, cbar = False,
-                    annot=True, annot_kws={"size": 7},
+                    annot=annot, annot_kws={"size": 7},
                     vmin = vmin, vmax = vmax)
         axes[0][0].set_title('%s ecc, dist = %i (attended left bar)'%(bar_ecc, bar_dist))
 
@@ -592,7 +592,7 @@ class Decoding_Model(GLMsingle_Model):
 
         ## attended rightmost
         sns.heatmap(flip_average_stim, cmap = 'magma', ax = axes[0][1], square = True, cbar = False,
-                annot=True, annot_kws={"size": 7},
+                annot=annot, annot_kws={"size": 7},
                 vmin = vmin, vmax = vmax)
         axes[0][1].set_title('flipped case (attended right bar)')
 
@@ -612,7 +612,7 @@ class Decoding_Model(GLMsingle_Model):
             
     def plot_avg_crossed_stim(self, average_stim = None, flip_average_stim = None, DM_trl_ind = None,
                                     bar_ecc = None, same_ecc = None, downsample_FA_DM = None, 
-                                    vmin = 0, vmax = .4, cmap = 'magma', filename = None):
+                                    vmin = 0, vmax = .4, cmap = 'magma', filename = None, annot = True):
         
         """Make 4x4 plot of recontruscted stim, averaged across conditions
         (and also reverse case)
@@ -641,7 +641,7 @@ class Decoding_Model(GLMsingle_Model):
 
         ## attended leftmost, vertical
         sns.heatmap(average_stim, cmap = cmap, ax = axes[0][0], square = True, cbar = False,
-                    annot=True, annot_kws={"size": 7},
+                    annot=annot, annot_kws={"size": 7},
                     vmin = vmin, vmax = vmax)
         axes[0][0].set_title('attend %s ecc, unattend %s ecc'%(bar_ecc_list[0], bar_ecc_list[1]))
 
@@ -657,7 +657,7 @@ class Decoding_Model(GLMsingle_Model):
 
         ## attended rightmost
         sns.heatmap(flip_average_stim, cmap = 'magma', ax = axes[0][1], square = True, cbar = False,
-                annot=True, annot_kws={"size": 7},
+                annot=annot, annot_kws={"size": 7},
                 vmin = vmin, vmax = vmax)
         axes[0][1].set_title('flipped case')
 
@@ -910,12 +910,17 @@ class Decoding_Model(GLMsingle_Model):
         
         ## convert betas estimates into volume images (if not done so already)
         # and get filenames
-        betas_filelist = self.convert_betas_volume(participant, model_type = glmsingle_model, 
-                                                    file_ext = file_ext, trial_num = trial_num)
-
+        #filelist = self.convert_betas_volume(participant, model_type = glmsingle_model, 
+        #                                            file_ext = file_ext, trial_num = trial_num)
+        
+        # QUICK FIX TO SAVE TIME -> CHANGE BACK LATER
+        pp_decoder_dir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = participant))
+        roi_name = 'V1'
+        filelist = [val for val in os.listdir(pp_decoder_dir) if '_task-FA_ROI-{rn}_'.format(rn = roi_name) in val and val.endswith('_reconstructed_stim.h5')]
+        
         ## get FA DM
         FA_DM_dict, _ = self.get_visual_DM_dict(participant, 
-                                            filelist = betas_filelist, 
+                                            filelist = filelist, 
                                             pp_bar_pos_df = pp_bar_pos_df)
         
         # need to downsample stimulus space
@@ -927,7 +932,8 @@ class Decoding_Model(GLMsingle_Model):
         return FA_DM_dict, fa_grid_coordinates
         
     def get_FA_ROI_data(self, participant = None, roi_name = 'V1', index_arr = [], overwrite = False,
-                            glmsingle_model = 'D', file_ext = '_cropped.nii.gz', trial_num = 132):
+                            glmsingle_model = 'D', file_ext = '_cropped.nii.gz', trial_num = 132,
+                            return_data = True):
         
         """Get FA data (beta values) for the ROI of a participant, for all runs,
         and return dataframe in a format compatible with braindecoder 
@@ -938,8 +944,10 @@ class Decoding_Model(GLMsingle_Model):
         betas_filelist = self.convert_betas_volume(participant, model_type = glmsingle_model, 
                                                     file_ext = file_ext, trial_num = trial_num)
 
-        ## get masked ROI data file list
-        masked_FAdata_df_filelist = self.get_ROImask_data(participant, 
+        # if we want the loaded data file
+        if return_data:
+            ## get masked ROI data file list
+            masked_FAdata_df_filelist = self.get_ROImask_data(participant, 
                                                         file_list = betas_filelist, 
                                                         task = 'FA', 
                                                         run_type = 'all', ses = 'all', 
@@ -947,26 +955,38 @@ class Decoding_Model(GLMsingle_Model):
                                                         index_arr = index_arr,
                                                         overwrite = overwrite)
         
-        ## return as dict of dataframes
-        output_dict = {}
-        for filename in masked_FAdata_df_filelist:
+            ## return as dict of dataframes
+            output_dict = {}
+            for filename in masked_FAdata_df_filelist:
+                
+                # get file run and ses number
+                file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(filename)
+                
+                # load df
+                masked_df = pd.read_csv(filename, sep='\t', index_col=['time'], 
+                                                compression='gzip').astype(np.float32)
+                # and format it accordingly (should clean up in the future - simplest is saving data as hdf5 files)
+                out_df = pd.DataFrame(masked_df.to_numpy(), 
+                                    index=pd.Index(np.arange(len(masked_df)), 
+                                                name='time'),
+                                    columns = pd.Index(range(masked_df.to_numpy().shape[1]), 
+                                                    name='source')).astype(np.float32)
+                
+                output_dict['ses-{sn}_run-{rn}'.format(sn = file_sn, rn = file_rn)] = out_df
+                
+            return output_dict
+        
+        else:
+            ## get masked ROI data file list
+            masked_FAdata_df_filelist = self.get_ROImask_filenames(participant, 
+                                                                    file_list = betas_filelist, 
+                                                                    task = 'FA', 
+                                                                    run_type = 'all', ses = 'all', 
+                                                                    roi_name = roi_name, 
+                                                                    index_arr = index_arr)
             
-            # get file run and ses number
-            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(filename)
-            
-            # load df
-            masked_df = pd.read_csv(filename, sep='\t', index_col=['time'], 
-                                            compression='gzip').astype(np.float32)
-            # and format it accordingly (should clean up in the future - simplest is saving data as hdf5 files)
-            out_df = pd.DataFrame(masked_df.to_numpy(), 
-                                index=pd.Index(np.arange(len(masked_df)), 
-                                               name='time'),
-                                columns = pd.Index(range(masked_df.to_numpy().shape[1]), 
-                                                   name='source')).astype(np.float32)
-            
-            output_dict['ses-{sn}_run-{rn}'.format(sn = file_sn, rn = file_rn)] = out_df
-            
-        return output_dict
+            # return file name list
+            return masked_FAdata_df_filelist
           
     def fit_residuals(self, model = None, data = None, paradigm = None, parameters = None, fit_method = 't', 
                             best_vox = None, filename = None):
@@ -1219,6 +1239,39 @@ class Decoding_Model(GLMsingle_Model):
             run_position_df_dict[df_key] = self.make_df_run_bar_pos(run_df = pp_bar_pos_df['ses-{s}'.format(s = file_sn)]['run-{r}'.format(r=file_rn)])
 
         return run_position_df_dict
+    
+    def get_group_average_stim_dict(self, participant_list = [], reconstructed_stim_dict = None, run_position_df_dict = None, 
+                                            lowres_DM_dict = None, bar_type = 'parallel'):
+        
+        """Get average stim dict for group
+        """
+        
+        group_average_stim_dict = {}
+        group_flip_average_stim_dict = {}
+
+        for participant in participant_list:
+
+            ## get average stim (across unique bar positions) for participant's ROI
+            # and bar type (parallel or crossed)
+            pp_average_stim_dict, pp_flip_average_stim_dict = self.get_pp_average_stim_dict(reconstructed_stim_dict = reconstructed_stim_dict['sub-{sj}'.format(sj = participant)], 
+                                                                                            run_position_df_dict = run_position_df_dict['sub-{sj}'.format(sj = participant)], 
+                                                                                            lowres_DM_dict = lowres_DM_dict['sub-{sj}'.format(sj = participant)], 
+                                                                                            bar_type = bar_type)
+            if participant == participant_list[0]:                 
+                group_average_stim_dict = {keynames1: {keynames2: items2[np.newaxis, ...] for keynames2, items2 in items1.items()} for keynames1, items1 in pp_average_stim_dict.items()}
+                group_flip_average_stim_dict = {keynames1: {keynames2: items2[np.newaxis, ...] for keynames2, items2 in items1.items()} for keynames1, items1 in pp_flip_average_stim_dict.items()}
+                
+            else:
+                for keynames1 in group_average_stim_dict.keys():
+                    for keynames2 in group_average_stim_dict[keynames1].keys():
+                        
+                        group_average_stim_dict[keynames1][keynames2] = np.vstack((group_average_stim_dict[keynames1][keynames2],
+                                                                                pp_average_stim_dict[keynames1][keynames2][np.newaxis, ...]))
+                        group_flip_average_stim_dict[keynames1][keynames2] = np.vstack((group_flip_average_stim_dict[keynames1][keynames2],
+                                                                                        pp_flip_average_stim_dict[keynames1][keynames2][np.newaxis, ...]))
+
+        return group_average_stim_dict, group_flip_average_stim_dict
+        
         
     def get_pp_average_stim_dict(self, reconstructed_stim_dict = None, run_position_df_dict = None, lowres_DM_dict = None, bar_type = 'parallel'):
         
@@ -1380,6 +1433,114 @@ class Decoding_Model(GLMsingle_Model):
         
         return prf_decoder_model
         
+    def get_pp_data_keys(self, participant = None, roi_name = 'V1', fa_file_ext = '_cropped.nii.gz'):
+        
+        """Get participant data identifier (ses-X_run-Y) keys as list
+        """        
+        # ## get masked FA ROI filenames, all runs
+        # filelist = self.get_FA_ROI_data(participant = participant, 
+        #                                         roi_name = roi_name, 
+        #                                         index_arr = [], 
+        #                                         overwrite = False,
+        #                                         file_ext = fa_file_ext,
+        #                                         glmsingle_model = 'D', 
+        #                                         trial_num = 132,
+        #                                         return_data = False)
+        
+        # for now do it differently, should change later to make neater
+        pp_decoder_dir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = participant))
+        filelist = [val for val in os.listdir(pp_decoder_dir) if '_task-FA_ROI-{rn}_'.format(rn = roi_name) in val and val.endswith('_reconstructed_stim.h5')]
+        filelist.sort()
+        
+        # save ses and run as list of strings
+        output_list = []
+        for filename in filelist:
+            
+            # get file run and ses number
+            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(filename)
+                
+            output_list.append('ses-{sn}_run-{rn}'.format(sn = file_sn, rn = file_rn))
+        
+        return np.array(output_list)
+    
+    def load_group_DM_dict(self, participant_list = [], group_bar_pos_df = None, 
+                                fa_file_ext = '_cropped.nii.gz', ses = 'mean', data_keys_dict = {}):
+        
+        """Load FA downsampled DM for all participants in participant list
+        returns dict of DMs 
+        """
+        
+        group_lowres_DM_dict = {}
+
+        for participant in participant_list:
+            
+            ## get FA DM and grid coordinates (8x8)
+            FA_DM_dict, _ = self.get_FA_stim_grid(participant = participant, 
+                                                                    ses = ses, 
+                                                                    pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = participant)],
+                                                                    file_ext = fa_file_ext,
+                                                                    glmsingle_model = 'D', 
+                                                                    trial_num = 132)
+            
+            ## get downsampled FA DM
+            lowres_DM_dict = self.get_lowresDM_dict(DM_dict = FA_DM_dict, 
+                                                    data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)])
+            
+            group_lowres_DM_dict['sub-{sj}'.format(sj = participant)] = lowres_DM_dict
+            
+        return group_lowres_DM_dict
+    
+    def load_group_decoded_stim_dict(self, participant_list = [], roi_name = 'V1',
+                                model_type = 'gauss_hrf', data_keys_dict = {}):
+        
+        """Load FA downsampled DM for all participants in participant list
+        returns dict of DMs 
+        """
+        
+        group_reconstructed_stim_dict = {}
+
+        for participant in participant_list:
+            
+            ## load reconstructed stim
+            reconstructed_stim_dict = self.load_reconstructed_stim_dict(participant = participant, 
+                                                                        task = 'FA', 
+                                                                        roi_name = roi_name, 
+                                                                        model_type = model_type,
+                                                                        data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)])
+            
+            group_reconstructed_stim_dict['sub-{sj}'.format(sj = participant)] = reconstructed_stim_dict
+            
+        return group_reconstructed_stim_dict
+            
+    def load_group_data_keys(self, participant_list = [], fa_file_ext = '_cropped.nii.gz'):
+        
+        data_keys_dict = {}
+        
+        for participant in participant_list:
+            print('Loading participant run keys for sub-{sj}'.format(sj = participant))
+            data_keys_dict['sub-{sj}'.format(sj = participant)] = self.get_pp_data_keys(participant = participant, 
+                                                                                        roi_name = 'V1', 
+                                                                                        fa_file_ext = fa_file_ext) 
+                  
+        return data_keys_dict
+    
+    def load_group_run_position_df_dict(self, participant_list = [], group_bar_pos_df = None, data_keys_dict = {}):
+        
+        """Load FA downsampled DM for all participants in participant list
+        returns dict of DMs 
+        """
+        
+        group_run_pos_df_dict = {}
+
+        for participant in participant_list:
+            
+            ## get FA bar position dict, across runs
+            run_position_df_dict =  self.get_run_position_df_dict(pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = participant)],  
+                                                                data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)])
+            
+            group_run_pos_df_dict['sub-{sj}'.format(sj = participant)] = run_position_df_dict
+            
+        return group_run_pos_df_dict          
                       
     def plot_prf_diagnostics(self, pars_grid = None, pars_gd = None, pars_fitter = None, 
                                 prf_decoder_model = None, data = None, 

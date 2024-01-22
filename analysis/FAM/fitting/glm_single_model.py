@@ -269,7 +269,7 @@ class GLMsingle_Model(Model):
             # append to use later
             all_files.append(betas_filename)
         
-        return  all_files   
+        return all_files   
 
     def convert_coord_pRF2screen_grid(self, prf_x_coord = np.array([]), prf_y_coord = np.array([]), grid_num = None):
 

@@ -1433,34 +1433,20 @@ class Decoding_Model(GLMsingle_Model):
         
         return prf_decoder_model
         
-    def get_pp_data_keys(self, participant = None, roi_name = 'V1', fa_file_ext = '_cropped.nii.gz'):
+    def get_data_keys(self, pp_bar_pos_df = None):
         
-        """Get participant data identifier (ses-X_run-Y) keys as list
+        """Get participant data identifier (ses-X_run-Y) keys as list of strings
+        to use as reference throughout analysis
+        
         """        
-        # ## get masked FA ROI filenames, all runs
-        # filelist = self.get_FA_ROI_data(participant = participant, 
-        #                                         roi_name = roi_name, 
-        #                                         index_arr = [], 
-        #                                         overwrite = False,
-        #                                         file_ext = fa_file_ext,
-        #                                         glmsingle_model = 'D', 
-        #                                         trial_num = 132,
-        #                                         return_data = False)
-        
-        # for now do it differently, should change later to make neater
-        pp_decoder_dir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = participant))
-        filelist = [val for val in os.listdir(pp_decoder_dir) if '_task-FA_ROI-{rn}_'.format(rn = roi_name) in val and val.endswith('_reconstructed_stim.h5')]
-        filelist.sort()
         
         # save ses and run as list of strings
         output_list = []
-        for filename in filelist:
-            
-            # get file run and ses number
-            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(filename)
-                
-            output_list.append('ses-{sn}_run-{rn}'.format(sn = file_sn, rn = file_rn))
         
+        for ses_key in pp_bar_pos_df.keys():
+            for run_key in pp_bar_pos_df[ses_key].keys():
+                output_list.append('{sn}_{rn}'.format(sn = ses_key, rn = run_key))
+                        
         return np.array(output_list)
     
     def load_group_DM_dict(self, participant_list = [], group_bar_pos_df = None, 
@@ -1512,15 +1498,13 @@ class Decoding_Model(GLMsingle_Model):
             
         return group_reconstructed_stim_dict
             
-    def load_group_data_keys(self, participant_list = [], fa_file_ext = '_cropped.nii.gz'):
+    def load_group_data_keys(self, participant_list = [], group_bar_pos_df = None):
         
         data_keys_dict = {}
         
         for participant in participant_list:
             print('Loading participant run keys for sub-{sj}'.format(sj = participant))
-            data_keys_dict['sub-{sj}'.format(sj = participant)] = self.get_pp_data_keys(participant = participant, 
-                                                                                        roi_name = 'V1', 
-                                                                                        fa_file_ext = fa_file_ext) 
+            data_keys_dict['sub-{sj}'.format(sj = participant)] = self.get_data_keys(pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = participant)]) 
                   
         return data_keys_dict
     

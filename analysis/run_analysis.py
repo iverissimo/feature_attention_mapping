@@ -219,13 +219,11 @@ match task:
         
         if py_cmd == 'fitdecoder': # fit FA betas decoder
             
-            group_bar_pos_df = {}
-            for pp in FAM_data.sj_num:
-                # get participant bar positions for FA task
-                group_bar_pos_df['sub-{sj}'.format(sj = pp)] = FAM_beh.load_FA_bar_position(pp, 
-                                                                                            ses_num = None, 
-                                                                                            ses_type = 'func', 
-                                                                                            run_num = None)        
+            # get all participant bar positions for FA task
+            group_bar_pos_df = FAM_beh.get_group_FA_bar_position_dict(participant_list = FAM_data.sj_num, 
+                                                                    ses_num = None, 
+                                                                    ses_type = 'func', 
+                                                                    run_num = None)         
             ## actually fit
             print('Fitting started!')
             FAM_Decoder.fit_decoder(participant_list = FAM_data.sj_num, 

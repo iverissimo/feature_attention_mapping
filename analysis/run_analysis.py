@@ -219,9 +219,6 @@ match task:
         
         if py_cmd == 'fitdecoder': # fit FA betas decoder
             
-            ## load FA model class
-            FAM_FA = GLMsingle_Model(FAM_data, use_atlas = use_atlas)
-            
             group_bar_pos_df = {}
             for pp in FAM_data.sj_num:
                 # get participant bar positions for FA task

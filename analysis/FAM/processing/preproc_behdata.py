@@ -191,31 +191,78 @@ class PreprocBeh:
                 print('no files in %s'%input_pth)
             else:
                 print('loading files from %s'%input_pth)
-                    
-                bp_files = [op.join(input_pth,x) for x in os.listdir(input_pth) if 'task-FA' in x \
-                                and x.endswith(self.MRIObj.bar_pos_ext)]
                 
+                # if looking at func session
+                if ses_type == 'func':
+                    # first get bold file list 
+                    bold_files = [x for x in os.listdir(input_pth) if 'task-FA' in x and x.endswith('_bold.nii.gz')]
+                    # get run and ses_num identifier
+                    ses_run_ids = ['{sn}_task-FA_run-{rn}'.format(sn = ses, 
+                                                                rn = self.MRIObj.mri_utils.get_run_ses_from_str(file)[0]) for file in bold_files]
+                    # get unique identifiers
+                    ses_run_ids = np.unique(ses_run_ids) 
+                    
+                    # get bar position file names
+                    bp_files = [op.join(input_pth, 'sub-{sj}_{srid}{fext}'.format(sj = participant,
+                                                                                srid = sn_rn_id,
+                                                                                fext = self.MRIObj.bar_pos_ext)
+                                        ) for sn_rn_id in ses_run_ids]          
+                else:
+                    bp_files = [op.join(input_pth,x) for x in os.listdir(input_pth) if 'task-FA' in x \
+                                    and x.endswith(self.MRIObj.bar_pos_ext)]
+                    
                 print('{nr} bar position files found for task-FA'.format(nr=len(bp_files)))
 
                 # if we provided a specific run number, only load that
                 if run_num:
-                    run_filename = [val for val in bp_files if 'run-{r}'.format(r=run_num) in val][0]
-                    print('Loading {f}'.format(f=op.split(run_filename)[-1]))
-                    
-                    bar_pos_df[ses]['run-{r}'.format(r=run_num)] = pd.read_pickle(run_filename)
-                    
+                    run_filename = op.join(input_pth, 'sub-{sj}_{sn}_task-FA_run-{rn}{fext}'.format(sj = participant,
+                                                                                                    sn = ses,
+                                                                                                    rn = run_num,
+                                                                                                    fext = self.MRIObj.bar_pos_ext)
+                                           )
+                    if op.isfile(run_filename):
+                        print('Loading {f}'.format(f=op.split(run_filename)[-1]))
+                        bar_pos_df[ses]['run-{r}'.format(r=run_num)] = pd.read_pickle(run_filename)
+                    else:
+                        print('No trial info file for run-{r}'.format(r=run_num))
                 else:
                     # for each run
-                    for r in np.arange(self.MRIObj.mri_nr_runs):
-
-                        run_filename = [val for val in bp_files if 'run-{r}'.format(r=(r+1)) in val]
-                        if len(run_filename) == 0:
-                            print('No trial info file for run-{r}'.format(r=(r+1)))
+                    for run_filename in bp_files:
+                        if op.isfile(run_filename):
+                            print('Loading {f}'.format(f=op.split(run_filename)[-1]))
+                            bar_pos_df[ses]['run-{r}'.format(r=self.MRIObj.mri_utils.get_run_ses_from_str(run_filename)[0])] = pd.read_pickle(run_filename)
                         else:
-                            print('Loading {f}'.format(f=op.split(run_filename[0])[-1]))
-                            bar_pos_df[ses]['run-{r}'.format(r=(r+1))] = pd.read_pickle(run_filename[0])
-        
+                            print('No trial info file for run-{r}'.format(r=self.MRIObj.mri_utils.get_run_ses_from_str(run_filename)[0]))
         return bar_pos_df
+    
+    def get_group_FA_bar_position_dict(self, participant_list = [], ses_num = None, ses_type = 'func', run_num = None):
+        
+        """
+        Load bar position from pickle files
+        for all participants
+
+        Parameters
+        ----------
+        participant_list : list
+            list of strings with participant number
+        ses : str
+            session number (default ses-1)
+        ses_type: str
+            type of session (default func)
+        run_num: int/str
+            run number
+        """ 
+        
+        group_bar_pos_df = {}
+        
+        for participant in participant_list:
+            # get participant bar positions for FA task
+            group_bar_pos_df['sub-{sj}'.format(sj = participant)] = self.load_FA_bar_position(participant, 
+                                                                                            ses_num = ses_num, 
+                                                                                            ses_type = ses_type, 
+                                                                                            run_num = run_num)     
+              
+        return   group_bar_pos_df
     
     def get_run_ses_by_color(self, participant, ses_num = None, ses_type = 'func', run_num = None):
 
@@ -226,7 +273,7 @@ class PreprocBeh:
         pp_bar_pos_df = self.load_FA_bar_position(participant, ses_num = ses_num, ses_type = ses_type, run_num = run_num)
 
         att_color_ses_run = {'color_green': {'ses': [], 'run': []}, 
-                     'color_red': {'ses': [], 'run': []}}
+                            'color_red': {'ses': [], 'run': []}}
 
         for ses_key in pp_bar_pos_df.keys():
             for run_key in pp_bar_pos_df[ses_key]:

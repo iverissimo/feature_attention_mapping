@@ -103,74 +103,66 @@ class GLMsingle_Model(Model):
         y_coords_deg = np.concatenate((y_coords_deg, [self.bar_y_coords_pix[-1] + self.bar_width_pix[1]]))
         self.y_coords_deg = self.convert_pix2dva(y_coords_deg)
         
-    def get_visual_DM_dict(self, participant, filelist = None, pp_bar_pos_df = None):
+    def get_visual_DM_dict(self, pp_bar_pos_df = None):
     
         """
-        Given participant ID and filelist of runs to fit,
-        will return dict for each run in list,
+        return dict for each participant run,
         with visual DM for each type of regressor (attended bar, unattended bar, overlap, both bars, etc)
         
         ex:
-        out_dict['r1s1'] = {'att_bar': [trial, x,y], 'unatt_bar': [trial,x,y], ...}
+        out_dict['ses-1_run-1'] = {'att_bar': [trial, x,y], 'unatt_bar': [trial,x,y], ...}
 
         Parameters
         ----------
-        participant : str
-            participant ID
-        filelist : list
-            list with absolute filenames to fit)
+        pp_bar_pos_df: df/dict
+            from behavioral object, with bar position info of participant runs
         """ 
         
         # set empty dicts
         out_dict = {}
         
-        ## loop over files
-        for ind, file in enumerate(filelist):
-            
-            ## append run number, and ses number in list of ints
-            # useful for when fitting several runs at same time
-            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(file)
-            
-            out_dict['r{r}s{s}'.format(r = file_rn, s = file_sn)] = {}
-            
-            ## get bar position df for run
-            run_bar_pos_df = pp_bar_pos_df['ses-{s}'.format(s = file_sn)]['run-{r}'.format(r=file_rn)]
-            print('loading bar positions for ses-{s}, run-{r}'. format(s = file_sn, r=file_rn))
+        for ses_key in pp_bar_pos_df.keys():
+            for run_key in pp_bar_pos_df[ses_key].keys():
+                
+                # get run identifier
+                ses_run_id = '{sn}_{rn}'.format(sn = ses_key, rn = run_key)
+                print('loading bar positions for {srid}'. format(srid = ses_run_id))
+                
+                # initialize dict
+                out_dict[ses_run_id] = {}
+                
+                ## get bar position df for run
+                run_bar_pos_df = pp_bar_pos_df[ses_key][run_key]
 
-            ## get run bar midpoint and direction values
-            # for each bar type (arrays will have len == total number of trial types)
-            AttBar_bar_midpoint, AttBar_bar_pass_direction = run_bar_pos_df.loc[(run_bar_pos_df['attend_condition'] == 1), 
-                                                                                ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
-            UnattBar_bar_midpoint, UnattBar_bar_pass_direction = run_bar_pos_df.loc[(run_bar_pos_df['attend_condition'] == 0), 
-                                                                                ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
+                ## get run bar midpoint and direction values
+                # for each bar type (arrays will have len == total number of trial types)
+                AttBar_bar_midpoint, AttBar_bar_pass_direction = run_bar_pos_df.loc[(run_bar_pos_df['attend_condition'] == 1), 
+                                                                                    ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
+                UnattBar_bar_midpoint, UnattBar_bar_pass_direction = run_bar_pos_df.loc[(run_bar_pos_df['attend_condition'] == 0), 
+                                                                                    ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
 
-            ## GET DM FOR ATTENDED BAR
-            out_dict['r{r}s{s}'.format(r = file_rn, 
-                                        s = file_sn)]['att_bar'] = self.get_bar_visual_dm(midpoint_bar = AttBar_bar_midpoint, 
-                                                                                          direction_bar = AttBar_bar_pass_direction, 
-                                                                                          res_scaling = .1)
-            ## GET DM FOR UNATTENDED BAR
-            out_dict['r{r}s{s}'.format(r = file_rn, 
-                                        s = file_sn)]['unatt_bar'] = self.get_bar_visual_dm(midpoint_bar = UnattBar_bar_midpoint, 
-                                                                                          direction_bar = UnattBar_bar_pass_direction, 
-                                                                                          res_scaling = .1)
+                ## GET DM FOR ATTENDED BAR
+                out_dict[ses_run_id]['att_bar'] = self.get_bar_visual_dm(midpoint_bar = AttBar_bar_midpoint, 
+                                                                                            direction_bar = AttBar_bar_pass_direction, 
+                                                                                            res_scaling = .1)
+                ## GET DM FOR UNATTENDED BAR
+                out_dict[ses_run_id]['unatt_bar'] = self.get_bar_visual_dm(midpoint_bar = UnattBar_bar_midpoint, 
+                                                                                            direction_bar = UnattBar_bar_pass_direction, 
+                                                                                            res_scaling = .1)
 
-            ## GET DM FOR OVERLAP OF BARS
-            out_dict['r{r}s{s}'.format(r = file_rn, 
-                                        s = file_sn)]['overlap'] = self.MRIObj.mri_utils.get_bar_overlap_dm(np.stack((out_dict['r{r}s{s}'.format(r = file_rn, s = file_sn)]['att_bar'],
-                                                                                                            out_dict['r{r}s{s}'.format(r = file_rn, s = file_sn)]['unatt_bar'])))
+                ## GET DM FOR OVERLAP OF BARS
+                out_dict[ses_run_id]['overlap'] = self.MRIObj.mri_utils.get_bar_overlap_dm(np.stack((out_dict[ses_run_id]['att_bar'],
+                                                                                                    out_dict[ses_run_id]['unatt_bar'])))
 
-            ## GET DM FOR BOTH BARS COMBINED (FULL STIM THAT WAS ON SCREEN)
-            stimulus_dm = np.sum(np.stack((out_dict['r{r}s{s}'.format(r = file_rn, s = file_sn)]['att_bar'],
-                                            out_dict['r{r}s{s}'.format(r = file_rn, s = file_sn)]['unatt_bar'])), axis = 0)
-            stimulus_dm[stimulus_dm >=1] = 1
-            
-            out_dict['r{r}s{s}'.format(r = file_rn, 
-                                        s = file_sn)]['full_stim'] = stimulus_dm
+                ## GET DM FOR BOTH BARS COMBINED (FULL STIM THAT WAS ON SCREEN)
+                stimulus_dm = np.sum(np.stack((out_dict[ses_run_id]['att_bar'],
+                                                out_dict[ses_run_id]['unatt_bar'])), axis = 0)
+                stimulus_dm[stimulus_dm >=1] = 1
+                
+                out_dict[ses_run_id]['full_stim'] = stimulus_dm
 
-            if ind == 0:
-                # get keys for each condition
-                condition_dm_keys = [name for name in out_dict['r{r}s{s}'.format(r = file_rn, s = file_sn)].keys()]
+        # get keys for each condition
+        condition_dm_keys = list(out_dict[ses_run_id].keys())
                 
         return out_dict, condition_dm_keys
         

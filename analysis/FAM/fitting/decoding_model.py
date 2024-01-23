@@ -805,11 +805,7 @@ class Decoding_Model(GLMsingle_Model):
                                                 trial_num = 132)
         ## get FA DM and grid coordinates (8x8)
         FA_DM_dict, fa_grid_coordinates = self.get_FA_stim_grid(participant = participant, 
-                                                                ses = ses, 
-                                                                pp_bar_pos_df = pp_bar_pos_df,
-                                                                file_ext = fa_file_ext,
-                                                                glmsingle_model = 'D', 
-                                                                trial_num = 132)
+                                                                group_bar_pos_df = {'sub-{sj}'.format(sj = participant): pp_bar_pos_df})
         
         ## decode over runs
         # save reconstructed stim as HDF5 file, to later load
@@ -844,8 +840,7 @@ class Decoding_Model(GLMsingle_Model):
             file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(df_key)
             
             print('downsampling FA DM for ses-{sn}, run-{rn}'.format(sn = file_sn, rn=file_rn))
-            lowres_DM = self.downsample_DM(DM_arr = FA_DM_dict['r{rn}s{sn}'.format(sn = file_sn, 
-                                                                                   rn = file_rn)]['full_stim'])
+            lowres_DM = self.downsample_DM(DM_arr = FA_DM_dict[df_key]['full_stim'])
             
             # correlate reconstructed stim with downsampled DM
             corr, pval = scipy.stats.pearsonr(reconstructed_stimulus.values.ravel(), 
@@ -854,10 +849,6 @@ class Decoding_Model(GLMsingle_Model):
             
             # append to dict
             lowres_DM_dict[df_key] = lowres_DM
-            
-            ## save run position df (for convenience)
-            #print('making df with bar position info for ses-{s}, run-{r}'. format(s = file_sn, r=file_rn)) 
-            #run_position_df = self.make_df_run_bar_pos(run_df = pp_bar_pos_df['ses-{s}'.format(s = file_sn)]['run-{r}'.format(r=file_rn)])
         
         return lowres_DM_dict, reconstructed_stim_dict
                
@@ -902,30 +893,14 @@ class Decoding_Model(GLMsingle_Model):
         
         return reconstructed_stimulus
          
-    def get_FA_stim_grid(self, participant = None, ses = 'mean', pp_bar_pos_df = None,
-                                glmsingle_model = 'D', file_ext = '_cropped.nii.gz', trial_num = 132):
+    def get_FA_stim_grid(self, participant = None, group_bar_pos_df = None):
         
         """Get participant FA DM + grid coordinates that will be used in decoder
         """
         
-        ## convert betas estimates into volume images (if not done so already)
-        # and get filenames
-        #filelist = self.convert_betas_volume(participant, model_type = glmsingle_model, 
-        #                                            file_ext = file_ext, trial_num = trial_num)
-        
-        # QUICK FIX TO SAVE TIME -> CHANGE BACK LATER
-        pp_decoder_dir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = participant))
-        roi_name = 'V1'
-        filelist = [val for val in os.listdir(pp_decoder_dir) if '_task-FA_ROI-{rn}_'.format(rn = roi_name) in val and val.endswith('_reconstructed_stim.h5')]
-        
         ## get FA DM
-        FA_DM_dict, _ = self.get_visual_DM_dict(participant, 
-                                            filelist = filelist, 
-                                            pp_bar_pos_df = pp_bar_pos_df)
+        FA_DM_dict, _ = self.get_visual_DM_dict(pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = participant)])
         
-        # need to downsample stimulus space
-        # to actually be able to fit on CPU
-
         ## get grid coordinates (8x8)
         fa_grid_coordinates = self.get_decoder_grid_coords()
         
@@ -1174,16 +1149,10 @@ class Decoding_Model(GLMsingle_Model):
         ## iterate over runs
         reconstructed_stim_dict = {}
 
-        for ind, df_key in enumerate(data_keys):
+        for df_key in data_keys:
             
-            # get run number and session, to avoid mistakes 
-            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(df_key)
-            
-            # load stim
-            reconstructed_stimulus = pd.read_hdf(decoded_stim_filename.format(snrnkey = df_key))
-            
-            # append to dict
-            reconstructed_stim_dict[df_key] = reconstructed_stimulus
+            # load stim and append to dict
+            reconstructed_stim_dict[df_key] = pd.read_hdf(decoded_stim_filename.format(snrnkey = df_key))
             
         return reconstructed_stim_dict
     
@@ -1193,20 +1162,13 @@ class Decoding_Model(GLMsingle_Model):
         """
     
         ## iterate over runs
-        lowres_DM_dict = {'full_stim': {}, 'att_bar': {}, 'unatt_bar': {}}
+        lowres_DM_dict = {key: {} for key in list(DM_dict[data_keys[0]].keys())}
 
         for ind, df_key in enumerate(data_keys):
             
-            # get run number and session, to avoid mistakes 
-            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(df_key)
-            
-            # downsample DM and append to dicts, for later plotting
-            lowres_DM_dict['full_stim'][df_key] = self.downsample_DM(DM_arr = DM_dict['r{rn}s{sn}'.format(sn = file_sn, 
-                                                                                    rn = file_rn)]['full_stim'])
-            lowres_DM_dict['att_bar'][df_key] = self.downsample_DM(DM_arr = DM_dict['r{rn}s{sn}'.format(sn = file_sn, 
-                                                                                    rn = file_rn)]['att_bar'])
-            lowres_DM_dict['unatt_bar'][df_key] = self.downsample_DM(DM_arr = DM_dict['r{rn}s{sn}'.format(sn = file_sn, 
-                                                                                    rn = file_rn)]['unatt_bar'])
+            for stim_key in lowres_DM_dict.keys():
+                # downsample DM and append to dicts
+                lowres_DM_dict[stim_key][df_key] = self.downsample_DM(DM_arr = DM_dict[df_key][stim_key])
                     
         return lowres_DM_dict
     
@@ -1449,8 +1411,7 @@ class Decoding_Model(GLMsingle_Model):
                         
         return np.array(output_list)
     
-    def load_group_DM_dict(self, participant_list = [], group_bar_pos_df = None, 
-                                fa_file_ext = '_cropped.nii.gz', ses = 'mean', data_keys_dict = {}):
+    def load_group_DM_dict(self, participant_list = [], group_bar_pos_df = None, data_keys_dict = {}):
         
         """Load FA downsampled DM for all participants in participant list
         returns dict of DMs 
@@ -1460,19 +1421,15 @@ class Decoding_Model(GLMsingle_Model):
 
         for participant in participant_list:
             
+            print('Getting downsampled DM for sub-{sj}'.format(sj = participant)) 
+            
             ## get FA DM and grid coordinates (8x8)
             FA_DM_dict, _ = self.get_FA_stim_grid(participant = participant, 
-                                                                    ses = ses, 
-                                                                    pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = participant)],
-                                                                    file_ext = fa_file_ext,
-                                                                    glmsingle_model = 'D', 
-                                                                    trial_num = 132)
+                                                  group_bar_pos_df = group_bar_pos_df)
             
             ## get downsampled FA DM
-            lowres_DM_dict = self.get_lowresDM_dict(DM_dict = FA_DM_dict, 
-                                                    data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)])
-            
-            group_lowres_DM_dict['sub-{sj}'.format(sj = participant)] = lowres_DM_dict
+            group_lowres_DM_dict['sub-{sj}'.format(sj = participant)] = self.get_lowresDM_dict(DM_dict = FA_DM_dict, 
+                                                                                            data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)])
             
         return group_lowres_DM_dict
     
@@ -1517,6 +1474,8 @@ class Decoding_Model(GLMsingle_Model):
         group_run_pos_df_dict = {}
 
         for participant in participant_list:
+            
+            print('Getting bar positions for sub-{sj}'.format(sj = participant)) 
             
             ## get FA bar position dict, across runs
             run_position_df_dict =  self.get_run_position_df_dict(pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = participant)],  

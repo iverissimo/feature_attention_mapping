@@ -10,6 +10,8 @@ import itertools
 from scipy.interpolate import pchip
 import scipy
 
+from tqdm import tqdm
+
 from PIL import Image, ImageDraw
 
 from FAM.fitting.model import Model
@@ -21,6 +23,8 @@ from glmsingle.glmsingle import getcanonicalhrf
 import time
 import cortex
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from IPython.display import HTML, display
 import matplotlib.patches as patches
 import seaborn as sns
 
@@ -1205,39 +1209,39 @@ class Decoding_Model(GLMsingle_Model):
     def get_group_average_stim_dict(self, participant_list = [], reconstructed_stim_dict = None, run_position_df_dict = None, 
                                             lowres_DM_dict = None, bar_type = 'parallel'):
         
-        """Get average stim dict for group
+        """Get average stim dict 
+        averaged across group of participants
         """
         
+        ## get average stim (across unique bar positions) for all participants 
+        average_stim_dict, flip_average_stim_dict = self.get_average_stim_dict(participant_list = participant_list,
+                                                                            reconstructed_stim_dict = reconstructed_stim_dict, 
+                                                                            run_position_df_dict = run_position_df_dict, 
+                                                                            lowres_DM_dict = lowres_DM_dict, 
+                                                                            bar_type = bar_type)
+
         group_average_stim_dict = {}
         group_flip_average_stim_dict = {}
 
-        for participant in participant_list:
-
-            ## get average stim (across unique bar positions) for participant's ROI
-            # and bar type (parallel or crossed)
-            pp_average_stim_dict, pp_flip_average_stim_dict = self.get_pp_average_stim_dict(reconstructed_stim_dict = reconstructed_stim_dict['sub-{sj}'.format(sj = participant)], 
-                                                                                            run_position_df_dict = run_position_df_dict['sub-{sj}'.format(sj = participant)], 
-                                                                                            lowres_DM_dict = lowres_DM_dict['sub-{sj}'.format(sj = participant)], 
-                                                                                            bar_type = bar_type)
-            if participant == participant_list[0]:                 
-                group_average_stim_dict = {keynames1: {keynames2: items2[np.newaxis, ...] for keynames2, items2 in items1.items()} for keynames1, items1 in pp_average_stim_dict.items()}
-                group_flip_average_stim_dict = {keynames1: {keynames2: items2[np.newaxis, ...] for keynames2, items2 in items1.items()} for keynames1, items1 in pp_flip_average_stim_dict.items()}
+        # average across participants
+        for keynames1 in average_stim_dict.keys():
+            
+            group_average_stim_dict[keynames1] = {}
+            group_flip_average_stim_dict[keynames1] = {}
+            
+            for keynames2 in average_stim_dict[keynames1].keys():
                 
-            else:
-                for keynames1 in group_average_stim_dict.keys():
-                    for keynames2 in group_average_stim_dict[keynames1].keys():
-                        
-                        group_average_stim_dict[keynames1][keynames2] = np.vstack((group_average_stim_dict[keynames1][keynames2],
-                                                                                pp_average_stim_dict[keynames1][keynames2][np.newaxis, ...]))
-                        group_flip_average_stim_dict[keynames1][keynames2] = np.vstack((group_flip_average_stim_dict[keynames1][keynames2],
-                                                                                        pp_flip_average_stim_dict[keynames1][keynames2][np.newaxis, ...]))
+                group_average_stim_dict[keynames1][keynames2] = np.mean(average_stim_dict[keynames1][keynames2], axis = 0)
+                group_flip_average_stim_dict[keynames1][keynames2] = np.mean(flip_average_stim_dict[keynames1][keynames2], axis = 0)
 
         return group_average_stim_dict, group_flip_average_stim_dict
+    
+    def get_average_stim_dict(self, participant_list = [], reconstructed_stim_dict = None, run_position_df_dict = None, 
+                                    lowres_DM_dict = None, bar_type = 'parallel'):
         
-        
-    def get_pp_average_stim_dict(self, reconstructed_stim_dict = None, run_position_df_dict = None, lowres_DM_dict = None, bar_type = 'parallel'):
-        
-        """Get average reconstructed stim dict for a participant
+        """For all participants in list
+        create dict with average reconstructed stim
+        collapsed across conditions (where that's possible)
         """
         
         # save results in dict
@@ -1256,37 +1260,46 @@ class Decoding_Model(GLMsingle_Model):
             
                 for bar_dist in bar_dist_list:
                     
-                    ## average over runs
-                    average_stim_all = []
-                    flip_average_stim_all = []
+                    average_stim = []
+                    flip_average_stim = []
                     
-                    ## stack all runs
-                    for snrn_key, snrn_stim in reconstructed_stim_dict.items():
+                    print('Averaging data for parallel bars, for attended bar ecc %s, inter-bar distance %s'%(bar_ecc,str(bar_dist)))
+                    
+                    # iterate over participants
+                    for participant in tqdm(participant_list):
+                    
+                        ## average over runs
+                        pp_average_stim = []
+                        pp_flip_average_stim = []
                         
-                        average_stim_all.append(self.get_parallel_average_stim(reconstructed_stimulus = snrn_stim, 
-                                                                            position_df = run_position_df_dict[snrn_key], 
-                                                                            bar_ecc = bar_ecc, 
-                                                                            abs_inter_bar_dist = bar_dist, 
-                                                                            flipped_stim = False, 
-                                                                            DM_arr = lowres_DM_dict['full_stim'][snrn_key]))
+                        ## stack all runs
+                        for snrn_key, snrn_stim in reconstructed_stim_dict['sub-{sj}'.format(sj = participant)].items():
+                            
+                            pp_average_stim.append(self.get_parallel_average_stim(reconstructed_stimulus = snrn_stim, 
+                                                                                position_df = run_position_df_dict['sub-{sj}'.format(sj = participant)][snrn_key], 
+                                                                                bar_ecc = bar_ecc, 
+                                                                                abs_inter_bar_dist = bar_dist, 
+                                                                                flipped_stim = False, 
+                                                                                DM_arr = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['full_stim'][snrn_key]))
 
-                        # also get average flipped case
-                        flip_average_stim_all.append(self.get_parallel_average_stim(reconstructed_stimulus = snrn_stim, 
-                                                                            position_df = run_position_df_dict[snrn_key], 
-                                                                            bar_ecc = bar_ecc, 
-                                                                            abs_inter_bar_dist = bar_dist, 
-                                                                            flipped_stim = True, 
-                                                                            DM_arr = lowres_DM_dict['full_stim'][snrn_key]))
-                    average_stim_all = np.stack(average_stim_all)
-                    flip_average_stim_all = np.stack(flip_average_stim_all)
-                    
-                    ## average over runs
-                    average_stim = np.mean(average_stim_all, axis = 0)
-                    flip_average_stim = np.mean(flip_average_stim_all, axis = 0)
-                    
+                            # also get average flipped case
+                            pp_flip_average_stim.append(self.get_parallel_average_stim(reconstructed_stimulus = snrn_stim, 
+                                                                                position_df = run_position_df_dict['sub-{sj}'.format(sj = participant)][snrn_key], 
+                                                                                bar_ecc = bar_ecc, 
+                                                                                abs_inter_bar_dist = bar_dist, 
+                                                                                flipped_stim = True, 
+                                                                                DM_arr = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['full_stim'][snrn_key]))
+                        pp_average_stim = np.stack(pp_average_stim)
+                        pp_flip_average_stim = np.stack(pp_flip_average_stim)
+                        
+                        ## average over participant runs 
+                        # and append
+                        average_stim.append(np.median(pp_average_stim, axis = 0)) 
+                        flip_average_stim.append(np.median(pp_flip_average_stim, axis = 0))
+                        
                     # save in dict
-                    average_stim_dict[bar_ecc][bar_dist] = average_stim
-                    flip_average_stim_dict[bar_ecc][bar_dist] = flip_average_stim
+                    average_stim_dict[bar_ecc][bar_dist] = np.stack(average_stim)
+                    flip_average_stim_dict[bar_ecc][bar_dist] = np.stack(flip_average_stim)
                     
         elif bar_type == 'crossed':
             
@@ -1301,37 +1314,47 @@ class Decoding_Model(GLMsingle_Model):
                 # and if crossed bars where equidistant to center or not
                 for same_ecc in [True, False]:
                     
-                    ## average over runs
-                    average_stim_all = []
-                    flip_average_stim_all = []
+                    average_stim = []
+                    flip_average_stim = []
                     
-                    ## stack all runs
-                    for snrn_key, snrn_stim in reconstructed_stim_dict.items():
-                        
-                        average_stim_all.append(self.get_crossed_average_stim(reconstructed_stimulus = snrn_stim, 
-                                                                            position_df = run_position_df_dict[snrn_key], 
-                                                                            bar_ecc = bar_ecc, 
-                                                                            same_ecc = same_ecc,  
-                                                                            flipped_stim = False, 
-                                                                            DM_arr = lowres_DM_dict['full_stim'][snrn_key]))
+                    print('Averaging data for crossed bars, for attended bar ecc %s, bars at same distance = %s'%(bar_ecc, str(same_ecc)))
+                    
+                    # iterate over participants
+                    for participant in tqdm(participant_list):
+                    
+                        ## average over runs
+                        pp_average_stim = []
+                        pp_flip_average_stim = []
+                    
+                        ## stack all runs
+                        for snrn_key, snrn_stim in reconstructed_stim_dict['sub-{sj}'.format(sj = participant)].items():
+                            
+                            pp_average_stim.append(self.get_crossed_average_stim(reconstructed_stimulus = snrn_stim, 
+                                                                                position_df = run_position_df_dict['sub-{sj}'.format(sj = participant)][snrn_key], 
+                                                                                bar_ecc = bar_ecc, 
+                                                                                same_ecc = same_ecc,  
+                                                                                flipped_stim = False, 
+                                                                                DM_arr = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['full_stim'][snrn_key]))
 
-                        # also get average flipped case
-                        flip_average_stim_all.append(self.get_crossed_average_stim(reconstructed_stimulus = snrn_stim, 
-                                                                            position_df = run_position_df_dict[snrn_key], 
-                                                                            bar_ecc = bar_ecc, 
-                                                                            same_ecc = same_ecc, 
-                                                                            flipped_stim = True, 
-                                                                            DM_arr = lowres_DM_dict['full_stim'][snrn_key]))
-                    average_stim_all = np.stack(average_stim_all)
-                    flip_average_stim_all = np.stack(flip_average_stim_all)
-                    
-                    ## average over runs
-                    average_stim = np.mean(average_stim_all, axis = 0)
-                    flip_average_stim = np.mean(flip_average_stim_all, axis = 0)
-                
+                            # also get average flipped case
+                            pp_flip_average_stim.append(self.get_crossed_average_stim(reconstructed_stimulus = snrn_stim, 
+                                                                                position_df = run_position_df_dict['sub-{sj}'.format(sj = participant)][snrn_key],
+                                                                                bar_ecc = bar_ecc, 
+                                                                                same_ecc = same_ecc, 
+                                                                                flipped_stim = True, 
+                                                                                DM_arr = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['full_stim'][snrn_key]))
+
+                        pp_average_stim = np.stack(pp_average_stim)
+                        pp_flip_average_stim = np.stack(pp_flip_average_stim)
+                        
+                        ## average over participant runs 
+                        # and append
+                        average_stim.append(np.median(pp_average_stim, axis = 0)) 
+                        flip_average_stim.append(np.median(pp_flip_average_stim, axis = 0))
+                        
                     # save in dict
-                    average_stim_dict[bar_ecc][int(same_ecc)] = average_stim
-                    flip_average_stim_dict[bar_ecc][int(same_ecc)] = flip_average_stim
+                    average_stim_dict[bar_ecc][int(same_ecc)] = np.stack(average_stim)
+                    flip_average_stim_dict[bar_ecc][int(same_ecc)] = np.stack(flip_average_stim)
                     
         return average_stim_dict, flip_average_stim_dict
         
@@ -1529,5 +1552,210 @@ class Decoding_Model(GLMsingle_Model):
                 palette = sns.color_palette(['black', 'orange', 'green'], 3))
         plt.show()      
                 
+    def animate_parallel_stim(self, participant_list = [], average_stim_dict = None, flip_average_stim_dict = None, 
+                                    run_position_df_dict = None, lowres_DM_dict = None,
+                                    bar_ecc = 'far',  vmin = 0, vmax = .4, cmap = 'plasma', annot = False, 
+                                    roi_name = 'V1', interval=600, filename = None):
         
+        """Create animation with average reconstructed stim for parallel bar positions
+        for attended bar at specific eccentricity
+        """
         
+        ## turn dict into average array, to plot in movie
+        parallel_avg_arr = [np.mean(items1, axis = 0) for keynames1, items1 in average_stim_dict['parallel'][bar_ecc].items()]
+        parallel_avg_arr = np.stack(parallel_avg_arr)
+
+        parallel_flip_avg_arr = [np.mean(items1, axis = 0) for keynames1, items1 in flip_average_stim_dict['parallel'][bar_ecc].items()]
+        parallel_flip_avg_arr = np.stack(parallel_flip_avg_arr)
+        
+        ## get frames of DM with corresponding bar position
+        
+        # get example DM for participant in list
+        pp = participant_list[0]
+        df_key = list(run_position_df_dict['sub-{sj}'.format(sj = pp)].keys())[0]
+        
+        downsample_FA_DM_list = []
+        
+        for i in average_stim_dict['parallel'][bar_ecc].keys():
+
+            DM_trl_ind = self.get_uniq_cond_trl_ind(position_df = run_position_df_dict['sub-{sj}'.format(sj = pp)][df_key], 
+                                                        bar_ecc = bar_ecc, 
+                                                        bars_pos = 'parallel', 
+                                                        bar_dist = i)
+            downsample_FA_DM_list.append(lowres_DM_dict['sub-{sj}'.format(sj = pp)]['full_stim'][df_key][DM_trl_ind])
+                
+        ## initialize base figure
+        fig, axes = plt.subplots(nrows=2, ncols=2, figsize = (10,10))
+
+        fig.suptitle('Reconstructed stim (parallel bars), ROI - %s'%roi_name, fontsize=16)
+    
+        ## set function to update frames
+        def update_parallel_stim(frame, stim_arr = [], flip_stim_arr = [], 
+                                bar_ecc = 'far', dm_list = [],
+                                vmin = 0, vmax = .4, cmap = 'plasma', annot = False):
+            
+            bar_ecc_ind = {'far': 1, 'middle': 2, 'near': 3}
+            bar_dist = 1+frame
+            
+            # clear axis of fig
+            axes[0][0].clear() 
+            axes[1][0].clear() 
+            axes[0][1].clear() 
+            axes[1][1].clear() 
+            
+            ## attended leftmost
+            sns.heatmap(stim_arr[frame], cmap = cmap, ax = axes[0][0], 
+                        square = True, cbar = False,
+                        annot=annot, annot_kws={"size": 7},
+                        vmin = vmin, vmax = vmax)
+            axes[0][0].set_title('Inter-bar distance = %i'%(bar_dist))
+            
+            ## reversed case attend rightmost
+            sns.heatmap(flip_stim_arr[frame], cmap = cmap, ax = axes[1][0], 
+                        square = True, cbar = False,
+                        annot=annot, annot_kws={"size": 7},
+                        vmin = vmin, vmax = vmax)
+
+
+            ## DMs
+            # attend left
+            axes[0][1].imshow(dm_list[frame].T, cmap = 'binary_r', vmax = 1.5)
+            # Add the patch to the Axes
+            axes[0][1].add_patch(patches.Rectangle((bar_ecc_ind[bar_ecc] - .5, -.5), 1, 8, 
+                                                linewidth = 2, edgecolor='purple', 
+                                                facecolor='purple', hatch = '///'))
+            
+            # annotate correlation value between stim and DM
+            corr, pval = scipy.stats.pearsonr(stim_arr[frame].ravel(), 
+                                            dm_list[frame].T.ravel())
+            axes[0][1].set_title(r"$\rho$ = {r}".format(r = '%.2f'%(corr))+\
+                                '   pval = {p}'.format(p = "{:.2e}".format(pval)))
+
+            # attend right
+            axes[1][1].imshow(dm_list[frame].T, cmap = 'binary_r', vmax = 1.5)
+            # Add the patch to the Axes
+            axes[1][1].add_patch(patches.Rectangle(((bar_ecc_ind[bar_ecc] - .5 + bar_dist), -.5), 1, 8, 
+                                                linewidth = 2, edgecolor='green', 
+                                                facecolor='green', hatch = '///'))
+            
+            # annotate correlation value between stim and DM
+            corr, pval = scipy.stats.pearsonr(flip_stim_arr[frame].ravel(), 
+                                            dm_list[frame].T.ravel())
+            axes[1][1].set_title(r"$\rho$ = {r}".format(r = '%.2f'%(corr))+\
+                                '   pval = {p}'.format(p = "{:.2e}".format(pval))) 
+          
+        ## create animation      
+        ani = FuncAnimation(fig, update_parallel_stim, 
+                            frames=range(parallel_avg_arr.shape[0]), 
+                            fargs = (parallel_avg_arr, parallel_flip_avg_arr,
+                                    bar_ecc, downsample_FA_DM_list,
+                                    vmin, vmax, cmap, annot),
+                            interval=interval)
+        
+        return ani
+    
+    def animate_crossed_stim(self, participant_list = [], average_stim_dict = None, flip_average_stim_dict = None, 
+                                    run_position_df_dict = None, lowres_DM_dict = None,
+                                    bar_ecc = 'far',  vmin = 0, vmax = .4, cmap = 'plasma', annot = False, 
+                                    roi_name = 'V1', interval=600, filename = None):
+        
+        """Create animation with average reconstructed stim for crossed bar positions
+        for attended bar at specific eccentricity
+        """
+        
+        ## turn dict into average array, to plot in movie
+        crossed_avg_arr = [np.mean(average_stim_dict['crossed'][bar_ecc][ecc_bool], axis = 0) for ecc_bool in [0, 1]]
+        crossed_avg_arr = np.stack(crossed_avg_arr)
+
+        crossed_flip_avg_arr = [np.mean(flip_average_stim_dict['crossed'][bar_ecc][ecc_bool], axis = 0) for ecc_bool in [0, 1]]
+        crossed_flip_avg_arr = np.stack(crossed_flip_avg_arr)
+        
+        ## get frames of DM with corresponding bar position
+        
+        # get example DM for participant in list
+        pp = participant_list[0]
+        df_key = list(run_position_df_dict['sub-{sj}'.format(sj = pp)].keys())[0]
+        
+        downsample_FA_DM_list = []
+        
+        for i in [0, 1]:
+
+            DM_trl_ind = self.get_uniq_cond_trl_ind(position_df = run_position_df_dict['sub-{sj}'.format(sj = pp)][df_key], 
+                                                    bar_ecc = bar_ecc, 
+                                                    bars_pos = 'crossed', 
+                                                    same_ecc = i)
+            downsample_FA_DM_list.append(lowres_DM_dict['sub-{sj}'.format(sj = pp)]['full_stim'][df_key][DM_trl_ind])
+                
+        ## initialize base figure
+        fig, axes = plt.subplots(nrows=2, ncols=2, figsize = (10,10))
+
+        fig.suptitle('Reconstructed stim (crossed bars), ROI - %s'%roi_name, fontsize=16)
+    
+        ## set function to update frames
+        def update_crossed_stim(frame, stim_arr = [], flip_stim_arr = [], 
+                                bar_ecc = 'far', dm_list = [],
+                                vmin = 0, vmax = .4, cmap = 'plasma', annot = False):
+            
+            bar_ecc_ind = {'far': 1, 'middle': 2, 'near': 3}
+            # make reference dict with unique conditions of attended and unattend
+            uniq_cond_dict = {'far': 'near', 'near': 'middle', 'middle': 'far'}
+
+            # bar ecc list of attended and unattended bar
+            bar_ecc_list = [bar_ecc, bar_ecc] if frame == 1 else [bar_ecc, uniq_cond_dict[bar_ecc]]
+            
+            # clear axis of fig
+            axes[0][0].clear() 
+            axes[1][0].clear() 
+            axes[0][1].clear() 
+            axes[1][1].clear() 
+            
+            ## attended leftmost
+            sns.heatmap(stim_arr[frame], cmap = cmap, ax = axes[0][0], 
+                        square = True, cbar = False,
+                        annot=annot, annot_kws={"size": 7},
+                        vmin = vmin, vmax = vmax)
+            axes[0][0].set_title('Same eccentricity = %s'%(str(bool(frame))))
+            
+            ## reversed case attend upper
+            sns.heatmap(flip_stim_arr[frame], cmap = cmap, ax = axes[1][0], 
+                        square = True, cbar = False,
+                        annot=annot, annot_kws={"size": 7},
+                        vmin = vmin, vmax = vmax)
+
+            ## DMs
+            # attend left
+            axes[0][1].imshow(dm_list[frame].T, cmap = 'binary_r', vmax = 1.5)
+            # Add the patch to the Axes
+            axes[0][1].add_patch(patches.Rectangle((bar_ecc_ind[bar_ecc_list[0]] - .5, -.5), 1, 8, 
+                                                    linewidth = 2, edgecolor='purple', 
+                                                    facecolor='purple', hatch = '///'))
+            
+            # annotate correlation value between stim and DM
+            corr, pval = scipy.stats.pearsonr(stim_arr[frame].ravel(), 
+                                            dm_list[frame].T.ravel())
+            axes[0][1].set_title(r"$\rho$ = {r}".format(r = '%.2f'%(corr))+\
+                                '   pval = {p}'.format(p = "{:.2e}".format(pval)))
+
+            # attend up
+            axes[1][1].imshow(dm_list[frame].T, cmap = 'binary_r', vmax = 1.5)
+            # Add the patch to the Axes
+            axes[1][1].add_patch(patches.Rectangle((-.5, bar_ecc_ind[bar_ecc_list[1]] - .5), 8, 1, 
+                                                    angle=0.0,
+                                                    linewidth = 2, edgecolor='green', 
+                                                    facecolor='green', hatch = '///'))
+            
+            # annotate correlation value between stim and DM
+            corr, pval = scipy.stats.pearsonr(flip_stim_arr[frame].ravel(), 
+                                            dm_list[frame].T.ravel())
+            axes[1][1].set_title(r"$\rho$ = {r}".format(r = '%.2f'%(corr))+\
+                                '   pval = {p}'.format(p = "{:.2e}".format(pval))) 
+          
+        ## create animation      
+        ani = FuncAnimation(fig, update_crossed_stim, 
+                            frames=range(crossed_avg_arr.shape[0]), 
+                            fargs = (crossed_avg_arr, crossed_flip_avg_arr,
+                                    bar_ecc, downsample_FA_DM_list,
+                                    vmin, vmax, cmap, annot),
+                            interval=interval)
+        
+        return ani

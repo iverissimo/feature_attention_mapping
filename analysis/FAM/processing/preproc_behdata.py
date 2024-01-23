@@ -77,8 +77,25 @@ class PreprocBeh:
             # loop over tasks
             for tsk in tasks:
                 
-                events_files = [op.join(input_pth,x) for x in os.listdir(input_pth) if 'task-{tsk}'.format(tsk=tsk) in x \
-                                and x.endswith(self.MRIObj.events_ext)]
+                # if looking at func session
+                if ses_type == 'func':
+                    # first get bold file list 
+                    bold_files = [x for x in os.listdir(input_pth) if 'task-{tname}'.format(tname = tsk) in x and x.endswith('_bold.nii.gz')]
+                    # get run and ses_num identifier
+                    ses_run_ids = ['{sn}_task-{tname}_run-{rn}'.format(sn = ses, 
+                                                                    tname = tsk,
+                                                                    rn = self.MRIObj.mri_utils.get_run_ses_from_str(file)[0]) for file in bold_files]
+                    # get unique identifiers
+                    ses_run_ids = np.unique(ses_run_ids) 
+                    
+                    # get bar position file names
+                    events_files = [op.join(input_pth, 'sub-{sj}_{srid}{fext}'.format(sj = participant,
+                                                                                srid = sn_rn_id,
+                                                                                fext = self.MRIObj.events_ext)
+                                        ) for sn_rn_id in ses_run_ids]          
+                else:
+                    events_files = [op.join(input_pth,x) for x in os.listdir(input_pth) if 'task-{tsk}'.format(tsk=tsk) in x \
+                                    and x.endswith(self.MRIObj.events_ext)]
                 
                 print('{nr} events files found for task-{tsk}'.format(nr=len(events_files),
                                                                      tsk=tsk))
@@ -87,15 +104,12 @@ class PreprocBeh:
                 events_df[tsk] = {}
                 
                 # for each run
-                for r in np.arange(self.MRIObj.mri_nr_runs):
-
-                    run_filename = [val for val in events_files if 'run-{r}'.format(r=(r+1)) in val]
-                    if len(run_filename) == 0:
-                        print('No events file for run-{r}'.format(r=(r+1)))
+                for run_filename in events_files:
+                    if op.isfile(run_filename):
+                        print('Loading {f}'.format(f=op.split(run_filename)[-1]))
+                        events_df[tsk]['run-{r}'.format(r=self.MRIObj.mri_utils.get_run_ses_from_str(run_filename)[0])] = pd.read_csv(run_filename, sep='\t')
                     else:
-                        print('Loading {f}'.format(f=op.split(run_filename[0])[-1]))
-                        df_run = pd.read_csv(run_filename[0], sep='\t')
-                        events_df[tsk]['run-{r}'.format(r=(r+1))] = df_run
+                        print('No events file for run-{r}'.format(r=self.MRIObj.mri_utils.get_run_ses_from_str(run_filename)[0]))
         
         return events_df
     
@@ -132,9 +146,26 @@ class PreprocBeh:
             # loop over tasks
             for tsk in tasks:
                 
-                tf_files = [op.join(input_pth,x) for x in os.listdir(input_pth) if 'task-{tsk}'.format(tsk=tsk) in x \
-                                and x.endswith(self.MRIObj.trial_info_ext)]
-                
+                # if looking at func session
+                if ses_type == 'func':
+                    # first get bold file list 
+                    bold_files = [x for x in os.listdir(input_pth) if 'task-{tname}'.format(tname = tsk) in x and x.endswith('_bold.nii.gz')]
+                    # get run and ses_num identifier
+                    ses_run_ids = ['{sn}_task-{tname}_run-{rn}'.format(sn = ses, 
+                                                                    tname = tsk,
+                                                                    rn = self.MRIObj.mri_utils.get_run_ses_from_str(file)[0]) for file in bold_files]
+                    # get unique identifiers
+                    ses_run_ids = np.unique(ses_run_ids) 
+                    
+                    # get bar position file names
+                    tf_files = [op.join(input_pth, 'sub-{sj}_{srid}{fext}'.format(sj = participant,
+                                                                                srid = sn_rn_id,
+                                                                                fext = self.MRIObj.trial_info_ext)
+                                        ) for sn_rn_id in ses_run_ids]          
+                else:
+                    tf_files = [op.join(input_pth,x) for x in os.listdir(input_pth) if 'task-{tsk}'.format(tsk=tsk) in x \
+                                    and x.endswith(self.MRIObj.trial_info_ext)]
+                    
                 print('{nr} trial info files found for task-{tsk}'.format(nr=len(tf_files),
                                                                      tsk=tsk))
                 
@@ -142,15 +173,12 @@ class PreprocBeh:
                 trial_info_df[tsk] = {}
                 
                 # for each run
-                for r in np.arange(self.MRIObj.mri_nr_runs):
-
-                    run_filename = [val for val in tf_files if 'run-{r}'.format(r=(r+1)) in val]
-                    if len(run_filename) == 0:
-                        print('No trial info file for run-{r}'.format(r=(r+1)))
+                for run_filename in tf_files:
+                    if op.isfile(run_filename):
+                        print('Loading {f}'.format(f=op.split(run_filename)[-1]))
+                        trial_info_df[tsk]['run-{r}'.format(r=self.MRIObj.mri_utils.get_run_ses_from_str(run_filename)[0])] = pd.read_csv(run_filename)
                     else:
-                        print('Loading {f}'.format(f=op.split(run_filename[0])[-1]))
-                        df_run = pd.read_csv(run_filename[0])
-                        trial_info_df[tsk]['run-{r}'.format(r=(r+1))] = df_run
+                        print('No trial info file for run-{r}'.format(r=self.MRIObj.mri_utils.get_run_ses_from_str(run_filename)[0]))
         
         return trial_info_df
 

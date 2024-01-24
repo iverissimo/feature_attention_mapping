@@ -1294,8 +1294,8 @@ class Decoding_Model(GLMsingle_Model):
                         
                         ## average over participant runs 
                         # and append
-                        average_stim.append(np.median(pp_average_stim, axis = 0)) 
-                        flip_average_stim.append(np.median(pp_flip_average_stim, axis = 0))
+                        average_stim.append(np.mean(pp_average_stim, axis = 0)) 
+                        flip_average_stim.append(np.mean(pp_flip_average_stim, axis = 0))
                         
                     # save in dict
                     average_stim_dict[bar_ecc][bar_dist] = np.stack(average_stim)
@@ -1349,8 +1349,8 @@ class Decoding_Model(GLMsingle_Model):
                         
                         ## average over participant runs 
                         # and append
-                        average_stim.append(np.median(pp_average_stim, axis = 0)) 
-                        flip_average_stim.append(np.median(pp_flip_average_stim, axis = 0))
+                        average_stim.append(np.mean(pp_average_stim, axis = 0)) 
+                        flip_average_stim.append(np.mean(pp_flip_average_stim, axis = 0))
                         
                     # save in dict
                     average_stim_dict[bar_ecc][int(same_ecc)] = np.stack(average_stim)
@@ -1652,7 +1652,10 @@ class Decoding_Model(GLMsingle_Model):
                                     vmin, vmax, cmap, annot),
                             interval=interval)
         
-        return ani
+        if filename is None:
+            return ani
+        else:
+            ani.save(filename=filename, writer="ffmpeg") # save mp4 file
     
     def animate_crossed_stim(self, participant_list = [], average_stim_dict = None, flip_average_stim_dict = None, 
                                     run_position_df_dict = None, lowres_DM_dict = None,
@@ -1758,4 +1761,307 @@ class Decoding_Model(GLMsingle_Model):
                                     vmin, vmax, cmap, annot),
                             interval=interval)
         
-        return ani
+        if filename is None:
+            return ani
+        else:
+            ani.save(filename=filename, writer="ffmpeg") # save mp4 file
+
+    def plot_decoder_results(self, participant_list = [], ROI_list = ['V1'], model_type = 'gauss_hrf',
+                        prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean', fa_file_ext = '_cropped.nii.gz',
+                        mask_bool_df = None, stim_on_screen = [], group_bar_pos_df = []):
+        
+        """plot reconstructed stim averaged over unique conditions
+        for all participants and ROIs
+        """
+        
+        # make dir to save estimates
+        fig_dir = op.join(self.MRIObj.derivatives_pth, 'plots', 'reconstructed_stim')
+        fig_id = 'sub-GROUP_task-FA_model-{modname}_reconstructed_stim'.format(modname = model_type)
+        
+        if len(participant_list) == 1:
+            pp = participant_list[0]
+            fig_dir = op.join(fig_dir, 'sub-{sj}'.format(sj = pp))
+            fig_id = fig_id.replace('sub-GROUP', 'sub-{sj}'.format(sj = pp)) 
+        
+        os.makedirs(fig_dir, exist_ok = True)
+        print('saving figures in %s'%fig_dir)
+        
+        ## load participant data keys
+        # for reference later on
+        data_keys_dict = self.load_group_data_keys(participant_list = participant_list, 
+                                                group_bar_pos_df = group_bar_pos_df)
+        
+        ## get downsampled FA DM for group
+        lowres_DM_dict = self.load_group_DM_dict(participant_list = participant_list, 
+                                                group_bar_pos_df = group_bar_pos_df, 
+                                                data_keys_dict = data_keys_dict)
+        
+        ## get FA bar position dict, across runs, for group
+        run_position_df_dict = self.load_group_run_position_df_dict(participant_list = participant_list, 
+                                                                    group_bar_pos_df = group_bar_pos_df,  
+                                                                    data_keys_dict = data_keys_dict)
+        
+        # iterate over ROIs             
+        for roi_name in ROI_list:
+            
+            base_filename = op.join(fig_dir, fig_id+'_ROI-{rname}'.format(rname = roi_name))
+            
+            print('Plotting decoder results for ROI %s'%roi_name)
+            
+            ## load reconstructed stim
+            reconstructed_stim_dict = self.load_group_decoded_stim_dict(participant_list = participant_list, 
+                                                                        roi_name = roi_name,
+                                                                        model_type = model_type, 
+                                                                        data_keys_dict = data_keys_dict)
+            
+            # set vmax for plots, at 90% of value distribution
+            all_pix_values = np.array([items2.values.ravel() for keynames1, items1 in reconstructed_stim_dict.items() for keynames2, items2 in items1.items()])
+            all_pix_values = all_pix_values.ravel()
+            vmax = np.quantile(all_pix_values, .85)
+            print('setting vmax as %.2f'%vmax)
+               
+            # prin correlation values, just to check         
+            if len(participant_list) == 1:
+                
+                ## correlate reconstructed stim with downsampled DM across runs
+                for ind, df_key in enumerate(data_keys_dict['sub-{sj}'.format(sj = pp)]):
+                    
+                    corr, pval = scipy.stats.pearsonr(reconstructed_stim_dict['sub-{sj}'.format(sj = pp)][df_key].values.ravel(), 
+                                                    lowres_DM_dict['sub-{sj}'.format(sj = pp)]['full_stim'][df_key].ravel())
+                    print('correlation between reconstructed stim and DM is %.2f, %.2f'%(corr, pval))
+
+                ## find trials where attended bar and unattended bar in same position
+                same_bar_pos_ind_dict = self.get_same_bar_pos_ind_dict(lowresDM_dict = lowres_DM_dict['sub-{sj}'.format(sj = pp)], 
+                                                                        data_keys = data_keys_dict['sub-{sj}'.format(sj = pp)])
+
+                for ind, df_key in enumerate(data_keys_dict['sub-{sj}'.format(sj = pp)]):
+                    
+                    corr, pval = scipy.stats.pearsonr(reconstructed_stim_dict['sub-{sj}'.format(sj = pp)][df_key].values[same_bar_pos_ind_dict[df_key][:,0]].ravel(), 
+                                                    reconstructed_stim_dict['sub-{sj}'.format(sj = pp)][df_key].values[same_bar_pos_ind_dict[df_key][:,1]].ravel())
+                    print('correlation between trials where\nattended bar and unattended bar in same position is %.2f, %.2f'%(corr, pval))
+                    
+            ## get average stim (across unique bar positions) for all participant's ROI
+            # and bar type (parallel or crossed)
+
+            average_stim_dict = {'parallel': {}, 'crossed': {}}
+            flip_average_stim_dict = {'parallel': {}, 'crossed': {}}
+
+            average_stim_dict['parallel'], flip_average_stim_dict['parallel'] = self.get_average_stim_dict(participant_list = participant_list,
+                                                                                                        reconstructed_stim_dict = reconstructed_stim_dict, 
+                                                                                                        run_position_df_dict = run_position_df_dict, 
+                                                                                                        lowres_DM_dict = lowres_DM_dict, 
+                                                                                                        bar_type = 'parallel')
+            
+            average_stim_dict['crossed'], flip_average_stim_dict['crossed'] = self.get_average_stim_dict(participant_list = participant_list,
+                                                                                                        reconstructed_stim_dict = reconstructed_stim_dict, 
+                                                                                                        run_position_df_dict = run_position_df_dict, 
+                                                                                                        lowres_DM_dict = lowres_DM_dict, 
+                                                                                                        bar_type = 'crossed')
+
+            ## create animation 
+            # for the different ecc
+            for bar_ecc in ['far', 'middle', 'near']:
+                
+                # for parallel bars
+                self.animate_parallel_stim(participant_list = participant_list, 
+                                        average_stim_dict = average_stim_dict, 
+                                        flip_average_stim_dict = flip_average_stim_dict, 
+                                        run_position_df_dict = run_position_df_dict, 
+                                        lowres_DM_dict = lowres_DM_dict,
+                                        bar_ecc = bar_ecc,  
+                                        vmin = 0, 
+                                        vmax = vmax, 
+                                        cmap = 'magma', 
+                                        annot = False, 
+                                        roi_name = roi_name, 
+                                        interval = 800, 
+                                        filename = base_filename+'_barPOS-parallel_barECC-{be}.mp4'.format(be = bar_ecc))
+                
+                # for crossed bars
+                self.animate_crossed_stim(participant_list = participant_list, 
+                                        average_stim_dict = average_stim_dict, 
+                                        flip_average_stim_dict = flip_average_stim_dict, 
+                                        run_position_df_dict = run_position_df_dict, 
+                                        lowres_DM_dict = lowres_DM_dict,
+                                        bar_ecc = bar_ecc,  
+                                        vmin = 0, 
+                                        vmax = vmax, 
+                                        cmap = 'magma', 
+                                        annot = False, 
+                                        roi_name = roi_name, 
+                                        interval = 800, 
+                                        filename = base_filename+'_barPOS-crossed_barECC-{be}.mp4'.format(be = bar_ecc))
+                
+            ## plot png of panels too, with annotation of values
+            ## PARALLEL BARS ##
+            pp = participant_list[0]
+            df_key = list(run_position_df_dict['sub-{sj}'.format(sj = pp)].keys())[0]
+
+            for bar_ecc in average_stim_dict['parallel'].keys():
+                for bar_dist in average_stim_dict['parallel'][bar_ecc].keys():
+                    
+                    # get frame of DM with corresponding bar position
+                    DM_trl_ind = self.get_uniq_cond_trl_ind(position_df = run_position_df_dict['sub-{sj}'.format(sj = pp)][df_key], 
+                                                            bar_ecc = bar_ecc, 
+                                                            bars_pos = 'parallel', 
+                                                            bar_dist = bar_dist)
+
+                    ## plot figure
+                    self.plot_avg_parallel_stim(average_stim = np.mean(average_stim_dict['parallel'][bar_ecc][bar_dist], axis = 0), 
+                                                flip_average_stim = np.mean(flip_average_stim_dict['parallel'][bar_ecc][bar_dist], axis = 0), 
+                                                DM_trl_ind = DM_trl_ind,
+                                                bar_ecc = bar_ecc, 
+                                                bar_dist = bar_dist, 
+                                                downsample_FA_DM = lowres_DM_dict['sub-{sj}'.format(sj = pp)]['full_stim'][df_key], 
+                                                vmin = 0, 
+                                                vmax = vmax, 
+                                                cmap = 'magma',
+                                                annot = True,
+                                                filename = base_filename+'_barPOS-parallel_barECC-{be}_barDIST-{bd}.png'.format(be = bar_ecc,
+                                                                                                                               bd = bar_dist))
+                
+            ## CROSSED BARS ##
+            for bar_ecc in average_stim_dict['crossed'].keys():
+                for same_ecc in average_stim_dict['crossed'][bar_ecc].keys():
+                
+                    # get frame of DM with corresponding bar position
+                    DM_trl_ind = self.get_uniq_cond_trl_ind(position_df = run_position_df_dict['sub-{sj}'.format(sj = pp)][df_key], 
+                                                            bar_ecc = bar_ecc, 
+                                                            bars_pos = 'crossed', 
+                                                            same_ecc = same_ecc)
+
+                    ## plot figure
+                    self.plot_avg_crossed_stim(average_stim = np.mean(average_stim_dict['crossed'][bar_ecc][same_ecc], axis = 0), 
+                                                flip_average_stim = np.mean(flip_average_stim_dict['crossed'][bar_ecc][same_ecc], axis = 0), 
+                                                DM_trl_ind = DM_trl_ind,
+                                                bar_ecc = bar_ecc, 
+                                                same_ecc = same_ecc, 
+                                                downsample_FA_DM = lowres_DM_dict['sub-{sj}'.format(sj = pp)]['full_stim'][df_key], 
+                                                vmin = 0, 
+                                                vmax = vmax, 
+                                                cmap = 'magma', 
+                                                annot = True,
+                                    filename = base_filename+'_barPOS-crossed_barECC-{be}_barDIST-{bd}.png'.format(be = bar_ecc,
+                                                                                                                   bd = str(bool(same_ecc))))
+                
+    def get_bar_drive(self, participant_list = [], average_stim_dict = None, flip_average_stim_dict = None, 
+                            run_position_df_dict = None, lowres_DM_dict = None,
+                            bar_type = 'parallel'):
+        
+        """Get average drive value within bar
+        returns dataframe with drive values
+        """
+        
+        output_df = []
+        
+        if bar_type == 'parallel':
+            
+            ## reference dict with bar ecc for cond and flipped case
+            bar_ecc_ind = {'far': 1, 'middle': 2, 'near': 3}
+            flip_bar_ecc = np.array(['far', 'middle', 'near', 'near', 'middle', 'far'])
+
+            pp = participant_list[0]
+            df_key = list(run_position_df_dict['sub-{sj}'.format(sj = pp)].keys())[0]
+
+            for bar_ecc in average_stim_dict['parallel'].keys():
+                
+                for bar_dist in average_stim_dict['parallel'][bar_ecc].keys():
+                    
+                    # get frame of DM with corresponding bar position
+                    DM_trl_ind = self.get_uniq_cond_trl_ind(position_df = run_position_df_dict['sub-{sj}'.format(sj = pp)][df_key], 
+                                                            bar_ecc = bar_ecc, 
+                                                            bars_pos = 'parallel', 
+                                                            bar_dist = bar_dist)
+
+                    # get dm array, for masking
+                    dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = pp)]['full_stim'][df_key][DM_trl_ind]
+                    att_dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = pp)]['att_bar'][df_key][DM_trl_ind]
+                    unatt_dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = pp)]['unatt_bar'][df_key][DM_trl_ind]
+
+                    # attended bar drives
+                    att_drive1 = [np.median(average_stim_dict['parallel'][bar_ecc][bar_dist][i][np.where(att_dm_arr.T)], axis = 0) for i in range(len(participant_list))]
+                    att_drive2 = [np.median(flip_average_stim_dict['parallel'][bar_ecc][bar_dist][i][np.where(unatt_dm_arr.T)], axis = 0) for i in range(len(participant_list))]
+                    att_drive = np.stack((att_drive1, att_drive2))
+
+                    # unattended bar drives
+                    unatt_drive1 = [np.median(average_stim_dict['parallel'][bar_ecc][bar_dist][i][np.where(unatt_dm_arr.T)], axis = 0) for i in range(len(participant_list))]
+                    unatt_drive2 = [np.median(flip_average_stim_dict['parallel'][bar_ecc][bar_dist][i][np.where(att_dm_arr.T)], axis = 0) for i in range(len(participant_list))]
+                    unatt_drive = np.stack((unatt_drive1, unatt_drive2))
+                    
+                    # first store values as dict
+                    drive_dict = {'sj': np.stack((participant_list for i in range(4))),
+                                'bar_type': np.repeat(['att_bar', 'unatt_bar'], 2)[...,np.newaxis],
+                                'bar_ecc': np.tile([bar_ecc, flip_bar_ecc[bar_ecc_ind[bar_ecc] + bar_dist - 1]], 2)[...,np.newaxis],
+                                'drive': np.vstack((att_drive, unatt_drive))}
+
+                    # then convert to data frame
+                    drive_df = pd.DataFrame({k:list(v) for k,v in drive_dict.items()}).explode(['sj', 'drive'], ignore_index = True)
+                    drive_df.loc[:,'bar_type'] = drive_df['bar_type'].map(lambda x: x[0])
+                    drive_df.loc[:,'bar_ecc'] = drive_df['bar_ecc'].map(lambda x: x[0])
+                    drive_df.loc[:,'bar_dist'] = bar_dist
+                    drive_df.loc[:,'bar_orientation'] = 'parallel'
+                    
+                    ## finally append in outdict
+                    output_df.append(drive_df)
+                    
+        elif bar_type == 'crossed':
+            
+            uniq_cond_dict = {'far': 'near', 'near': 'middle', 'middle': 'far'}
+
+            pp = participant_list[0]
+            df_key = list(run_position_df_dict['sub-{sj}'.format(sj = pp)].keys())[0]
+
+            for bar_ecc in average_stim_dict['crossed'].keys():
+                
+                for same_ecc in average_stim_dict['crossed'][bar_ecc].keys():
+                    
+                    # bar ecc list of attended and unattended bar
+                    bar_ecc_list = [bar_ecc, bar_ecc] if same_ecc == True else [bar_ecc, uniq_cond_dict[bar_ecc]]
+
+                    # get frame of DM with corresponding bar position
+                    DM_trl_ind = self.get_uniq_cond_trl_ind(position_df = run_position_df_dict['sub-{sj}'.format(sj = pp)][df_key], 
+                                                            bar_ecc = bar_ecc, 
+                                                            bars_pos = 'crossed', 
+                                                            same_ecc = same_ecc)
+
+                    # get dm array, for masking
+                    dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = pp)]['full_stim'][df_key][DM_trl_ind]
+                    att_dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = pp)]['att_bar'][df_key][DM_trl_ind]
+                    unatt_dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = pp)]['unatt_bar'][df_key][DM_trl_ind]
+
+                    # attended bar drives
+                    att_drive1 = [np.median(average_stim_dict['crossed'][bar_ecc][same_ecc][i][np.where(att_dm_arr.T)], axis = 0) for i in range(len(participant_list))]
+                    att_drive2 = [np.median(flip_average_stim_dict['crossed'][bar_ecc][same_ecc][i][np.where(unatt_dm_arr.T)], axis = 0) for i in range(len(participant_list))]
+                    att_drive = np.stack((att_drive1, att_drive2))
+
+                    # unattended bar drives
+                    unatt_drive1 = [np.median(average_stim_dict['crossed'][bar_ecc][same_ecc][i][np.where(unatt_dm_arr.T)], axis = 0) for i in range(len(participant_list))]
+                    unatt_drive2 = [np.median(flip_average_stim_dict['crossed'][bar_ecc][same_ecc][i][np.where(att_dm_arr.T)], axis = 0) for i in range(len(participant_list))]
+                    unatt_drive = np.stack((unatt_drive1, unatt_drive2))
+
+                    # first store values as dict
+                    drive_dict = {'sj': np.stack((participant_list for i in range(4))),
+                                'bar_type': np.repeat(['att_bar', 'unatt_bar'], 2)[...,np.newaxis],
+                                'bar_ecc': np.tile(bar_ecc_list, 2)[...,np.newaxis],
+                                'drive': np.vstack((att_drive, unatt_drive))}
+
+                    # then convert to data frame
+                    drive_df = pd.DataFrame({k:list(v) for k,v in drive_dict.items()}).explode(['sj', 'drive'], ignore_index = True)
+                    drive_df.loc[:,'bar_type'] = drive_df['bar_type'].map(lambda x: x[0])
+                    drive_df.loc[:,'bar_ecc'] = drive_df['bar_ecc'].map(lambda x: x[0])
+                    drive_df.loc[:,'bar_dist'] = bool(same_ecc)
+                    drive_df.loc[:,'bar_orientation'] = 'crossed'
+
+                    ## finally append in outdict
+                    output_df.append(drive_df)
+              
+        # turn into full df      
+        output_df = pd.concat(output_df, ignore_index = True)
+            
+        return output_df
+                    
+                    
+                    
+
+                                
+        

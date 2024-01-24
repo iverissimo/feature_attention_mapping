@@ -32,7 +32,7 @@ import nibabel as nib
 import neuropythy
 
 import braincoder
-from braincoder.models import GaussianPRF2DWithHRF, GaussianPRF2D
+from braincoder.models import GaussianPRF2DWithHRF, GaussianPRF2D, DifferenceOfGaussiansPRF2DWithHRF
 from braincoder.hrf import SPMHRFModel
 from braincoder.optimize import ParameterFitter, ResidualFitter, StimulusFitter
 
@@ -1028,25 +1028,27 @@ class Decoding_Model(GLMsingle_Model):
         Fit PRF parameters (encoding model)
         """
         
-        ## set prf model 
-        # first without hrf
-        prf_decoder_model = self.setup_prf_model(data = data, grid_coordinates = grid_coordinates, 
-                                                model_type = model_type,
-                                                paradigm = paradigm, 
-                                                fit_hrf = False)    
-        
+        # if we want to fit the hrf
+        fit_hrf = True if 'hrf' in model_type else False
+                
         # if there is a pars file already, just load it
         if filename is not None and op.isfile(filename):
             print('Loading pRF fit parameters stored in %s'%filename)
             output_pars = pd.read_hdf(filename).astype(np.float32)  
             
-            # if we fitted the hrf, then reload prf model accordingly
-            if 'hrf' in model_type:
-                prf_decoder_model = self.setup_prf_model(data = data, grid_coordinates = grid_coordinates, 
-                                                model_type = model_type,
-                                                paradigm = paradigm, 
-                                                fit_hrf = True) 
+            # reload prf model accordingly            
+            prf_decoder_model = self.setup_prf_model(data = data, grid_coordinates = grid_coordinates, 
+                                                    model_type = model_type,
+                                                    paradigm = paradigm, 
+                                                    fit_hrf = fit_hrf) 
         else:
+            ## set gauss prf model 
+            # first without hrf
+            prf_decoder_model = self.setup_prf_model(data = data, grid_coordinates = grid_coordinates, 
+                                                    model_type = 'gauss_hrf',
+                                                    paradigm = paradigm, 
+                                                    fit_hrf = False)  
+        
             # We set up a parameter fitter
             par_fitter = ParameterFitter(model = prf_decoder_model, 
                                         data = data, 
@@ -1076,15 +1078,12 @@ class Decoding_Model(GLMsingle_Model):
             pars_gd = par_fitter.fit(init_pars=refined_grid_pars, learning_rate=1e-2, max_n_iterations=5000,
                                             min_n_iterations=100,
                                             r2_atol=0.0001)
-            # ## plot diagnostic figure 
-            # self.plot_prf_diagnostics(pars_grid = grid_pars, pars_gd = pars_gd, pars_fitter = par_fitter,
-            #                             par_keys=['ols', 'gd'], figurename = None)
             
             ## now fit the hrf, if such is the case
             if 'hrf' in model_type:
                 # redefine model
                 prf_decoder_model = self.setup_prf_model(data = data, grid_coordinates = grid_coordinates, 
-                                                model_type = model_type,
+                                                model_type = 'gauss_hrf',
                                                 paradigm = paradigm, 
                                                 fit_hrf = True)  
                 # and fitter
@@ -1101,10 +1100,57 @@ class Decoding_Model(GLMsingle_Model):
                                                 r2_atol=0.0001) 
             else:
                 output_pars = pars_gd
-        
+                
+            # save gauss estimates
             if filename is not None:
-                print('Saving pRF fit parameters in %s'%filename)
-                output_pars.to_hdf(filename, key='df_pars', mode='w', index = False)  
+                print('Saving Gauss pRF fit parameters in %s'%filename.replace(model_type, 'gauss_hrf'))
+                output_pars.to_hdf(filename.replace(model_type, 'gauss_hrf'), 
+                                   key='df_pars', mode='w', index = False) 
+                
+            ## now run other models, 
+            # if such is the case
+            if model_type == 'dog_hrf':
+                
+                prf_decoder_model = self.setup_prf_model(data = data, grid_coordinates = grid_coordinates, 
+                                                        model_type = model_type,
+                                                        paradigm = paradigm, 
+                                                        fit_hrf = fit_hrf) 
+                
+                # initialize DoG model with gauss fit pars
+                pars_dog_init = output_pars.copy()
+                
+                # This is the relative amplitude of the inhibitory receptive field
+                # compared to the excitatory one.
+                pars_dog_init['srf_amplitude'] = 0.1
+
+                # This is the relative size of the inhibitory receptive field
+                # compared to the excitatory one.
+                pars_dog_init['srf_size'] = 2.
+
+                # Let's set up a new parameterfitter
+                par_fitter_dog = ParameterFitter(model = prf_decoder_model, 
+                                                 data = data, 
+                                                 paradigm = paradigm)
+
+                # Note how, for now, we are not optimizing the HRF parameters.
+                pars_dog = par_fitter_dog.fit(init_pars = pars_dog_init, 
+                                            learning_rate = 1e-2, max_n_iterations = 5000,
+                                            min_n_iterations = 100,
+                                            r2_atol=0.0001,
+                                            fixed_pars = ['hrf_delay', 'hrf_dispersion'])
+                
+                # Now we optimize _with_ the HRF parameters
+                if fit_hrf:
+                    output_pars = par_fitter_dog.fit(init_pars = pars_dog, learning_rate=1e-2, max_n_iterations=5000,
+                                                    min_n_iterations=100,
+                                                    r2_atol=0.0001)
+                else:
+                    output_pars = pars_dog
+
+                # save estimates
+                if filename is not None:
+                    print('Saving pRF fit parameters in %s'%filename)
+                    output_pars.to_hdf(filename, key='df_pars', mode='w', index = False)  
         
         return prf_decoder_model, output_pars
     
@@ -1415,6 +1461,14 @@ class Decoding_Model(GLMsingle_Model):
                                                     paradigm = paradigm,
                                                     hrf_model = hrf_model,
                                                     flexible_hrf_parameters = fit_hrf)
+            
+        elif model_type == 'dog_hrf':
+            # (DoG with HRF)
+            prf_decoder_model = DifferenceOfGaussiansPRF2DWithHRF(data = data,
+                                                                grid_coordinates = grid_coordinates, 
+                                                                paradigm = paradigm,
+                                                                hrf_model = hrf_model,
+                                                                flexible_hrf_parameters = fit_hrf)
         
         return prf_decoder_model
         

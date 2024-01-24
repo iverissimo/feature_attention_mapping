@@ -229,7 +229,7 @@ match task:
             FAM_Decoder.fit_decoder(participant_list = FAM_data.sj_num, 
                                     ROI_list = ['V1','V2','V3','V3AB','LO','hV4'], #['V1'], 
                                     overwrite = True, 
-                                    model_type = 'gauss_hrf',
+                                    model_type = 'dog_hrf', #'gauss_hrf',
                                     ses = 'mean', 
                                     prf_file_ext =  FAM_mri.get_mrifile_ext(nifti_file = True)['pRF'], 
                                     fa_file_ext = '_cropped.nii.gz',

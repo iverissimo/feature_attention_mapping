@@ -208,7 +208,7 @@ class MRIUtils(Utils):
         print('combining masks')
         
         # load images 
-        mask_imgs_list = [neuropythy.io.load(img_name).get_fdata() for img_name in mask_filenames_list]
+        mask_imgs_list = [neuropythy.io.load(img_name).get_fdata().astype(np.float32) for img_name in mask_filenames_list]
 
         # sum data values
         sum_data = np.sum(mask_imgs_list, axis = 0)

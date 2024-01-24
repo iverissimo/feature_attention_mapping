@@ -56,6 +56,8 @@ class Batcher:
         # if fitting model, we also need to copy fit folder from derivatives
         if step_type in ['fitmodel', 'fitdecoder']:
             copy_cmd = self.copy_fit_deriv(use_rsync = use_rsync, task = taskname, use_fs_label = use_fs_label)
+        elif step_type == 'post_fmriprep':
+            copy_cmd = self.copy_fmriprep_deriv(use_rsync = use_rsync)
         else:
             copy_cmd = ''
         
@@ -348,6 +350,30 @@ class Batcher:
                     """cp -r $DERIV_DIR/freesurfer/sub-$SJ_NR $TMPDIR/derivatives/freesurfer\nwait\n\n"""
                     
         return copyFS_cmd
+    
+    def copy_fmriprep_deriv(self, use_rsync = False):
+        
+        """For some analysis we need fmriprep data files
+        so we also need to add that to the script
+        """
+        
+        # if running for group
+        if self.group_bool:
+            if use_rsync:
+                copyFMRIPREP_cmd = """mkdir -p $TMPDIR/derivatives/fmriprep\nwait\n"""+ \
+                    """rsync -chavP --exclude=".*" $DERIV_DIR/fmriprep/ $TMPDIR/derivatives/fmriprep --no-compress\nwait\n\n"""
+            else:
+                copyFMRIPREP_cmd = """mkdir -p $TMPDIR/derivatives/fmriprep\nwait\n"""+ \
+                    """cp -r $DERIV_DIR/fmriprep $TMPDIR/derivatives/\nwait\n\n"""
+        else:
+            if use_rsync:
+                copyFMRIPREP_cmd = """mkdir -p $TMPDIR/derivatives/fmriprep/sub-$SJ_NR\nwait\n"""+ \
+                    """rsync -chavP --exclude=".*" $DERIV_DIR/fmriprep/sub-$SJ_NR/ $TMPDIR/derivatives/fmriprep/sub-$SJ_NR --no-compress\nwait\n\n"""
+            else:
+                copyFMRIPREP_cmd = """mkdir -p $TMPDIR/derivatives/fmriprep/sub-$SJ_NR\nwait\n"""+ \
+                    """cp -r $DERIV_DIR/fmriprep/sub-$SJ_NR $TMPDIR/derivatives/fmriprep\nwait\n\n"""
+                    
+        return copyFMRIPREP_cmd
             
     def rsync_deriv(self):
     

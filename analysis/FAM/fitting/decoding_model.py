@@ -1943,7 +1943,51 @@ class Decoding_Model(GLMsingle_Model):
                                                 annot = True,
                                     filename = base_filename+'_barPOS-crossed_barECC-{be}_barDIST-{bd}.png'.format(be = bar_ecc,
                                                                                                                    bd = str(bool(same_ecc))))
-                
+                    
+            ## get drive (median value within bar location) ##
+            # PARALLEL BARS #
+            drive_df_parallel = self.get_bar_drive(participant_list = participant_list, 
+                                                    average_stim_dict = average_stim_dict, 
+                                                    flip_average_stim_dict = flip_average_stim_dict, 
+                                                    run_position_df_dict = run_position_df_dict, 
+                                                    lowres_DM_dict = lowres_DM_dict,
+                                                    bar_type = 'parallel')
+
+            # CROSSED BARS #
+            drive_df_crossed = self.get_bar_drive(participant_list = participant_list, 
+                                                average_stim_dict = average_stim_dict, 
+                                                flip_average_stim_dict = flip_average_stim_dict, 
+                                                run_position_df_dict = run_position_df_dict, 
+                                                lowres_DM_dict = lowres_DM_dict,
+                                                bar_type = 'crossed')
+
+            # COMBINED #
+            drive_df = pd.concat((drive_df_parallel, drive_df_crossed), ignore_index = True)
+            
+            ## and make some bar plots to check
+            # overall 
+            self.plot_barplot_avg_drive(drive_df = drive_df, 
+                                        hue_order = ['att_bar', 'unatt_bar'], 
+                                        bar_key_list = ['parallel', 'crossed', None], 
+                                        roi_name = roi_name, 
+                                        filename = base_filename+'_avg_drive_barplot.png')
+            # split by ecc 
+            self.plot_barplot_ecc_drive(drive_df = drive_df, 
+                                        hue_order = ['att_bar', 'unatt_bar'], 
+                                        bar_key_list = ['parallel', 'crossed', None], 
+                                        roi_name = roi_name, 
+                                        filename = base_filename+'_avg_drive_ECC_barplot.png')
+            # parallel - split by inter-bar distance 
+            self.plot_barplot_parallel_dist_drive(drive_df_parallel = drive_df_parallel, 
+                                                hue_order = ['att_bar', 'unatt_bar'], 
+                                                roi_name = roi_name, 
+                                                filename = base_filename+'_avg_drive_barPOS-parallel_barDIST_barplot.png')
+            # crossed - split by inter-bar "distance" 
+            self.plot_barplot_crossed_dist_drive(drive_df_crossed = drive_df_crossed, 
+                                                hue_order = ['att_bar', 'unatt_bar'], 
+                                                roi_name = roi_name, 
+                                                filename = base_filename+'_avg_drive_barPOS-crossed_barDIST_barplot.png')
+            
     def get_bar_drive(self, participant_list = [], average_stim_dict = None, flip_average_stim_dict = None, 
                             run_position_df_dict = None, lowres_DM_dict = None,
                             bar_type = 'parallel'):
@@ -2059,8 +2103,175 @@ class Decoding_Model(GLMsingle_Model):
         output_df = pd.concat(output_df, ignore_index = True)
             
         return output_df
+                            
+    def plot_barplot_crossed_dist_drive(self, drive_df_crossed = None, hue_order = ['att_bar', 'unatt_bar'], roi_name = 'V1',
+                                            filename = None):
+        
+        """ drive for crossed bars at same/different inter-bar eccs
+        """
+        
+        fig, axes = plt.subplots(nrows=1, ncols=2, figsize = (10,5), sharey = True)
+
+        for ind, same_ecc in enumerate([0,1]):
+            
+            df2plot = drive_df_crossed[drive_df_crossed['bar_dist'] == same_ecc]
+
+            sns.barplot(df2plot, 
+                        y = 'drive', x = 'bar_type', estimator = np.mean, errorbar=('se'), 
+                        capsize = .3 ,linewidth = 3, palette = ['#229c8d', '#cc742d'],
+                    order = hue_order, ax = axes[ind])
+            
+            axes[ind].set_title('Bars at same ecc = %s'%(str(bool(same_ecc)).upper()))
+
+            # overlay participant lines
+            for pp in df2plot.sj.unique():
+                sns.pointplot(df2plot[df2plot['sj'] == pp], 
+                            y = 'drive', x = 'bar_type',
+                            estimator = np.mean, errorbar=('se'),
+                            order = hue_order,
+                            linestyles = '--', alpha = .3, 
+                            legend = False, ax = axes[ind])
+
+        axes[ind].set_ylim([np.quantile(drive_df_crossed.drive.values, .01), 
+                            np.quantile(drive_df_crossed.drive.values, .98)])
+        fig.suptitle('Average drive within CROSSED bars - {rk}'.format(rk = roi_name), fontsize=16, y=.99)
+        
+        # save figure
+        if filename is not None:
+            fig.savefig(filename, dpi= 200)
+          
+    def plot_barplot_parallel_dist_drive(self, drive_df_parallel = None, hue_order = ['att_bar', 'unatt_bar'], roi_name = 'V1',
+                                                filename = None):
+        
+        """ drive for parallel bars at different inter-bar distances
+        """
+                
+        fig, axes = plt.subplots(nrows=1, ncols=5, figsize = (15,5), sharey = True)
+
+        for ind, dist in enumerate(np.arange(5)):
+            
+            df2plot = drive_df_parallel[drive_df_parallel['bar_dist'] == dist + 1]
+
+            sns.barplot(df2plot, 
+                        y = 'drive', x = 'bar_type', estimator = np.mean, errorbar=('se'), 
+                        capsize = .3 ,linewidth = 3, palette = ['#229c8d', '#cc742d'],
+                    order = hue_order, ax = axes[ind])
+            
+            axes[ind].set_title('Bar Distance %i'%(dist + 1))
+
+            # overlay participant lines
+            for pp in df2plot.sj.unique():
+                sns.pointplot(df2plot[df2plot['sj'] == pp], 
+                            y = 'drive', x = 'bar_type',
+                            estimator = np.mean, errorbar=('se'),
+                            order = hue_order,
+                            linestyles = '--', alpha = .3, 
+                            legend = False, ax = axes[ind])
+
+        axes[ind].set_ylim([np.quantile(drive_df_parallel.drive.values, .01), 
+                            np.quantile(drive_df_parallel.drive.values, .99)])
+        fig.suptitle('Average drive within PARALELL bars - {rk}'.format(rk = roi_name), fontsize=16, y=.99)
+        
+        # save figure
+        if filename is not None:
+            fig.savefig(filename, dpi= 200)
+        
+    def plot_barplot_ecc_drive(self, drive_df = None, hue_order = ['att_bar', 'unatt_bar'], roi_name = 'V1',
+                                bar_key_list = ['parallel', 'crossed', None], filename = None):
+        
+        """ drive for each eccentricity
+        """
+                
+        ## plot overall drive of attended vs unattended bar  ##
+        fig, axes = plt.subplots(nrows=3, ncols=len(bar_key_list), figsize = (15,12), sharey = True)
+
+        # iterate over bar types
+        for ind_r, bar_key in enumerate(bar_key_list):
+            
+            if bar_key is None:
+                df2plot = drive_df
+                bk = 'parallel + crossed'
+            else:
+                df2plot = drive_df[drive_df['bar_orientation'] == bar_key]
+                bk = bar_key
+                
+            for ind_c, ecc in enumerate(['near', 'middle', 'far']):
+
+                df2plot_ecc = df2plot[df2plot['bar_ecc'] == ecc]
+
+                sns.barplot(df2plot_ecc, 
+                            y = 'drive', x = 'bar_type', estimator = np.mean, errorbar=('se'), 
+                            capsize = .3 ,linewidth = 3, palette = ['#229c8d', '#cc742d'],
+                        order = hue_order, ax = axes[ind_r][ind_c])
+                
+                # overlay participant lines
+                for pp in df2plot.sj.unique():
+                    sns.pointplot(df2plot_ecc[df2plot_ecc['sj'] == pp], 
+                                y = 'drive', x = 'bar_type',
+                                estimator = np.mean, errorbar=('se'),
+                                order = hue_order,
+                                linestyles = '--', alpha = .3, 
+                                legend = False, ax = axes[ind_r][ind_c])
                     
+                if ind_r < 2:
+                    axes[ind_r][ind_c].set_xticks([])
+                    axes[ind_r][ind_c].set_xlabel('')
                     
+                axes[ind_r][ind_c].set_title('{ek} ecc, {bk} bars'.format(bk = bk.upper(), ek = ecc.upper()))
+
+        axes[ind_r][ind_c].set_ylim([np.quantile(df2plot_ecc.drive.values, .01), 
+                                    np.quantile(df2plot_ecc.drive.values, .98)])
+        fig.suptitle('Average drive within bar - {rk}'.format(rk = roi_name), fontsize=16, y=.95)
+            
+        # save figure
+        if filename is not None:
+            fig.savefig(filename, dpi= 200)
+               
+    def plot_barplot_avg_drive(self, drive_df = None, hue_order = ['att_bar', 'unatt_bar'], roi_name = 'V1',
+                                bar_key_list = ['parallel', 'crossed', None], filename = None):
+        
+        """Overall drive
+        """
+                
+        ## plot overall drive of attended vs unattended bar  ##
+        fig, axes = plt.subplots(nrows=1, ncols=len(bar_key_list), figsize = (15,5), sharey = True)
+
+        # iterate over bar types
+        for ind, bar_key in enumerate(bar_key_list):
+            
+            if bar_key is None:
+                df2plot = drive_df
+                bk = 'parallel + crossed'
+            else:
+                df2plot = drive_df[drive_df['bar_orientation'] == bar_key]
+                bk = bar_key
+                
+            sns.barplot(df2plot, y = 'drive', x = 'bar_type', estimator = np.mean, errorbar=('se'), 
+                        capsize = .3 ,linewidth = 3, palette = ['#229c8d', '#cc742d'], 
+                        hue_order = hue_order, ax = axes[ind])
+
+            # overlay participant lines
+            for pp in df2plot.sj.unique():
+
+                sns.pointplot(df2plot[df2plot['sj'] == pp], 
+                            y = 'drive', x = 'bar_type', estimator = np.mean, errorbar=('se'),
+                            hue_order = hue_order,
+                            linestyles = '--', alpha = .3, #color = 'k', 
+                            legend = False, ax = axes[ind])
+            
+            axes[ind].set_title('{bk} bars'.format(bk = bk.upper()))
+
+        axes[ind].set_ylim([np.quantile(df2plot.drive.values, .01), 
+                            np.quantile(df2plot.drive.values, .98)])
+        fig.suptitle('Average drive within bar - {rk}'.format(rk = roi_name), fontsize=16, y=1)
+        
+        # save figure
+        if filename is not None:
+            fig.savefig(filename, dpi= 200)
+        
+        
+        
+                      
                     
 
                                 

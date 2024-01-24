@@ -386,7 +386,7 @@ class Batcher:
             """mkdir -p $TMPDIR/derivatives/post_fmriprep/$SPACE\n"""+ \
             """mkdir -p $TMPDIR/sourcedata\n\nwait\n\n"""+\
             """if [ -d "$DERIV_DIR/post_fmriprep/$SPACE" ]\nthen\n"""+ \
-            """    cp -r $DERIV_DIR/post_fmriprep/$SPACE $TMPDIR/derivatives/post_fmriprep/\nfi\nwait\n""" 
+            """    cp -r $DERIV_DIR/post_fmriprep/$SPACE $TMPDIR/derivatives/post_fmriprep/\nfi\nwait\n"""+ \
             """cp -r $SOURCE_DIR/ $TMPDIR/\n\nwait\n\n"""
         else:
             cmd = """# call the programs\n$START_EMAIL\n\n"""+\
@@ -394,7 +394,7 @@ class Batcher:
             """mkdir -p $TMPDIR/derivatives/post_fmriprep/$SPACE/sub-$SJ_NR\n"""+ \
             """mkdir -p $TMPDIR/sourcedata/sub-$SJ_NR\n\nwait\n\n"""+\
             """if [ -d "$DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR" ]\nthen\n"""+ \
-            """    cp -r $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/post_fmriprep/$SPACE\nfi\nwait\n""" 
+            """    cp -r $DERIV_DIR/post_fmriprep/$SPACE/sub-$SJ_NR $TMPDIR/derivatives/post_fmriprep/$SPACE\nfi\nwait\n"""+ \
             """cp -r $SOURCE_DIR/sub-$SJ_NR $TMPDIR/sourcedata/\n\nwait\n\n"""
             
         return cmd

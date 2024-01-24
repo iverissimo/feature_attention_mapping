@@ -90,7 +90,7 @@ class Batcher:
                
     def submit_jobs(self, participant_list = [], step_type = 'fitmodel', taskname = 'pRF', concurrent_job = True,
                         n_jobs = 8, n_batches = 10, chunk_data = None, fit_hrf = True, use_rsync = False, 
-                        dry_run = False, prf_model_name = 'gauss', fa_model_name = 'glmsingle',
+                        dry_run = False, prf_model_name = 'gauss', fa_model_name = 'glmsingle', encoding_model_name = 'gauss_hrf',
                         run_type = 'mean', ses2fit = 'mean', username = ''):
         
         """script to actually submit the jobs
@@ -111,6 +111,7 @@ class Batcher:
         working_str = working_str.replace('$RUN', run_type)
         working_str = working_str.replace('$PRFMODEL', prf_model_name)
         working_str = working_str.replace('$FAMODEL', fa_model_name)
+        working_str = working_str.replace('$ENCODEMODEL', encoding_model_name)
 
         # batch filename
         if concurrent_job and len(participant_list) > 1:
@@ -171,7 +172,7 @@ class Batcher:
                     """(\n  python run_analysis.py --subject ${pp_arr[$i]} """+ \
                     """--cmd {cmd} --task $TASK --dir slurm """.format(cmd = step_type)+ \
                     """--ses2fit $SES --run_type $RUN --prf_model_name $PRFMODEL """+ \
-                    """--fa_model_name $FAMODEL """+ \
+                    """--fa_model_name $FAMODEL --encoding_model $ENCODEMODEL """+ \
                     """--n_jobs {n_jobs} --n_batches {n_batches} """.format(n_jobs = n_jobs, n_batches = n_batches)+ \
                     """--wf_dir $TMPDIR """
                     
@@ -189,7 +190,7 @@ class Batcher:
                 # set fitting model command 
                 fit_cmd = """python run_analysis.py --subject $SJ_NR --cmd {cmd} --task $TASK --dir slurm """.format(cmd = step_type)+ \
                     """--ses2fit $SES --run_type $RUN --prf_model_name $PRFMODEL """+ \
-                    """--fa_model_name $FAMODEL """+ \
+                    """--fa_model_name $FAMODEL --encoding_model $ENCODEMODEL """+ \
                     """--n_jobs {n_jobs} --n_batches {n_batches} """.format(n_jobs = n_jobs, n_batches = n_batches)+ \
                     """--wf_dir $TMPDIR """
                 

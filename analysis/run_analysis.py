@@ -84,6 +84,11 @@ parser.add_argument("--fa_model_name",
                     default = 'glmsingle',
                     help="Type of FA model to fit: glmsingle [default], gain, glm, etc...]"
                     )
+parser.add_argument("--encoding_model",
+                    type = str, 
+                    default = 'gauss_hrf',
+                    help="Type of pRF encoding model to use in FA decoder: gauss_hrf [default], dog_hrf, etc...]"
+                    )
 parser.add_argument("--vertex",
                     nargs = '*', 
                     default = [],
@@ -130,6 +135,7 @@ fit_hrf = args.fit_hrf
 run_type = args.run_type
 ses2fit = args.ses2fit 
 fa_model_name = args.fa_model_name
+encoding_model_name = args.encoding_model
 use_atlas = args.atlas
 hemisphere = args.hemisphere
 n_batches = args.n_batches
@@ -229,7 +235,7 @@ match task:
             FAM_Decoder.fit_decoder(participant_list = FAM_data.sj_num, 
                                     ROI_list = ['V1','V2','V3','V3AB','LO','hV4'], #['V1'], 
                                     overwrite = True, 
-                                    model_type = 'dog_hrf', #'gauss_hrf',
+                                    model_type = encoding_model_name,
                                     ses = 'mean', 
                                     prf_file_ext =  FAM_mri.get_mrifile_ext(nifti_file = True)['pRF'], 
                                     fa_file_ext = '_cropped.nii.gz',
@@ -251,7 +257,7 @@ match task:
             
             FAM_Decoder.plot_decoder_results(participant_list = FAM_data.sj_num, 
                                             ROI_list = ['V1','V2','V3','V3AB','LO','hV4'], #['V1'], 
-                                            model_type = 'gauss_hrf',
+                                            model_type = encoding_model_name,
                                             ses = 'mean', 
                                             prf_file_ext =  FAM_mri.get_mrifile_ext(nifti_file = True)['pRF'], 
                                             fa_file_ext = '_cropped.nii.gz',

@@ -1432,7 +1432,7 @@ class MRIUtils(Utils):
                 img = nib.load(nifti_ref)
                 
                 # make new nifti and save
-                new_img = nib.Nifti1Image(data, img.affine, img.header)
+                new_img = nib.Nifti1Image(data.astype(np.float32) , img.affine, img.header.set_data_dtype(np.float32))
                 nib.save(new_img, output_file)
                 
             # append out files

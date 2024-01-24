@@ -2101,6 +2101,8 @@ class Decoding_Model(GLMsingle_Model):
               
         # turn into full df      
         output_df = pd.concat(output_df, ignore_index = True)
+        # turn drive values to float
+        output_df.loc[:,'drive'] = output_df.drive.astype(float)
             
         return output_df
                             

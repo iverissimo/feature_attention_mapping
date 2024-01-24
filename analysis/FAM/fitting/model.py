@@ -448,6 +448,32 @@ class Model:
         # and save as dataframe
         out_dir_ROI_mask_data = op.join(self.MRIObj.derivatives_pth, 'masked_data', 'sub-{sj}'.format(sj = participant))
         
+        ## first create mask images
+        func_im_mask_filenames = []
+        
+        for r, file in enumerate(file_list):
+            ## get run number, and ses number in list of ints
+            # useful for when fitting several runs at same time
+            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(file)
+            
+            # resample mask to func image space
+            _ = self.MRIObj.mri_utils.resample_T1mask_to_func(mask_img = T1_im_mask, 
+                                                                    bold_filename = file,
+                                                                    filename = mask_name.format(tsk = task,
+                                                                                                session = file_sn,
+                                                                                                run = file_rn),
+                                                                    overwrite = overwrite)
+            
+            # store mask image filenames
+            func_im_mask_filenames.append(mask_name.format(tsk = task,
+                                                    session = file_sn,
+                                                    run = file_rn))
+        
+        ## sum and average them, to make sure ROI mask same for all runs
+        func_im_mask_list = self.MRIObj.mri_utils.combine_mask_imgs(mask_filenames_list = func_im_mask_filenames, 
+                                                                    return_img = True)
+        
+        # now extract relevat timeseries
         masked_data_all = [] 
         masked_data_filenames = []
         for r, file in enumerate(file_list):
@@ -457,12 +483,7 @@ class Model:
             file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(file)
             
             # resample mask to func image space
-            func_im_mask = self.MRIObj.mri_utils.resample_T1mask_to_func(mask_img = T1_im_mask, 
-                                                                    bold_filename = file,
-                                                                    filename = mask_name.format(tsk = task,
-                                                                                                session = file_sn,
-                                                                                                run = file_rn),
-                                                                    overwrite = overwrite)
+            func_im_mask = func_im_mask_list[r]
             
             # make filename
             csv_filename = op.join(out_dir_ROI_mask_data, 

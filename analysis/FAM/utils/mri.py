@@ -199,6 +199,37 @@ class MRIUtils(Utils):
         else:
             return masked_data_df
         
+    def combine_mask_imgs(self, mask_filenames_list = [], return_img = True):
+        
+        """from a list of mask images (binary nii files)
+        sum them and normalize, and replace values with new mask
+        """
+        
+        print('combining masks')
+        
+        # load images 
+        mask_imgs_list = [neuropythy.io.load(img_name).get_fdata() for img_name in mask_filenames_list]
+
+        # sum data values
+        sum_data = np.sum(mask_imgs_list, axis = 0)
+        sum_data[sum_data > 0] = 1 # and make binary again
+        
+        new_mask_imgs_list = []
+        
+        # replace and save new file name
+        for img_name in mask_filenames_list:
+            
+            old_mask = neuropythy.io.load(img_name) 
+            new_mask_img = nilearn.image.new_img_like(old_mask, sum_data)
+            
+            neuropythy.io.save(img_name, new_mask_img)
+            
+            # append new mask images
+            new_mask_imgs_list.append(new_mask_img)
+        
+        # if we want list of images
+        if return_img:
+            return new_mask_imgs_list
 
     def create_atlas_df(self, annot_filename = '', pysub = 'hcp_999999', atlas_name = 'glasser'):
 

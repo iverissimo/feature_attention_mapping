@@ -32,7 +32,7 @@ import nibabel as nib
 import neuropythy
 
 import braincoder
-from braincoder.models import GaussianPRF2DWithHRF, GaussianPRF2D, DifferenceOfGaussiansPRF2DWithHRF
+from braincoder.models import GaussianPRF2DWithHRF, GaussianPRF2D, DifferenceOfGaussiansPRF2DWithHRF, DifferenceOfGaussiansPRF2D
 from braincoder.hrf import SPMHRFModel
 from braincoder.optimize import ParameterFitter, ResidualFitter, StimulusFitter
 
@@ -832,7 +832,8 @@ class Decoding_Model(GLMsingle_Model):
             masked_data_df = masked_FAdata_dict[df_key]
 
             # get reconstructed stim as df
-            reconstructed_stimulus = self.decode_FA_stim(data = masked_data_df, 
+            reconstructed_stimulus = self.decode_FA_stim(model_type = model_type,
+                                                        data = masked_data_df, 
                                                         grid_coordinates = fa_grid_coordinates,  
                                                         parameters = pars_gd,
                                                         omega = omega, 
@@ -858,8 +859,8 @@ class Decoding_Model(GLMsingle_Model):
         
         return lowres_DM_dict, reconstructed_stim_dict
                
-    def decode_FA_stim(self, data = None, grid_coordinates = None,  parameters = None, omega = None, dof = None,
-                            best_voxels = None, filename = None):
+    def decode_FA_stim(self, model_type = 'gauss_hrf', data = None, grid_coordinates = None,  parameters = None, 
+                            omega = None, dof = None, best_voxels = None, filename = None):
         
         """Decode FA betas for a given run
         and save reconstructed stim as hdf5 file
@@ -872,13 +873,22 @@ class Decoding_Model(GLMsingle_Model):
             print('Loading reconstructed stim from %s'%filename)
             reconstructed_stimulus = pd.read_hdf(filename).astype(np.float32)  
         else:
-            model_single_trial = GaussianPRF2D(grid_coordinates = grid_coordinates,
-                                            paradigm = None,
-                                            data = data.loc[:, best_voxels],
-                                            parameters = parameters.loc[best_voxels],
-                                            weights = None,
-                                            omega = omega,
-                                            dof = dof)
+            if model_type == 'gauss_hrf':
+                model_single_trial = GaussianPRF2D(grid_coordinates = grid_coordinates,
+                                                paradigm = None,
+                                                data = data.loc[:, best_voxels],
+                                                parameters = parameters.loc[best_voxels],
+                                                weights = None,
+                                                omega = omega,
+                                                dof = dof)
+            elif model_type == 'dog_hrf':
+                model_single_trial = DifferenceOfGaussiansPRF2D(grid_coordinates = grid_coordinates,
+                                                                paradigm = None,
+                                                                data = data.loc[:, best_voxels],
+                                                                parameters = parameters.loc[best_voxels],
+                                                                weights = None,
+                                                                omega = omega,
+                                                                dof = dof)
             
             stim_fitter = StimulusFitter(data = data.loc[:, best_voxels], 
                                     model = model_single_trial, 

@@ -914,10 +914,12 @@ class GLMsingle_Model(Model):
 
         if use_corr_mask:
             opt['brainexclude'] = final_mask.astype(int)
+            opt['brainthresh'] = [99, 0] # which allows all voxels to pass the intensity threshold --> we use surface data
+            opt['brainR2'] = 100 # not using on-off model for noise pool
+        
+        # session indicator
         opt['sessionindicator'] = self.ses_num_arr 
-        #opt['brainthresh'] = [99, 0] # which allows all voxels to pass the intensity threshold --> we use surface data
-        #opt['brainR2'] = 100 # not using on-off model for noise pool
-
+        
         # define polynomials to project out from data (we only want to use intercept and slope)
         opt['maxpolydeg'] = [[0, 1] for _ in range(data.shape[0])]
 

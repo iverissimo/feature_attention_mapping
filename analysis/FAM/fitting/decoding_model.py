@@ -788,7 +788,9 @@ class Decoding_Model(GLMsingle_Model):
         
         # get array with best voxel indices 
         best_voxels = self.get_best_voxels(pars_gd = pars_gd, r2_gd = r2_gd,  
-                                           sd_lim = [0.3, 8], n_vox = 300)
+                                           x_lim = [-6,6], y_lim = [-6,6], 
+                                           size_min = .3, size_max = 'std', std_val = 3, 
+                                           n_vox = 300)
         
         ## fit residuals on prf data
         omega, dof  = self.fit_residuals(model = prf_decoder_model, 
@@ -1000,7 +1002,8 @@ class Decoding_Model(GLMsingle_Model):
         
         return omega, dof 
                 
-    def get_best_voxels(self, pars_gd = None, r2_gd = None,  sd_lim = [0.3, 8], n_vox = 300):
+    def get_best_voxels(self, pars_gd = None, r2_gd = None, x_lim = [-6,6], y_lim = [-6,6], 
+                                size_min = .3, size_max = 'std', std_val = 3, n_vox = 300):
         
         """
         Get best voxels to then use in fitter
@@ -1009,8 +1012,20 @@ class Decoding_Model(GLMsingle_Model):
         # sort indices according to r2 values
         sort_ind = r2_gd.sort_values(ascending=False).index
         
-        # mask for pRF SD (not too small or big)
-        masked_voxels = pars_gd[(pars_gd['sd'] > .3) & (pars_gd['sd'] < 6.5)].index
+        # mask for pRFs
+        # for x and y lim (to be within screen dimensions)
+        masked_pars = pars_gd.query('x >= {xmin} & x <= {xmax} & y >= {ymin} & y <= {ymax}'.format(xmin = x_lim[0], xmax = x_lim[1],
+                                                                                                ymin = y_lim[0], ymax = y_lim[1]))
+        # for size (not too small or big)
+        if isinstance(size_max, str):
+            # use X standard deviation from mean as size max threshold
+            masked_pars = masked_pars.query('sd >= {sdmin} & sd <= {sdmax}'.format(sdmin = size_min,
+                                                                                sdmax = np.std(masked_pars.sd.values) * std_val))
+        else:
+            masked_pars = masked_pars.query('sd >= {sdmin} & sd <= {sdmax}'.format(sdmin = size_min, sdmax = size_max))
+            
+        # get index for masked parameters
+        masked_voxels = masked_pars.index
         
         # of those, get best voxels
         best_voxels = np.array([val for val in sort_ind if val in masked_voxels])

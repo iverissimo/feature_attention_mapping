@@ -846,7 +846,7 @@ class GLMsingle_Model(Model):
         # if fitting niftis, need to make some changes
         if self.MRIObj.sj_space == 'T1w':
             use_corr_mask = False
-            #file_ext = file_ext.replace('.npy', '.nii.gz')
+            file_ext = file_ext.replace('.npy', '.nii.gz')
 
         ## get list of files to load
         bold_filelist = self.MRIObj.mri_utils.get_bold_file_list(participant, task = 'FA', ses = 'all', file_ext = file_ext,

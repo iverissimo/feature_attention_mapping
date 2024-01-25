@@ -5,6 +5,7 @@ import os.path as op
 import pandas as pd
 
 import glob
+import neuropythy
 
 class Model:
 
@@ -196,7 +197,14 @@ class Model:
 
         ## now actually load data
         print('Loading {x} files of task {t}'.format(x = len(file_list), t = task))
-        data_arr = np.stack([np.load(arr,allow_pickle=True) for arr in file_list]) # will be (run, vertex, TR)
+        
+        # check if file is npy or nii.gz
+        if file_list[0].endswith('nii.gz'):
+            data_arr = np.stack([neuropythy.io.load(arr).get_fdata().astype(np.float32) for arr in file_list]) # will be (run, XYZ, TR)
+        elif file_list[0].endswith('.npy'):
+            data_arr = np.stack([np.load(arr,allow_pickle=True) for arr in file_list]) # will be (run, vertex, TR)
+        
+        print(data_arr.shape)
 
         # for pRF task, we always average runs (if several) because same design
         if task == 'pRF':

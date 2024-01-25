@@ -1525,7 +1525,7 @@ class Decoding_Model(GLMsingle_Model):
             
         return group_lowres_DM_dict
     
-    def load_group_decoded_stim_dict(self, participant_list = [], roi_name = 'V1',
+    def load_group_decoded_stim_dict(self, participant_list = [], roi_name = 'V1', task = 'FA',
                                 model_type = 'gauss_hrf', data_keys_dict = {}):
         
         """Load FA downsampled DM for all participants in participant list
@@ -1538,7 +1538,7 @@ class Decoding_Model(GLMsingle_Model):
             
             ## load reconstructed stim
             reconstructed_stim_dict = self.load_reconstructed_stim_dict(participant = participant, 
-                                                                        task = 'FA', 
+                                                                        task = task, 
                                                                         roi_name = roi_name, 
                                                                         model_type = model_type,
                                                                         data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)])
@@ -2340,10 +2340,102 @@ class Decoding_Model(GLMsingle_Model):
         if filename is not None:
             fig.savefig(filename, dpi= 200)
         
+    def get_pp_stim_visual_dm_correlation(self, reconstructed_stim_dict = None, lowres_DM_dict = None, data_keys_dict = []):
         
+        """
+        correlate reconstructed stim with downsampled DM
+        across runs for a given participant
+        """ 
         
-                      
-                    
+        # concatenate arrays across runs
+        stim_runs = np.hstack((reconstructed_stim_dict[df_key].values.ravel() for df_key in data_keys_dict))
+        dm_runs = np.hstack((lowres_DM_dict[df_key].ravel() for df_key in data_keys_dict))
+        
+        # correlate reconstructed stim with downsampled DM
+        corr, pval = scipy.stats.pearsonr(stim_runs, dm_runs)
+        
+        return corr, pval
+    
+    def get_stim_visual_dm_correlation(self, participant_list = [], reconstructed_stim_dict = None, 
+                                            lowres_DM_dict = None, data_keys_dict = []):
+        
+        """
+        correlate reconstructed stim with downsampled DM
+        across runs for all participants
+        and return df with values
+        """ 
+        
+        stim_corr_df = []
+        
+        for participant in participant_list:
+            
+            pp_corr, pp_pval = self.get_pp_stim_visual_dm_correlation(reconstructed_stim_dict = reconstructed_stim_dict['sub-{sj}'.format(sj = participant)], 
+                                                                      lowres_DM_dict = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['full_stim'], 
+                                                                      data_keys_dict = data_keys_dict['sub-{sj}'.format(sj = participant)])
+        
+            stim_corr_df.append(pd.DataFrame({'sj': ['sub-{sj}'.format(sj = participant)],
+                                              'corr': [pp_corr],
+                                              'pval': [pp_pval]}
+                                             ))
+
+            print('sub-{sj} correlation between reconstructed stim and DM is {c}, {p}'.format(sj = participant,
+                                                                                            c = '%.2f'%pp_corr,
+                                                                                            p = '%.2f'%pp_pval))
+        
+        stim_corr_df = pd.concat(stim_corr_df, ignore_index=True)  
+        
+        return stim_corr_df      
+    
+    def get_pp_stim_same_bar_pos_correlation(self, reconstructed_stim_dict = None, lowres_DM_dict = None, data_keys_dict = []):
+        
+        """
+        correlate reconstructed stim for
+        trials where attended bar and unattended bar in same position
+        across runs for a given participant
+        """ 
+        
+        ## find trials where attended bar and unattended bar in same position
+        same_bar_pos_ind_dict = self.get_same_bar_pos_ind_dict(lowresDM_dict = lowres_DM_dict, data_keys = data_keys_dict)
+        
+        # concatenate arrays across runs
+        stimA_runs = np.hstack((reconstructed_stim_dict[df_key].values[same_bar_pos_ind_dict[df_key][:,0]].ravel() for df_key in data_keys_dict))
+        stimB_runs = np.hstack((reconstructed_stim_dict[df_key].values[same_bar_pos_ind_dict[df_key][:,1]].ravel() for df_key in data_keys_dict))
+        
+        # correlate with each other
+        corr, pval = scipy.stats.pearsonr(stimA_runs, stimB_runs)
+        
+        return corr, pval
+    
+    def get_stim_same_bar_pos_correlation(self, participant_list = [], reconstructed_stim_dict = None, 
+                                                lowres_DM_dict = None, data_keys_dict = []):
+        
+        """
+        correlate reconstructed stim for
+        trials where attended bar and unattended bar in same position
+        across runs for all participants
+        and return df with values
+        """ 
+        
+        stim_corr_df = []
+        
+        for participant in participant_list:
+            
+            pp_corr, pp_pval = self.get_pp_stim_same_bar_pos_correlation(reconstructed_stim_dict = reconstructed_stim_dict['sub-{sj}'.format(sj = participant)], 
+                                                                      lowres_DM_dict = lowres_DM_dict['sub-{sj}'.format(sj = participant)], 
+                                                                      data_keys_dict = data_keys_dict['sub-{sj}'.format(sj = participant)])
+        
+            stim_corr_df.append(pd.DataFrame({'sj': ['sub-{sj}'.format(sj = participant)],
+                                              'corr': [pp_corr],
+                                              'pval': [pp_pval]}
+                                             ))
+
+            print('sub-{sj} correlation between trials where\nattended bar and unattended bar in same position is {c}, {p}'.format(sj = participant,
+                                                                                                                                c = '%.2f'%pp_corr,
+                                                                                                                                p = '%.2f'%pp_pval))
+        
+        stim_corr_df = pd.concat(stim_corr_df, ignore_index=True)  
+        
+        return stim_corr_df    
 
                                 
         

@@ -204,6 +204,12 @@ print('Subject list is {l}'.format(l=str(FAM_data.sj_num)))
 ## Load BATCHER object 
 FAM_SLURM = Batcher(FAM_data)
 
+# give some extra params
+FAM_SLURM.send_email = send_email
+FAM_SLURM.partition_name = partition_name
+FAM_SLURM.node_name = node_name
+FAM_SLURM.batch_mem_Gib = batch_mem_Gib
+
 # set up some general parameters for job(s) nodes
 FAM_SLURM.setup_slurm_pars(n_hours = n_hours, n_tasks = n_tasks, n_nodes = n_nodes, n_cpus_task = n_cpus_task)
 

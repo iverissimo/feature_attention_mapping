@@ -128,6 +128,7 @@ class Batcher:
             for pp in participant_list:
                 working_str_list.append(working_str.replace('$SJ_NR', pp))
                 job_file_list.append(js_name.replace('$SJ_NR', pp))
+                
               
         # iterate over jobs, print them for inspection and submit  
         for i in range(len(job_file_list)):

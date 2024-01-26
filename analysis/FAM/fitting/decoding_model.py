@@ -1587,49 +1587,276 @@ class Decoding_Model(GLMsingle_Model):
             
         return group_run_pos_df_dict          
                       
-    def plot_prf_diagnostics(self, pars_grid = None, pars_gd = None, pars_fitter = None, 
-                                prf_decoder_model = None, data = None, 
-                                par_keys=['ols', 'gd'], figurename = None):
+    def plot_prf_diagnostics(self, participant_list = [], ROI_list = ['V1'], model_type = 'gauss_hrf',
+                                    prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean', 
+                                    mask_bool_df = None, stim_on_screen = []):
         
+        """plot encoding model pRF estimates
+        for all participants and ROIs
         """
-        plot some diagnostic figures
-        """
         
-        ## compare r2 of grid and iterative (or iterative and hrf) 
-        r2_ols = pars_fitter.get_rsq(pars_grid)
-        r2_gd = pars_fitter.get_rsq(pars_gd)
-        r2_both = pd.concat((r2_ols, r2_gd), keys=['r2_%s'%par_keys[0], 
-                                                   'r2_%s'%par_keys[1]], axis=1)
-
-        sns.relplot(x='r2_%s'%par_keys[0], y='r2_%s'%par_keys[1], 
-                    data=r2_both.reset_index(), kind='scatter')
-        plt.plot([0, 1], [0, 1], 'k--')
-        plt.show()
+        # make dir to save estimates
+        fig_dir = op.join(self.MRIObj.derivatives_pth, 'plots', 'prf_decoder')
+        fig_id = 'sub-GROUP_task-pRF_model-{modname}_estimates'.format(modname = model_type)
         
-        ## Let's plot the location of gradient descent PRFs
-        sns.relplot(x='x', y='y', hue='r2', data=pars_gd.join(r2_gd.to_frame('r2')), 
-                    size='sd', sizes=(10, 100), palette='viridis')
-        plt.title('PRF locations')
-        plt.show()
+        if len(participant_list) == 1:
+            pp = participant_list[0]
+            fig_dir = op.join(fig_dir, 'sub-{sj}'.format(sj = pp))
+            fig_id = fig_id.replace('sub-GROUP', 'sub-{sj}'.format(sj = pp)) 
         
-        ## plot a few voxels with highest r2 improvement
-        improvement = r2_gd - r2_ols
-        largest_improvements = improvement.sort_values(ascending=False).index[:9]
-        print(improvement.sort_values(ascending=False).loc[largest_improvements])
+        os.makedirs(fig_dir, exist_ok = True)
+        print('saving figures in %s'%fig_dir)
+        
+        # base filename for figures 
+        base_filename = op.join(fig_dir, fig_id)
+        
+        ## 
+        # store pars for all ROIs and participants
+        prf_pars_gd_dict = {}
+        prf_best_voxels_dict = {}
+        
+        for roi_name in ROI_list:
+    
+            print('Making pRF diagnostic plots for %s'%roi_name)
+            
+            prf_pars_gd_dict[roi_name] = {}
+            prf_best_voxels_dict[roi_name] = {}
+            
+            for participant in tqdm(participant_list):
 
-        pred_grid = prf_decoder_model.predict(parameters=pars_grid)
-        pred_gd = prf_decoder_model.predict(parameters=pars_gd)
+                ## load prf parameters (decoder)
+                pars_gd = self.load_encoding_model_pars(participant = participant, 
+                                                            task = 'pRF', 
+                                                            roi_name = roi_name, 
+                                                            model_type = model_type)
 
-        pred = pd.concat((data.loc[:, largest_improvements], 
-                        pred_grid.loc[:, largest_improvements], 
-                        pred_gd.loc[:, largest_improvements]), axis=1, 
-                        keys=['data', par_keys[0], par_keys[1]], names=['model'])
+                # get masked prf ROI data, averaged across runs
+                prf_masked_data_df = self.get_prf_ROI_data(participant = participant, 
+                                                            roi_name = roi_name, 
+                                                            index_arr = [], 
+                                                            overwrite = False, 
+                                                            file_ext = prf_file_ext)
 
-        #
-        tmp = pred.stack(['model', 'source']).to_frame('value')
-        sns.relplot(x='level_0', y='value', hue='model', col='source', data=tmp.reset_index(), kind='line', col_wrap=3,
-                palette = sns.color_palette(['black', 'orange', 'green'], 3))
-        plt.show()      
+                # get prf stimulus DM and grid coordinates
+                prf_stimulus_dm, prf_grid_coordinates = self.get_prf_stim_grid(participant = participant, 
+                                                                                ses = ses, 
+                                                                                mask_bool_df = mask_bool_df, 
+                                                                                stim_on_screen = stim_on_screen)
+
+                ## need to select best voxels 
+                # get rsq
+                r2_gd = self.get_encoding_r2(data = prf_masked_data_df, 
+                                            grid_coordinates = prf_grid_coordinates, 
+                                            model_type = model_type,
+                                            paradigm = prf_stimulus_dm,  
+                                            pars_gd = pars_gd)
+                
+                # get array with best voxel indices 
+                best_voxels = self.get_best_voxels(pars_gd = pars_gd, r2_gd = r2_gd,  
+                                                        x_lim = [-6,6], y_lim = [-6,6], 
+                                                        size_min = .3, size_max = 'std', std_val = 3, 
+                                                        n_vox = 300)
+                
+                # store in dict
+                prf_pars_gd_dict[roi_name][participant] = pars_gd.join(r2_gd.to_frame('r2'))
+                prf_best_voxels_dict[roi_name][participant] = best_voxels
+                
+                # also load r2 for gauss, for comparison
+                if 'gauss' not in model_type:
+                    pars_gauss_gd = self.load_encoding_model_pars(participant = participant, 
+                                                                task = 'pRF', 
+                                                                roi_name = roi_name, 
+                                                                model_type = 'gauss_hrf')
+                    r2_gauss_gd = self.get_encoding_r2(data = prf_masked_data_df, 
+                                                        grid_coordinates = prf_grid_coordinates, 
+                                                        model_type = model_type,
+                                                        paradigm = prf_stimulus_dm,  
+                                                        pars_gd = pars_gauss_gd)
+                    
+                    prf_pars_gd_dict[roi_name][participant] = prf_pars_gd_dict[roi_name][participant].join(r2_gauss_gd.to_frame('r2_gauss'))
+                    
+        ## make eccentricity size df
+        ecc_size_df = []
+
+        for pp in participant_list:
+            for ind, roi_name in enumerate(ROI_list):
+                ## calculate eccentricity
+                eccentricity = np.abs(prf_pars_gd_dict[roi_name][pp].iloc[prf_best_voxels_dict[roi_name][pp]].x +\
+                                    prf_pars_gd_dict[roi_name][pp].iloc[prf_best_voxels_dict[roi_name][pp]].y * 1j)
+
+                ecc_size_df.append(pd.DataFrame({'sj': np.repeat(pp, len(eccentricity)),
+                                                'r2': prf_pars_gd_dict[roi_name][pp].iloc[prf_best_voxels_dict[roi_name][pp]].r2,
+                                                'size': prf_pars_gd_dict[roi_name][pp].iloc[prf_best_voxels_dict[roi_name][pp]].sd,
+                                                'ecc': eccentricity,
+                                                'ROI': np.repeat(roi_name, len(eccentricity))
+                                                }))
+        ecc_size_df = pd.concat(ecc_size_df, ignore_index=True)
+                    
+        ## now actually plot
+        if len(participant_list) == 1: 
+            
+            ## make figure with voxel locations for all ROIs of participant
+            fig, axes = plt.subplots(nrows=1, ncols=len(ROI_list), figsize = (3.5*len(ROI_list),4), sharey=True, sharex=True)
+            fig.suptitle('PRF locations', fontsize=16)
+
+            for ind, roi_name in enumerate(ROI_list):
+                sns.scatterplot(x='x', y='y', hue='r2', data=prf_pars_gd_dict[roi_name][pp], 
+                            size='sd', sizes=(10, 100), palette='viridis',
+                            ax = axes[ind], legend = True)
+                axes[ind].set_title(roi_name, fontsize=16)
+            fig.tight_layout()
+            fig.savefig(base_filename+'_pRF_locations.png')
+            
+            ## make figure with voxel locations used in decoder
+            fig, axes = plt.subplots(nrows=1, ncols=len(ROI_list), figsize = (3.5*len(ROI_list),4), sharey=True, sharex=True)
+            fig.suptitle('PRF locations (voxels used in decoding)', fontsize=16)
+
+            for ind, roi_name in enumerate(ROI_list):
+                ## Let's plot the location of voxels used in decoding
+                sns.scatterplot(x='x', y='y', hue='r2', 
+                                data=prf_pars_gd_dict[roi_name][pp].iloc[prf_best_voxels_dict[roi_name][pp]], 
+                            size='sd', sizes=(10, 100), palette='viridis',
+                            ax = axes[ind], legend = True)
+                axes[ind].set_title(roi_name, fontsize=16)
+            fig.tight_layout()
+            fig.savefig(base_filename+'_pRF_locations_bestvox.png')
+            
+            ## make figure with voxel locations used in decoder
+            # as polar angle map
+            fig, axes = plt.subplots(nrows=1, ncols=len(ROI_list), figsize = (3.5*len(ROI_list),4), sharey=True, sharex=True,
+                                    subplot_kw={'projection': 'polar'})
+            fig.suptitle('PRF locations (voxels used in decoding)', fontsize=16)
+
+            for ind, roi_name in enumerate(ROI_list):
+                ## calculate eccentricity
+                eccentricity = np.abs(prf_pars_gd_dict[roi_name][pp].iloc[prf_best_voxels_dict[roi_name][pp]].x +\
+                                    prf_pars_gd_dict[roi_name][pp].iloc[prf_best_voxels_dict[roi_name][pp]].y * 1j)
+                
+                ## polar angle
+                polar_angle = np.angle(prf_pars_gd_dict[roi_name][pp].iloc[prf_best_voxels_dict[roi_name][pp]].x +\
+                                    prf_pars_gd_dict[roi_name][pp].iloc[prf_best_voxels_dict[roi_name][pp]].y * 1j)
+                
+                # plot polar
+                axes[ind].scatter(polar_angle, eccentricity, c=polar_angle, cmap='hsv')
+                
+                axes[ind].set_title(roi_name, fontsize=16)
+            fig.tight_layout()
+            fig.savefig(base_filename+'_pRF_PA_bestvox.png')
+            
+            ## Plt RSQ distribution for participant
+            fig, axes = plt.subplots(nrows=1, ncols=len(ROI_list), figsize = (3.5*len(ROI_list),4), sharey=True, sharex=True)
+            fig.suptitle('RSQ encoding model %s\n(voxels used in decoding)'%model_type.upper(), fontsize=16)
+
+            for ind, roi_name in enumerate(ROI_list):
+                sns.boxplot(y='r2', 
+                            data=prf_pars_gd_dict[roi_name][pp].iloc[prf_best_voxels_dict[roi_name][pp]], 
+                            color = self.MRIObj.params['plotting']['ROI_pal'][roi_name],
+                            width=.5, linewidth = 3,
+                            ax = axes[ind])
+                axes[ind].set_title(roi_name, fontsize=16)
+                
+            axes[0].tick_params(axis='both', which='major', labelsize=18)
+            axes[0].set_ylim(0,1)
+            axes[0].set_ylabel('RSQ',fontsize = 20, labelpad=18)
+            fig.tight_layout()
+            fig.savefig(base_filename+'_pRF_RSQ_bestvox.png')
+            
+            ## make eccentricity size plots for one participant
+            lm = sns.lmplot(ecc_size_df[ecc_size_df['sj'] == pp], x = 'ecc', y = 'size', hue = 'ROI', markers="x", 
+                            palette = self.MRIObj.params['plotting']['ROI_pal'],
+                    scatter_kws={'alpha':0.2}, height=5, legend = False)
+
+            lm.fig.suptitle('encoding model %s\n(voxels used in decoding)'%model_type.upper(), fontsize=16)
+            lm.set_xlabels('Eccentricity', fontsize = 20, labelpad=18)
+            lm.set_ylabels('Size', fontsize = 20, labelpad=18)
+            lm.tick_params(axis='both', which='major', labelsize=18)
+
+            leg = lm.axes[0,0].legend(loc='center left', bbox_to_anchor=(1, 0.5))
+            for lh in leg.legendHandles: 
+                lh.set_alpha(1)
+            lm.figure.savefig(base_filename+'_pRF_ECC-SIZE_bestvox.png')
+            
+            # ## compare RsQ of 2 models
+            # if 'gauss' not in model_type:
+            #     regp = sns.relplot(x ='r2_gauss', y = 'r2', 
+            #                       data = r2_both.reset_index(), kind='scatter')
+            #     plt.plot([0, 1], [0, 1], 'k--')
+            
+        else:
+            ## first get average per pp and ROI
+            group_r2_df = []
+            for pp in participant_list:
+                r2_pp = [np.mean(prf_pars_gd_dict[roi_name][pp].iloc[prf_best_voxels_dict[roi_name][pp]].r2) for roi_name in ROI_list]
+                
+                group_r2_df.append(pd.DataFrame({'sj': np.repeat(pp, len(ROI_list)),
+                                                'r2': r2_pp,
+                                                'ROI': ROI_list}))
+            group_r2_df = pd.concat(group_r2_df, ignore_index=True)
+            
+            ## Plt RSQ distribution for GROUP
+            fig, axes = plt.subplots(nrows=1, ncols=1, figsize = (10,5), sharey=True, sharex=True)
+            fig.suptitle('RSQ encoding model %s\n(voxels used in decoding)'%model_type.upper(), fontsize=16)
+
+            sns.boxplot(y='r2', x = 'ROI',
+                        data=group_r2_df, 
+                        palette = self.MRIObj.params['plotting']['ROI_pal'],
+                        hue = 'ROI', hue_order=ROI_list,
+                        width=.5, linewidth = 3,
+                        ax = axes)
+
+            sns.stripplot(data = group_r2_df,
+                        x = 'ROI', y = 'r2', 
+                        order = ROI_list, palette = sns.color_palette("bright", len(participant_list)),
+                        hue = 'sj', alpha=1, jitter = .1, legend = False,
+                        ax=axes)
+            axes.tick_params(axis='both', which='major', labelsize=18)
+            axes.set_ylim(0,1)
+            axes.set_ylabel('RSQ',fontsize = 20, labelpad=18)
+            axes.set_xlabel('')
+            fig.tight_layout()
+            fig.savefig(base_filename+'_pRF_RSQ_bestvox.png')
+            
+            ## make binned df for group plot
+            avg_binned_df = [] 
+            n_bins = 10
+            for roi_name in ROI_list:
+                
+                cuts = pd.cut(ecc_size_df[ecc_size_df['ROI'] == roi_name]['ecc'], n_bins)
+
+                # get binned average
+                tmp_df = ecc_size_df[ecc_size_df['ROI'] == roi_name].groupby(['sj', cuts])['size'].mean().reset_index()
+
+                # create average ecc range
+                ecc_range = np.linspace(ecc_size_df[ecc_size_df['ROI'] == roi_name]['ecc'].min(),
+                                        ecc_size_df[ecc_size_df['ROI'] == roi_name]['ecc'].max(), n_bins)
+
+                # get category codes
+                ind_categ = tmp_df.ecc.cat.codes.values
+
+                # replace ecc with average ecc of bin
+                tmp_df.loc[:,'ecc'] = np.array([ecc_range[i] for i in ind_categ])
+                tmp_df.loc[:, 'ROI'] = roi_name
+    
+                avg_binned_df.append(tmp_df)
+            avg_binned_df = pd.concat(avg_binned_df, ignore_index=True)
+            
+            ## make binned eccentricity size plots
+            # for group
+            lm = sns.lmplot(avg_binned_df, x = 'ecc', y = 'size', hue = 'ROI', markers="x", 
+                            palette = self.MRIObj.params['plotting']['ROI_pal'],
+                    scatter_kws={'alpha':0.2}, height=5, legend = False)
+
+            lm.fig.suptitle('encoding model %s\n(voxels used in decoding)'%model_type.upper(), fontsize=16)
+            lm.set_xlabels('Eccentricity', fontsize = 20, labelpad=18)
+            lm.set_ylabels('Size', fontsize = 20, labelpad=18)
+            lm.tick_params(axis='both', which='major', labelsize=18)
+
+            leg = lm.axes[0,0].legend(loc='center left', bbox_to_anchor=(1, 0.5))
+            for lh in leg.legendHandles: 
+                lh.set_alpha(1)
+            
+            lm.figure.savefig(base_filename+'_pRF_ECC-SIZE_bestvox.png')
+         
                 
     def animate_parallel_stim(self, participant_list = [], average_stim_dict = None, flip_average_stim_dict = None, 
                                     run_position_df_dict = None, lowres_DM_dict = None,

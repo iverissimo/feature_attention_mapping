@@ -2733,5 +2733,78 @@ class Decoding_Model(GLMsingle_Model):
             
         return pp_avg_stim_df
         
-                            
+    def get_pp_all_trial_drive(self, reconstructed_stim_dict = None, lowres_DM_dict = None, reference_data_keys = [],
+                                    run_position_df_dict = None):
         
+        """
+        Get bar drive for all trials (averaged across runs)
+        of a given participant
+        """
+        
+        # referance data key
+        ref_dfkeys = reference_data_keys[0]
+        
+        # get reference stim + dms + bar positions
+        pp_ref_stim = reconstructed_stim_dict[ref_dfkeys]
+        pp_ref_att_dm = lowres_DM_dict['att_bar'][ref_dfkeys]
+        pp_ref_unatt_dm = lowres_DM_dict['unatt_bar'][ref_dfkeys]
+        pp_ref_run_pos_df = run_position_df_dict[ref_dfkeys]
+        
+        # total number of trials
+        n_trials = len(pp_ref_att_dm)
+        
+        ## get attended bar drive for all trials
+        att_drive_all = np.array([np.mean(pp_ref_stim.stack('y').loc[i].iloc[::-1, :].to_numpy()[np.where(pp_ref_att_dm[i].T)], axis = 0) for i in range(n_trials)])
+        ## and same for unattended bar
+        unatt_drive_all = np.array([np.mean(pp_ref_stim.stack('y').loc[i].iloc[::-1, :].to_numpy()[np.where(pp_ref_unatt_dm[i].T)], axis = 0) for i in range(n_trials)])
+
+        ## make drive df all trials
+
+        ## first for attended bar
+        att_df = pp_ref_run_pos_df.query('attend_condition').sort_values('trial_ind')[['trial_ind', 'bars_pos', 'bar_ecc', 'abs_inter_bar_dist']]
+        att_df.rename(columns={'bars_pos': 'bar_orientation', 
+                            'abs_inter_bar_dist': 'bar_dist'}, inplace=True)
+        # add relevant info
+        att_df.loc[:, 'bar_type'] = 'att_bar'
+        att_df.loc[:, 'drive'] = att_drive_all
+
+        ## same for unattended bar
+        unatt_df = pp_ref_run_pos_df.query('~attend_condition').sort_values('trial_ind')[['trial_ind', 'bars_pos', 'bar_ecc', 'abs_inter_bar_dist']]
+        unatt_df.rename(columns={'bars_pos': 'bar_orientation', 
+                            'abs_inter_bar_dist': 'bar_dist'}, inplace=True)
+        # add relevant info
+        unatt_df.loc[:, 'bar_type'] = 'unatt_bar'
+        unatt_df.loc[:, 'drive'] = unatt_drive_all
+
+        ## combine
+        df_drive_pp = pd.concat((att_df, unatt_df), ignore_index=True)
+        
+        return df_drive_pp
+    
+    def get_all_trial_drive(self, participant_list = [], ROI_list = ['V1'],    
+                                reconstructed_stim_dict = None, lowres_DM_dict = None, reference_data_keys_dict = None,
+                                run_position_df_dict = None):
+        
+        """
+        Get bar drive for all trials (averaged across runs)
+        of all participants and ROIs
+        """
+        
+        df_drive = []
+                
+        for roi_name in ROI_list:
+            for participant in participant_list:
+                                
+                df_drive_pp = self.get_pp_all_trial_drive(reconstructed_stim_dict = reconstructed_stim_dict[roi_name]['sub-{sj}'.format(sj = participant)], 
+                                                        lowres_DM_dict = lowres_DM_dict['sub-{sj}'.format(sj = participant)], 
+                                                        reference_data_keys = reference_data_keys_dict['sub-{sj}'.format(sj = participant)],
+                                                        run_position_df_dict = run_position_df_dict['sub-{sj}'.format(sj = participant)])
+                # add relevant info
+                df_drive_pp.loc[:, 'ROI'] = roi_name
+                df_drive_pp.loc[:, 'sj'] = 'sub-{sj}'.format(sj = participant)
+                
+                # and append
+                df_drive.append(df_drive_pp)
+        df_drive = pd.concat(df_drive, ignore_index=True)
+        
+        return df_drive

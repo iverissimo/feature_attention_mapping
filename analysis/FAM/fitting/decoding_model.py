@@ -2683,9 +2683,12 @@ class Decoding_Model(GLMsingle_Model):
         
         for participant in participant_list:
             
-            avg_stim_df_dict['sub-{sj}'.format(sj = participant)] = self.get_pp_run_stim_average(reconstructed_stim_dict = reconstructed_stim_dict['sub-{sj}'.format(sj = participant)], 
-                                                                                                 lowres_DM_dict = lowres_DM_dict['sub-{sj}'.format(sj = participant)], 
-                                                                                                 data_keys_dict = data_keys_dict['sub-{sj}'.format(sj = participant)])
+            pp_avg_stim_df = self.get_pp_run_stim_average(reconstructed_stim_dict = reconstructed_stim_dict['sub-{sj}'.format(sj = participant)], 
+                                                        lowres_DM_dict = lowres_DM_dict['sub-{sj}'.format(sj = participant)], 
+                                                        data_keys_dict = data_keys_dict['sub-{sj}'.format(sj = participant)])
+            
+            # reference bar positions is first run configuraiton of data df keys, so store as such
+            avg_stim_df_dict['sub-{sj}'.format(sj = participant)] = {data_keys_dict['sub-{sj}'.format(sj = participant)][0]: pp_avg_stim_df}
             
         return avg_stim_df_dict
         

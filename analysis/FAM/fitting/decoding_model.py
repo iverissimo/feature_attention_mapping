@@ -1669,7 +1669,7 @@ class Decoding_Model(GLMsingle_Model):
                                                                 model_type = 'gauss_hrf')
                     r2_gauss_gd = self.get_encoding_r2(data = prf_masked_data_df, 
                                                         grid_coordinates = prf_grid_coordinates, 
-                                                        model_type = model_type,
+                                                        model_type = 'gauss_hrf',
                                                         paradigm = prf_stimulus_dm,  
                                                         pars_gd = pars_gauss_gd)
                     
@@ -1856,8 +1856,7 @@ class Decoding_Model(GLMsingle_Model):
                 lh.set_alpha(1)
             
             lm.figure.savefig(base_filename+'_pRF_ECC-SIZE_bestvox.png')
-         
-                
+                   
     def animate_parallel_stim(self, participant_list = [], average_stim_dict = None, flip_average_stim_dict = None, 
                                     run_position_df_dict = None, lowres_DM_dict = None,
                                     bar_ecc = 'far',  vmin = 0, vmax = .4, cmap = 'plasma', annot = False, 
@@ -2673,6 +2672,63 @@ class Decoding_Model(GLMsingle_Model):
         stim_corr_df = pd.concat(stim_corr_df, ignore_index=True)  
         
         return stim_corr_df    
+   
+    def get_run_stim_average(self, participant_list = [], reconstructed_stim_dict = None, lowres_DM_dict = None, data_keys_dict = []):
+        
+        """average reconstructed stim across runs
+        for all participants
+        """
+        
+        avg_stim_df_dict = {}
+        
+        for participant in participant_list:
+            
+            avg_stim_df_dict['sub-{sj}'.format(sj = participant)] = self.get_pp_run_stim_average(reconstructed_stim_dict = reconstructed_stim_dict['sub-{sj}'.format(sj = participant)], 
+                                                                                                 lowres_DM_dict = lowres_DM_dict['sub-{sj}'.format(sj = participant)], 
+                                                                                                 data_keys_dict = data_keys_dict['sub-{sj}'.format(sj = participant)])
+            
+        return avg_stim_df_dict
+        
+    def get_pp_run_stim_average(self, reconstructed_stim_dict = None, lowres_DM_dict = None, data_keys_dict = []):
+        
+        """average reconstructed stim across runs
+        for a given participant
+        """
+        
+        # use first run of list as reference key
+        ref_dfkey = data_keys_dict[0]
 
-                                
+        # make reference trial index array
+        ref_trial_ind = np.arange(len(lowres_DM_dict['full_stim'][ref_dfkey]))
+
+        # store reconstructed_stim, averaged across runs,
+        pp_avg_stim_df = reconstructed_stim_dict[ref_dfkey].copy()
+
+        # for each reference trial
+        for ref_t in ref_trial_ind:
+            
+            # first array stacked is reference run trial
+            avg_values = [pp_avg_stim_df.loc[ref_t].values]
+                
+            # iterate over rest of runs
+            for dfkey in data_keys_dict[1:]:
+                
+                # get array with trial indices where 
+                # bar position == bar position from reference-run trial
+                trials_ref_barpos = np.where((lowres_DM_dict['full_stim'][dfkey].reshape(len(ref_trial_ind), -1) == lowres_DM_dict['full_stim'][ref_dfkey][ref_t].ravel()).all(-1))[0]
+
+                # then from those, check which one is the same condition
+                # (attended bar position == attended bar position from reference-run trial)
+                new_t = np.where((lowres_DM_dict['att_bar'][dfkey][trials_ref_barpos,...].reshape(2, -1) == lowres_DM_dict['att_bar'][ref_dfkey][ref_t].ravel()).all(-1))[0][0]
+                dfkey_trial = trials_ref_barpos[new_t]
+                
+                # append trial stim values
+                avg_values.append(reconstructed_stim_dict[dfkey].loc[dfkey_trial].values)
+                
+            # replace with average values across runs
+            pp_avg_stim_df.loc[ref_t, :] = np.mean(np.stack(avg_values), axis = 0)
+            
+        return pp_avg_stim_df
+        
+                            
         

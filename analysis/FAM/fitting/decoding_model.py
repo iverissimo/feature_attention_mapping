@@ -2119,6 +2119,15 @@ class Decoding_Model(GLMsingle_Model):
                                                                         model_type = model_type, 
                                                                         data_keys_dict = data_keys_dict)
             
+            ## average reconstructed stim across runs
+            reconstructed_stim_dict = self.get_run_stim_average(participant_list = participant_list, 
+                                                                reconstructed_stim_dict = reconstructed_stim_dict,
+                                                                lowres_DM_dict = lowres_DM_dict, 
+                                                                data_keys_dict = data_keys_dict)
+            
+            ## get reference data keys for all participants
+            reference_data_keys_dict = {key: item[:1] for key, item in data_keys_dict.items()}
+            
             # set vmax for plots, at 90% of value distribution
             all_pix_values = np.array([items2.values.ravel() for keynames1, items1 in reconstructed_stim_dict.items() for keynames2, items2 in items1.items()])
             all_pix_values = all_pix_values.ravel()
@@ -2129,7 +2138,7 @@ class Decoding_Model(GLMsingle_Model):
             if len(participant_list) == 1:
                 
                 ## correlate reconstructed stim with downsampled DM across runs
-                for ind, df_key in enumerate(data_keys_dict['sub-{sj}'.format(sj = pp)]):
+                for ind, df_key in enumerate(reference_data_keys_dict['sub-{sj}'.format(sj = pp)]):
                     
                     corr, pval = scipy.stats.pearsonr(reconstructed_stim_dict['sub-{sj}'.format(sj = pp)][df_key].values.ravel(), 
                                                     lowres_DM_dict['sub-{sj}'.format(sj = pp)]['full_stim'][df_key].ravel())
@@ -2137,9 +2146,9 @@ class Decoding_Model(GLMsingle_Model):
 
                 ## find trials where attended bar and unattended bar in same position
                 same_bar_pos_ind_dict = self.get_same_bar_pos_ind_dict(lowresDM_dict = lowres_DM_dict['sub-{sj}'.format(sj = pp)], 
-                                                                        data_keys = data_keys_dict['sub-{sj}'.format(sj = pp)])
+                                                                        data_keys = reference_data_keys_dict['sub-{sj}'.format(sj = pp)])
 
-                for ind, df_key in enumerate(data_keys_dict['sub-{sj}'.format(sj = pp)]):
+                for ind, df_key in enumerate(reference_data_keys_dict['sub-{sj}'.format(sj = pp)]):
                     
                     corr, pval = scipy.stats.pearsonr(reconstructed_stim_dict['sub-{sj}'.format(sj = pp)][df_key].values[same_bar_pos_ind_dict[df_key][:,0]].ravel(), 
                                                     reconstructed_stim_dict['sub-{sj}'.format(sj = pp)][df_key].values[same_bar_pos_ind_dict[df_key][:,1]].ravel())

@@ -555,6 +555,29 @@ class Decoding_Model(GLMsingle_Model):
         
         return downsample_FA_DM
     
+    def get_min_dist_competing_bar(self, trial_num = 0, coord_y_bar = None, coord_x_bar = None, 
+                                        dm_comp_bar = None, 
+                                        coord_x_deg_arr = None, coord_y_deg_arr = None):
+        
+        """Get minimum distance to competing bar
+        """
+        
+        competing_bar_coords = [(c[0], c[1]) for c in np.stack(np.where(dm_comp_bar.T[...,trial_num])).T]
+        # convert to deg
+        competing_bar_coords_deg = [(coord_y_deg_arr[c[0]],coord_x_deg_arr[c[1]]) for c in competing_bar_coords]
+
+        # convert origin coords to deg too
+        coord_y_deg = coord_y_deg_arr[coord_y_bar]
+        coord_x_deg = coord_x_deg_arr[coord_x_bar]
+
+        # the get distances
+        competing_dist_list = [np.sqrt((coord_y_deg - p2[0]) ** 2 + (coord_x_deg - p2[1]) ** 2) for p2 in competing_bar_coords_deg]
+        
+        # return smallest dist
+        return np.min(competing_dist_list)
+        
+        
+    
     def plot_avg_parallel_stim(self, average_stim = None, flip_average_stim = None, DM_trl_ind = None,
                                     bar_ecc = None, bar_dist = None, downsample_FA_DM = None, 
                                     vmin = 0, vmax = .4, cmap = 'magma', filename = None, annot = True):

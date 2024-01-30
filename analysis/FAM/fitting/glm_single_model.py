@@ -143,12 +143,12 @@ class GLMsingle_Model(Model):
 
                 ## GET DM FOR ATTENDED BAR
                 out_dict[ses_run_id]['att_bar'] = self.get_bar_visual_dm(midpoint_bar = AttBar_bar_midpoint, 
-                                                                                            direction_bar = AttBar_bar_pass_direction, 
-                                                                                            res_scaling = .1)
+                                                                        direction_bar = AttBar_bar_pass_direction, 
+                                                                        res_scaling = .1)
                 ## GET DM FOR UNATTENDED BAR
                 out_dict[ses_run_id]['unatt_bar'] = self.get_bar_visual_dm(midpoint_bar = UnattBar_bar_midpoint, 
-                                                                                            direction_bar = UnattBar_bar_pass_direction, 
-                                                                                            res_scaling = .1)
+                                                                        direction_bar = UnattBar_bar_pass_direction, 
+                                                                        res_scaling = .1)
 
                 ## GET DM FOR OVERLAP OF BARS
                 out_dict[ses_run_id]['overlap'] = self.MRIObj.mri_utils.get_bar_overlap_dm(np.stack((out_dict[ses_run_id]['att_bar'],

@@ -188,15 +188,36 @@ class Decoding_Model(GLMsingle_Model):
         
         return prf_stimulus_dm, prf_grid_coordinates
     
-    def make_df_run_bar_pos(self, run_df = None):
+    def make_df_run_bar_pos(self, run_df = None, prf_bar_coords_dict = None):
         
         """make data frame with bar positions and indices for each trial
         for a given run (in a summarized way)
         """
         
+        ## get run bar midpoint and direction values
+        # for each bar type (arrays will have len == total number of trial types)
+        AttBar_bar_midpoint, AttBar_bar_pass_direction = run_df.loc[(run_df['attend_condition'] == 1), 
+                                                                            ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
+        UnattBar_bar_midpoint, UnattBar_bar_pass_direction = run_df.loc[(run_df['attend_condition'] == 0), 
+                                                                            ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
+
         ## find parallel + crossed bar trial indices
-        parallel_bar_ind = np.where((run_df[run_df['attend_condition'] == 1].bar_pass_direction_at_TR.values[0] == run_df[run_df['attend_condition'] == 0].bar_pass_direction_at_TR.values[0]))[0]
-        crossed_bar_ind = np.where((run_df[run_df['attend_condition'] == 1].bar_pass_direction_at_TR.values[0] != run_df[run_df['attend_condition'] == 0].bar_pass_direction_at_TR.values[0]))[0]
+        parallel_bar_ind = np.where((AttBar_bar_pass_direction == UnattBar_bar_pass_direction))[0]
+        crossed_bar_ind = np.where((AttBar_bar_pass_direction != UnattBar_bar_pass_direction))[0]
+
+        # check for masked trials
+        if prf_bar_coords_dict is not None:
+            print('checking for trials to mask')
+            t_mask = self.get_trial_ind_mask(AttBar_bar_midpoint = AttBar_bar_midpoint, 
+                                            AttBar_bar_pass_direction = AttBar_bar_pass_direction,
+                                            UnattBar_bar_midpoint = UnattBar_bar_midpoint, 
+                                            UnattBar_bar_pass_direction = UnattBar_bar_pass_direction,
+                                            prf_bar_coords_dict = prf_bar_coords_dict)
+            # if trials to mask
+            if t_mask is not None:
+                print('removing %i trials'%len(t_mask))
+                parallel_bar_ind = np.array([val for val in parallel_bar_ind if val not in t_mask])
+                crossed_bar_ind = np.array([val for val in crossed_bar_ind if val not in t_mask])
 
         ## make summary dataframe 
         position_df = []
@@ -309,10 +330,13 @@ class Decoding_Model(GLMsingle_Model):
         """find trials where attended bar and unattended bar in same position
         to correlate with each other
         """
-        n_trials = DM_arr.shape[0]
+        
+        ## get trial indices that were NOT masked 
+        trials_arr = np.where((np.sum(np.sum(DM_arr, axis = -1), axis = -1) != 0))[0]
+        
         same_bar_pos_ind = []
 
-        for i in range(n_trials):
+        for i in trials_arr:
 
             ind_list = np.where((DM_arr.reshape(132, -1) == DM_arr[i].ravel()).all(-1))[0]
             same_bar_pos_ind.append(ind_list)
@@ -1292,7 +1316,7 @@ class Decoding_Model(GLMsingle_Model):
             
         return same_bar_pos_ind_dict
     
-    def get_run_position_df_dict(self, pp_bar_pos_df = None,  data_keys = ['ses-1_run-1']):
+    def get_run_position_df_dict(self, pp_bar_pos_df = None,  data_keys = ['ses-1_run-1'], pp_prf_bar_coords_dict = None):
         
         """make data frame with bar positions and indices in trial
         """
@@ -1305,7 +1329,8 @@ class Decoding_Model(GLMsingle_Model):
             # get run number and session, to avoid mistakes 
             file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(df_key)
             
-            run_position_df_dict[df_key] = self.make_df_run_bar_pos(run_df = pp_bar_pos_df['ses-{s}'.format(s = file_sn)]['run-{r}'.format(r=file_rn)])
+            run_position_df_dict[df_key] = self.make_df_run_bar_pos(run_df = pp_bar_pos_df['ses-{s}'.format(s = file_sn)]['run-{r}'.format(r=file_rn)],
+                                                                    prf_bar_coords_dict = pp_prf_bar_coords_dict)
 
         return run_position_df_dict
     
@@ -1600,7 +1625,8 @@ class Decoding_Model(GLMsingle_Model):
                   
         return data_keys_dict
     
-    def load_group_run_position_df_dict(self, participant_list = [], group_bar_pos_df = None, data_keys_dict = {}):
+    def load_group_run_position_df_dict(self, participant_list = [], group_bar_pos_df = None, data_keys_dict = {},
+                                            prf_bar_coords_dict = None):
         
         """Load FA downsampled DM for all participants in participant list
         returns dict of DMs 
@@ -1614,7 +1640,8 @@ class Decoding_Model(GLMsingle_Model):
             
             ## get FA bar position dict, across runs
             run_position_df_dict =  self.get_run_position_df_dict(pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = participant)],  
-                                                                data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)])
+                                                                data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)],
+                                                                pp_prf_bar_coords_dict = prf_bar_coords_dict['sub-{sj}'.format(sj = participant)])
             
             group_run_pos_df_dict['sub-{sj}'.format(sj = participant)] = run_position_df_dict
             
@@ -2106,7 +2133,7 @@ class Decoding_Model(GLMsingle_Model):
 
     def plot_decoder_results(self, participant_list = [], ROI_list = ['V1'], model_type = 'gauss_hrf',
                         prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean', fa_file_ext = '_cropped.nii.gz',
-                        mask_bool_df = None, stim_on_screen = [], group_bar_pos_df = []):
+                        mask_bool_df = None, stim_on_screen = [], group_bar_pos_df = [], prf_bar_coords_dict = None):
         
         """plot reconstructed stim averaged over unique conditions
         for all participants and ROIs
@@ -2132,12 +2159,14 @@ class Decoding_Model(GLMsingle_Model):
         ## get downsampled FA DM for group
         lowres_DM_dict = self.load_group_DM_dict(participant_list = participant_list, 
                                                 group_bar_pos_df = group_bar_pos_df, 
-                                                data_keys_dict = data_keys_dict)
+                                                data_keys_dict = data_keys_dict,
+                                                prf_bar_coords_dict = prf_bar_coords_dict)
         
         ## get FA bar position dict, across runs, for group
         run_position_df_dict = self.load_group_run_position_df_dict(participant_list = participant_list, 
                                                                     group_bar_pos_df = group_bar_pos_df,  
-                                                                    data_keys_dict = data_keys_dict)
+                                                                    data_keys_dict = data_keys_dict,
+                                                                    prf_bar_coords_dict = prf_bar_coords_dict)
         
         # iterate over ROIs             
         for roi_name in ROI_list:
@@ -2167,7 +2196,7 @@ class Decoding_Model(GLMsingle_Model):
             vmax = np.quantile(all_pix_values, .85)
             print('setting vmax as %.2f'%vmax)
                
-            # prin correlation values, just to check         
+            # print correlation values, just to check         
             if len(participant_list) == 1:
                 
                 ## correlate reconstructed stim with downsampled DM across runs
@@ -2625,9 +2654,14 @@ class Decoding_Model(GLMsingle_Model):
         across runs for a given participant
         """ 
         
+        # check for masked trials -> make index array for each run
+        bar_present_dict = {df_key: np.where((np.sum(np.sum(lowres_DM_dict[df_key], 
+                                         axis = -1), 
+                                        axis = -1) != 0))[0] for df_key in data_keys_dict}
+        
         # concatenate arrays across runs
-        stim_runs = np.hstack((reconstructed_stim_dict[df_key].values.ravel() for df_key in data_keys_dict))
-        dm_runs = np.hstack((lowres_DM_dict[df_key].ravel() for df_key in data_keys_dict))
+        stim_runs = np.hstack((reconstructed_stim_dict[df_key].values[bar_present_dict[df_key]].ravel() for df_key in data_keys_dict))
+        dm_runs = np.hstack((lowres_DM_dict[df_key][bar_present_dict[df_key]].ravel() for df_key in data_keys_dict))
         
         # correlate reconstructed stim with downsampled DM
         corr, pval = scipy.stats.pearsonr(stim_runs, dm_runs)
@@ -2802,13 +2836,13 @@ class Decoding_Model(GLMsingle_Model):
         pp_ref_unatt_dm = lowres_DM_dict['unatt_bar'][ref_dfkeys]
         pp_ref_run_pos_df = run_position_df_dict[ref_dfkeys]
         
-        # total number of trials
-        n_trials = len(pp_ref_att_dm)
+        # trial index aray
+        trials_arr = pp_ref_run_pos_df.sort_values('trial_ind').trial_ind.unique()
         
         ## get attended bar drive for all trials
-        att_drive_all = np.array([np.mean(pp_ref_stim.stack('y').loc[i].iloc[::-1, :].to_numpy()[np.where(pp_ref_att_dm[i].T)], axis = 0) for i in range(n_trials)])
+        att_drive_all = np.array([np.mean(pp_ref_stim.stack('y').loc[i].iloc[::-1, :].to_numpy()[np.where(pp_ref_att_dm[i].T)], axis = 0) for i in trials_arr])
         ## and same for unattended bar
-        unatt_drive_all = np.array([np.mean(pp_ref_stim.stack('y').loc[i].iloc[::-1, :].to_numpy()[np.where(pp_ref_unatt_dm[i].T)], axis = 0) for i in range(n_trials)])
+        unatt_drive_all = np.array([np.mean(pp_ref_stim.stack('y').loc[i].iloc[::-1, :].to_numpy()[np.where(pp_ref_unatt_dm[i].T)], axis = 0) for i in trials_arr])
 
         ## make drive df all trials
 

@@ -267,6 +267,15 @@ match task:
                                                                                         crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                                         shift = FAM_data.shift_TRs_num)) 
             
+            ## get prf bar position dict
+            # to mask out FA trials that were not fully visible
+            prf_bar_coords_dict = FAM_pRF.get_masked_bar_coords(participant_list = FAM_data.sj_num, 
+                                                                ses = 'mean', 
+                                                                mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                                                                        crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                                        shift = FAM_data.shift_TRs_num), 
+                                                                bar_direction = None)
+            
             FAM_Decoder.plot_decoder_results(participant_list = FAM_data.sj_num, 
                                             ROI_list = ['V1','V2','V3','V3AB','LO','hV4'], #['V1'], 
                                             model_type = encoding_model_name,
@@ -279,7 +288,8 @@ match task:
                                             stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
                                                                                         crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                                         shift = FAM_data.shift_TRs_num), 
-                                            group_bar_pos_df = group_bar_pos_df)
+                                            group_bar_pos_df = group_bar_pos_df,
+                                            prf_bar_coords_dict = prf_bar_coords_dict)
 
         elif py_cmd == 'fitmodel': # fit FA model
             

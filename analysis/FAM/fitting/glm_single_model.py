@@ -103,7 +103,42 @@ class GLMsingle_Model(Model):
         y_coords_deg = np.concatenate((y_coords_deg, [self.bar_y_coords_pix[-1] + self.bar_width_pix[1]]))
         self.y_coords_deg = self.convert_pix2dva(y_coords_deg)
         
-    def get_visual_DM_dict(self, pp_bar_pos_df = None):
+    def get_trial_ind_mask(self, AttBar_bar_midpoint = [], AttBar_bar_pass_direction = [],
+                                UnattBar_bar_midpoint = [], UnattBar_bar_pass_direction = [],
+                                prf_bar_coords_dict = {}):
+        """
+        Given dict with prf bar coordinates, check which FA bars were visible
+        and return trial indices to mask out
+        """
+        
+        ## vertical bar passes
+        t_att = np.where(((AttBar_bar_pass_direction == 'vertical') &\
+                (~np.isin(AttBar_bar_midpoint[:,-1],prf_bar_coords_dict['vertical']))
+                ))[0]
+        t_unatt = np.where(((UnattBar_bar_pass_direction == 'vertical') &\
+                (~np.isin(UnattBar_bar_midpoint[:,-1],prf_bar_coords_dict['vertical']))
+                ))[0]
+        t_vert = np.hstack((t_att,t_unatt))
+        
+        ## horizontal bar passes
+        t_att = np.where(((AttBar_bar_pass_direction == 'horizontal') &\
+                (~np.isin(AttBar_bar_midpoint[:,0],prf_bar_coords_dict['horizontal']))
+                ))[0]
+        t_unatt = np.where(((UnattBar_bar_pass_direction == 'horizontal') &\
+                (~np.isin(UnattBar_bar_midpoint[:,0],prf_bar_coords_dict['horizontal']))
+                ))[0]
+        t_horiz = np.hstack((t_att,t_unatt))
+        
+        ## combine
+        t_mask = np.hstack((t_vert,t_horiz))
+        
+        ## if no trials to be masked, return none
+        if len(t_mask) == 0:
+            t_mask = None
+        
+        return t_mask
+        
+    def get_visual_DM_dict(self, pp_bar_pos_df = None, pp_prf_bar_coords_dict = None):
     
         """
         return dict for each participant run,
@@ -116,6 +151,9 @@ class GLMsingle_Model(Model):
         ----------
         pp_bar_pos_df: df/dict
             from behavioral object, with bar position info of participant runs
+        pp_prf_bar_coords_dict: df/dict
+            dict with prf bar positions for participant, vertical/horizontal runs
+            when given will be used to mask out not visible bar locations
         """ 
         
         # set empty dicts
@@ -141,14 +179,27 @@ class GLMsingle_Model(Model):
                 UnattBar_bar_midpoint, UnattBar_bar_pass_direction = run_bar_pos_df.loc[(run_bar_pos_df['attend_condition'] == 0), 
                                                                                     ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
 
+                # if possible, mask out not visible bar positions
+                if pp_prf_bar_coords_dict is not None:
+                    # get trial indices to mask out
+                    t_mask = self.get_trial_ind_mask(AttBar_bar_midpoint = AttBar_bar_midpoint, 
+                                                    AttBar_bar_pass_direction = AttBar_bar_pass_direction,
+                                                    UnattBar_bar_midpoint = UnattBar_bar_midpoint, 
+                                                    UnattBar_bar_pass_direction = UnattBar_bar_pass_direction,
+                                                    prf_bar_coords_dict = pp_prf_bar_coords_dict)
+                else:
+                    t_mask = None
+                    
                 ## GET DM FOR ATTENDED BAR
                 out_dict[ses_run_id]['att_bar'] = self.get_bar_visual_dm(midpoint_bar = AttBar_bar_midpoint, 
                                                                         direction_bar = AttBar_bar_pass_direction, 
-                                                                        res_scaling = .1)
+                                                                        res_scaling = .1,
+                                                                        trial_mask = t_mask)
                 ## GET DM FOR UNATTENDED BAR
                 out_dict[ses_run_id]['unatt_bar'] = self.get_bar_visual_dm(midpoint_bar = UnattBar_bar_midpoint, 
                                                                         direction_bar = UnattBar_bar_pass_direction, 
-                                                                        res_scaling = .1)
+                                                                        res_scaling = .1,
+                                                                        trial_mask = t_mask)
 
                 ## GET DM FOR OVERLAP OF BARS
                 out_dict[ses_run_id]['overlap'] = self.MRIObj.mri_utils.get_bar_overlap_dm(np.stack((out_dict[ses_run_id]['att_bar'],
@@ -166,7 +217,7 @@ class GLMsingle_Model(Model):
                 
         return out_dict, condition_dm_keys
         
-    def get_bar_visual_dm(self, midpoint_bar = None, direction_bar = None, res_scaling = .1):
+    def get_bar_visual_dm(self, midpoint_bar = None, direction_bar = None, res_scaling = .1, trial_mask = None):
         
         """Make visual design matrix, for a specific bar
         returns array of (trials, x, y)
@@ -208,6 +259,10 @@ class GLMsingle_Model(Model):
         
         ## and swap positions to get (time, x, y)
         visual_dm_array = np.rollaxis(visual_dm_array, 2, 1)
+        
+        # if we provided a trial mask, then set those trials to 0
+        if trial_mask is not None:
+            visual_dm_array[trial_mask] = 0
 
         return self.MRIObj.mri_utils.normalize(visual_dm_array)
         

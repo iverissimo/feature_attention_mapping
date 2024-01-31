@@ -747,7 +747,7 @@ class Decoding_Model(GLMsingle_Model):
     
     def fit_decoder(self, participant_list = [], ROI_list = ['V1'], overwrite = False, model_type = 'gauss_hrf',
                         prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean', fa_file_ext = '_cropped.nii.gz',
-                        mask_bool_df = None, stim_on_screen = [], group_bar_pos_df = []):
+                        mask_bool_df = None, stim_on_screen = [], group_bar_pos_df = [], prf_bar_coords_dict = None):
         
         """
         Fit decoder across participants
@@ -761,11 +761,13 @@ class Decoding_Model(GLMsingle_Model):
                 self.decode_ROI(participant = pp, roi_name = roi_name, overwrite = overwrite, prf_file_ext = prf_file_ext, 
                                 ses = ses, mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
                                 model_type = model_type, fa_file_ext = fa_file_ext, 
-                                pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = pp)])
+                                pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = pp)],
+                                prf_bar_coords_dict = prf_bar_coords_dict)
                        
     def decode_ROI(self, participant = None, roi_name = 'V1', overwrite = False, model_type = 'gauss_hrf',
                         prf_file_ext = '_cropped_dc_psc.nii.gz', fa_file_ext = '_cropped.nii.gz', ses = 'mean',
-                        mask_bool_df = None, stim_on_screen = [], save_estimates = True, pp_bar_pos_df = None):
+                        mask_bool_df = None, stim_on_screen = [], save_estimates = True, pp_bar_pos_df = None,
+                        prf_bar_coords_dict = None):
         
         """For a given participant and ROI,
         run decoder analysis
@@ -834,7 +836,8 @@ class Decoding_Model(GLMsingle_Model):
                                                 trial_num = 132)
         ## get FA DM and grid coordinates (8x8)
         FA_DM_dict, fa_grid_coordinates = self.get_FA_stim_grid(participant = participant, 
-                                                                group_bar_pos_df = {'sub-{sj}'.format(sj = participant): pp_bar_pos_df})
+                                                                group_bar_pos_df = {'sub-{sj}'.format(sj = participant): pp_bar_pos_df},
+                                                                prf_bar_coords_dict = prf_bar_coords_dict)
         
         ## decode over runs
         # save reconstructed stim as HDF5 file, to later load
@@ -932,13 +935,19 @@ class Decoding_Model(GLMsingle_Model):
         
         return reconstructed_stimulus
          
-    def get_FA_stim_grid(self, participant = None, group_bar_pos_df = None):
+    def get_FA_stim_grid(self, participant = None, group_bar_pos_df = None, prf_bar_coords_dict = None):
         
         """Get participant FA DM + grid coordinates that will be used in decoder
         """
         
+        # if we didnt provide a prf bar position mask, set to None
+        if prf_bar_coords_dict is None:
+            prf_bar_coords_dict = {}
+            prf_bar_coords_dict['sub-{sj}'.format(sj = participant)] = None
+        
         ## get FA DM
-        FA_DM_dict, _ = self.get_visual_DM_dict(pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = participant)])
+        FA_DM_dict, _ = self.get_visual_DM_dict(pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = participant)],
+                                                pp_prf_bar_coords_dict = prf_bar_coords_dict['sub-{sj}'.format(sj = participant)])
         
         ## get grid coordinates (8x8)
         fa_grid_coordinates = self.get_decoder_grid_coords()
@@ -1536,7 +1545,7 @@ class Decoding_Model(GLMsingle_Model):
                         
         return np.array(output_list)
     
-    def load_group_DM_dict(self, participant_list = [], group_bar_pos_df = None, data_keys_dict = {}):
+    def load_group_DM_dict(self, participant_list = [], group_bar_pos_df = None, data_keys_dict = {}, prf_bar_coords_dict = None):
         
         """Load FA downsampled DM for all participants in participant list
         returns dict of DMs 
@@ -1550,7 +1559,8 @@ class Decoding_Model(GLMsingle_Model):
             
             ## get FA DM and grid coordinates (8x8)
             FA_DM_dict, _ = self.get_FA_stim_grid(participant = participant, 
-                                                  group_bar_pos_df = group_bar_pos_df)
+                                                  group_bar_pos_df = group_bar_pos_df,
+                                                  prf_bar_coords_dict = prf_bar_coords_dict)
             
             ## get downsampled FA DM
             group_lowres_DM_dict['sub-{sj}'.format(sj = participant)] = self.get_lowresDM_dict(DM_dict = FA_DM_dict, 
@@ -2735,6 +2745,11 @@ class Decoding_Model(GLMsingle_Model):
 
         # make reference trial index array
         ref_trial_ind = np.arange(len(lowres_DM_dict['full_stim'][ref_dfkey]))
+        
+        # check for masked trials
+        t_mask = np.where((np.sum(np.sum(lowres_DM_dict['full_stim'][ref_dfkey], 
+                                         axis = -1), 
+                                  axis = -1) == 0))[0]
 
         # store reconstructed_stim, averaged across runs,
         pp_avg_stim_df = reconstructed_stim_dict[ref_dfkey].copy()
@@ -2742,27 +2757,32 @@ class Decoding_Model(GLMsingle_Model):
         # for each reference trial
         for ref_t in ref_trial_ind:
             
-            # first array stacked is reference run trial
-            avg_values = [pp_avg_stim_df.loc[ref_t].values]
-                
-            # iterate over rest of runs
-            for dfkey in data_keys_dict[1:]:
-                
-                # get array with trial indices where 
-                # bar position == bar position from reference-run trial
-                trials_ref_barpos = np.where((lowres_DM_dict['full_stim'][dfkey].reshape(len(ref_trial_ind), -1) == lowres_DM_dict['full_stim'][ref_dfkey][ref_t].ravel()).all(-1))[0]
-
-                # then from those, check which one is the same condition
-                # (attended bar position == attended bar position from reference-run trial)
-                new_t = np.where((lowres_DM_dict['att_bar'][dfkey][trials_ref_barpos,...].reshape(2, -1) == lowres_DM_dict['att_bar'][ref_dfkey][ref_t].ravel()).all(-1))[0][0]
-                dfkey_trial = trials_ref_barpos[new_t]
-                
-                # append trial stim values
-                avg_values.append(reconstructed_stim_dict[dfkey].loc[dfkey_trial].values)
-                
-            # replace with average values across runs
-            pp_avg_stim_df.loc[ref_t, :] = np.mean(np.stack(avg_values), axis = 0)
+            # if not masked trial
+            if ref_t not in t_mask:
             
+                # first array stacked is reference run trial
+                avg_values = [pp_avg_stim_df.loc[ref_t].values]
+                    
+                # iterate over rest of runs
+                for dfkey in data_keys_dict[1:]:
+                    
+                    # get array with trial indices where 
+                    # bar position == bar position from reference-run trial
+                    trials_ref_barpos = np.where((lowres_DM_dict['full_stim'][dfkey].reshape(len(ref_trial_ind), -1) == lowres_DM_dict['full_stim'][ref_dfkey][ref_t].ravel()).all(-1))[0]
+
+                    # then from those, check which one is the same condition
+                    # (attended bar position == attended bar position from reference-run trial)
+                    new_t = np.where((lowres_DM_dict['att_bar'][dfkey][trials_ref_barpos,...].reshape(2, -1) == lowres_DM_dict['att_bar'][ref_dfkey][ref_t].ravel()).all(-1))[0][0]
+                    dfkey_trial = trials_ref_barpos[new_t]
+                    
+                    # append trial stim values
+                    avg_values.append(reconstructed_stim_dict[dfkey].loc[dfkey_trial].values)
+                    
+                # replace with average values across runs
+                pp_avg_stim_df.loc[ref_t, :] = np.mean(np.stack(avg_values), axis = 0)
+            else:
+                pp_avg_stim_df.loc[ref_t, :] = 0
+                
         return pp_avg_stim_df
         
     def get_pp_all_trial_drive(self, reconstructed_stim_dict = None, lowres_DM_dict = None, reference_data_keys = [],

@@ -580,27 +580,143 @@ class Decoding_Model(GLMsingle_Model):
         return downsample_FA_DM
     
     def get_min_dist_competing_bar(self, trial_num = 0, coord_y_bar = None, coord_x_bar = None, 
-                                        dm_comp_bar = None, 
-                                        coord_x_deg_arr = None, coord_y_deg_arr = None):
+                                        dm_comp_bar = None, fa_grid_coordinates = None):
         
         """Get minimum distance to competing bar
+        note that provided coordinates expected to be in deg
         """
         
-        competing_bar_coords = [(c[0], c[1]) for c in np.stack(np.where(dm_comp_bar.T[...,trial_num])).T]
-        # convert to deg
-        competing_bar_coords_deg = [(coord_y_deg_arr[c[0]],coord_x_deg_arr[c[1]]) for c in competing_bar_coords]
+        # first get position index for pixels of competing bar
+        competing_bar_pix_ind = np.where(dm_comp_bar.reshape(dm_comp_bar.shape[0], -1)[trial_num])[0]
+        
+        # from fa coordinates df, subselect pixels and respective coordinates
+        competing_bar_coords_df = fa_grid_coordinates.iloc[competing_bar_pix_ind]
 
-        # convert origin coords to deg too
-        coord_y_deg = coord_y_deg_arr[coord_y_bar]
-        coord_x_deg = coord_x_deg_arr[coord_x_bar]
-
-        # the get distances
-        competing_dist_list = [np.sqrt((coord_y_deg - p2[0]) ** 2 + (coord_x_deg - p2[1]) ** 2) for p2 in competing_bar_coords_deg]
+        # then get distances
+        competing_dist_list = [np.sqrt((coord_x_bar - new_coords.x) ** 2 + (coord_y_bar - new_coords.y) ** 2) for _, new_coords in competing_bar_coords_df.iterrows()]
         
         # return smallest dist
         return np.min(competing_dist_list)
         
+    def get_pix_intensity(self, stim_df = None, att_dm_arr = None, unatt_dm_arr = None, fa_grid_coordinates = None,
+                                overlap_only = False):
         
+        """
+        per reconstructed stim, get intensity values per pixel
+        for when there was an attended/unattended bar at coordinate
+        returns intensity values for all pixel locations
+        """
+        
+        ## make empty df to store intesity values
+        # for all pixels
+        pixel_df = []
+
+        ## iterate over pixels
+        for index, pix_coord_deg in fa_grid_coordinates.iterrows():
+            
+            ## stim intensity values for pixel across all trials
+            stim_pix_trials = stim_df.iloc[...,index].values
+            
+            # get trial numbers 
+            # where there was an attended or unattended bar at pixel coordinate
+            trials_att = np.where(att_dm_arr.reshape(len(stim_pix_trials), -1)[...,index] == 1)[0]
+            trials_unatt = np.where(unatt_dm_arr.reshape(len(stim_pix_trials), -1)[...,index] == 1)[0]
+            
+            # check if pixel has any overlap trials            
+            trials_overlap = np.array([val for val in trials_att if val in trials_unatt])
+            
+            # if we only want to look at overlap
+            if overlap_only:
+                trials_att = trials_overlap
+                trials_unatt = trials_overlap
+            else:
+                # remove overlap trials
+                trials_att = np.array([val for val in trials_att if val not in trials_overlap])
+                trials_unatt = np.array([val for val in trials_unatt if val not in trials_overlap])
+
+            # if there are any trials where bars fall in this coordinate
+            if len(trials_att) > 0 and len(trials_unatt) > 0:
+
+                ## get intensity values for pixel
+                inten_att = stim_pix_trials[trials_att]
+                inten_unatt = stim_pix_trials[trials_unatt]
+
+                ## get minimum distance to competing bar
+                # when attended, distance to unattended
+                min_dist_att = np.array([self.get_min_dist_competing_bar(trial_num = t, 
+                                                                    coord_y_bar = pix_coord_deg.y, 
+                                                                    coord_x_bar = pix_coord_deg.x, 
+                                                                    dm_comp_bar = unatt_dm_arr, 
+                                                                    fa_grid_coordinates = fa_grid_coordinates) for t in trials_att])
+
+                # when unattended, distance to attended bar
+                min_dist_unatt =  np.array([self.get_min_dist_competing_bar(trial_num = t, 
+                                                                    coord_y_bar = pix_coord_deg.y, 
+                                                                    coord_x_bar = pix_coord_deg.x, 
+                                                                    dm_comp_bar = att_dm_arr, 
+                                                                    fa_grid_coordinates = fa_grid_coordinates) for t in trials_unatt])
+
+                ## and eccentricity for the point
+                # (in deg)
+                pix_ecc = np.abs(pix_coord_deg.x + pix_coord_deg.y * 1j)
+
+                # store in df
+                # att
+                c_att_df = pd.DataFrame({'intensity': inten_att,'min_dist': min_dist_att})
+                c_att_df.loc[:,'bar_type'] = 'att_bar'
+                c_att_df.loc[:,'ecc'] = pix_ecc
+                c_att_df.loc[:,'coord_ind'] = index
+                # unatt
+                c_unatt_df = pd.DataFrame({'intensity': inten_unatt,'min_dist': min_dist_unatt})
+                c_unatt_df.loc[:,'bar_type'] = 'unatt_bar'
+                c_unatt_df.loc[:,'ecc'] = pix_ecc
+                c_unatt_df.loc[:,'coord_ind'] = index
+
+                # and append 
+                pixel_df.append(pd.concat((c_att_df, c_unatt_df), ignore_index=True))
+            else:
+                print('no trials for screen position (%.2f,%.2f)'%(pix_coord_deg.x,pix_coord_deg.y))
+
+        pixel_df = pd.concat(pixel_df, ignore_index=True)
+    
+        return pixel_df
+    
+    def get_group_pix_intensity(self, participant_list = [], ROI_list = ['V1'], overlap_only = False,
+                                    reconstructed_stim_dict = None, lowres_DM_dict = None, data_keys_dict = []):
+        
+        """
+        per ROI reconstructed stim, get value of pixel for when there was an attended/unattended bar there
+        """
+        
+        ## get FA grid coordinates (8x8)
+        # to use in pixel quantification
+        fa_grid_coordinates = self.get_decoder_grid_coords()
+        
+        ROI_pixel_df = []
+                
+        for roi_name in ROI_list:
+            print(roi_name)
+            for participant in tqdm(participant_list):
+                
+                # for all runs, get pixel intensity df          
+                pixel_df = []
+                for dfkey in data_keys_dict['sub-{sj}'.format(sj = participant)]:
+                    pixel_df.append(self.get_pix_intensity(stim_df = reconstructed_stim_dict[roi_name]['sub-{sj}'.format(sj = participant)][dfkey], 
+                                                        att_dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['att_bar'][dfkey], 
+                                                        unatt_dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['unatt_bar'][dfkey],
+                                                        fa_grid_coordinates = fa_grid_coordinates,
+                                                        overlap_only = overlap_only))
+                pixel_df = pd.concat(pixel_df, ignore_index=True)
+                # average over relevant dimensions
+                pixel_df = pixel_df.groupby(['coord_ind', 'bar_type', 'min_dist', 'ecc']).mean().reset_index()
+                # add relevant info
+                pixel_df.loc[:, 'ROI'] = roi_name
+                pixel_df.loc[:, 'sj'] = 'sub-{sj}'.format(sj = participant)
+                # and append
+                ROI_pixel_df.append(pixel_df)
+        ROI_pixel_df = pd.concat(ROI_pixel_df, ignore_index=True)
+        
+        return ROI_pixel_df
     
     def plot_avg_parallel_stim(self, average_stim = None, flip_average_stim = None, DM_trl_ind = None,
                                     bar_ecc = None, bar_dist = None, downsample_FA_DM = None, 

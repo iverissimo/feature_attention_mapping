@@ -674,10 +674,6 @@ class Decoding_Model(GLMsingle_Model):
 
         # note - here we transpose the DM array when correlating because the average_stim we calculated
         # has a different format than the reconstructed stim outputted by brain decoder
-        avg_corr, avg_pval = scipy.stats.pearsonr(average_stim.ravel(), 
-                                                  downsample_FA_DM[DM_trl_ind].T.ravel())
-        flip_avg_corr, flip_avg_pval = scipy.stats.pearsonr(flip_average_stim.ravel(), 
-                                                            downsample_FA_DM[DM_trl_ind].T.ravel())
                 
         bar_ecc_ind = {'far': 1, 'middle': 2, 'near': 3}
         
@@ -686,6 +682,19 @@ class Decoding_Model(GLMsingle_Model):
 
         # bar ecc list of attended and unattended bar
         bar_ecc_list = [bar_ecc, bar_ecc] if same_ecc == True else [bar_ecc, uniq_cond_dict[bar_ecc]]
+        
+        # in ref trial is masked
+        if DM_trl_ind is None:
+            dm2plot = np.zeros((8,8))
+            dm2plot[bar_ecc_ind[bar_ecc_list[0]]] = 1
+            dm2plot[..., bar_ecc_ind[bar_ecc_list[1]]] = 1
+        else:
+            dm2plot = downsample_FA_DM[DM_trl_ind]
+        
+        avg_corr, avg_pval = scipy.stats.pearsonr(average_stim.ravel(), 
+                                                  dm2plot.T.ravel())
+        flip_avg_corr, flip_avg_pval = scipy.stats.pearsonr(flip_average_stim.ravel(), 
+                                                            dm2plot.T.ravel())
         
         # plot figure
         fig, axes = plt.subplots(nrows=2, ncols=2, figsize = (10,10))
@@ -697,7 +706,7 @@ class Decoding_Model(GLMsingle_Model):
         axes[0][0].set_title('attend %s ecc, unattend %s ecc'%(bar_ecc_list[0], bar_ecc_list[1]))
 
         ## DM
-        axes[1][0].imshow(downsample_FA_DM[DM_trl_ind].T, cmap = 'binary_r', vmax = 1.5)
+        axes[1][0].imshow(dm2plot.T, cmap = 'binary_r', vmax = 1.5)
         # Add the patch to the Axes
         axes[1][0].add_patch(patches.Rectangle((bar_ecc_ind[bar_ecc_list[0]] - .5, -.5), 1, 8, 
                                             linewidth = 2, edgecolor='purple', 
@@ -713,7 +722,7 @@ class Decoding_Model(GLMsingle_Model):
         axes[0][1].set_title('flipped case')
 
         ## DM
-        axes[1][1].imshow(downsample_FA_DM[DM_trl_ind].T, cmap = 'binary_r', vmax = 1.5)
+        axes[1][1].imshow(dm2plot.T, cmap = 'binary_r', vmax = 1.5)
         # Add the patch to the Axes
         axes[1][1].add_patch(patches.Rectangle((-.5, bar_ecc_ind[bar_ecc_list[1]] - .5), 8, 1, 
                                             angle=0.0,
@@ -756,7 +765,11 @@ class Decoding_Model(GLMsingle_Model):
                                 ((position_df['attend_condition'] == False))))]
             
             # get trial ind
-            trl_ind = masked_df[masked_df.duplicated(subset=['trial_ind'])].trial_ind.values[0]
+            trl_list = masked_df[masked_df.duplicated(subset=['trial_ind'])].trial_ind.values
+            if len(trl_list) > 0:
+                trl_ind = trl_list[0]
+            else:
+                trl_ind = None
             
         elif bars_pos == 'parallel':
             
@@ -2052,7 +2065,10 @@ class Decoding_Model(GLMsingle_Model):
                                                     bar_ecc = bar_ecc, 
                                                     bars_pos = 'crossed', 
                                                     same_ecc = i)
-            downsample_FA_DM_list.append(lowres_DM_dict['sub-{sj}'.format(sj = pp)]['full_stim'][df_key][DM_trl_ind])
+            if DM_trl_ind is None:
+                downsample_FA_DM_list.append(None)
+            else:
+                downsample_FA_DM_list.append(lowres_DM_dict['sub-{sj}'.format(sj = pp)]['full_stim'][df_key][DM_trl_ind])
                 
         ## initialize base figure
         fig, axes = plt.subplots(nrows=2, ncols=2, figsize = (10,10))
@@ -2070,6 +2086,14 @@ class Decoding_Model(GLMsingle_Model):
 
             # bar ecc list of attended and unattended bar
             bar_ecc_list = [bar_ecc, bar_ecc] if frame == 1 else [bar_ecc, uniq_cond_dict[bar_ecc]]
+            
+            # in case we didnt provide dm
+            if len(dm_list) == 0 or dm_list[frame] is None:
+                dm2plot = np.zeros((8,8))
+                dm2plot[bar_ecc_ind[bar_ecc_list[0]]] = 1
+                dm2plot[..., bar_ecc_ind[bar_ecc_list[1]]] = 1
+            else:
+                dm2plot = dm_list[frame]
             
             # clear axis of fig
             axes[0][0].clear() 
@@ -2092,7 +2116,7 @@ class Decoding_Model(GLMsingle_Model):
 
             ## DMs
             # attend left
-            axes[0][1].imshow(dm_list[frame].T, cmap = 'binary_r', vmax = 1.5)
+            axes[0][1].imshow(dm2plot.T, cmap = 'binary_r', vmax = 1.5)
             # Add the patch to the Axes
             axes[0][1].add_patch(patches.Rectangle((bar_ecc_ind[bar_ecc_list[0]] - .5, -.5), 1, 8, 
                                                     linewidth = 2, edgecolor='purple', 
@@ -2100,12 +2124,12 @@ class Decoding_Model(GLMsingle_Model):
             
             # annotate correlation value between stim and DM
             corr, pval = scipy.stats.pearsonr(stim_arr[frame].ravel(), 
-                                            dm_list[frame].T.ravel())
+                                            dm2plot.T.ravel())
             axes[0][1].set_title(r"$\rho$ = {r}".format(r = '%.2f'%(corr))+\
                                 '   pval = {p}'.format(p = "{:.2e}".format(pval)))
 
             # attend up
-            axes[1][1].imshow(dm_list[frame].T, cmap = 'binary_r', vmax = 1.5)
+            axes[1][1].imshow(dm2plot.T, cmap = 'binary_r', vmax = 1.5)
             # Add the patch to the Axes
             axes[1][1].add_patch(patches.Rectangle((-.5, bar_ecc_ind[bar_ecc_list[1]] - .5), 8, 1, 
                                                     angle=0.0,
@@ -2114,7 +2138,7 @@ class Decoding_Model(GLMsingle_Model):
             
             # annotate correlation value between stim and DM
             corr, pval = scipy.stats.pearsonr(flip_stim_arr[frame].ravel(), 
-                                            dm_list[frame].T.ravel())
+                                            dm2plot.T.ravel())
             axes[1][1].set_title(r"$\rho$ = {r}".format(r = '%.2f'%(corr))+\
                                 '   pval = {p}'.format(p = "{:.2e}".format(pval))) 
           
@@ -2372,13 +2396,13 @@ class Decoding_Model(GLMsingle_Model):
         returns dataframe with drive values
         """
         
+        ## reference dict with bar ecc for cond and flipped case
+        bar_ecc_ind = {'far': 1, 'middle': 2, 'near': 3}
+        flip_bar_ecc = np.array(['far', 'middle', 'near', 'near', 'middle', 'far'])
+        
         output_df = []
         
         if bar_type == 'parallel':
-            
-            ## reference dict with bar ecc for cond and flipped case
-            bar_ecc_ind = {'far': 1, 'middle': 2, 'near': 3}
-            flip_bar_ecc = np.array(['far', 'middle', 'near', 'near', 'middle', 'far'])
 
             pp = participant_list[0]
             df_key = list(run_position_df_dict['sub-{sj}'.format(sj = pp)].keys())[0]
@@ -2443,11 +2467,21 @@ class Decoding_Model(GLMsingle_Model):
                                                             bar_ecc = bar_ecc, 
                                                             bars_pos = 'crossed', 
                                                             same_ecc = same_ecc)
-
-                    # get dm array, for masking
-                    dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = pp)]['full_stim'][df_key][DM_trl_ind]
-                    att_dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = pp)]['att_bar'][df_key][DM_trl_ind]
-                    unatt_dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = pp)]['unatt_bar'][df_key][DM_trl_ind]
+                    
+                    # in case ref trial was masked
+                    if DM_trl_ind is None:
+                        dm_arr = np.zeros((8,8))
+                        dm_arr[bar_ecc_ind[bar_ecc_list[0]]] = 1
+                        dm_arr[..., bar_ecc_ind[bar_ecc_list[1]]] = 1
+                        att_dm_arr = np.zeros((8,8))
+                        att_dm_arr[bar_ecc_ind[bar_ecc_list[0]]] = 1
+                        unatt_dm_arr = np.zeros((8,8))
+                        unatt_dm_arr[..., bar_ecc_ind[bar_ecc_list[1]]] = 1
+                    else:
+                        # get dm array, for masking
+                        dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = pp)]['full_stim'][df_key][DM_trl_ind]
+                        att_dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = pp)]['att_bar'][df_key][DM_trl_ind]
+                        unatt_dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = pp)]['unatt_bar'][df_key][DM_trl_ind]
 
                     # attended bar drives
                     att_drive1 = [np.median(average_stim_dict['crossed'][bar_ecc][same_ecc][i][np.where(att_dm_arr.T)], axis = 0) for i in range(len(participant_list))]

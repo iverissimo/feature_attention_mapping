@@ -1018,7 +1018,7 @@ class Decoding_Model(GLMsingle_Model):
             lowres_DM = self.downsample_DM(DM_arr = FA_DM_dict[df_key]['full_stim'])
             
             ## and set downsampled DM as mask, if such is the case
-            mask_fa = lowres_DM if mask_barpos else None
+            mask_fa = lowres_DM.astype(bool) if mask_barpos else None
                 
             print('decoding data from %s'%df_key)
             

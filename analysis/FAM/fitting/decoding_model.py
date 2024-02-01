@@ -900,7 +900,8 @@ class Decoding_Model(GLMsingle_Model):
     
     def fit_decoder(self, participant_list = [], ROI_list = ['V1'], overwrite = False, model_type = 'gauss_hrf',
                         prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean', fa_file_ext = '_cropped.nii.gz',
-                        mask_bool_df = None, stim_on_screen = [], group_bar_pos_df = [], prf_bar_coords_dict = None):
+                        mask_bool_df = None, stim_on_screen = [], group_bar_pos_df = [], prf_bar_coords_dict = None,
+                        mask_barpos = False):
         
         """
         Fit decoder across participants
@@ -915,12 +916,12 @@ class Decoding_Model(GLMsingle_Model):
                                 ses = ses, mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
                                 model_type = model_type, fa_file_ext = fa_file_ext, 
                                 pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = pp)],
-                                prf_bar_coords_dict = prf_bar_coords_dict)
+                                prf_bar_coords_dict = prf_bar_coords_dict, mask_barpos = mask_barpos)
                        
     def decode_ROI(self, participant = None, roi_name = 'V1', overwrite = False, model_type = 'gauss_hrf',
                         prf_file_ext = '_cropped_dc_psc.nii.gz', fa_file_ext = '_cropped.nii.gz', ses = 'mean',
                         mask_bool_df = None, stim_on_screen = [], save_estimates = True, pp_bar_pos_df = None,
-                        prf_bar_coords_dict = None):
+                        prf_bar_coords_dict = None, mask_barpos = False):
         
         """For a given participant and ROI,
         run decoder analysis
@@ -1001,10 +1002,23 @@ class Decoding_Model(GLMsingle_Model):
         # make filename generic to save per run
         decoded_stim_filename = decoded_stim_filename.replace('_task', '_{snrnkey}_task') 
         
+        # rename is masking bar position
+        if mask_barpos:
+            decoded_stim_filename = decoded_stim_filename.replace('_stim', '_stim_masked')
+        
         reconstructed_stim_dict = {}
         lowres_DM_dict = {}
         for ind, df_key in enumerate(masked_FAdata_dict):
-    
+            
+            ## downsample DM 
+            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(df_key)
+            print('downsampling FA DM for ses-{sn}, run-{rn}'.format(sn = file_sn, rn=file_rn))
+            
+            lowres_DM = self.downsample_DM(DM_arr = FA_DM_dict[df_key]['full_stim'])
+            
+            ## and set downsampled DM as mask, if such is the case
+            mask_fa = lowres_DM if mask_barpos else None
+                
             print('decoding data from %s'%df_key)
             
             # get run ROI dataframe
@@ -1017,16 +1031,11 @@ class Decoding_Model(GLMsingle_Model):
                                                         parameters = pars_gd,
                                                         omega = omega, 
                                                         dof = dof,
+                                                        mask = mask_fa,
                                                         best_voxels = best_voxels, 
                                                         filename = decoded_stim_filename.format(snrnkey = df_key))
             # append to dict
             reconstructed_stim_dict[df_key] = reconstructed_stimulus
-            
-            ## downsample DM to check correlation
-            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(df_key)
-            
-            print('downsampling FA DM for ses-{sn}, run-{rn}'.format(sn = file_sn, rn=file_rn))
-            lowres_DM = self.downsample_DM(DM_arr = FA_DM_dict[df_key]['full_stim'])
             
             # correlate reconstructed stim with downsampled DM
             corr, pval = scipy.stats.pearsonr(reconstructed_stimulus.values.ravel(), 
@@ -1039,7 +1048,7 @@ class Decoding_Model(GLMsingle_Model):
         return lowres_DM_dict, reconstructed_stim_dict
                
     def decode_FA_stim(self, model_type = 'gauss_hrf', data = None, grid_coordinates = None,  parameters = None, 
-                            omega = None, dof = None, best_voxels = None, filename = None):
+                            omega = None, dof = None, best_voxels = None, filename = None, mask = None):
         
         """Decode FA betas for a given run
         and save reconstructed stim as hdf5 file
@@ -1077,10 +1086,11 @@ class Decoding_Model(GLMsingle_Model):
             # Legacy Adam is a bit faster than the default Adam optimizer on M1
             # Learning rate of 1.0 is a bit high, but works well here
             reconstructed_stimulus = stim_fitter.fit(legacy_adam=False, 
-                                                    min_n_iterations=200, 
+                                                    min_n_iterations=1000, 
                                                     max_n_iterations=5000, 
                                                     learning_rate = .01,
-                                                    l2_norm = .01)
+                                                    l2_norm = .01,
+                                                    mask = mask)
             
             if filename is not None:
                 print('Saving reconstructed stim in %s'%filename)

@@ -89,6 +89,10 @@ parser.add_argument("--encoding_model",
                     default = 'gauss_hrf',
                     help="Type of pRF encoding model to use in FA decoder: gauss_hrf [default], dog_hrf, etc...]"
                     )
+parser.add_argument("--mask_fa", 
+                    action = 'store_true',
+                    help="if option called, use position mask in decoder"
+                    )
 parser.add_argument("--vertex",
                     nargs = '*', 
                     default = [],
@@ -136,6 +140,7 @@ run_type = args.run_type
 ses2fit = args.ses2fit 
 fa_model_name = args.fa_model_name
 encoding_model_name = args.encoding_model
+mask_fa = args.mask_fa
 use_atlas = args.atlas
 hemisphere = args.hemisphere
 n_batches = args.n_batches
@@ -245,7 +250,8 @@ match task:
                                     stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
                                                                                 crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                                 shift = FAM_data.shift_TRs_num), 
-                                    group_bar_pos_df = group_bar_pos_df)
+                                    group_bar_pos_df = group_bar_pos_df,
+                                    mask_barpos = mask_fa)
             
         elif py_cmd == 'vizdecoder': ## should be in visualze class, change later
             

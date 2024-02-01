@@ -1004,6 +1004,7 @@ class Decoding_Model(GLMsingle_Model):
         
         # rename is masking bar position
         if mask_barpos:
+            print('decoding data with constrained (masked) bar positions')
             decoded_stim_filename = decoded_stim_filename.replace('_stim', '_stim_masked')
         
         reconstructed_stim_dict = {}

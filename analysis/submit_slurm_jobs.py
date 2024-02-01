@@ -153,6 +153,10 @@ parser.add_argument("--encoding_model",
                     default = 'gauss_hrf',
                     help="Type of pRF encoding model to use in FA decoder: gauss_hrf [default], dog_hrf, etc...]"
                     )
+parser.add_argument("--mask_fa", 
+                    action = 'store_true',
+                    help="if option called, use position mask in decoder"
+                    )
 
 # parse the command line
 args = parser.parse_args()
@@ -191,6 +195,7 @@ run_type = args.run_type
 ses2fit = args.ses2fit # 'ses-mean'
 fa_model_name = args.fa_model_name
 encoding_model_name = args.encoding_model
+mask_fa = args.mask_fa
 
 ## Load data object --> as relevant paths, variables and utility functions
 print("Running data analysis for subject {sj}!".format(sj=sj))
@@ -218,5 +223,5 @@ FAM_SLURM.submit_jobs(participant_list = FAM_data.sj_num,
                 step_type = pycmd, taskname = task, concurrent_job = concurrent_job,
                 n_jobs = n_jobs, n_batches = n_batches, chunk_data = None, fit_hrf = fit_hrf, use_rsync = use_rsync, 
                 prf_model_name = prf_model_name, fa_model_name = fa_model_name, run_type = run_type, ses2fit = ses2fit,
-                encoding_model_name = encoding_model_name, dry_run = dry_run, username = username)
+                encoding_model_name = encoding_model_name, mask_fa = mask_fa, dry_run = dry_run, username = username)
 

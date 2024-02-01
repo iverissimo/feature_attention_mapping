@@ -42,7 +42,8 @@ class Batcher:
         self.n_cpus_task = n_cpus_task
           
     def create_sh_script_str(self, participant_list = [], step_type = 'fitmodel', taskname = 'pRF', concurrent_job = True,
-                                n_jobs = 8, n_batches = 10, chunk_data = None, fit_hrf = True, use_rsync = False):
+                                n_jobs = 8, n_batches = 10, chunk_data = None, fit_hrf = True, use_rsync = False,
+                                mask_fa = False):
         
         """Make full batch script for analysis 
         """
@@ -65,7 +66,7 @@ class Batcher:
         fit_cmd = self.make_step_script(participant_list = participant_list, step_type = step_type, 
                                         concurrent_job = concurrent_job,
                                         n_jobs = n_jobs, n_batches = n_batches, chunk_data = chunk_data, 
-                                        fit_hrf = fit_hrf)
+                                        fit_hrf = fit_hrf, mask_fa = mask_fa)
         
         ## replace common commands and scratch dir in base string
         working_string = bash_basetxt.replace('$COPY_CMD', copy_cmd)
@@ -91,7 +92,7 @@ class Batcher:
     def submit_jobs(self, participant_list = [], step_type = 'fitmodel', taskname = 'pRF', concurrent_job = True,
                         n_jobs = 8, n_batches = 10, chunk_data = None, fit_hrf = True, use_rsync = False, 
                         dry_run = False, prf_model_name = 'gauss', fa_model_name = 'glmsingle', encoding_model_name = 'gauss_hrf',
-                        run_type = 'mean', ses2fit = 'mean', username = ''):
+                        mask_fa = False, run_type = 'mean', ses2fit = 'mean', username = ''):
         
         """script to actually submit the jobs
         """
@@ -103,7 +104,7 @@ class Batcher:
         working_str = self.create_sh_script_str(participant_list = participant_list, step_type = step_type, 
                                                 taskname = taskname, concurrent_job = concurrent_job,
                                                 n_jobs = n_jobs, n_batches = n_batches, chunk_data = chunk_data, fit_hrf = fit_hrf, 
-                                                use_rsync = use_rsync)
+                                                use_rsync = use_rsync, mask_fa=mask_fa)
         
         # replace model specific parts, if applicable
         working_str = working_str.replace('$TASK', taskname)
@@ -147,7 +148,7 @@ class Batcher:
                 os.system('sbatch ' + jf)
         
     def make_step_script(self, participant_list = [], step_type = 'fitmodel', concurrent_job = True,
-                            n_jobs = 8, n_batches = 10, chunk_data = None, fit_hrf = True):
+                            n_jobs = 8, n_batches = 10, chunk_data = None, fit_hrf = True, mask_fa = False):
         
         """Make analysis step specific script
         """
@@ -185,6 +186,10 @@ class Batcher:
                 if fit_hrf:
                     fit_cmd += """--fit_hrf """
                     
+                # if we want to mask FA data
+                if mask_fa:
+                    fit_cmd += """--mask_fa """
+                    
                 fit_cmd += """\n) &\n"""+ \
                     """done\n\nwait"""
             else:
@@ -202,6 +207,10 @@ class Batcher:
                 # if we want to fit hrf
                 if fit_hrf:
                     fit_cmd += """--fit_hrf """
+                    
+                # if we want to mask FA data
+                if mask_fa:
+                    fit_cmd += """--mask_fa """
 
             fit_cmd += """\n\n"""
              

@@ -147,7 +147,7 @@ class BehUtils(Utils):
         """
             
         ## get value of key pressed
-        key_val = trial_df[trial_df['event_type'] == 'response']['response'].values[0]
+        key_val = trial_df[trial_df['event_type'] == 'response']['response'].values[-1]
 
         ## get name of key pressed
         key_name = [k for k, v in keys.items() if key_val in v][0]
@@ -174,11 +174,11 @@ class BehUtils(Utils):
         """
         
         if task == 'pRF':
-            trial_nr = trial_df[trial_df['event_type'] == 'response']['trial_nr'].values[0]
-            RT = trial_df[trial_df['event_type'] == 'response']['onset'].values[0] - trial_nr * TR
+            trial_nr = trial_df[trial_df['event_type'] == 'response']['trial_nr'].values[-1]
+            RT = trial_df[trial_df['event_type'] == 'response']['onset'].values[-1] - trial_nr * TR
             
         elif task == 'FA':
-            RT = trial_df[trial_df['event_type'] == 'response']['onset'].values[0] - trial_df[trial_df['event_type'] == 'stim']['onset'].values[0]
+            RT = trial_df[trial_df['event_type'] == 'response']['onset'].values[-1] - trial_df[trial_df['event_type'] == 'stim']['onset'].values[0]
         
         return RT
 
@@ -245,20 +245,15 @@ class BehUtils(Utils):
             participant ID (just the number)
         
         """ 
-
-        if str(participant).zfill(3) == '004':
-
-            keys = {'right_index': ['right','b', 2, '2','num_2', 'y'],
-                    'left_index': ['left','e', 1, '1','num_1', 'w']}
         
-        elif str(participant).zfill(3) == '010':
+        if str(participant).zfill(3) == '010':
 
              keys = {'right_index': ['left','e', 1, '1','num_1'],
                     'left_index': ['right','b', 2, '2','num_2']}
 
         else:
-            keys = {'right_index': ['right','b', 2, '2','num_2'],
-                    'left_index': ['left','e', 1, '1','num_1']}
+            keys = {'right_index': ['right','b', 2, '2','num_2', 'y'],
+                    'left_index': ['left','e', 1, '1','num_1', 'w']}
     
         return keys
 

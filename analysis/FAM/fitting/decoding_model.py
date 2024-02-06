@@ -3044,7 +3044,7 @@ class Decoding_Model(GLMsingle_Model):
     
     def get_all_trial_drive(self, participant_list = [], ROI_list = ['V1'],    
                                 reconstructed_stim_dict = None, lowres_DM_dict = None, reference_data_keys_dict = None,
-                                run_position_df_dict = None):
+                                run_position_df_dict = None, df_FA_beh_RT = None):
         
         """
         Get bar drive for all trials (averaged across runs)
@@ -3063,6 +3063,13 @@ class Decoding_Model(GLMsingle_Model):
                 # add relevant info
                 df_drive_pp.loc[:, 'ROI'] = roi_name
                 df_drive_pp.loc[:, 'sj'] = 'sub-{sj}'.format(sj = participant)
+                
+                # if we provided participant behavioral data
+                if df_FA_beh_RT is not None:
+                    
+                    pp_beh_df = df_FA_beh_RT[df_FA_beh_RT['sj'] == 'sub-{sj}'.format(sj = participant)]
+                    # merge info into drive df
+                    df_drive_pp = df_drive_pp.merge(pp_beh_df, on=['sj', 'run', 'ses', 'trial_ind'])
                 
                 # and append
                 df_drive.append(df_drive_pp)

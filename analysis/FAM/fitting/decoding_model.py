@@ -322,7 +322,7 @@ class Decoding_Model(GLMsingle_Model):
         if vmax is None:
             vmax = np.quantile(reconstructed_stimulus.values.ravel(), 0.97)
         
-        return sns.heatmap(reconstructed_stimulus.stack('y').loc[frame].iloc[::-1, :], vmin = vmin, vmax = vmax, cmap = cmap,
+        return sns.heatmap(reconstructed_stimulus.stack('y', dropna = False).loc[frame].iloc[::-1, :], vmin = vmin, vmax = vmax, cmap = cmap,
                            xticklabels = xticklabels, yticklabels = yticklabels, square = square)
         
     def get_run_trial_pairs(self, DM_arr = None):
@@ -398,34 +398,34 @@ class Decoding_Model(GLMsingle_Model):
                 # if we want the flipped case, and conditions are not symmetrical
                 if flipped_stim == True and sym_trial == False:
                     trl_ind = self.get_flipped_trial_ind(trl_ind = ind, DM_arr = DM_arr)
-                trl_stim = reconstructed_stimulus.stack('y').loc[trl_ind].iloc[::-1, :].to_numpy()
+                trl_stim = reconstructed_stimulus.stack('y', dropna = False).loc[trl_ind].iloc[::-1, :].to_numpy()
             # trial to be flipped horizontally (this is mirrored left and right)
             elif not trl_df.query('x_pos > 0 & attend_condition').empty:
                 # if we want the flipped case, and conditions are not symmetrical
                 if flipped_stim == True and sym_trial == False:
                     trl_ind = self.get_flipped_trial_ind(trl_ind = ind, DM_arr = DM_arr)
-                trl_stim = self.flip_arr(reconstructed_stimulus.stack('y').loc[trl_ind].iloc[::-1, :].to_numpy(),
+                trl_stim = self.flip_arr(reconstructed_stimulus.stack('y', dropna = False).loc[trl_ind].iloc[::-1, :].to_numpy(),
                                          flip_type='lr')
             # trial to be rotated 90deg CCW
             elif not trl_df.query('y_pos > 0 & attend_condition').empty:
                 # if we want the flipped case, and conditions are not symmetrical
                 if flipped_stim == True and sym_trial == False:
                     trl_ind = self.get_flipped_trial_ind(trl_ind = ind, DM_arr = DM_arr)
-                trl_stim = np.rot90(reconstructed_stimulus.stack('y').loc[trl_ind].iloc[::-1, :].to_numpy(),
+                trl_stim = np.rot90(reconstructed_stimulus.stack('y', dropna = False).loc[trl_ind].iloc[::-1, :].to_numpy(),
                                     axes=(0, 1))
             # trial to be rotated 90deg CW
             elif not trl_df.query('y_pos < 0 & attend_condition').empty:
                 # if we want the flipped case, and conditions are not symmetrical
                 if flipped_stim == True and sym_trial == False:
                     trl_ind = self.get_flipped_trial_ind(trl_ind = ind, DM_arr = DM_arr)
-                trl_stim = np.rot90(reconstructed_stimulus.stack('y').loc[trl_ind].iloc[::-1, :].to_numpy(),
+                trl_stim = np.rot90(reconstructed_stimulus.stack('y', dropna = False).loc[trl_ind].iloc[::-1, :].to_numpy(),
                                     axes=(1, 0))
                 
             average_stim.append(trl_stim)
         average_stim = np.stack(average_stim)
                         
         # and average
-        average_stim = np.mean(average_stim, axis = 0)
+        average_stim = np.nanmean(average_stim, axis = 0)
 
         # if we want the flipped trials for symmetrical cases
         if flipped_stim == True and sym_trial == True:
@@ -488,7 +488,7 @@ class Decoding_Model(GLMsingle_Model):
             # attended bar vertical, on the left. unattended bar horizontal, upper meridian
             if not trl_df[(trl_df['x_pos'] < 0) & (trl_df['attend_condition'] == bool(np.abs(1 - flip_att_bool)))].empty: 
                 
-                trl_stim = reconstructed_stimulus.stack('y').loc[ind].iloc[::-1, :].to_numpy()
+                trl_stim = reconstructed_stimulus.stack('y', dropna = False).loc[ind].iloc[::-1, :].to_numpy()
                 
                 # trial to also be flipped vertically (this is mirrored up and down) 
                 if not trl_df[(trl_df['y_pos'] < 0) & (trl_df['attend_condition'] == bool(np.abs(0 - flip_att_bool)))].empty:
@@ -497,7 +497,7 @@ class Decoding_Model(GLMsingle_Model):
             # trial to be flipped horizontally (this is mirrored left and right) 
             elif not trl_df[(trl_df['x_pos'] > 0) & (trl_df['attend_condition'] == bool(np.abs(1 - flip_att_bool)))].empty:
                 
-                trl_stim = self.flip_arr(reconstructed_stimulus.stack('y').loc[ind].iloc[::-1, :].to_numpy(),
+                trl_stim = self.flip_arr(reconstructed_stimulus.stack('y', dropna = False).loc[ind].iloc[::-1, :].to_numpy(),
                                                 flip_type='lr')
                 
                 # trial to also be flipped vertically (this is mirrored up and down) 
@@ -507,7 +507,7 @@ class Decoding_Model(GLMsingle_Model):
             # trial to be rotated 90deg CW
             elif not trl_df[(trl_df['x_pos'] < 0) & (trl_df['attend_condition'] == bool(np.abs(0 - flip_att_bool)))].empty: 
                 
-                trl_stim = np.rot90(reconstructed_stimulus.stack('y').loc[ind].iloc[::-1, :].to_numpy(),
+                trl_stim = np.rot90(reconstructed_stimulus.stack('y', dropna = False).loc[ind].iloc[::-1, :].to_numpy(),
                                                         axes=(1, 0))
                 
                 if not trl_df[(trl_df['y_pos'] > 0) & (trl_df['attend_condition'] == bool(np.abs(1 - flip_att_bool)))].empty:
@@ -516,18 +516,18 @@ class Decoding_Model(GLMsingle_Model):
             # trial to be rotated 90deg CCW + flip horizontally
             elif not trl_df[(trl_df['x_pos'] > 0) & (trl_df['attend_condition'] == bool(np.abs(0 - flip_att_bool)))].empty: 
                 
-                trl_stim = self.get_diag_mirror_arr(reconstructed_stimulus.stack('y').loc[ind].iloc[::-1, :].to_numpy(),
+                trl_stim = self.get_diag_mirror_arr(reconstructed_stimulus.stack('y', dropna = False).loc[ind].iloc[::-1, :].to_numpy(),
                                                         diag_type = 'minor')
                 
                 if not trl_df[(trl_df['y_pos'] > 0) & (trl_df['attend_condition'] == bool(np.abs(1 - flip_att_bool)))].empty:
-                    trl_stim = np.rot90(reconstructed_stimulus.stack('y').loc[ind].iloc[::-1, :].to_numpy(),
+                    trl_stim = np.rot90(reconstructed_stimulus.stack('y', dropna = False).loc[ind].iloc[::-1, :].to_numpy(),
                                                         axes=(0, 1))
             
             average_stim.append(trl_stim)
         average_stim = np.stack(average_stim)
                         
         # and average 
-        average_stim = np.mean(average_stim, axis = 0)
+        average_stim = np.nanmean(average_stim, axis = 0)
 
         # if we want the flipped trials for symmetrical cases
         if flipped_stim == True and same_ecc == True:
@@ -1504,8 +1504,8 @@ class Decoding_Model(GLMsingle_Model):
             
             for keynames2 in average_stim_dict[keynames1].keys():
                 
-                group_average_stim_dict[keynames1][keynames2] = np.mean(average_stim_dict[keynames1][keynames2], axis = 0)
-                group_flip_average_stim_dict[keynames1][keynames2] = np.mean(flip_average_stim_dict[keynames1][keynames2], axis = 0)
+                group_average_stim_dict[keynames1][keynames2] = np.nanmean(average_stim_dict[keynames1][keynames2], axis = 0)
+                group_flip_average_stim_dict[keynames1][keynames2] = np.nanmean(flip_average_stim_dict[keynames1][keynames2], axis = 0)
 
         return group_average_stim_dict, group_flip_average_stim_dict
     
@@ -1567,8 +1567,8 @@ class Decoding_Model(GLMsingle_Model):
                         
                         ## average over participant runs 
                         # and append
-                        average_stim.append(np.mean(pp_average_stim, axis = 0)) 
-                        flip_average_stim.append(np.mean(pp_flip_average_stim, axis = 0))
+                        average_stim.append(np.nanmean(pp_average_stim, axis = 0)) 
+                        flip_average_stim.append(np.nanmean(pp_flip_average_stim, axis = 0))
                         
                     # save in dict
                     average_stim_dict[bar_ecc][bar_dist] = np.stack(average_stim)
@@ -1622,8 +1622,8 @@ class Decoding_Model(GLMsingle_Model):
                         
                         ## average over participant runs 
                         # and append
-                        average_stim.append(np.mean(pp_average_stim, axis = 0)) 
-                        flip_average_stim.append(np.mean(pp_flip_average_stim, axis = 0))
+                        average_stim.append(np.nanmean(pp_average_stim, axis = 0)) 
+                        flip_average_stim.append(np.nanmean(pp_flip_average_stim, axis = 0))
                         
                     # save in dict
                     average_stim_dict[bar_ecc][int(same_ecc)] = np.stack(average_stim)
@@ -1992,7 +1992,7 @@ class Decoding_Model(GLMsingle_Model):
             ## first get average per pp and ROI
             group_r2_df = []
             for pp in participant_list:
-                r2_pp = [np.mean(prf_pars_gd_dict[roi_name][pp].iloc[prf_best_voxels_dict[roi_name][pp]].r2) for roi_name in ROI_list]
+                r2_pp = [np.nanmean(prf_pars_gd_dict[roi_name][pp].iloc[prf_best_voxels_dict[roi_name][pp]].r2) for roi_name in ROI_list]
                 
                 group_r2_df.append(pd.DataFrame({'sj': np.repeat(pp, len(ROI_list)),
                                                 'r2': r2_pp,
@@ -2073,10 +2073,10 @@ class Decoding_Model(GLMsingle_Model):
         """
         
         ## turn dict into average array, to plot in movie
-        parallel_avg_arr = [np.mean(items1, axis = 0) for keynames1, items1 in average_stim_dict['parallel'][bar_ecc].items()]
+        parallel_avg_arr = [np.nanmean(items1, axis = 0) for keynames1, items1 in average_stim_dict['parallel'][bar_ecc].items()]
         parallel_avg_arr = np.stack(parallel_avg_arr)
 
-        parallel_flip_avg_arr = [np.mean(items1, axis = 0) for keynames1, items1 in flip_average_stim_dict['parallel'][bar_ecc].items()]
+        parallel_flip_avg_arr = [np.nanmean(items1, axis = 0) for keynames1, items1 in flip_average_stim_dict['parallel'][bar_ecc].items()]
         parallel_flip_avg_arr = np.stack(parallel_flip_avg_arr)
         
         ## get frames of DM with corresponding bar position
@@ -2178,10 +2178,10 @@ class Decoding_Model(GLMsingle_Model):
         """
         
         ## turn dict into average array, to plot in movie
-        crossed_avg_arr = [np.mean(average_stim_dict['crossed'][bar_ecc][ecc_bool], axis = 0) for ecc_bool in [0, 1]]
+        crossed_avg_arr = [np.nanmean(average_stim_dict['crossed'][bar_ecc][ecc_bool], axis = 0) for ecc_bool in [0, 1]]
         crossed_avg_arr = np.stack(crossed_avg_arr)
 
-        crossed_flip_avg_arr = [np.mean(flip_average_stim_dict['crossed'][bar_ecc][ecc_bool], axis = 0) for ecc_bool in [0, 1]]
+        crossed_flip_avg_arr = [np.nanmean(flip_average_stim_dict['crossed'][bar_ecc][ecc_bool], axis = 0) for ecc_bool in [0, 1]]
         crossed_flip_avg_arr = np.stack(crossed_flip_avg_arr)
         
         ## get frames of DM with corresponding bar position
@@ -2440,8 +2440,8 @@ class Decoding_Model(GLMsingle_Model):
                                                             bar_dist = bar_dist)
 
                     ## plot figure
-                    self.plot_avg_parallel_stim(average_stim = np.mean(average_stim_dict['parallel'][bar_ecc][bar_dist], axis = 0), 
-                                                flip_average_stim = np.mean(flip_average_stim_dict['parallel'][bar_ecc][bar_dist], axis = 0), 
+                    self.plot_avg_parallel_stim(average_stim = np.nanmean(average_stim_dict['parallel'][bar_ecc][bar_dist], axis = 0), 
+                                                flip_average_stim = np.nanmean(flip_average_stim_dict['parallel'][bar_ecc][bar_dist], axis = 0), 
                                                 DM_trl_ind = DM_trl_ind,
                                                 bar_ecc = bar_ecc, 
                                                 bar_dist = bar_dist, 
@@ -2464,8 +2464,8 @@ class Decoding_Model(GLMsingle_Model):
                                                             same_ecc = same_ecc)
 
                     ## plot figure
-                    self.plot_avg_crossed_stim(average_stim = np.mean(average_stim_dict['crossed'][bar_ecc][same_ecc], axis = 0), 
-                                                flip_average_stim = np.mean(flip_average_stim_dict['crossed'][bar_ecc][same_ecc], axis = 0), 
+                    self.plot_avg_crossed_stim(average_stim = np.nanmean(average_stim_dict['crossed'][bar_ecc][same_ecc], axis = 0), 
+                                                flip_average_stim = np.nanmean(flip_average_stim_dict['crossed'][bar_ecc][same_ecc], axis = 0), 
                                                 DM_trl_ind = DM_trl_ind,
                                                 bar_ecc = bar_ecc, 
                                                 same_ecc = same_ecc, 
@@ -2980,37 +2980,76 @@ class Decoding_Model(GLMsingle_Model):
                     avg_values.append(reconstructed_stim_dict[dfkey].loc[dfkey_trial].values)
                     
                 # replace with average values across runs
-                pp_avg_stim_df.loc[ref_t, :] = np.mean(np.stack(avg_values), axis = 0)
+                pp_avg_stim_df.loc[ref_t, :] = np.nanmean(np.stack(avg_values), axis = 0)
             else:
                 pp_avg_stim_df.loc[ref_t, :] = 0
                 
         return pp_avg_stim_df
         
+    def mask_reconstructed_stim(self, stim_df = None, y_lim = [], x_lim = []):
+        
+        """
+        mask reconstructed stim df 
+        filling positions outside x/y bounds with nans
+        """
+        
+        masked_stim_df = stim_df.copy()
+        
+        ## insert nans in irrelevant locations
+        if not masked_stim_df.iloc[:, masked_stim_df.columns.get_level_values(0) < x_lim[0]].empty:
+            masked_stim_df.iloc[:, masked_stim_df.columns.get_level_values(0) < x_lim[0]] = np.nan
+            
+        if not masked_stim_df.iloc[:, masked_stim_df.columns.get_level_values(1) < y_lim[0]].empty:
+            masked_stim_df.iloc[:, masked_stim_df.columns.get_level_values(1) < y_lim[0]] = np.nan
+            
+        if not masked_stim_df.iloc[:, masked_stim_df.columns.get_level_values(0) > x_lim[-1]].empty:
+            masked_stim_df.iloc[:, masked_stim_df.columns.get_level_values(0) > x_lim[-1]] = np.nan
+            
+        if not masked_stim_df.iloc[:, masked_stim_df.columns.get_level_values(1) > y_lim[-1]].empty:
+            masked_stim_df.iloc[:, masked_stim_df.columns.get_level_values(1) > y_lim[-1]] = np.nan
+            
+        return masked_stim_df
+    
     def get_pp_all_trial_drive(self, reconstructed_stim_dict = None, lowres_DM_dict = None, reference_data_keys = [],
-                                    run_position_df_dict = None):
+                                    run_position_df_dict = None, prf_bar_coords_dict = None):
         
         """
         Get bar drive for all trials (averaged across runs)
         of a given participant
         """
+        
+        # if we provided prf coordinates as reference, 
+        # will get limits in deg and mask stim before getting drive values
+        if prf_bar_coords_dict is not None:
+            pp_lim_y = self.convert_pix2dva(prf_bar_coords_dict['vertical'])
+            pp_lim_y.sort()
+            pp_lim_x = self.convert_pix2dva(prf_bar_coords_dict['horizontal'])
+            pp_lim_x.sort()
+        
         df_drive_pp = []
         
         # loop over reference data key
         for ref_dfkeys in reference_data_keys:
         
-            # get reference stim + dms + bar positions
-            pp_ref_stim = reconstructed_stim_dict[ref_dfkeys]
+            ## get reference stim + dms + bar positions
             pp_ref_att_dm = lowres_DM_dict['att_bar'][ref_dfkeys]
             pp_ref_unatt_dm = lowres_DM_dict['unatt_bar'][ref_dfkeys]
             pp_ref_run_pos_df = run_position_df_dict[ref_dfkeys]
+            # mask stim df
+            if prf_bar_coords_dict is not None:
+                pp_ref_stim = self.mask_reconstructed_stim(stim_df = reconstructed_stim_dict[ref_dfkeys], 
+                                                           y_lim = [pp_lim_y[0], pp_lim_y[-1]], 
+                                                           x_lim = [pp_lim_x[0], pp_lim_x[-1]])
+            else:
+                pp_ref_stim = reconstructed_stim_dict[ref_dfkeys]
             
             # trial index aray
             trials_arr = pp_ref_run_pos_df.sort_values('trial_ind').trial_ind.unique()
             
             ## get attended bar drive for all trials
-            att_drive_all = np.array([np.mean(pp_ref_stim.stack('y').loc[i].iloc[::-1, :].to_numpy()[np.where(pp_ref_att_dm[i].T)], axis = 0) for i in trials_arr])
+            att_drive_all = np.array([np.nanmean(pp_ref_stim.stack('y', dropna = False).loc[i].iloc[::-1, :].to_numpy()[np.where(pp_ref_att_dm[i].T)], axis = 0) for i in trials_arr])
             ## and same for unattended bar
-            unatt_drive_all = np.array([np.mean(pp_ref_stim.stack('y').loc[i].iloc[::-1, :].to_numpy()[np.where(pp_ref_unatt_dm[i].T)], axis = 0) for i in trials_arr])
+            unatt_drive_all = np.array([np.nanmean(pp_ref_stim.stack('y', dropna = False).loc[i].iloc[::-1, :].to_numpy()[np.where(pp_ref_unatt_dm[i].T)], axis = 0) for i in trials_arr])
 
             ## make drive df all trials
 
@@ -3044,7 +3083,7 @@ class Decoding_Model(GLMsingle_Model):
     
     def get_all_trial_drive(self, participant_list = [], ROI_list = ['V1'],    
                                 reconstructed_stim_dict = None, lowres_DM_dict = None, reference_data_keys_dict = None,
-                                run_position_df_dict = None, df_FA_beh_RT = None):
+                                run_position_df_dict = None, df_FA_beh_RT = None, prf_bar_coords_dict = None):
         
         """
         Get bar drive for all trials (averaged across runs)
@@ -3054,12 +3093,19 @@ class Decoding_Model(GLMsingle_Model):
         df_drive = []
                 
         for roi_name in ROI_list:
-            for participant in participant_list:
+            for participant in tqdm(participant_list):
+                
+                # if we give prf bar coordinates, use those to mask drive values
+                if prf_bar_coords_dict is not None:
+                    pp_prf_bar_coords_dict = prf_bar_coords_dict['sub-{sj}'.format(sj = participant)]
+                else:
+                    pp_prf_bar_coords_dict = None
                                 
                 df_drive_pp = self.get_pp_all_trial_drive(reconstructed_stim_dict = reconstructed_stim_dict[roi_name]['sub-{sj}'.format(sj = participant)], 
                                                         lowres_DM_dict = lowres_DM_dict['sub-{sj}'.format(sj = participant)], 
                                                         reference_data_keys = reference_data_keys_dict['sub-{sj}'.format(sj = participant)],
-                                                        run_position_df_dict = run_position_df_dict['sub-{sj}'.format(sj = participant)])
+                                                        run_position_df_dict = run_position_df_dict['sub-{sj}'.format(sj = participant)],
+                                                        prf_bar_coords_dict = pp_prf_bar_coords_dict)
                 # add relevant info
                 df_drive_pp.loc[:, 'ROI'] = roi_name
                 df_drive_pp.loc[:, 'sj'] = 'sub-{sj}'.format(sj = participant)

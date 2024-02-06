@@ -1400,7 +1400,7 @@ class Decoding_Model(GLMsingle_Model):
         return pars_gd
     
     def load_reconstructed_stim_dict(self, participant = None, task = 'FA', roi_name = 'V1', model_type = 'gauss_hrf',
-                                    data_keys = ['ses-1_run-1']):
+                                    data_keys = ['ses-1_run-1'], masked_stim = False):
         
         """Load previously save reconstructed stim
         """
@@ -1414,6 +1414,11 @@ class Decoding_Model(GLMsingle_Model):
                                                                                                     tsk = task,
                                                                                                     rname = roi_name,
                                                                                                     dmod = model_type))
+        
+        # if we want to load masked reconstructed stim
+        if masked_stim:
+            decoded_stim_filename = decoded_stim_filename.replace('_stim.h5', '_stim_masked.h5')
+            
         # make filename generic to load per run
         decoded_stim_filename = decoded_stim_filename.replace('_task', '_{snrnkey}_task') 
         
@@ -1734,7 +1739,7 @@ class Decoding_Model(GLMsingle_Model):
         return group_lowres_DM_dict
     
     def load_group_decoded_stim_dict(self, participant_list = [], roi_name = 'V1', task = 'FA',
-                                model_type = 'gauss_hrf', data_keys_dict = {}):
+                                model_type = 'gauss_hrf', data_keys_dict = {}, masked_stim = False):
         
         """Load FA downsampled DM for all participants in participant list
         returns dict of DMs 
@@ -1749,7 +1754,8 @@ class Decoding_Model(GLMsingle_Model):
                                                                         task = task, 
                                                                         roi_name = roi_name, 
                                                                         model_type = model_type,
-                                                                        data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)])
+                                                                        data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)],
+                                                                        masked_stim = masked_stim)
             
             group_reconstructed_stim_dict['sub-{sj}'.format(sj = participant)] = reconstructed_stim_dict
             

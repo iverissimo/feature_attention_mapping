@@ -546,7 +546,6 @@ class PreprocBeh:
         
                     ## loop over attended and unattended conditions
                     # (we might want to compare)
-
                     for cond in category_color.keys():
                         
                         ## initialize a response array filled with nans for all trials in run
@@ -603,5 +602,101 @@ class PreprocBeh:
                          
         return df_summary
 
+    def get_FA_RT(self, ses_type = 'func'):
+        
+        """
+        Get RT for FA task
 
+        Parameters
+        ----------
+        ses_type: str
+            type of session (default func)
+        
+        """ 
+        
+        # number of task trials
+        n_trials = len(self.FA_bar_pass_trials)
+        
+        # summarize results in dataframe
+        df_RT = []
+        
+        # loop over participants
+        for pp in self.MRIObj.sj_num:
+            
+            # and over sessions (if more than one)
+            for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
+                
+                ## load events files for that session
+                events_df = self.load_events(pp, ses = ses, ses_type = ses_type, tasks=['FA'])
+                ## load trial info for that session
+                trial_info_df = self.load_trial_info(pp, ses = ses, ses_type = ses_type, tasks=['FA'])
+                
+                ## loop over runs
+                for run in events_df['FA'].keys():
+                    
+                    # get run event dataframe
+                    run_ev_df = events_df['FA'][run]
+                    # and trial info
+                    run_trl_info_df = trial_info_df['FA'][run]
+
+                    ## trial numbers where participant responded
+                    # will include bar stim on screen + TR after
+                    sub_response_trials = [[trl,trl+1] for trl in self.FA_bar_pass_trials if 'response' in run_ev_df[run_ev_df['trial_nr'].isin([trl,trl+1])]['event_type'].values]
+                                        
+                    ## get bar color and bar color category 
+                    # for attended and unattended bars
+                    # for all trials
+                    category_color, bar_color = self.MRIObj.beh_utils.get_FA_trials_bar_color(run_trl_info_df)    
+        
+                    ## select only attended conditions (to label for color)
+                    att_category_color = category_color['attend_bar']
+                    att_bar_color = bar_color['attend_bar']
+                     
+                    ## initialize a response array filled with nans for all trials in run
+                    all_responses_bool = np.zeros(self.FA_total_trials); all_responses_bool[:] = np.nan
+                    all_responses_RT = np.zeros(self.FA_total_trials); all_responses_RT[:] = np.nan
+                    
+                    ## get boolean array showing if participant response was correct or not
+                    # for trials where they responded
+                    
+                    # some participants swapped the buttons, so make exceptions
+                    pp_task_keys = self.MRIObj.beh_utils.get_pp_task_keys(pp)
+
+                    sub_response_bool = np.array([self.MRIObj.beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'].isin(t)], trial_bar_color = att_bar_color[t[0]], 
+                                                                                        task = 'FA', keys = pp_task_keys) for t in sub_response_trials])
+                    
+                    all_responses_bool[np.ravel(sub_response_trials)[::2]] = sub_response_bool
+                    
+                    ## get reaction times for the same 
+                    # trials
+                    sub_response_RT = np.array([self.MRIObj.beh_utils.get_pp_response_rt(run_ev_df[run_ev_df['trial_nr'].isin(t)],
+                                                                                    task = 'FA', TR = self.MRIObj.TR) for t in sub_response_trials])
+
+                    all_responses_RT[np.ravel(sub_response_trials)[::2]] = sub_response_RT
+                    
+                    ## now slice array for ONLY bar passing trials
+                    #
+                    RUN_category_color = np.array(att_category_color)[self.FA_bar_pass_trials]
+                    RUN_bar_color = np.array(att_bar_color)[self.FA_bar_pass_trials]
+
+                    RUN_responses_bool = all_responses_bool[self.FA_bar_pass_trials]
+
+                    RUN_response_RT = all_responses_RT[self.FA_bar_pass_trials]; 
+                    #RUN_response_RT[RUN_responses_bool!=1] = np.nan
+                    
+                    ## append df
+                    df_RT.append(pd.DataFrame({'sj': np.repeat('sub-{sj}'.format(sj=pp), n_trials), 
+                                            'ses': np.repeat(ses, n_trials),
+                                            'run': np.repeat(run, n_trials),
+                                            'trial_ind': np.arange(n_trials),
+                                            'color_category': RUN_category_color,
+                                            'bar_color': RUN_bar_color,
+                                            'correct': RUN_responses_bool,
+                                            'RT': RUN_response_RT
+                                            })
+                    )
+                    
+        df_RT = pd.concat(df_RT, ignore_index=True)
+                         
+        return df_RT
     

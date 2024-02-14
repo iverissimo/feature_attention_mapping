@@ -662,12 +662,13 @@ class Decoding_Model(GLMsingle_Model):
 
                 # store in df
                 # att
-                c_att_df = pd.DataFrame({'intensity': inten_att,'min_dist': min_dist_att})
+                c_att_df = pd.DataFrame({'intensity': inten_att,'min_dist': min_dist_att, 'trial_ind': trials_att})
                 c_att_df.loc[:,'bar_type'] = 'att_bar'
                 c_att_df.loc[:,'ecc'] = pix_ecc
                 c_att_df.loc[:,'coord_ind'] = index
+                
                 # unatt
-                c_unatt_df = pd.DataFrame({'intensity': inten_unatt,'min_dist': min_dist_unatt})
+                c_unatt_df = pd.DataFrame({'intensity': inten_unatt,'min_dist': min_dist_unatt, 'trial_ind': trials_unatt})
                 c_unatt_df.loc[:,'bar_type'] = 'unatt_bar'
                 c_unatt_df.loc[:,'ecc'] = pix_ecc
                 c_unatt_df.loc[:,'coord_ind'] = index
@@ -701,14 +702,17 @@ class Decoding_Model(GLMsingle_Model):
                 # for all runs, get pixel intensity df          
                 pixel_df = []
                 for dfkey in data_keys_dict['sub-{sj}'.format(sj = participant)]:
-                    pixel_df.append(self.get_pix_intensity(stim_df = reconstructed_stim_dict[roi_name]['sub-{sj}'.format(sj = participant)][dfkey], 
+                    tmp_df = self.get_pix_intensity(stim_df = reconstructed_stim_dict[roi_name]['sub-{sj}'.format(sj = participant)][dfkey], 
                                                         att_dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['att_bar'][dfkey], 
                                                         unatt_dm_arr = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['unatt_bar'][dfkey],
                                                         fa_grid_coordinates = fa_grid_coordinates,
-                                                        overlap_only = overlap_only))
+                                                        overlap_only = overlap_only)
+                    tmp_df.loc[:, 'run'] = 'run-{rn}'.format(rn = self.MRIObj.mri_utils.get_run_ses_from_str(dfkey)[0])
+                    tmp_df.loc[:, 'ses'] = 'ses-{sn}'.format(sn = self.MRIObj.mri_utils.get_run_ses_from_str(dfkey)[1])
+                    pixel_df.append(tmp_df)
                 pixel_df = pd.concat(pixel_df, ignore_index=True)
-                # average over relevant dimensions
-                pixel_df = pixel_df.groupby(['coord_ind', 'bar_type', 'min_dist', 'ecc']).mean().reset_index()
+                ## average over relevant dimensions
+                #pixel_df = pixel_df.groupby(['coord_ind', 'bar_type', 'min_dist', 'ecc']).mean().reset_index()
                 # add relevant info
                 pixel_df.loc[:, 'ROI'] = roi_name
                 pixel_df.loc[:, 'sj'] = 'sub-{sj}'.format(sj = participant)
@@ -3114,8 +3118,11 @@ class Decoding_Model(GLMsingle_Model):
                 if df_FA_beh_RT is not None:
                     
                     pp_beh_df = df_FA_beh_RT[df_FA_beh_RT['sj'] == 'sub-{sj}'.format(sj = participant)]
-                    # merge info into drive df
+                    
+                    ## merge info into drive df
+                    # and drop incorrect trials
                     df_drive_pp = df_drive_pp.merge(pp_beh_df, on=['sj', 'run', 'ses', 'trial_ind'])
+                    df_drive_pp = df_drive_pp[df_drive_pp['correct'] == 1]
                 
                 # and append
                 df_drive.append(df_drive_pp)

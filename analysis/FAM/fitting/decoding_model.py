@@ -267,9 +267,58 @@ class Decoding_Model(GLMsingle_Model):
             
         ## also add absolute distance
         position_df.loc[:,'abs_inter_bar_dist'] = np.absolute(position_df.inter_bar_dist.values)
+        
+        ## add bar eccentricity in deg
+        
+        # get near absolute ecc value in deg
+        min_ecc = np.min(self.x_coords_deg[self.x_coords_deg>0])
+
+        # replace ecc with numeric value
+        ecc_deg = position_df.bar_ecc.values.copy()
+        ecc_deg[ecc_deg == 'near'] = min_ecc
+        ecc_deg[ecc_deg == 'middle'] = min_ecc + min_ecc*2
+        ecc_deg[ecc_deg == 'far'] = min_ecc + min_ecc*4
+        position_df.loc[:, 'bar_ecc_deg'] = ecc_deg
+        
+        ## also add label indicating if competing bar is closer to fovea (for given trial)
+        position_df.loc[:, 'compbar_closer2fix'] = False
+        # for attended bars
+        ind_list = position_df[(position_df.sort_values(['attend_condition'],ascending=False).groupby('trial_ind')['bar_ecc_deg'].transform(lambda x: x.values[0] > x.values[1])) &\
+                                (position_df['attend_condition'] == True)].index.values
+        position_df.loc[ind_list, 'compbar_closer2fix'] = True
+        # and unattended bars
+        ind_list = position_df[(position_df.sort_values(['attend_condition'],ascending=False).groupby('trial_ind')['bar_ecc_deg'].transform(lambda x: x.values[0] < x.values[1])) &\
+                                (position_df['attend_condition'] == False)].index.values
+        position_df.loc[ind_list, 'compbar_closer2fix'] = True
    
         return position_df
     
+    def convert_bar_pos_dict2df(self, run_position_df_dict = {}):
+        
+        """convert run position dict to df
+        (helper function)
+        """
+        
+        output_df = []
+
+        for sub_key in run_position_df_dict.keys():
+            for run_key in run_position_df_dict[sub_key].keys():
+                
+                tmp_df = run_position_df_dict[sub_key][run_key].copy()
+                
+                tmp_df.loc[:, 'sj'] = sub_key
+                tmp_df.loc[:, 'ses'] = run_key.split('_')[0]
+                tmp_df.loc[:, 'run'] = run_key.split('_')[1]
+                ## add label for attended condition
+                tmp_df.loc[tmp_df.query('attend_condition').index.values, 'bar_type'] = 'att_bar'
+                tmp_df.loc[tmp_df.query('~attend_condition').index.values, 'bar_type'] = 'unatt_bar'
+                
+                output_df.append(tmp_df)
+        output_df = pd.concat(output_df, ignore_index = True)
+        
+        return output_df
+        
+
     def get_trl_ecc_dist_df(self, position_df = None, bars_pos = 'parallel', bar_ecc = 'far', abs_inter_bar_dist = 5):
         
         """Given a data frame with bar positions and indices for each trial for a given run,

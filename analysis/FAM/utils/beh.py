@@ -293,3 +293,40 @@ class BehUtils(Utils):
         
         return data_keys_dict
     
+    def get_trial_ind_mask(self, AttBar_bar_midpoint = [], AttBar_bar_pass_direction = [],
+                                UnattBar_bar_midpoint = [], UnattBar_bar_pass_direction = [],
+                                prf_bar_coords_dict = {}):
+        """
+        Given dict with prf bar coordinates, check which FA bars were visible
+        and return trial indices to mask out
+        """
+        
+        ## vertical bar passes
+        t_att = np.where(((AttBar_bar_pass_direction == 'vertical') &\
+                (~np.isin(AttBar_bar_midpoint[:,-1],prf_bar_coords_dict['vertical']))
+                ))[0]
+        t_unatt = np.where(((UnattBar_bar_pass_direction == 'vertical') &\
+                (~np.isin(UnattBar_bar_midpoint[:,-1],prf_bar_coords_dict['vertical']))
+                ))[0]
+        t_vert = np.hstack((t_att,t_unatt))
+        
+        ## horizontal bar passes
+        t_att = np.where(((AttBar_bar_pass_direction == 'horizontal') &\
+                (~np.isin(AttBar_bar_midpoint[:,0],prf_bar_coords_dict['horizontal']))
+                ))[0]
+        t_unatt = np.where(((UnattBar_bar_pass_direction == 'horizontal') &\
+                (~np.isin(UnattBar_bar_midpoint[:,0],prf_bar_coords_dict['horizontal']))
+                ))[0]
+        t_horiz = np.hstack((t_att,t_unatt))
+        
+        ## combine
+        t_mask = np.hstack((t_vert,t_horiz))
+        
+        ## if no trials to be masked, return none
+        if len(t_mask) == 0:
+            t_mask = None
+        
+        return t_mask
+    
+    
+    

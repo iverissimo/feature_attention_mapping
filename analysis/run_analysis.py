@@ -275,12 +275,8 @@ match task:
             
             ## get prf bar position dict
             # to mask out FA trials that were not fully visible
-            prf_bar_coords_dict = FAM_pRF.get_masked_bar_coords(participant_list = FAM_data.sj_num, 
-                                                                ses = 'mean', 
-                                                                mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
-                                                                                                        crop_nr = FAM_data.task_nr_cropTR['pRF'], 
-                                                                                                        shift = FAM_data.shift_TRs_num), 
-                                                                bar_direction = None)
+            prf_bar_coords_dict = FAM_beh.get_pRF_masked_bar_coords(participant_list = FAM_data.sj_num, 
+                                                                    ses = 'mean')
             
             FAM_Decoder.plot_decoder_results(participant_list = FAM_data.sj_num, 
                                             ROI_list = ['V1','V2','V3','V3AB','LO','hV4'], #['V1'], 

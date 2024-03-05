@@ -188,110 +188,6 @@ class Decoding_Model(GLMsingle_Model):
         
         return prf_stimulus_dm, prf_grid_coordinates
     
-    def make_df_run_bar_pos(self, run_df = None, prf_bar_coords_dict = None):
-        
-        """make data frame with bar positions and indices for each trial
-        for a given run (in a summarized way)
-        """
-        
-        ## get run bar midpoint and direction values
-        # for each bar type (arrays will have len == total number of trial types)
-        AttBar_bar_midpoint, AttBar_bar_pass_direction = run_df.loc[(run_df['attend_condition'] == 1), 
-                                                                            ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
-        UnattBar_bar_midpoint, UnattBar_bar_pass_direction = run_df.loc[(run_df['attend_condition'] == 0), 
-                                                                            ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
-
-        ## find parallel + crossed bar trial indices
-        parallel_bar_ind = np.where((AttBar_bar_pass_direction == UnattBar_bar_pass_direction))[0]
-        crossed_bar_ind = np.where((AttBar_bar_pass_direction != UnattBar_bar_pass_direction))[0]
-
-        # check for masked trials
-        if prf_bar_coords_dict is not None:
-            print('checking for trials to mask')
-            t_mask = self.get_trial_ind_mask(AttBar_bar_midpoint = AttBar_bar_midpoint, 
-                                            AttBar_bar_pass_direction = AttBar_bar_pass_direction,
-                                            UnattBar_bar_midpoint = UnattBar_bar_midpoint, 
-                                            UnattBar_bar_pass_direction = UnattBar_bar_pass_direction,
-                                            prf_bar_coords_dict = prf_bar_coords_dict)
-            # if trials to mask
-            if t_mask is not None:
-                print('removing %i trials'%len(t_mask))
-                parallel_bar_ind = np.array([val for val in parallel_bar_ind if val not in t_mask])
-                crossed_bar_ind = np.array([val for val in crossed_bar_ind if val not in t_mask])
-
-        ## make summary dataframe 
-        position_df = []
-
-        for keys, ind_arr in {'parallel': parallel_bar_ind, 'crossed': crossed_bar_ind}.items():
-            for att_bool in [0,1]:
-                tmp_df = pd.DataFrame({'x_pos': run_df[run_df['attend_condition'] == att_bool].bar_midpoint_at_TR.values[0][ind_arr][:,0],
-                                    'y_pos': run_df[run_df['attend_condition'] == att_bool].bar_midpoint_at_TR.values[0][ind_arr][:,1],
-                                    'trial_ind': ind_arr})
-                tmp_df['attend_condition'] = bool(att_bool)
-                tmp_df['bars_pos'] = keys
-                position_df.append(tmp_df)
-        position_df = pd.concat(position_df, ignore_index = True)
-        
-        ## add interbar distance (only for parallel bars)
-        # for x
-        inds_uatt = position_df[((position_df['attend_condition'] == 0) &\
-                                (position_df['bars_pos'] == 'parallel') &\
-                    ((position_df['x_pos'] != 0)))].sort_values('trial_ind').index
-        inds_att = position_df[((position_df['attend_condition'] == 1) &\
-                                (position_df['bars_pos'] == 'parallel') &\
-                    ((position_df['x_pos'] != 0)))].sort_values('trial_ind').index
-        inter_bar_dist = (position_df.iloc[inds_uatt].x_pos.values - position_df.iloc[inds_att].x_pos.values)/self.bar_width_pix[0]
-
-        position_df.loc[inds_uatt,'inter_bar_dist'] = inter_bar_dist
-        position_df.loc[inds_att,'inter_bar_dist'] = inter_bar_dist
-
-        # for y
-        inds_uatt = position_df[((position_df['attend_condition'] == 0) &\
-                                (position_df['bars_pos'] == 'parallel') &\
-                    ((position_df['y_pos'] != 0)))].sort_values('trial_ind').index
-        inds_att = position_df[((position_df['attend_condition'] == 1) &\
-                                (position_df['bars_pos'] == 'parallel') &\
-                    ((position_df['y_pos'] != 0)))].sort_values('trial_ind').index
-        inter_bar_dist = (position_df.iloc[inds_uatt].y_pos.values - position_df.iloc[inds_att].y_pos.values)/self.bar_width_pix[0]
-
-        position_df.loc[inds_uatt,'inter_bar_dist'] = inter_bar_dist
-        position_df.loc[inds_att,'inter_bar_dist'] = inter_bar_dist
-        
-        ## add bar eccentricity
-        ecc_dict = {'far': self.bar_x_coords_pix[0::5], 'middle': self.bar_x_coords_pix[1::3], 'near': self.bar_x_coords_pix[2:4]}
-
-        for ecc_key in ecc_dict.keys():
-            inds = position_df[((position_df['x_pos'].isin(ecc_dict[ecc_key])) |\
-                        (position_df['y_pos'].isin(ecc_dict[ecc_key])))].sort_values('trial_ind').index
-            position_df.loc[inds,'bar_ecc'] = ecc_key
-            
-        ## also add absolute distance
-        position_df.loc[:,'abs_inter_bar_dist'] = np.absolute(position_df.inter_bar_dist.values)
-        
-        ## add bar eccentricity in deg
-        
-        # get near absolute ecc value in deg
-        min_ecc = np.min(self.x_coords_deg[self.x_coords_deg>0])
-
-        # replace ecc with numeric value
-        ecc_deg = position_df.bar_ecc.values.copy()
-        ecc_deg[ecc_deg == 'near'] = min_ecc
-        ecc_deg[ecc_deg == 'middle'] = min_ecc + min_ecc*2
-        ecc_deg[ecc_deg == 'far'] = min_ecc + min_ecc*4
-        position_df.loc[:, 'bar_ecc_deg'] = ecc_deg
-        
-        ## also add label indicating if competing bar is closer to fovea (for given trial)
-        position_df.loc[:, 'compbar_closer2fix'] = False
-        # for attended bars
-        ind_list = position_df[(position_df.sort_values(['attend_condition'],ascending=False).groupby('trial_ind')['bar_ecc_deg'].transform(lambda x: x.values[0] > x.values[1])) &\
-                                (position_df['attend_condition'] == True)].index.values
-        position_df.loc[ind_list, 'compbar_closer2fix'] = True
-        # and unattended bars
-        ind_list = position_df[(position_df.sort_values(['attend_condition'],ascending=False).groupby('trial_ind')['bar_ecc_deg'].transform(lambda x: x.values[0] < x.values[1])) &\
-                                (position_df['attend_condition'] == False)].index.values
-        position_df.loc[ind_list, 'compbar_closer2fix'] = True
-   
-        return position_df
     
     def convert_bar_pos_dict2df(self, run_position_df_dict = {}):
         
@@ -1514,24 +1410,6 @@ class Decoding_Model(GLMsingle_Model):
             
         return same_bar_pos_ind_dict
     
-    def get_run_position_df_dict(self, pp_bar_pos_df = None,  data_keys = ['ses-1_run-1'], pp_prf_bar_coords_dict = None):
-        
-        """make data frame with bar positions and indices in trial
-        """
-        
-        run_position_df_dict = {}
-
-        for ind, df_key in enumerate(data_keys):
-            
-            print('making df with bar position info for %s'%df_key)
-            # get run number and session, to avoid mistakes 
-            file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(df_key)
-            
-            run_position_df_dict[df_key] = self.make_df_run_bar_pos(run_df = pp_bar_pos_df['ses-{s}'.format(s = file_sn)]['run-{r}'.format(r=file_rn)],
-                                                                    prf_bar_coords_dict = pp_prf_bar_coords_dict)
-
-        return run_position_df_dict
-    
     def get_group_average_stim_dict(self, participant_list = [], reconstructed_stim_dict = None, run_position_df_dict = None, 
                                             lowres_DM_dict = None, bar_type = 'parallel'):
         
@@ -1797,28 +1675,7 @@ class Decoding_Model(GLMsingle_Model):
             group_reconstructed_stim_dict['sub-{sj}'.format(sj = participant)] = reconstructed_stim_dict
             
         return group_reconstructed_stim_dict
-            
-    def load_group_run_position_df_dict(self, participant_list = [], group_bar_pos_df = None, data_keys_dict = {},
-                                            prf_bar_coords_dict = None):
-        
-        """Load FA downsampled DM for all participants in participant list
-        returns dict of DMs 
-        """
-        
-        group_run_pos_df_dict = {}
-
-        for participant in participant_list:
-            
-            print('Getting bar positions for sub-{sj}'.format(sj = participant)) 
-            
-            ## get FA bar position dict, across runs
-            run_position_df_dict =  self.get_run_position_df_dict(pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = participant)],  
-                                                                data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)],
-                                                                pp_prf_bar_coords_dict = prf_bar_coords_dict['sub-{sj}'.format(sj = participant)])
-            
-            group_run_pos_df_dict['sub-{sj}'.format(sj = participant)] = run_position_df_dict
-            
-        return group_run_pos_df_dict          
+               
                       
     def plot_prf_diagnostics(self, participant_list = [], ROI_list = ['V1'], model_type = 'gauss_hrf',
                                     prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean', 

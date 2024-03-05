@@ -102,42 +102,7 @@ class GLMsingle_Model(Model):
         y_coords_deg = np.concatenate(([self.bar_y_coords_pix[0] - self.bar_width_pix[1]], self.bar_y_coords_pix))
         y_coords_deg = np.concatenate((y_coords_deg, [self.bar_y_coords_pix[-1] + self.bar_width_pix[1]]))
         self.y_coords_deg = self.convert_pix2dva(y_coords_deg)
-        
-    def get_trial_ind_mask(self, AttBar_bar_midpoint = [], AttBar_bar_pass_direction = [],
-                                UnattBar_bar_midpoint = [], UnattBar_bar_pass_direction = [],
-                                prf_bar_coords_dict = {}):
-        """
-        Given dict with prf bar coordinates, check which FA bars were visible
-        and return trial indices to mask out
-        """
-        
-        ## vertical bar passes
-        t_att = np.where(((AttBar_bar_pass_direction == 'vertical') &\
-                (~np.isin(AttBar_bar_midpoint[:,-1],prf_bar_coords_dict['vertical']))
-                ))[0]
-        t_unatt = np.where(((UnattBar_bar_pass_direction == 'vertical') &\
-                (~np.isin(UnattBar_bar_midpoint[:,-1],prf_bar_coords_dict['vertical']))
-                ))[0]
-        t_vert = np.hstack((t_att,t_unatt))
-        
-        ## horizontal bar passes
-        t_att = np.where(((AttBar_bar_pass_direction == 'horizontal') &\
-                (~np.isin(AttBar_bar_midpoint[:,0],prf_bar_coords_dict['horizontal']))
-                ))[0]
-        t_unatt = np.where(((UnattBar_bar_pass_direction == 'horizontal') &\
-                (~np.isin(UnattBar_bar_midpoint[:,0],prf_bar_coords_dict['horizontal']))
-                ))[0]
-        t_horiz = np.hstack((t_att,t_unatt))
-        
-        ## combine
-        t_mask = np.hstack((t_vert,t_horiz))
-        
-        ## if no trials to be masked, return none
-        if len(t_mask) == 0:
-            t_mask = None
-        
-        return t_mask
-        
+          
     def get_visual_DM_dict(self, pp_bar_pos_df = None, pp_prf_bar_coords_dict = None):
     
         """
@@ -182,11 +147,11 @@ class GLMsingle_Model(Model):
                 # if possible, mask out not visible bar positions
                 if pp_prf_bar_coords_dict is not None:
                     # get trial indices to mask out
-                    t_mask = self.get_trial_ind_mask(AttBar_bar_midpoint = AttBar_bar_midpoint, 
-                                                    AttBar_bar_pass_direction = AttBar_bar_pass_direction,
-                                                    UnattBar_bar_midpoint = UnattBar_bar_midpoint, 
-                                                    UnattBar_bar_pass_direction = UnattBar_bar_pass_direction,
-                                                    prf_bar_coords_dict = pp_prf_bar_coords_dict)
+                    t_mask = self.MRIObj.beh_utils.get_trial_ind_mask(AttBar_bar_midpoint = AttBar_bar_midpoint, 
+                                                                    AttBar_bar_pass_direction = AttBar_bar_pass_direction,
+                                                                    UnattBar_bar_midpoint = UnattBar_bar_midpoint, 
+                                                                    UnattBar_bar_pass_direction = UnattBar_bar_pass_direction,
+                                                                    prf_bar_coords_dict = pp_prf_bar_coords_dict)
                 else:
                     t_mask = None
                     

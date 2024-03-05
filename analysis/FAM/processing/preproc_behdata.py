@@ -700,3 +700,274 @@ class PreprocBeh:
                          
         return df_RT
     
+    def get_pRF_bar_coords_per_TR(self, bar_direction = 'horizontal'):
+
+        """
+        Get array with pRF bar center coordinates per TR.
+        Note - if horizontal bar pass (bar is vertically oriented), will return y coordinates; 
+        if vertical bar passes (bar is horizontally oriented)) will return x coordinates
+
+        """
+
+        screen_res = self.MRIObj.screen_res[0] if bar_direction == 'horizontal' else self.MRIObj.screen_res[1]
+        conditions = ['L-R', 'R-L'] if bar_direction == 'horizontal' else ['D-U','U-D'] 
+
+        bar_coord_per_TR = []
+
+        for _,bartype in enumerate(self.MRIObj.pRF_bar_pass):
+
+            if bartype == conditions[0]:
+                bar_coord_per_TR += list(screen_res*np.linspace(-.5,.5, self.MRIObj.pRF_nr_TRs[bartype]))
+            elif bartype == conditions[1]:
+                bar_coord_per_TR += list(screen_res*np.linspace(.5,-.5, self.MRIObj.pRF_nr_TRs[bartype]))
+            else:
+                # want to keep the irrelevant dimensions as nan, to avoid confusion
+                bar_coord_per_TR += list(np.repeat(np.nan, self.MRIObj.pRF_nr_TRs[bartype]))
+
+        # crop and shift array, if such was the case
+        bar_coord_per_TR = self.MRIObj.beh_utils.crop_shift_arr(np.array(bar_coord_per_TR), 
+                                                                crop_nr = self.MRIObj.task_nr_cropTR['pRF'], 
+                                                                shift = self.MRIObj.shift_TRs_num)
+
+        return bar_coord_per_TR
+    
+    def get_pRF_masked_bar_coords(self, participant_list = [], ses = 'mean', mask_bool_df = None, bar_direction = None):
+
+        """
+        Get dict with unique pRF bar coordinates (for horizontal and vertical bar passes)
+        masked for participant visibility
+
+        Parameters
+        ----------
+        participant_list: list
+            list with participant ID
+        ses : str
+            session number (default mean)
+        mask_bool_df: dataframe
+            will be used to mask design matrix given behavioral performance
+        bar_direction: str
+            if given, will only return horizontal/vertical bar pass coordinates 
+        """
+
+        if isinstance(ses, str) and 'ses' in ses: # to account for differences in input
+            ses = re.search(r'(?<=ses-).*', ses)[0]
+
+        if mask_bool_df is None:
+            mask_bool_df = self.get_pRF_mask_bool(ses_type = 'func',
+                                                    crop_nr = self.MRIObj.task_nr_cropTR['pRF'], 
+                                                    shift = self.MRIObj.shift_TRs_num)
+            
+        bar_coords_dict = {}
+            
+        # loop over participant
+        for participant in participant_list:
+
+            # if we set a specific session, then select that one, else combine
+            if ses == 'mean':
+                mask_bool = mask_bool_df[mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant)]['mask_bool'].values
+            else:
+                mask_bool = mask_bool_df[(mask_bool_df['ses'] == 'ses-{s}'.format(s = ses)) & \
+                                    (mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant))]['mask_bool'].values 
+            mask_bool = np.prod(mask_bool, axis = 0)
+                
+            # iterate over bar directions
+            if bar_direction is None:
+                bar_direction_list = ['vertical', 'horizontal']
+            elif isinstance(bar_direction, str):
+                bar_direction_list = [bar_direction]
+
+            bar_coords_dict['sub-{sj}'.format(sj = participant)] = {}
+            
+            for bd_key in bar_direction_list:
+
+                ## get pRF bar center coordinates per TR for bar pass direction
+                bar_coords_masked = self.get_pRF_bar_coords_per_TR(bar_direction = bd_key).copy()
+                bar_coords_masked[np.where((mask_bool == 0))[0]] = np.nan
+
+                # get unique coordinates
+                uniq_bar_coords = np.unique(bar_coords_masked)
+                uniq_bar_coords = np.array([val for val in uniq_bar_coords if ~np.isnan(val)])
+
+                bar_coords_dict['sub-{sj}'.format(sj = participant)][bd_key] = uniq_bar_coords
+
+        return bar_coords_dict
+    
+    def make_FA_df_run_bar_pos(self, run_df = None, prf_bar_coords_dict = None):
+        
+        """make data frame with bar positions and indices for each trial
+        for a given run (in a summarized way)
+        """
+
+        # define bar width in pixel
+        bar_width_pix = self.MRIObj.screen_res * self.MRIObj.bar_width['FA']
+
+        # define number of bars per direction
+        num_bars = np.array(self.MRIObj.FA_num_bar_position) 
+
+        # all possible positions in pixels [x,y] for midpoint of
+        # horizontal bar passes 
+        bar_x_coords_pix = np.sort(np.concatenate((-np.arange(bar_width_pix[0]/2,self.MRIObj.screen_res[0]/2,bar_width_pix[0])[0:int(num_bars[0]/2)],
+                                        np.arange(bar_width_pix[0]/2,self.MRIObj.screen_res[0]/2,bar_width_pix[0])[0:int(num_bars[0]/2)])))
+        
+        ## get run bar midpoint and direction values
+        # for each bar type (arrays will have len == total number of trial types)
+        AttBar_bar_midpoint, AttBar_bar_pass_direction = run_df.loc[(run_df['attend_condition'] == 1), 
+                                                                            ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
+        UnattBar_bar_midpoint, UnattBar_bar_pass_direction = run_df.loc[(run_df['attend_condition'] == 0), 
+                                                                            ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
+
+        ## find parallel + crossed bar trial indices
+        parallel_bar_ind = np.where((AttBar_bar_pass_direction == UnattBar_bar_pass_direction))[0]
+        crossed_bar_ind = np.where((AttBar_bar_pass_direction != UnattBar_bar_pass_direction))[0]
+
+        # check for masked trials
+        if prf_bar_coords_dict is not None:
+            print('checking for trials to mask')
+            t_mask = self.MRIObj.beh_utils.get_trial_ind_mask(AttBar_bar_midpoint = AttBar_bar_midpoint, 
+                                                            AttBar_bar_pass_direction = AttBar_bar_pass_direction,
+                                                            UnattBar_bar_midpoint = UnattBar_bar_midpoint, 
+                                                            UnattBar_bar_pass_direction = UnattBar_bar_pass_direction,
+                                                            prf_bar_coords_dict = prf_bar_coords_dict)
+            # if trials to mask
+            if t_mask is not None:
+                print('removing %i trials'%len(t_mask))
+                parallel_bar_ind = np.array([val for val in parallel_bar_ind if val not in t_mask])
+                crossed_bar_ind = np.array([val for val in crossed_bar_ind if val not in t_mask])
+
+        ## make summary dataframe 
+        position_df = []
+
+        for keys, ind_arr in {'parallel': parallel_bar_ind, 'crossed': crossed_bar_ind}.items():
+            for att_bool in [0,1]:
+                tmp_df = pd.DataFrame({'x_pos': run_df[run_df['attend_condition'] == att_bool].bar_midpoint_at_TR.values[0][ind_arr][:,0],
+                                    'y_pos': run_df[run_df['attend_condition'] == att_bool].bar_midpoint_at_TR.values[0][ind_arr][:,1],
+                                    'trial_ind': ind_arr})
+                tmp_df['attend_condition'] = bool(att_bool)
+                tmp_df['bars_pos'] = keys
+                position_df.append(tmp_df)
+        position_df = pd.concat(position_df, ignore_index = True)
+        
+        ## add interbar distance (only for parallel bars)
+        # for x
+        inds_uatt = position_df[((position_df['attend_condition'] == 0) &\
+                                (position_df['bars_pos'] == 'parallel') &\
+                    ((position_df['x_pos'] != 0)))].sort_values('trial_ind').index
+        inds_att = position_df[((position_df['attend_condition'] == 1) &\
+                                (position_df['bars_pos'] == 'parallel') &\
+                    ((position_df['x_pos'] != 0)))].sort_values('trial_ind').index
+        inter_bar_dist = (position_df.iloc[inds_uatt].x_pos.values - position_df.iloc[inds_att].x_pos.values)/bar_width_pix[0]
+
+        position_df.loc[inds_uatt,'inter_bar_dist'] = inter_bar_dist
+        position_df.loc[inds_att,'inter_bar_dist'] = inter_bar_dist
+
+        # for y
+        inds_uatt = position_df[((position_df['attend_condition'] == 0) &\
+                                (position_df['bars_pos'] == 'parallel') &\
+                    ((position_df['y_pos'] != 0)))].sort_values('trial_ind').index
+        inds_att = position_df[((position_df['attend_condition'] == 1) &\
+                                (position_df['bars_pos'] == 'parallel') &\
+                    ((position_df['y_pos'] != 0)))].sort_values('trial_ind').index
+        inter_bar_dist = (position_df.iloc[inds_uatt].y_pos.values - position_df.iloc[inds_att].y_pos.values)/bar_width_pix[0]
+
+        position_df.loc[inds_uatt,'inter_bar_dist'] = inter_bar_dist
+        position_df.loc[inds_att,'inter_bar_dist'] = inter_bar_dist
+        
+        ## add bar eccentricity
+        ecc_dict = {'far': bar_x_coords_pix[0::5], 'middle': bar_x_coords_pix[1::3], 'near': bar_x_coords_pix[2:4]}
+
+        for ecc_key in ecc_dict.keys():
+            inds = position_df[((position_df['x_pos'].isin(ecc_dict[ecc_key])) |\
+                        (position_df['y_pos'].isin(ecc_dict[ecc_key])))].sort_values('trial_ind').index
+            position_df.loc[inds,'bar_ecc'] = ecc_key
+            
+        ## also add absolute distance
+        position_df.loc[:,'abs_inter_bar_dist'] = np.absolute(position_df.inter_bar_dist.values)
+        
+        ## add bar eccentricity in deg
+        
+        # get near absolute ecc value in deg
+        min_ecc = bar_width_pix[0]/2 * self.MRIObj.beh_utils.dva_per_pix(height_cm = self.MRIObj.params['monitor']['height'], 
+                                                            distance_cm = self.MRIObj.params['monitor']['distance'], 
+                                                            vert_res_pix = self.MRIObj.screen_res[1])
+
+        # replace ecc with numeric value
+        ecc_deg = position_df.bar_ecc.values.copy()
+        ecc_deg[ecc_deg == 'near'] = min_ecc
+        ecc_deg[ecc_deg == 'middle'] = min_ecc + min_ecc*2
+        ecc_deg[ecc_deg == 'far'] = min_ecc + min_ecc*4
+        position_df.loc[:, 'bar_ecc_deg'] = ecc_deg
+        
+        ## also add label indicating if competing bar is closer to fovea (for given trial)
+        position_df.loc[:, 'compbar_closer2fix'] = False
+        # for attended bars
+        ind_list = position_df[(position_df.sort_values(['attend_condition'],ascending=False).groupby('trial_ind')['bar_ecc_deg'].transform(lambda x: x.values[0] > x.values[1])) &\
+                                (position_df['attend_condition'] == True)].index.values
+        position_df.loc[ind_list, 'compbar_closer2fix'] = True
+        # and unattended bars
+        ind_list = position_df[(position_df.sort_values(['attend_condition'],ascending=False).groupby('trial_ind')['bar_ecc_deg'].transform(lambda x: x.values[0] < x.values[1])) &\
+                                (position_df['attend_condition'] == False)].index.values
+        position_df.loc[ind_list, 'compbar_closer2fix'] = True
+   
+        return position_df
+    
+    def get_FA_pp_run_position_df(self, pp_bar_pos_dict = None,  data_keys = ['ses-1_run-1'], pp_prf_bar_coords_dict = None):
+        
+        """get data frame with bar positions and indices for all runs
+        of a given participant
+        """
+   
+        run_position_df = []
+
+        for ind, df_key in enumerate(data_keys):
+            
+            print('making df with bar position info for %s'%df_key)
+            # get run number and session, to avoid mistakes 
+            file_rn, file_sn = self.MRIObj.beh_utils.get_run_ses_from_str(df_key)
+
+            tmp_df = self.make_FA_df_run_bar_pos(run_df = pp_bar_pos_dict['ses-{s}'.format(s = file_sn)]['run-{r}'.format(r=file_rn)],
+                                                prf_bar_coords_dict = pp_prf_bar_coords_dict)
+            tmp_df.loc[:, 'ses'] = 'ses-{s}'.format(s = file_sn)
+            tmp_df.loc[:, 'run'] = 'run-{r}'.format(r = file_rn)
+            
+            run_position_df.append(tmp_df) 
+        
+        return pd.concat(run_position_df, ignore_index=True)
+    
+    def get_FA_group_run_position_df(self, participant_list = [], group_bar_pos_dict = None, data_keys_dict = None,
+                                            prf_bar_coords_dict = None, ses_type = 'func'):
+        
+        """get data frame with bar positions and indices for all participants
+        """
+
+        # get all participant bar positions for FA task
+        if group_bar_pos_dict is None: 
+            group_bar_pos_dict = self.get_group_FA_bar_position_dict(participant_list = participant_list, 
+                                                                    ses_num = None, 
+                                                                    ses_type = ses_type, 
+                                                                    run_num = None)
+        
+        if data_keys_dict is None:
+            data_keys_dict = self.MRIObj.beh_utils.get_data_keys_dict(participant_list = participant_list, 
+                                                                    group_bar_pos_dict = group_bar_pos_dict)
+        
+        ## get prf bar position dict
+        # to mask out FA trials that were not fully visible
+        if prf_bar_coords_dict is None: 
+            prf_bar_coords_dict = self.get_pRF_masked_bar_coords(participant_list = participant_list,
+                                                                ses = 'mean')
+        
+        group_run_pos_df = []
+
+        for participant in participant_list:
+            
+            print('Getting bar positions for sub-{sj}'.format(sj = participant)) 
+            
+            ## get FA bar position dict, across runs
+            tmp_df =  self.get_FA_pp_run_position_df(pp_bar_pos_dict = group_bar_pos_dict['sub-{sj}'.format(sj = participant)],  
+                                                    data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)],
+                                                    pp_prf_bar_coords_dict = prf_bar_coords_dict['sub-{sj}'.format(sj = participant)])
+            tmp_df.loc[:, 'sj'] = 'sub-{sj}'.format(sj = participant)
+            
+            group_run_pos_df.append(tmp_df) 
+               
+        return pd.concat(group_run_pos_df, ignore_index=True)       

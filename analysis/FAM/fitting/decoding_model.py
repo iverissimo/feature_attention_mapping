@@ -1751,22 +1751,6 @@ class Decoding_Model(GLMsingle_Model):
                                                                 flexible_hrf_parameters = fit_hrf)
         
         return prf_decoder_model
-        
-    def get_data_keys(self, pp_bar_pos_df = None):
-        
-        """Get participant data identifier (ses-X_run-Y) keys as list of strings
-        to use as reference throughout analysis
-        
-        """        
-        
-        # save ses and run as list of strings
-        output_list = []
-        
-        for ses_key in pp_bar_pos_df.keys():
-            for run_key in pp_bar_pos_df[ses_key].keys():
-                output_list.append('{sn}_{rn}'.format(sn = ses_key, rn = run_key))
-                        
-        return np.array(output_list)
     
     def load_group_DM_dict(self, participant_list = [], group_bar_pos_df = None, data_keys_dict = {}, prf_bar_coords_dict = None):
         
@@ -1814,16 +1798,6 @@ class Decoding_Model(GLMsingle_Model):
             
         return group_reconstructed_stim_dict
             
-    def load_group_data_keys(self, participant_list = [], group_bar_pos_df = None):
-        
-        data_keys_dict = {}
-        
-        for participant in participant_list:
-            print('Loading participant run keys for sub-{sj}'.format(sj = participant))
-            data_keys_dict['sub-{sj}'.format(sj = participant)] = self.get_data_keys(pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = participant)]) 
-                  
-        return data_keys_dict
-    
     def load_group_run_position_df_dict(self, participant_list = [], group_bar_pos_df = None, data_keys_dict = {},
                                             prf_bar_coords_dict = None):
         
@@ -2363,8 +2337,8 @@ class Decoding_Model(GLMsingle_Model):
         
         ## load participant data keys
         # for reference later on
-        data_keys_dict = self.load_group_data_keys(participant_list = participant_list, 
-                                                group_bar_pos_df = group_bar_pos_df)
+        data_keys_dict = self.MRIObj.beh_utils.get_data_keys_dict(participant_list = participant_list, 
+                                                                group_bar_pos_dict = group_bar_pos_df)
         
         ## get downsampled FA DM for group
         lowres_DM_dict = self.load_group_DM_dict(participant_list = participant_list, 

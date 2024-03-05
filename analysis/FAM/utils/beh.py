@@ -40,7 +40,6 @@ class BehUtils(Utils):
             
         return condition_per_TR
 
-
     def get_pRF_trials_bar_color(self, run_df, total_trials = None,
                                 color_dict = {'color_red': ['orange', 'pink'], 'color_green': ['yellow', 'blue']}):
 
@@ -82,7 +81,6 @@ class BehUtils(Utils):
 
         return category_color, bar_color
 
-
     def get_FA_trials_bar_color(self, run_df, total_trials = None):
 
         """"
@@ -121,7 +119,6 @@ class BehUtils(Utils):
                     
         return category_color, bar_color
 
-
     def get_pp_response_bool(self, trial_df, trial_bar_color = '', task = 'pRF',
                             task_key_name = {'pRF':{'left_index': ['color_red'], 'right_index': ['color_green']},
                                             'FA':{'left_index': ['pink', 'blue'], 'right_index': ['orange', 'yellow']}},
@@ -156,7 +153,6 @@ class BehUtils(Utils):
 
         return response_bool
 
-
     def get_pp_response_rt(self, trial_df, task = 'pRF', TR = 1.6):
         
         """"
@@ -181,7 +177,6 @@ class BehUtils(Utils):
             RT = trial_df[trial_df['event_type'] == 'response']['onset'].values[-1] - trial_df[trial_df['event_type'] == 'stim']['onset'].values[0]
         
         return RT
-
 
     def get_FA_run_struct(self, bar_pass_direction, num_bar_pos = [6,6], empty_TR = 20, task_trial_TR = 2):
         
@@ -231,8 +226,7 @@ class BehUtils(Utils):
         bar_pass_trials = np.where((np.array(trial_type_all) == 'task'))[0]
         
         return np.array(trial_type_all), bar_pass_trials
-    
-    
+      
     def get_pp_task_keys(self, participant):
 
         """
@@ -257,4 +251,45 @@ class BehUtils(Utils):
     
         return keys
 
+    def get_data_keys(self, bar_pos_dict = None):
+        
+        """Get participant data identifier (ses-X_run-Y) keys as list of strings
+        to use as reference throughout analysis
 
+        Parameters
+        ----------
+        pp_bar_pos_dict: dict
+            participant dict which contains bar position df, obtained from behavior class
+            (ex: dict['ses-1']['run-1'] = pd.DataFrame)
+        """        
+        
+        # save ses and run as list of strings
+        output_list = []
+        
+        for ses_key in bar_pos_dict.keys():
+            for run_key in bar_pos_dict[ses_key].keys():
+                output_list.append('{sn}_{rn}'.format(sn = ses_key, rn = run_key))
+                        
+        return np.array(output_list)
+    
+    def get_data_keys_dict(self, participant_list = [], group_bar_pos_dict = None):
+
+        """Get data identifier (ses-X_run-Y) keys as list of strings
+        to use as reference throughout analysis
+        for all participants
+        return dict of keys
+
+        Parameters
+        ----------
+        participant_list: list
+            list with participant IDs
+        group_bar_pos_dict: dict
+            group dict which contains bar position df, obtained from behavior class
+            (ex: dict['sub-001']['ses-1']['run-1'] = pd.DataFrame)
+        """ 
+        
+        print('Loading participant run keys for %i participants'%len(participant_list))
+        data_keys_dict = {'sub-{sj}'.format(sj = pp): self.get_data_keys(bar_pos_dict = group_bar_pos_dict['sub-{sj}'.format(sj = pp)]) for pp in participant_list}
+        
+        return data_keys_dict
+    

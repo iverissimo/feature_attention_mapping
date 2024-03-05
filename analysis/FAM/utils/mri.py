@@ -49,7 +49,7 @@ from tqdm import tqdm
 import functools
 import operator
 
-from nilearn.glm.first_level.design_matrix import _cosine_drift as discrete_cosine_transform
+from nilearn.glm.first_level.design_matrix import create_cosine_drift
 
 from FAM.utils.general import Utils
 
@@ -1020,7 +1020,7 @@ class MRIUtils(Utils):
         elif detrend_type == 'dct':
 
             frame_times = np.linspace(0, data.shape[-1]*TR, data.shape[-1], endpoint=False)
-            dc_set = discrete_cosine_transform(high_pass = cut_off_hz, frame_times=frame_times)
+            dc_set = create_cosine_drift(high_pass = cut_off_hz, frame_times=frame_times)
 
             raise NameError('Not implemented yet')
 

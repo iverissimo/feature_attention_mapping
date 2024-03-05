@@ -159,10 +159,10 @@ mri: # refers to the Psychopy SyncGenerator class
 
   paths:
     local: 
-      root: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/DATA'
-      matlab: '/Applications/MATLAB_R2019a.app/bin/matlab'
-      derivatives: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/DATA/derivatives'
-      sourcedata: '/Volumes/Verissimo_Seagate_Hub_Plus/Projects/FAM/DATA/sourcedata'
+      root: '/Volumes/Ines_SSD/FAM/DATA'
+      matlab: '/Applications/MATLAB_R2023b.app/bin/matlab'
+      derivatives: '/Volumes/Ines_SSD/FAM/DATA/derivatives'
+      sourcedata: '/Volumes/Ines_SSD/FAM/DATA/sourcedata'
       singularity: ''
     
     slurm:

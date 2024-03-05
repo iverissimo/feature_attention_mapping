@@ -188,33 +188,7 @@ class Decoding_Model(GLMsingle_Model):
         
         return prf_stimulus_dm, prf_grid_coordinates
     
-    
-    def convert_bar_pos_dict2df(self, run_position_df_dict = {}):
-        
-        """convert run position dict to df
-        (helper function)
-        """
-        
-        output_df = []
-
-        for sub_key in run_position_df_dict.keys():
-            for run_key in run_position_df_dict[sub_key].keys():
-                
-                tmp_df = run_position_df_dict[sub_key][run_key].copy()
-                
-                tmp_df.loc[:, 'sj'] = sub_key
-                tmp_df.loc[:, 'ses'] = run_key.split('_')[0]
-                tmp_df.loc[:, 'run'] = run_key.split('_')[1]
-                ## add label for attended condition
-                tmp_df.loc[tmp_df.query('attend_condition').index.values, 'bar_type'] = 'att_bar'
-                tmp_df.loc[tmp_df.query('~attend_condition').index.values, 'bar_type'] = 'unatt_bar'
-                
-                output_df.append(tmp_df)
-        output_df = pd.concat(output_df, ignore_index = True)
-        
-        return output_df
-        
-
+            
     def get_trl_ecc_dist_df(self, position_df = None, bars_pos = 'parallel', bar_ecc = 'far', abs_inter_bar_dist = 5):
         
         """Given a data frame with bar positions and indices for each trial for a given run,

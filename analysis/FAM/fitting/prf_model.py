@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw
 import cortex
 
 from scipy.optimize import LinearConstraint, NonlinearConstraint
+from scipy.interpolate import pchip
 
 from joblib import Parallel, delayed
 from tqdm import tqdm
@@ -1683,7 +1684,54 @@ class pRF_model(Model):
         else:
             return result
     
-    
+    def get_average_hrf(self, pp_prf_estimates = None, prf_modelobj = None, rsq_threshold = None, stim_dur = None, osf = None):
+
+        """
+        Make average HRF timeseries
+        (requires previously obtained HRF params from pRF fitting)
+
+        Parameters
+        ----------
+        pp_prf_estimates : dict
+            dict with participant prf estimates
+        rsq_threshold: float or None
+            will only fit vertices where prf fit above certain rsq threshold 
+        """
+
+        ## find indices where pRF rsq high
+        rsq_threshold = .1 if rsq_threshold is None else rsq_threshold
+
+        if osf is None:
+            osf = self.osf
+
+        ind2use = np.where((pp_prf_estimates['r2'] > rsq_threshold))[0]
+        print('selecting %i HRFs to average'%len(ind2use))
+
+        ## make hrfs for all high rsq visual voxels
+        # shifted by onset (stc) and upsampled
+        hrf_ind2use = [prf_modelobj.create_hrf(hrf_params = [1, 
+                                                pp_prf_estimates['hrf_derivative'][vert],
+                                                pp_prf_estimates['hrf_dispersion'][vert]], 
+                                                osf = osf * self.MRIObj.TR, 
+                                                onset = self.hrf_onset) for vert in ind2use]
+        hrf_ind2use = np.vstack(hrf_ind2use)
+
+        ## average HRF, weighted by the pRF RSQ
+        avg_hrf = np.average(hrf_ind2use, axis=0, weights=self.MRIObj.mri_utils.normalize(pp_prf_estimates['r2'][ind2use]))
+
+        ## convolve to get the predicted response 
+        # to the desired stimulus duration
+        if stim_dur is None:
+            stim_dur = self.MRIObj.FA_bars_phase_dur # duration of bar presentation in seconds
+        res_step = self.MRIObj.TR/(self.MRIObj.TR * osf) # resolution of upsampled HRF
+
+        hrf_stim_convolved = np.convolve(avg_hrf, np.ones(int(np.max([1, np.round(stim_dur/res_step)]))))
+
+        ## now resample again to the TR
+        hrf_final = pchip(np.asarray(range(hrf_stim_convolved.shape[0])) * res_step,
+                        hrf_stim_convolved)(np.asarray(np.arange(0, int((hrf_stim_convolved.shape[0]-1) * res_step), self.MRIObj.TR)))
+        
+        return hrf_final/np.max(hrf_final)
                     
 
 

@@ -7,7 +7,7 @@ import yaml
 import glob
 
 import itertools
-from scipy.interpolate import pchip
+
 
 from PIL import Image, ImageDraw
 
@@ -231,7 +231,7 @@ class GLMsingle_Model(Model):
 
         return self.MRIObj.mri_utils.normalize(visual_dm_array)
         
-    def convert_betas_volume(self, participant, model_type = 'D', file_ext = '_cropped.nii.gz', trial_num = 132):
+    def convert_betas_volume(self, participant, model_type = 'D', file_ext = '_cropped.nii.gz', trial_num = 132, save_r2 = True):
         
         """Convert beta estimates from GLMsingle into nii files
         to use later in volume analysis
@@ -277,7 +277,17 @@ class GLMsingle_Model(Model):
                 
                 print('saving %s'%betas_filename)
                 nib.save(betas_img, betas_filename)
-            
+
+                # also save rsq
+                if save_r2:
+                    r2_run = GLMsing_estimates_dict['R2run'][..., ind]
+
+                    # create r2 image
+                    r2_img = nib.Nifti1Image(r2_run, func_img.affine)
+                    
+                    print('saving %s'%betas_filename.replace('betas', 'r2'))
+                    nib.save(r2_img, betas_filename.replace('betas', 'r2'))
+
             # append to use later
             all_files.append(betas_filename)
         
@@ -468,7 +478,7 @@ class GLMsingle_Model(Model):
 
         return trial_combinations_df
 
-    def make_singletrial_dm(self, run_num_arr = [], ses_num_arr = [], pp_bar_pos_df = {}, trial_combinations_df = None):
+    def make_singletrial_dm(self, run_num_arr = [], ses_num_arr = [], pp_bar_pos_df = None, trial_combinations_df = None):
 
         """
         Make single trial design matrix for one or more runs 
@@ -494,86 +504,29 @@ class GLMsingle_Model(Model):
         # with shape [runs, TRs, conditions]
         single_trl_DM = np.zeros((len(run_num_arr), len(self.condition_per_TR), len(trial_combinations_df)))
 
-        ## loop over runs
-        for file_ind, run_num in enumerate(run_num_arr):
+        ## per unique condition
+        for cond_ind in range(len(trial_combinations_df)):
 
-            # get session number
-            ses_num = ses_num_arr[file_ind]
+            # filter bar position df for condition
+            cond_df = pp_bar_pos_df[(pp_bar_pos_df['att_x_pos'] == trial_combinations_df.iloc[cond_ind].AttBar_bar_midpoint[0]) &\
+                                    (pp_bar_pos_df['att_y_pos'] == trial_combinations_df.iloc[cond_ind].AttBar_bar_midpoint[1]) &\
+                                    (pp_bar_pos_df['unatt_x_pos'] == trial_combinations_df.iloc[cond_ind].UnattBar_bar_midpoint[0]) &\
+                                    (pp_bar_pos_df['unatt_y_pos'] == trial_combinations_df.iloc[cond_ind].UnattBar_bar_midpoint[1])
+                                    ]
+            
+            ## get trial indices when bar on screen 
+            # (making sure that run and ses order are correct)
+            i_trials = [cond_df[(cond_df['ses'] == 'ses-{sn}'.format(sn = ses_num_arr[i])) &\
+                            (cond_df['run'] == 'run-{rn}'.format(rn = run_num_arr[i]))].trial_ind.values[0] for i in range(len(run_num_arr))]
 
-            ## get bar position df for run
-            run_bar_pos_df = pp_bar_pos_df['ses-{s}'.format(s = ses_num)]['run-{r}'.format(r=run_num)]
-            print('loading bar positions for ses-{s}, run-{r}'. format(s = ses_num, r=run_num))
-
-            ## get run bar midpoint and direction values
-            # for each bar type (arrays will have len == total number of trial types)
-            AttBar_bar_midpoint, AttBar_bar_pass_direction = run_bar_pos_df.loc[(run_bar_pos_df['attend_condition'] == 1), 
-                                                                                ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
-            UnattBar_bar_midpoint, UnattBar_bar_pass_direction = run_bar_pos_df.loc[(run_bar_pos_df['attend_condition'] == 0), 
-                                                                                ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
-
-            ## fill DM for all TRs
-            # get TR indices when bar on screen
-            i_TR = np.where((self.condition_per_TR == 'task'))[0]
-
-            ## get trial condition index, to find order of trial types
-            # relative to reference DF 
-            cond_index = np.array([trial_combinations_df[(trial_combinations_df['AttBar_bar_midpoint'].apply(lambda x: str(AttBar_bar_midpoint[trl_ind]) == str(x))) &\
-                        (trial_combinations_df['AttBar_bar_pass_direction'].apply(lambda x: str(AttBar_bar_pass_direction[trl_ind]) == str(x))) &\
-                        (trial_combinations_df['UnattBar_bar_midpoint'].apply(lambda x: str(UnattBar_bar_midpoint[trl_ind]) == str(x))) &\
-                        (trial_combinations_df['UnattBar_bar_pass_direction'].apply(lambda x: str(UnattBar_bar_pass_direction[trl_ind]) == str(x)))].index[0] for trl_ind in range(AttBar_bar_midpoint.shape[0])])
-
+            ## fill DM 
             # fill DM with which condition had its onset at what TR
-            single_trl_DM[file_ind, i_TR, cond_index] = 1
+            for i, t in enumerate(i_trials):
+                single_trl_DM[i, np.where((self.condition_per_TR == 'task'))[0][t], cond_ind] = 1
 
         return single_trl_DM, trial_combinations_df
 
-    def get_average_hrf(self, pp_prf_estimates, prf_modelobj, rsq_threshold = None, stim_dur = None):
-
-        """
-        Make average HRF to give as input to glm single model
-        (requires previously obtained HRF params from pRF fitting)
-
-        Parameters
-        ----------
-        pp_prf_estimates : dict
-            dict with participant prf estimates
-        prf_modelobj: object
-            pRF model object from prfpy, used to create HRF
-        rsq_threshold: float or None
-            will only fit vertices where prf fit above certain rsq threshold 
-        """
-
-        ## find indices where pRF rsq high
-        rsq_threshold = self.prf_rsq_threshold if rsq_threshold is None else rsq_threshold
-
-        ind2use = np.where((pp_prf_estimates['r2'] > rsq_threshold))[0]
-        print('selecting %i HRFs to average'%len(ind2use))
-
-        ## make hrfs for all high rsq visual voxels
-        # shifted by onset (stc) and upsampled
-        hrf_ind2use = [prf_modelobj.create_hrf(hrf_params = [1, 
-                                                            pp_prf_estimates['hrf_derivative'][vert],
-                                                            pp_prf_estimates['hrf_dispersion'][vert]], 
-                                                            osf = self.osf * self.MRIObj.TR, 
-                                                            onset = self.hrf_onset) for vert in ind2use]
-        hrf_ind2use = np.vstack(hrf_ind2use)
-
-        ## average HRF, weighted by the pRF RSQ
-        avg_hrf = np.average(hrf_ind2use, axis=0, weights=self.MRIObj.mri_utils.normalize(pp_prf_estimates['r2'][ind2use]))
-
-        ## convolve to get the predicted response 
-        # to the desired stimulus duration
-        if stim_dur is None:
-            stim_dur = self.MRIObj.FA_bars_phase_dur # duration of bar presentation in seconds
-        res_step = self.MRIObj.TR/(self.MRIObj.TR * self.osf) # resolution of upsampled HRF
-
-        hrf_stim_convolved = np.convolve(avg_hrf, np.ones(int(np.max([1, np.round(stim_dur/res_step)]))))
-
-        ## now resample again to the TR
-        hrf_final = pchip(np.asarray(range(hrf_stim_convolved.shape[0])) * res_step,
-                        hrf_stim_convolved)(np.asarray(np.arange(0, int((hrf_stim_convolved.shape[0]-1) * res_step), self.MRIObj.TR)))
-        
-        return hrf_final/np.max(hrf_final)
+    
 
     def subselect_trial_combinations(self, att_bar_xy = [], unatt_bar_xy = [], orientation_bars = None, single_trial_reference_df = None, 
                                             participant = None, hemisphere = None):
@@ -810,10 +763,10 @@ class GLMsingle_Model(Model):
 
         return np.load(op.join(fitpath, 'single_trl_DM.npy'), allow_pickle=True)
     
-    def fit_data(self, participant, pp_prf_estimates, prf_modelobj,  file_ext = '_cropped.npy', 
+    def fit_data(self, participant, file_ext = '_cropped.npy', hrf_arr = None,
                         smooth_nm = True, perc_thresh_nm = 95, n_jobs = 8,
                         seed_num = 2023, kernel = 3, nr_iter = 3, normalize = False,
-                        pp_bar_pos_df = {}, fit_hrf = False, hemisphere = 'BH', use_corr_mask = True,
+                        pp_bar_pos_df = None, fit_hrf = False, hemisphere = 'BH', use_corr_mask = True,
                         file_extent_nm = {'pRF': '_cropped_dc_psc.npy', 'FA': '_cropped_LinDetrend_psc.npy'}):
 
         """
@@ -823,10 +776,6 @@ class GLMsingle_Model(Model):
         ----------
         participant: str
             participant ID
-        prf_estimates : dict
-            dict with participant prf estimates
-        prf_modelobj: object
-            pRF model object from prfpy, to use to create HRF
         file_ext: str
             file extent for FA trials to be fitted
         smooth_nm: bool
@@ -885,9 +834,6 @@ class GLMsingle_Model(Model):
                                                                         pp_bar_pos_df = pp_bar_pos_df)
                                 
         print('Fitting {n} files: {f}'.format(n = len(train_file_list), f = str(train_file_list)))
-
-        ## get average hrf
-        hrf_final = self.get_average_hrf(pp_prf_estimates, prf_modelobj, rsq_threshold = self.prf_rsq_threshold)
         
         if use_corr_mask:
             ### make mask array of pRF high fitting voxels,
@@ -929,7 +875,7 @@ class GLMsingle_Model(Model):
             opt['wantlibrary'] = 1
         else:
             opt['wantlibrary'] = 0
-            opt['hrftoassume'] = hrf_final
+            opt['hrftoassume'] = hrf_arr
         opt['hrfonset'] = 0 # already setting onset in hrf
 
         if use_corr_mask:
@@ -986,7 +932,7 @@ class GLMsingle_Model(Model):
         ## plot average HRF
         fig, axis = plt.subplots(1,figsize=(8,5),dpi=100)
         axis.plot(getcanonicalhrf(self.MRIObj.FA_bars_phase_dur, self.MRIObj.TR, onset = self.hrf_onset), label = 'canonical_hrf')
-        axis.plot(hrf_final, label = 'average_hrf')
+        axis.plot(hrf_arr, label = 'average_hrf')
         axis.set_xlabel('Time (TR)')
         axis.legend()
         plt.savefig(op.join(outdir, 'hrf_avg.png'))

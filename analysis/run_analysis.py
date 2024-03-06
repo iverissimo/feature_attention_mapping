@@ -328,25 +328,42 @@ match task:
                     ## load FA model class
                     FAM_FA = GLMsingle_Model(FAM_data, use_atlas = use_atlas)
 
+                    # if using nifti, then flag it for other funcs
+                    if FAM_mri.MRIObj.sj_space == 'T1w': 
+                        nifti_bool = True
+
+                    ## get FA bar position dict, across runs, for group
+                    FA_run_position_df = FAM_beh.get_FA_group_run_position_df(participant_list = FAM_data.sj_num,
+                                                                            ses_type = 'func',
+                                                                            mask_df = False)
+                    ## reduce to minimum info necessary
+                    FA_run_position_df = FAM_beh.squeeze_FA_bar_pos_df(FA_run_position_df = FA_run_position_df)
+
                     ## actually fit
                     print('Fitting started!')
 
                     for pp in FAM_data.sj_num:
 
-                        # get participant bar positions for FA task
-                        pp_bar_pos_df = FAM_beh.load_FA_bar_position(pp, ses_num = None, ses_type = 'func', run_num = None)
+                        ## get participant average hrf
+                        # (from prf fitting)
+                        hrf_arr_pp = FAM_pRF.get_average_hrf(pp_prf_estimates = pp_prf_estimates['sub-{sj}'.format(sj = pp)], 
+                                                            prf_modelobj = pp_prf_models['sub-{sj}'.format(sj = pp)]['ses-mean']['{mname}_model'.format(mname = prf_model_name)], 
+                                                            rsq_threshold = FAM_FA.prf_rsq_threshold,
+                                                            stim_dur = FAM_FA.MRIObj.FA_bars_phase_dur,
+                                                            osf = FAM_FA.osf)
                         
-                        if FAM_mri.MRIObj.sj_space == 'T1w': # if using nifti, then flag it for other funcs
-                            nifti_bool = True
+                        ## iterate over hemispheres (if applicable)
+                        for hemi in hemis2fit: 
 
-                        for hemi in hemis2fit: # iterate over hemispheres
-
-                            _ = FAM_FA.fit_data(pp, pp_prf_estimates['sub-{sj}'.format(sj = pp)], 
-                                                pp_prf_models['sub-{sj}'.format(sj = pp)]['ses-mean']['{mname}_model'.format(mname = prf_model_name)],  
-                                                file_ext = '_cropped.npy', smooth_nm = True, perc_thresh_nm = 99, 
+                            _ = FAM_FA.fit_data(pp,
+                                                hrf_arr = hrf_arr_pp, 
+                                                file_ext = '_cropped.npy', 
+                                                smooth_nm = True, 
+                                                perc_thresh_nm = 99, 
                                                 file_extent_nm = FAM_mri.get_mrifile_ext(nifti_file=nifti_bool), 
                                                 fit_hrf = False,
-                                                pp_bar_pos_df = pp_bar_pos_df, hemisphere = hemi) 
+                                                pp_bar_pos_df = FA_run_position_df[FA_run_position_df['sj'] =='sub-{sj}'.format(sj = pp)], 
+                                                hemisphere = hemi) 
                             
                 case 'gain':
 

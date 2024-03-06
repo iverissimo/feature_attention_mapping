@@ -934,7 +934,7 @@ class PreprocBeh:
         return pd.concat(run_position_df, ignore_index=True)
     
     def get_FA_group_run_position_df(self, participant_list = [], group_bar_pos_dict = None, data_keys_dict = None,
-                                            prf_bar_coords_dict = None, ses_type = 'func'):
+                                            prf_bar_coords_dict = None, ses_type = 'func', mask_df = True):
         
         """get data frame with bar positions and indices for all participants
         """
@@ -952,9 +952,11 @@ class PreprocBeh:
         
         ## get prf bar position dict
         # to mask out FA trials that were not fully visible
-        if prf_bar_coords_dict is None: 
+        if prf_bar_coords_dict is None and mask_df: 
             prf_bar_coords_dict = self.get_pRF_masked_bar_coords(participant_list = participant_list,
                                                                 ses = 'mean')
+        elif mask_df == False:
+            prf_bar_coords_dict = {'sub-{sj}'.format(sj = pp): None for pp in participant_list}
         
         group_run_pos_df = []
 
@@ -967,7 +969,31 @@ class PreprocBeh:
                                                     data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)],
                                                     pp_prf_bar_coords_dict = prf_bar_coords_dict['sub-{sj}'.format(sj = participant)])
             tmp_df.loc[:, 'sj'] = 'sub-{sj}'.format(sj = participant)
+            ## add label for attended condition
+            tmp_df.loc[tmp_df.query('attend_condition').index.values, 'bar_type'] = 'att_bar'
+            tmp_df.loc[tmp_df.query('~attend_condition').index.values, 'bar_type'] = 'unatt_bar'
             
             group_run_pos_df.append(tmp_df) 
                
-        return pd.concat(group_run_pos_df, ignore_index=True)       
+        return pd.concat(group_run_pos_df, ignore_index=True)  
+
+    def squeeze_FA_bar_pos_df(self, FA_run_position_df = None):
+
+        """
+        Helper function to reduce bar position df,
+        keeping only minimum variables necessary to identify bar positions at a given trial
+        """     
+
+        ## create bar pos data frame, unstacked
+        # select attended trials
+        att_position_df = FA_run_position_df.query('attend_condition').loc[:, ['sj', 'run', 'ses', 'trial_ind', 'x_pos', 'y_pos', 'bars_pos']]
+        att_position_df.rename(columns={'x_pos': 'att_x_pos', 'y_pos': 'att_y_pos'}, inplace=True)
+        # select unattended trials
+        unatt_position_df = FA_run_position_df.query('~attend_condition').loc[:, ['sj', 'run', 'ses', 'trial_ind', 'x_pos', 'y_pos', 'bars_pos']]
+        unatt_position_df.rename(columns={'x_pos': 'unatt_x_pos', 'y_pos': 'unatt_y_pos'}, inplace=True)
+        unatt_position_df
+
+        # merge both
+        new_position_df = att_position_df.merge(unatt_position_df, on = ['sj', 'run', 'ses', 'trial_ind'])
+
+        return new_position_df

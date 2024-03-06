@@ -588,7 +588,7 @@ class MRIUtils(Utils):
 
         # list with absolute file names to be fitted
         bold_filelist = [op.join(file_path, file) for file_path in input_list for file in os.listdir(file_path) if 'task-{tsk}'.format(tsk = task) in file and \
-                        'acq-{acq}'.format(acq = acq_name) in file and file.endswith(file_ext)]
+                        'acq-{acq}'.format(acq = acq_name) in file and file.endswith(file_ext) and not file.startswith('.')]
         
         # if we're not combining sessions
         if isinstance(ses, int) or (isinstance(ses, str) and len(re.findall(r'\d{1,10}', ses))>0):

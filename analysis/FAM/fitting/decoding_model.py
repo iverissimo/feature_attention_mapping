@@ -2995,3 +2995,128 @@ class Decoding_Model(GLMsingle_Model):
         df_drive = pd.concat(df_drive, ignore_index=True)
         
         return df_drive
+    
+    def average_pp_stim_glmsing_trials(self, pp, pp_bar_pos_df = None, trial_combinations_df = None, 
+                                            reconstructed_stim_dict = None, data_keys_dict = None,
+                                            lowres_DM_dict = None):
+        
+        """
+        Average ROI recontructed stim for a given participant, across runs,
+        in same order of trial combinations (GLM single DM)
+        """
+
+        ## get ses and run numbers 
+        ses_num_arr = [self.MRIObj.mri_utils.get_run_ses_from_str(dat_id)[1] for dat_id in data_keys_dict['sub-{sj}'.format(sj = pp)]]
+        run_num_arr = [self.MRIObj.mri_utils.get_run_ses_from_str(dat_id)[0] for dat_id in data_keys_dict['sub-{sj}'.format(sj = pp)]]
+
+        if trial_combinations_df is None:
+            ## get all possible trial combinations
+            # to use for bookkeeping of single trial DM
+            trial_combinations_df = self.get_single_trial_combinations()
+
+        ## copy reconstructed stim of random run, to keep structure
+        pp_avg_stim_df = reconstructed_stim_dict['sub-{sj}'.format(sj = pp)][data_keys_dict['sub-{sj}'.format(sj = pp)][0]].copy()
+
+        ## get participant DM dict
+        pp_dm = lowres_DM_dict['sub-{sj}'.format(sj = pp)]
+
+        ## create reference dm to fill
+        pp_reference_dm = np.zeros(pp_dm['full_stim'][data_keys_dict['sub-{sj}'.format(sj = pp)][0]].shape)
+
+        ## per unique condition
+        for cond_ind in range(len(trial_combinations_df)):
+
+            # filter bar position df for condition
+            cond_df = pp_bar_pos_df[(pp_bar_pos_df['att_x_pos'] == trial_combinations_df.iloc[cond_ind].AttBar_bar_midpoint[0]) &\
+                                    (pp_bar_pos_df['att_y_pos'] == trial_combinations_df.iloc[cond_ind].AttBar_bar_midpoint[1]) &\
+                                    (pp_bar_pos_df['unatt_x_pos'] == trial_combinations_df.iloc[cond_ind].UnattBar_bar_midpoint[0]) &\
+                                    (pp_bar_pos_df['unatt_y_pos'] == trial_combinations_df.iloc[cond_ind].UnattBar_bar_midpoint[1])
+                                    ]
+
+            # if condition wasn't masked
+            if len(cond_df) == len(run_num_arr):
+            
+                avg_arr = []
+                
+                # iterate over runs to stack
+                for _, row in cond_df.loc[:, ['run', 'ses', 'trial_ind']].iterrows():
+                    
+                    r_stim = reconstructed_stim_dict['sub-{sj}'.format(sj = pp)]['{sn}_{rn}'.format(sn = row['ses'],
+                                                                                                    rn = row['run'])]
+                    avg_arr.append(r_stim.loc[row['trial_ind']].values) 
+                
+                # replace with average values across runs
+                pp_avg_stim_df.loc[cond_ind, :] = np.nanmean(np.stack(avg_arr), axis = 0)
+
+                # replace DM with bar pos
+                pp_reference_dm[cond_ind] = np.sum(np.stack((pp_dm['full_stim']['{sn}_{rn}'.format(sn = row['ses'],
+                                                                                                rn = row['run'])][row['trial_ind']],
+                                                            pp_dm['att_bar']['{sn}_{rn}'.format(sn = row['ses'],
+                                                                                                rn = row['run'])][row['trial_ind']]), 
+                                                            axis = 0), 
+                                                axis = 0)
+            else:
+                pp_avg_stim_df.loc[cond_ind, :] = np.nan #0
+                pp_reference_dm[cond_ind] = np.nan #0
+
+        return pp_avg_stim_df, pp_reference_dm
+    
+    def plot_trial_stim_movie(self, roi_name = 'V1', stim2plot = None, dm2plot = None, vmin = 0, vmax = .29, cmap = 'magma',
+                              annot = False, interval = 132, figsize = (8,5), name = 'Group', frame_inds = None, 
+                              filename = None, fps=24, dpi=100):
+
+        """
+        Create animation of (average) recontructed stim, for a given ROI of participant/group
+        And save video
+        """
+
+        # if we didnt specify frame indices
+        if frame_inds is None:
+            frame_inds = range(dm2plot.shape[0])
+
+        ## initialize base figure
+        fig, axes = plt.subplots(nrows=1, ncols=2, figsize = figsize)
+
+        fig.suptitle('Reconstructed stimulus (%s), ROI - %s'%(name,roi_name), fontsize=14)
+
+        ## set function to update frames
+        def update_stim(frame, stim_arr = [], dm_list = [],
+                        vmin = 0, vmax = .4, cmap = 'plasma', annot = False,
+                    line_color = 'green', alpha = .5, title = ''):
+            
+            # clear axis of fig
+            axes[0].clear() 
+            axes[1].clear() 
+
+            # DMs
+            # attend left
+            axes[1].imshow(dm_list[frame].T, cmap = 'binary_r', vmax = 1.5)
+            axes[1].vlines(3.5, -.5, 7.5, linestyles='dashed', color=line_color, alpha = alpha)
+            axes[1].hlines(3.5, -.5, 7.5, linestyles='dashed', color=line_color, alpha = alpha)
+
+            # plot stim
+            sns.heatmap(stim_arr.loc[frame], cmap = cmap, ax = axes[0], 
+                        square = True, cbar = False,
+                        annot=annot, annot_kws={"size": 7},
+                        vmin = vmin, vmax = vmax, fmt='.2f')
+            axes[0].vlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
+            axes[0].hlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
+
+        ## create animation      
+        ani = FuncAnimation(fig, update_stim, 
+                            frames = frame_inds, 
+                            fargs = (stim2plot.stack('y', future_stack=True), 
+                                    dm2plot,
+                                    vmin, vmax, cmap, annot),
+                            interval=interval)
+        
+        if filename is None:
+            return ani
+        else:
+            ani.save(filename=filename, writer="ffmpeg", fps=fps, dpi=dpi) # save mp4 file
+        
+
+
+
+
+

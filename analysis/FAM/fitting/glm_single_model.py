@@ -516,13 +516,14 @@ class GLMsingle_Model(Model):
             
             ## get trial indices when bar on screen 
             # (making sure that run and ses order are correct)
-            i_trials = [cond_df[(cond_df['ses'] == 'ses-{sn}'.format(sn = ses_num_arr[i])) &\
-                            (cond_df['run'] == 'run-{rn}'.format(rn = run_num_arr[i]))].trial_ind.values[0] for i in range(len(run_num_arr))]
+            if len(cond_df) == len(run_num_arr):
+                i_trials = [cond_df[(cond_df['ses'] == 'ses-{sn}'.format(sn = ses_num_arr[i])) &\
+                                (cond_df['run'] == 'run-{rn}'.format(rn = run_num_arr[i]))].trial_ind.values[0] for i in range(len(run_num_arr))]
 
-            ## fill DM 
-            # fill DM with which condition had its onset at what TR
-            for i, t in enumerate(i_trials):
-                single_trl_DM[i, np.where((self.condition_per_TR == 'task'))[0][t], cond_ind] = 1
+                ## fill DM 
+                # fill DM with which condition had its onset at what TR
+                for i, t in enumerate(i_trials):
+                    single_trl_DM[i, np.where((self.condition_per_TR == 'task'))[0][t], cond_ind] = 1
 
         return single_trl_DM, trial_combinations_df
 

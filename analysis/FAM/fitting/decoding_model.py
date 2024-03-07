@@ -904,6 +904,9 @@ class Decoding_Model(GLMsingle_Model):
                                         parameters = pars_gd, 
                                         fit_method = 't', 
                                         best_vox = best_voxels,
+                                        max_n_iterations = 5000, #10000, 
+                                        learning_rate = 0.02, 
+                                        min_n_iterations = 100,
                                         filename = pars_filename.replace('_pars.h5', '_resid.npz'))
         
         ## now get masked FA ROI data, all runs
@@ -1104,7 +1107,7 @@ class Decoding_Model(GLMsingle_Model):
             return masked_FAdata_df_filelist
           
     def fit_residuals(self, model = None, data = None, paradigm = None, parameters = None, fit_method = 't', 
-                            best_vox = None, filename = None):
+                            best_vox = None, filename = None, max_n_iterations = 1000, learning_rate = 0.02, min_n_iterations = 100):
         
         """Fit noise model on residuals
         """
@@ -1128,7 +1131,10 @@ class Decoding_Model(GLMsingle_Model):
                                         data = train_data, 
                                         paradigm = paradigm, 
                                         parameters = train_pars)
-            omega, dof = resid_fitter.fit(method=fit_method)
+            omega, dof = resid_fitter.fit(method=fit_method, 
+                                          max_n_iterations=max_n_iterations, 
+                                          learning_rate=learning_rate, 
+                                          min_n_iterations=min_n_iterations)
             
             if filename is not None:
                 print('Storing omega, dof and best voxel indices in %s'%filename)

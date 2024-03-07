@@ -129,7 +129,7 @@ class Decoding_Model(GLMsingle_Model):
         
         return group_index_df
         
-    def get_prf_ROI_data(self, participant = None, roi_name = 'V1', index_arr = [], overwrite = False, file_ext = None):
+    def get_prf_ROI_data(self, participant = None, roi_name = 'V1', index_arr = [], overwrite_T1 = False, overwrite_func = False, file_ext = None):
         
         """Get pRF data for the ROI of a participant, averaged across runs,
         and return dataframe in a format compatible with braindecoder 
@@ -153,7 +153,8 @@ class Decoding_Model(GLMsingle_Model):
                                             run_type = 'mean', ses = 'mean', 
                                             roi_name = roi_name, 
                                             index_arr = index_arr,
-                                            overwrite = overwrite)
+                                            overwrite_T1 = overwrite_T1,
+                                            overwrite_func = overwrite_func)
         
         return masked_data_df
     
@@ -821,7 +822,7 @@ class Decoding_Model(GLMsingle_Model):
             
         return trl_ind
     
-    def fit_decoder(self, participant_list = [], ROI_list = ['V1'], overwrite = False, model_type = 'gauss_hrf',
+    def fit_decoder(self, participant_list = [], ROI_list = ['V1'], overwrite_T1 = False, overwrite_func = False, model_type = 'gauss_hrf',
                         prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean', fa_file_ext = '_cropped.nii.gz',
                         mask_bool_df = None, stim_on_screen = [], group_bar_pos_df = [], prf_bar_coords_dict = None,
                         mask_barpos = False):
@@ -835,13 +836,14 @@ class Decoding_Model(GLMsingle_Model):
         for pp in participant_list:
             # iterate over ROIs
             for roi_name in ROI_list:
-                self.decode_ROI(participant = pp, roi_name = roi_name, overwrite = overwrite, prf_file_ext = prf_file_ext, 
+                self.decode_ROI(participant = pp, roi_name = roi_name, overwrite_T1 = overwrite_T1, overwrite_func = overwrite_func, 
+                                prf_file_ext = prf_file_ext, 
                                 ses = ses, mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
                                 model_type = model_type, fa_file_ext = fa_file_ext, 
                                 pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = pp)],
                                 prf_bar_coords_dict = prf_bar_coords_dict, mask_barpos = mask_barpos)
                        
-    def decode_ROI(self, participant = None, roi_name = 'V1', overwrite = False, model_type = 'gauss_hrf',
+    def decode_ROI(self, participant = None, roi_name = 'V1', overwrite_T1 = False, overwrite_func = False, model_type = 'gauss_hrf',
                         prf_file_ext = '_cropped_dc_psc.nii.gz', fa_file_ext = '_cropped.nii.gz', ses = 'mean',
                         mask_bool_df = None, stim_on_screen = [], save_estimates = True, pp_bar_pos_df = None,
                         prf_bar_coords_dict = None, mask_barpos = False):
@@ -865,7 +867,8 @@ class Decoding_Model(GLMsingle_Model):
         prf_masked_data_df = self.get_prf_ROI_data(participant = participant, 
                                                     roi_name = roi_name, 
                                                     index_arr = [], 
-                                                    overwrite = overwrite, 
+                                                    overwrite_T1 = overwrite_T1, 
+                                                    overwrite_func = overwrite_func,
                                                     file_ext = prf_file_ext)
     
         # get prf stimulus DM and grid coordinates
@@ -907,7 +910,8 @@ class Decoding_Model(GLMsingle_Model):
         masked_FAdata_dict = self.get_FA_ROI_data(participant = participant, 
                                                 roi_name = roi_name, 
                                                 index_arr = [], 
-                                                overwrite = overwrite, 
+                                                overwrite_T1 = overwrite_T1, 
+                                                overwrite_func = overwrite_func, 
                                                 file_ext = fa_file_ext,
                                                 glmsingle_model = 'D', 
                                                 trial_num = 132)
@@ -1041,7 +1045,7 @@ class Decoding_Model(GLMsingle_Model):
         
         return FA_DM_dict, fa_grid_coordinates
         
-    def get_FA_ROI_data(self, participant = None, roi_name = 'V1', index_arr = [], overwrite = False,
+    def get_FA_ROI_data(self, participant = None, roi_name = 'V1', index_arr = [], overwrite_T1 = False, overwrite_func = False,
                             glmsingle_model = 'D', file_ext = '_cropped.nii.gz', trial_num = 132,
                             return_data = True):
         
@@ -1063,7 +1067,8 @@ class Decoding_Model(GLMsingle_Model):
                                                         run_type = 'all', ses = 'all', 
                                                         roi_name = roi_name, 
                                                         index_arr = index_arr,
-                                                        overwrite = overwrite)
+                                                        overwrite_T1 = overwrite_T1,
+                                                        overwrite_func = overwrite_func)
         
             ## return as dict of dataframes
             output_dict = {}
@@ -1698,7 +1703,8 @@ class Decoding_Model(GLMsingle_Model):
                 prf_masked_data_df = self.get_prf_ROI_data(participant = participant, 
                                                             roi_name = roi_name, 
                                                             index_arr = [], 
-                                                            overwrite = False, 
+                                                            overwrite_T1 = False, 
+                                                            overwrite_func = False,
                                                             file_ext = prf_file_ext)
 
                 # get prf stimulus DM and grid coordinates

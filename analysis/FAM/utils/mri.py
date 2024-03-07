@@ -73,7 +73,7 @@ class MRIUtils(Utils):
         
         if filename is not None and op.isfile(filename) and overwrite == False:
             print('Loading %s'%filename)
-            mask_img = neuropythy.io.load(filename) 
+            mask_img = nilearn.image.load_img(filename) 
         else:
             print('Making T1w mask for ROI %s'%roi_name)
         
@@ -81,8 +81,9 @@ class MRIUtils(Utils):
             # path for sourcedata anat files of that participant
             anat_pth = glob.glob(op.join(sourcedata_pth, 'sub-{sj}'.format(sj = sub_id), 
                                         'ses-*', 'anat'))[0]
-            T1_filename = [op.join(anat_pth,val) for val in os.listdir(anat_pth) if val.endswith('.nii.gz') and 'T1w' in val][0]
-            T1_img = neuropythy.io.load(T1_filename)
+            T1_filename = [op.join(anat_pth,val) for val in os.listdir(anat_pth) if val.endswith('.nii.gz') and not val.startswith('.') and 'T1w' in val][0]
+            print(T1_filename)
+            T1_img = nilearn.image.load_img(T1_filename)
 
             # clear image of data, because we will fill it with mask values
             T1_img_empty = neuropythy.mri.to_image(neuropythy.mri.image_clear(T1_img, fill=0.0), 
@@ -102,9 +103,9 @@ class MRIUtils(Utils):
             mask_ix_r = nilearn.surface.load_surf_data(sub_label_str.format(hemi = 'rh', roi = roi_name))
             
             # join hemi masks
-            mask_l = np.zeros(fs_sub.LH.values()['vertex_count'])
+            mask_l = np.zeros(fs_sub.LH.vertex_count)
             mask_l[mask_ix_l] = 1
-            mask_r = np.zeros(fs_sub.RH.values()['vertex_count'])
+            mask_r = np.zeros(fs_sub.RH.vertex_count)
             mask_r[mask_ix_r] = 1
             mask_data = [mask_l, mask_r]
             
@@ -119,8 +120,8 @@ class MRIUtils(Utils):
                 
                 # actually mask
                 mask_data[index_mask == 0] = 0 
-                mask_tuple = tuple([mask_data[:fs_sub.LH.values()['vertex_count']],
-                                    mask_data[fs_sub.LH.values()['vertex_count']:]])
+                mask_tuple = tuple([mask_data[:fs_sub.LH.vertex_count],
+                                    mask_data[fs_sub.LH.vertex_count:]])
             else:
                 mask_tuple = tuple(mask_data)
                 
@@ -146,7 +147,7 @@ class MRIUtils(Utils):
         """
         if filename is not None and op.isfile(filename) and overwrite == False:
             print('Loading %s'%filename)
-            mask_img = neuropythy.io.load(filename) 
+            mask_img = nilearn.image.load_img(filename) 
         else:
             print('Resampling T1w mask to func dim')
             
@@ -208,7 +209,7 @@ class MRIUtils(Utils):
         print('combining masks')
         
         # load images 
-        mask_imgs_list = [neuropythy.io.load(img_name).get_fdata().astype(np.float32) for img_name in mask_filenames_list]
+        mask_imgs_list = [nilearn.image.load_img(img_name).get_fdata().astype(np.float32) for img_name in mask_filenames_list]
 
         # sum data values
         sum_data = np.sum(mask_imgs_list, axis = 0)
@@ -219,7 +220,7 @@ class MRIUtils(Utils):
         # replace and save new file name
         for img_name in mask_filenames_list:
             
-            old_mask = neuropythy.io.load(img_name) 
+            old_mask = nilearn.image.load_img(img_name) 
             new_mask_img = nilearn.image.new_img_like(old_mask, sum_data)
             
             neuropythy.io.save(img_name, new_mask_img)
@@ -1168,7 +1169,7 @@ class MRIUtils(Utils):
         os.makedirs(output_pth, exist_ok=True)
 
         # list of original niftis
-        orig_nii_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if val.endswith('.nii.gz')]
+        orig_nii_files = [op.join(input_pth, val) for val in os.listdir(input_pth) if val.endswith('.nii.gz') and not val.startswith('.')]
 
         # then for each file
         for file in orig_nii_files:

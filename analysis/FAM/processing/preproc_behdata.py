@@ -697,7 +697,11 @@ class PreprocBeh:
                     )
                     
         df_RT = pd.concat(df_RT, ignore_index=True)
-                         
+        
+        ## replace nan values (for trials where participant didnt respond)
+        miss_ind = df_RT[np.isnan(df_RT['correct'])].index
+        df_RT.loc[miss_ind, 'correct'] = 0
+                
         return df_RT
     
     def get_pRF_bar_coords_per_TR(self, bar_direction = 'horizontal'):

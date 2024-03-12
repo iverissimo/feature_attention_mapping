@@ -655,9 +655,9 @@ class Decoding_Model(GLMsingle_Model):
 
         # note - here we transpose the DM array when correlating because the average_stim we calculated
         # has a different format than the reconstructed stim outputted by brain decoder
-        avg_corr, avg_pval = scipy.stats.pearsonr(average_stim.ravel(), 
+        avg_corr, avg_pval = scipy.stats.pointbiserialr(average_stim.ravel(), 
                                                   downsample_FA_DM[DM_trl_ind].T.ravel())
-        flip_avg_corr, flip_avg_pval = scipy.stats.pearsonr(flip_average_stim.ravel(), 
+        flip_avg_corr, flip_avg_pval = scipy.stats.pointbiserialr(flip_average_stim.ravel(), 
                                                             downsample_FA_DM[DM_trl_ind].T.ravel())
                 
         bar_ecc_ind = {'far': 1, 'middle': 2, 'near': 3}
@@ -731,9 +731,9 @@ class Decoding_Model(GLMsingle_Model):
         else:
             dm2plot = downsample_FA_DM[DM_trl_ind]
         
-        avg_corr, avg_pval = scipy.stats.pearsonr(average_stim.ravel(), 
+        avg_corr, avg_pval = scipy.stats.pointbiserialr(average_stim.ravel(), 
                                                   dm2plot.T.ravel())
-        flip_avg_corr, flip_avg_pval = scipy.stats.pearsonr(flip_average_stim.ravel(), 
+        flip_avg_corr, flip_avg_pval = scipy.stats.pointbiserialr(flip_average_stim.ravel(), 
                                                             dm2plot.T.ravel())
         
         # plot figure
@@ -969,7 +969,7 @@ class Decoding_Model(GLMsingle_Model):
             reconstructed_stim_dict[df_key] = reconstructed_stimulus
             
             # correlate reconstructed stim with downsampled DM
-            corr, pval = scipy.stats.pearsonr(reconstructed_stimulus.values.ravel(), 
+            corr, pval = scipy.stats.pointbiserialr(reconstructed_stimulus.values.ravel(), 
                                             lowres_DM.ravel())
             print('correlation between reconstructed stim and DM is %.2f, %.2f'%(corr, pval))
             
@@ -2007,7 +2007,7 @@ class Decoding_Model(GLMsingle_Model):
                                                 facecolor='purple', hatch = '///'))
             
             # annotate correlation value between stim and DM
-            corr, pval = scipy.stats.pearsonr(stim_arr[frame].ravel(), 
+            corr, pval = scipy.stats.pointbiserialr(stim_arr[frame].ravel(), 
                                             dm_list[frame].T.ravel())
             axes[0][1].set_title(r"$\rho$ = {r}".format(r = '%.2f'%(corr))+\
                                 '   pval = {p}'.format(p = "{:.2e}".format(pval)))
@@ -2020,7 +2020,7 @@ class Decoding_Model(GLMsingle_Model):
                                                 facecolor='green', hatch = '///'))
             
             # annotate correlation value between stim and DM
-            corr, pval = scipy.stats.pearsonr(flip_stim_arr[frame].ravel(), 
+            corr, pval = scipy.stats.pointbiserialr(flip_stim_arr[frame].ravel(), 
                                             dm_list[frame].T.ravel())
             axes[1][1].set_title(r"$\rho$ = {r}".format(r = '%.2f'%(corr))+\
                                 '   pval = {p}'.format(p = "{:.2e}".format(pval))) 
@@ -2126,7 +2126,7 @@ class Decoding_Model(GLMsingle_Model):
                                                     facecolor='purple', hatch = '///'))
             
             # annotate correlation value between stim and DM
-            corr, pval = scipy.stats.pearsonr(stim_arr[frame].ravel(), 
+            corr, pval = scipy.stats.pointbiserialr(stim_arr[frame].ravel(), 
                                             dm2plot.T.ravel())
             axes[0][1].set_title(r"$\rho$ = {r}".format(r = '%.2f'%(corr))+\
                                 '   pval = {p}'.format(p = "{:.2e}".format(pval)))
@@ -2140,7 +2140,7 @@ class Decoding_Model(GLMsingle_Model):
                                                     facecolor='green', hatch = '///'))
             
             # annotate correlation value between stim and DM
-            corr, pval = scipy.stats.pearsonr(flip_stim_arr[frame].ravel(), 
+            corr, pval = scipy.stats.pointbiserialr(flip_stim_arr[frame].ravel(), 
                                             dm2plot.T.ravel())
             axes[1][1].set_title(r"$\rho$ = {r}".format(r = '%.2f'%(corr))+\
                                 '   pval = {p}'.format(p = "{:.2e}".format(pval))) 
@@ -2229,7 +2229,7 @@ class Decoding_Model(GLMsingle_Model):
                 ## correlate reconstructed stim with downsampled DM across runs
                 for ind, df_key in enumerate(reference_data_keys_dict['sub-{sj}'.format(sj = pp)]):
                     
-                    corr, pval = scipy.stats.pearsonr(reconstructed_stim_dict['sub-{sj}'.format(sj = pp)][df_key].values.ravel(), 
+                    corr, pval = scipy.stats.pointbiserialr(reconstructed_stim_dict['sub-{sj}'.format(sj = pp)][df_key].values.ravel(), 
                                                     lowres_DM_dict['sub-{sj}'.format(sj = pp)]['full_stim'][df_key].ravel())
                     print('correlation between reconstructed stim and DM is %.2f, %.2f'%(corr, pval))
 
@@ -2701,7 +2701,8 @@ class Decoding_Model(GLMsingle_Model):
         dm_runs = np.hstack((lowres_DM_dict[df_key][bar_present_dict[df_key]].ravel() for df_key in data_keys_dict))
         
         # correlate reconstructed stim with downsampled DM
-        corr, pval = scipy.stats.pearsonr(stim_runs, dm_runs)
+        #corr, pval = scipy.stats.pearsonr(stim_runs, dm_runs)
+        corr, pval = scipy.stats.pointbiserialr(stim_runs, dm_runs)
         
         return corr, pval
     

@@ -499,7 +499,7 @@ class PreprocBeh:
             
         return self.MRIObj.mri_utils.crop_shift_arr(stim_on_screen, crop_nr = crop_nr, shift = shift)
 
-    def get_FA_behavioral_results(self, ses_type = 'func'):
+    def get_FA_behavioral_results(self, participant_list = [], ses_type = 'func'):
         
         """
         Get overview of behavioral results for FA task
@@ -510,97 +510,71 @@ class PreprocBeh:
             type of session (default func)
         
         """ 
+
+        ## get FA bar position dict, across runs, for group
+        FA_run_position_df = self.get_FA_group_run_position_df(participant_list = participant_list,
+                                                                ses_type = 'func')
         
-        # summarize results in dataframe
-        df_summary = pd.DataFrame({'sj': [], 'ses': [], 'run': [], 
-                           'attended_color': [],'color_category': [],'bar_color': [],
-                            'accuracy': [], 'RT': []})
+        ## get RT and reponse values for group
+        df_FA_beh_RT = self.get_FA_RT(ses_type = 'func')
+
+        ## merge both dataframes, with unique trial per row
+
+        # get attended bar rows
+        att_RT_df = FA_run_position_df.query('attend_condition').merge(df_FA_beh_RT, on = ['sj', 'run', 'ses', 'trial_ind']).copy()
         
-        # loop over participants
-        for pp in self.MRIObj.sj_num:
-            
-            # and over sessions (if more than one)
-            for ses in self.MRIObj.session['sub-{sj}'.format(sj=pp)]:
-                
-                ## load events files for that session
-                events_df = self.load_events(pp, ses = ses, ses_type = ses_type, tasks=['FA'])
-                ## load trial info for that session
-                trial_info_df = self.load_trial_info(pp, ses = ses, ses_type = ses_type, tasks=['FA'])
-                
-                ## loop over runs
-                for run in events_df['FA'].keys():
-                    
-                    # get run event dataframe
-                    run_ev_df = events_df['FA'][run]
-                    # and trial info
-                    run_trl_info_df = trial_info_df['FA'][run]
-
-                    ## trial numbers where participant responded
-                    # will include bar stim on screen + TR after
-                    sub_response_trials = [[trl,trl+1] for trl in self.FA_bar_pass_trials if 'response' in run_ev_df[run_ev_df['trial_nr'].isin([trl,trl+1])]['event_type'].values]
-                                        
-                    ## get bar color and bar color category 
-                    # for attended and unattended bars
-                    # for all trials
-                    category_color, bar_color = self.MRIObj.beh_utils.get_FA_trials_bar_color(run_trl_info_df)    
+        # select unattended bar rows
+        unatt_RT_df = FA_run_position_df.query('~attend_condition').copy()
+        unatt_RT_df.loc[:, ('unatt_bar_ecc')] = unatt_RT_df.bar_ecc.values
+        unatt_RT_df.loc[:, ('unatt_bar_ecc_deg')] = unatt_RT_df.bar_ecc_deg.values
         
-                    ## loop over attended and unattended conditions
-                    # (we might want to compare)
-                    for cond in category_color.keys():
-                        
-                        ## initialize a response array filled with nans for all trials in run
-                        all_responses_bool = np.zeros(self.FA_total_trials); all_responses_bool[:] = np.nan
-                        all_responses_RT = np.zeros(self.FA_total_trials); all_responses_RT[:] = np.nan
-                        
-                        ## get boolean array showing if participant response was correct or not
-                        # for trials where they responded
-                        
-                        # some participants swapped the buttons, so make exceptions
-                        pp_task_keys = self.MRIObj.beh_utils.get_pp_task_keys(pp)
+        # join unattended bar info
+        att_RT_df = att_RT_df.merge(unatt_RT_df.loc[:, ['sj', 'run', 'ses', 'trial_ind', 'unatt_bar_ecc', 'unatt_bar_ecc_deg']],
+                                    on = ['sj', 'run', 'ses', 'trial_ind'])
 
-                        sub_response_bool = np.array([self.MRIObj.beh_utils.get_pp_response_bool(run_ev_df[run_ev_df['trial_nr'].isin(t)], trial_bar_color = bar_color[cond][t[0]], 
-                                                                                          task = 'FA', keys = pp_task_keys) for t in sub_response_trials])
-                        
-                        all_responses_bool[np.ravel(sub_response_trials)[::2]] = sub_response_bool
-                        
-                        ## get reaction times for the same 
-                        # trials
-                        sub_response_RT = np.array([self.MRIObj.beh_utils.get_pp_response_rt(run_ev_df[run_ev_df['trial_nr'].isin(t)],
-                                                                                      task = 'FA', TR = self.MRIObj.TR) for t in sub_response_trials])
+        ## set ecc as type numeric
+        att_RT_df['bar_ecc_deg'] = att_RT_df.bar_ecc_deg.values.astype('float')
+        att_RT_df['unatt_bar_ecc_deg'] = att_RT_df.unatt_bar_ecc_deg.values.astype('float')
 
-                        all_responses_RT[np.ravel(sub_response_trials)[::2]] = sub_response_RT
-                        
-                        ## now slice array for ONLY bar passing trials
-                        #
-                        RUN_category_color = np.array(category_color[cond])[self.FA_bar_pass_trials]
-                        RUN_bar_color = np.array(bar_color[cond])[self.FA_bar_pass_trials]
+        # get distance in deg
+        min_ecc = att_RT_df.bar_ecc_deg.min()*2
 
-                        RUN_responses_bool = all_responses_bool[self.FA_bar_pass_trials]
+        # add as column in dataframe
+        att_RT_df['abs_inter_bar_dist'] = att_RT_df.abs_inter_bar_dist.values.astype('float')
+        att_RT_df.loc[:, ('interbar_dist_deg')] = att_RT_df.abs_inter_bar_dist.values * min_ecc
+ 
 
-                        RUN_response_RT = all_responses_RT[self.FA_bar_pass_trials]; 
-                        RUN_response_RT[RUN_responses_bool!=1] = np.nan
-                        
-                        
-                        ## Fill results DF for each specifc bar color  
-                        # separately
-                        for bc in self.MRIObj.color_categories_dict[category_color[cond][0]]:
-                            
-                            at = True if cond == 'attend_bar' else False
+        return att_RT_df
+    
+    def get_FA_accuracy(self, att_RT_df = None):
 
-                            acc_by_bc = (np.nansum(RUN_responses_bool[np.where(RUN_bar_color == bc)[0]]))/len(np.where(RUN_bar_color == bc)[0])
+        """
+        For each attended ecc, 
+        split data into unattended bar ecc,
+        and get accuracy
 
-                            df_summary = pd.concat((df_summary,
-                                                    pd.DataFrame({'sj': ['sub-{sj}'.format(sj=pp)], 
-                                                                'ses': [ses],
-                                                                'run': [run],
-                                                                'attended_color': [at],
-                                                                'color_category': [category_color[cond][0]],
-                                                                'bar_color': [bc],
-                                                                'accuracy': [acc_by_bc],
-                                                                'RT': [np.nanmean(RUN_response_RT[np.where(RUN_bar_color == bc)[0]])]
-                                                                })))
-                         
-        return df_summary
+        Boxplot + swarmplot
+
+        Parameters
+        ----------
+        att_RT_df: df
+            behavioral dataframe from preproc class
+        """
+
+        ## create accuracy DF
+        count_df = att_RT_df.groupby(['sj', 'bar_ecc_deg', 'unatt_bar_ecc_deg', 'correct']).count().reset_index()
+        count_df = count_df.loc[:, ['sj', 'bar_ecc_deg', 'unatt_bar_ecc_deg', 'correct', 'color_category']]
+        count_df.rename(columns={'color_category': 'n_trials'}, inplace=True)
+
+        sum_df = count_df.groupby(['sj', 'bar_ecc_deg', 'unatt_bar_ecc_deg']).sum().reset_index()
+        sum_df = sum_df.loc[:, ['sj', 'bar_ecc_deg', 'unatt_bar_ecc_deg', 'n_trials']]
+        sum_df.rename(columns={'n_trials': 'total_trials'}, inplace=True)
+
+        acc_df = count_df.merge(sum_df, on = ['sj', 'bar_ecc_deg', 'unatt_bar_ecc_deg'])
+        acc_df.loc[:, 'accuracy'] = acc_df.n_trials.values/acc_df.total_trials.values * 100
+
+        return acc_df
+                           
 
     def get_FA_RT(self, ses_type = 'func'):
         

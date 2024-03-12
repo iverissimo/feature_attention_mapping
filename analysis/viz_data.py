@@ -2,6 +2,9 @@ import os, sys
 import os.path as op
 import argparse
 
+import numpy as np
+import pandas as pd
+
 import yaml
 from FAM.processing import load_exp_settings, preproc_mridata, preproc_behdata
 from FAM.visualize.preproc_viewer import MRIViewer
@@ -78,7 +81,6 @@ FAM_data = load_exp_settings.MRIData(params, sj,
                                     base_dir = system_dir, exclude_sj = exclude_sj)
 
 print('Subject list to vizualize is {l}'.format(l=str(FAM_data.sj_num)))
-
 
 ## Load preprocessing class for each data type ###
 
@@ -185,16 +187,29 @@ match data_type:
         match py_cmd:
 
             case 'behavior':
-        
-                print('Plotting behavior results for pRF and FA task') ## should do for both
-                
-                # first get the dataframe with the mean results
-                df_pRF_beh_summary = FAM_beh.get_pRF_behavioral_results(ses_type = 'func')
-                df_FA_beh_summary = FAM_beh.get_FA_behavioral_results(ses_type = 'func')
 
-                # actually plot
-                plotter.plot_pRF_behavior(results_df = df_pRF_beh_summary, plot_group = True)
-                plotter.plot_FA_behavior(results_df = df_FA_beh_summary, plot_group = True)
+                if task == 'FA':
+                    
+                    # make dataframe with behavioral results
+                    att_RT_df = FAM_beh.get_FA_behavioral_results(participant_list = FAM_data.sj_num,
+                                                                ses_type = 'func')
+                    
+                    
+                    # get accuracy per ecc
+                    acc_df = FAM_beh.get_FA_accuracy(att_RT_df = att_RT_df)
+
+                    
+
+        
+                # print('Plotting behavior results for pRF and FA task') ## should do for both
+                
+                # # first get the dataframe with the mean results
+                # df_pRF_beh_summary = FAM_beh.get_pRF_behavioral_results(ses_type = 'func')
+                # df_FA_beh_summary = FAM_beh.get_FA_behavioral_results(ses_type = 'func')
+
+                # # actually plot
+                # plotter.plot_pRF_behavior(results_df = df_pRF_beh_summary, plot_group = True)
+                # plotter.plot_FA_behavior(results_df = df_FA_beh_summary, plot_group = True)
 
             case TypeError: 
                 print('viz option NOT VALID')

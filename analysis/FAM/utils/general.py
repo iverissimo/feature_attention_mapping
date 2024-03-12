@@ -12,6 +12,10 @@ from joblib import Parallel, delayed
 from statsmodels.stats import weightstats
 from scipy import fft, interpolate
 
+import seaborn as sns
+import matplotlib
+import matplotlib.pyplot as plt
+
 class Utils:
 
     def __init__(self):
@@ -472,3 +476,20 @@ class Utils:
             final_dm[overlap_dm == 1] = overlap_weight
         
         return final_dm
+    
+    def create_palette(self, key_list = [], cmap = 'magma', num_col = None):
+
+        """
+        create dict with color palette colors
+        """
+        
+        if num_col is None:
+            num_col = len(key_list)
+
+        # get color map array
+        col_arr = np.array(sns.color_palette(cmap, num_col))
+
+        # actually create dict
+        dict_colors = {key: col_arr[i] for i, key in enumerate(key_list)}
+
+        return dict_colors

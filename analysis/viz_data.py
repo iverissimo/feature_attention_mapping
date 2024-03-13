@@ -194,11 +194,13 @@ match data_type:
                     att_RT_df = FAM_beh.get_FA_behavioral_results(participant_list = FAM_data.sj_num,
                                                                 ses_type = 'func')
                     
-                    
                     # get accuracy per ecc
                     acc_df = FAM_beh.get_FA_accuracy(att_RT_df = att_RT_df)
 
-                    
+                    # actually plot
+                    plotter.plot_FA_behavior(att_RT_df = att_RT_df, 
+                                             acc_df = acc_df, 
+                                             participant_list = FAM_data.sj_num)
 
         
                 # print('Plotting behavior results for pRF and FA task') ## should do for both

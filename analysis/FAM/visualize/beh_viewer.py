@@ -152,6 +152,13 @@ class BehViewer(Viewer):
                                                        data_type = 'RT_DIST'), 
                             figsize = (8,5), 
                             cmap = 'magma')
+            # repeat but by swapping x-axis and hue around
+            self.plot_FA_RTdist(att_RT_df = att_RT_df, 
+                            sub_id = pp,
+                            filename = filename.format(sj = pp, 
+                                                       data_type = 'RT_DIST2'), 
+                            figsize = (8,5), 
+                            ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'])
             
         ## also plot group
 
@@ -168,6 +175,13 @@ class BehViewer(Viewer):
                                                     data_type = 'RT_DIST'), 
                         figsize = (8,5), 
                         cmap = 'magma')
+        # repeat but by swapping x-axis and hue around
+        self.plot_FA_RTdist(att_RT_df = att_RT_df, 
+                        sub_id = None,
+                        filename = filename.format(sj = 'GROUP',  
+                                                    data_type = 'RT_DIST2'), 
+                        figsize = (8,5), 
+                        ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'])
         
         # plot accuracy
         self.plot_FA_ACCecc(acc_df = acc_df, 
@@ -182,7 +196,6 @@ class BehViewer(Viewer):
                         figsize = (8,5), 
                         ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'],
                         per_pp = False)
-
 
     def plot_FA_RTecc(self, att_RT_df = None, filename = None, figsize = (8,5), ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'], 
                             sub_id = None):
@@ -307,7 +320,7 @@ class BehViewer(Viewer):
         else:
             return fig
 
-    def plot_FA_RTdist(self, att_RT_df = None, filename = None, figsize = (8,5), cmap = 'magma', sub_id = None):
+    def plot_FA_RTdist(self, att_RT_df = None, filename = None, figsize = (8,5), cmap = 'magma', sub_id = None, ecc_colors = None):
 
         """
         For each attended ecc (of parallel trials)
@@ -333,31 +346,50 @@ class BehViewer(Viewer):
                                 (att_RT_df['bars_pos'] == 'parallel') &\
                                 (att_RT_df['sj'] == 'sub-{sj}'.format(sj = sub_id))]
         
-        # create color palette
-        dist_colors = self.MRIObj.beh_utils.create_palette(key_list = np.sort(df2plot_dist.interbar_dist_deg.unique()), 
-                                                           cmap = cmap, 
-                                                           num_col = None)
-
         ## create figure
         fig, axes0 = plt.subplots(nrows=1, ncols=1, figsize = figsize)
 
-        ## lineplots to show the linear trends,    
-        line_p = sns.lineplot(data = df2plot_dist,
-                            y = 'RT', x = 'bar_ecc_deg', hue = 'interbar_dist_deg', palette = dist_colors,
-                            err_style='bars', errorbar='se', marker='o', ms=10, err_kws = {'capsize': 5},
-                            linewidth=5, ax=axes0, legend=True)
+        if ecc_colors is not None:
+            ## lineplots to show the linear trends,    
+            line_p = sns.lineplot(data = df2plot_dist,
+                                y = 'RT', hue = 'bar_ecc_deg', x = 'interbar_dist_deg', palette = ecc_colors,
+                                err_style='bars', errorbar='se', marker='o', ms=10, err_kws = {'capsize': 5},
+                                linewidth=5, ax=axes0, legend=True)
 
-        handles, labels = line_p.get_legend_handles_labels()
+            handles, labels = line_p.get_legend_handles_labels()
+            line_p.legend(handles, ['{eval} deg'.format(eval = label[:4]) for label in labels], title = 'Target bar ecc', 
+                        loc='upper left', fontsize = 'small', title_fontsize= 'medium')
 
-        line_p.legend(handles, ['{eval} deg'.format(eval = label[:4]) for label in labels], title = 'Inter-bar distance', 
-                    loc='upper left', fontsize = 'small', title_fontsize= 'medium')
+            axes0.set_ylabel('RT [s]', fontsize = 16, labelpad = 15)
+            if sub_id is None:
+                axes0.set_ylim([.6, .9])
+            axes0.set_xlabel('Inter-bar distance [deg]', fontsize = 16, labelpad = 15)
+            axes0.set_title('Average RT per inter-bar distance',fontsize=14)
+            axes0.tick_params(axis='both', labelsize=14)
 
-        axes0.set_ylabel('RT [s]', fontsize = 16, labelpad = 15)
-        if sub_id is None:
-            axes0.set_ylim([.6, .9])
-        axes0.set_xlabel('Target bar ecc [deg]', fontsize = 16, labelpad = 15)
-        axes0.set_title('Average RT per inter-bar distance',fontsize=14)
-        axes0.tick_params(axis='both', labelsize=14)
+        else:
+            # create color palette
+            dist_colors = self.MRIObj.beh_utils.create_palette(key_list = np.sort(df2plot_dist.interbar_dist_deg.unique()), 
+                                                            cmap = cmap, 
+                                                            num_col = None)
+
+            ## lineplots to show the linear trends,    
+            line_p = sns.lineplot(data = df2plot_dist,
+                                y = 'RT', x = 'bar_ecc_deg', hue = 'interbar_dist_deg', palette = dist_colors,
+                                err_style='bars', errorbar='se', marker='o', ms=10, err_kws = {'capsize': 5},
+                                linewidth=5, ax=axes0, legend=True)
+
+            handles, labels = line_p.get_legend_handles_labels()
+
+            line_p.legend(handles, ['{eval} deg'.format(eval = label[:4]) for label in labels], title = 'Inter-bar distance', 
+                        loc='upper left', fontsize = 'small', title_fontsize= 'medium')
+
+            axes0.set_ylabel('RT [s]', fontsize = 16, labelpad = 15)
+            if sub_id is None:
+                axes0.set_ylim([.6, .9])
+            axes0.set_xlabel('Target bar ecc [deg]', fontsize = 16, labelpad = 15)
+            axes0.set_title('Average RT per inter-bar distance',fontsize=14)
+            axes0.tick_params(axis='both', labelsize=14)
 
         # if we provided filename, save
         if filename:

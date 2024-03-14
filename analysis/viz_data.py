@@ -201,17 +201,14 @@ match data_type:
                     plotter.plot_FA_behavior(att_RT_df = att_RT_df, 
                                              acc_df = acc_df, 
                                              participant_list = FAM_data.sj_num)
+                    
+                elif task == 'pRF':
+                    
+                    # first get the dataframe with the mean results
+                    df_pRF_beh_summary = FAM_beh.get_pRF_behavioral_results(ses_type = 'func')
 
-        
-                # print('Plotting behavior results for pRF and FA task') ## should do for both
-                
-                # # first get the dataframe with the mean results
-                # df_pRF_beh_summary = FAM_beh.get_pRF_behavioral_results(ses_type = 'func')
-                # df_FA_beh_summary = FAM_beh.get_FA_behavioral_results(ses_type = 'func')
-
-                # # actually plot
-                # plotter.plot_pRF_behavior(results_df = df_pRF_beh_summary, plot_group = True)
-                # plotter.plot_FA_behavior(results_df = df_FA_beh_summary, plot_group = True)
+                    # actually plot
+                    plotter.plot_pRF_behavior(results_df = df_pRF_beh_summary, plot_group = True)
 
             case TypeError: 
                 print('viz option NOT VALID')

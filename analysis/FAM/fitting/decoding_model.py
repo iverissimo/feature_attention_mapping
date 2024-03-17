@@ -62,6 +62,8 @@ class Decoding_Model(GLMsingle_Model):
         self.prf_sj_space = 'fsnative'
         self.decoder_dir = op.join(self.MRIObj.derivatives_pth, 'decoder')
         self.pRFModelObj = pRFModelObj
+
+        self.prf_condition_per_TR = self.pRFModelObj.condition_per_TR
         
         
     def load_prf_estimates(self, participant_list = [], ses = 'mean', run_type = 'mean', model_name = None, 
@@ -160,35 +162,149 @@ class Decoding_Model(GLMsingle_Model):
         return masked_data_df
     
     def get_prf_stim_grid(self, participant = None, ses = 'mean', mask_bool_df = None, stim_on_screen = [], 
-                            osf = 1, res_scaling = .1):
+                                prf_condition_per_TR = []):
         
         """Get prf stimulus array and grid coordinates for participant
         """
         
-        ## get stimulus array (time, y, x)
-        prfpy_dm = self.pRFModelObj.get_DM(participant, 
+        ## get stimulus array (time, x, y)
+        prf_stimulus_dm = self.make_prf_DM(participant, 
                                         ses = ses, 
                                         mask_bool_df = mask_bool_df, 
                                         stim_on_screen = stim_on_screen,
+                                        prf_condition_per_TR = prf_condition_per_TR,
                                         filename = None, 
-                                        osf = osf, 
-                                        res_scaling = res_scaling,
                                         transpose_dm = False)
-
-        ## and swap positions to get (time, x, y)
-        prf_stimulus_dm = np.rollaxis(prfpy_dm, 2, 1)
         
         ## get grid coordinates
         size = prf_stimulus_dm.shape[-1]
 
-        y, x = np.meshgrid(np.linspace(-1, 1, size)[::-1] *(self.MRIObj.screen_res[0]/2), 
-                            np.linspace(-1, 1, size) * (self.MRIObj.screen_res[0]/2))
-        x_deg = self.convert_pix2dva(x.ravel())
-        y_deg = self.convert_pix2dva(y.ravel())
+        coord_x = np.linspace(-self.convert_pix2dva(self.MRIObj.screen_res[0]/2), 
+                      self.convert_pix2dva(self.MRIObj.screen_res[0]/2), size+1, endpoint=True)
+        coord_x = np.hstack((coord_x[:int(size/2)], coord_x[int(size/2 + 1):]))
+        
+        coord_y = np.linspace(-self.convert_pix2dva(self.MRIObj.screen_res[1]/2), 
+                      self.convert_pix2dva(self.MRIObj.screen_res[1]/2), size+1, endpoint=True)
+        coord_y = np.hstack((coord_y[:int(size/2)], coord_y[int(size/2 + 1):]))
+
+        y, x = np.meshgrid(np.flip(coord_y), 
+                            coord_x)
+        x_deg = x.ravel()
+        y_deg = y.ravel()
 
         prf_grid_coordinates = pd.DataFrame({'x':x_deg, 'y': y_deg}).astype(np.float32)
         
         return prf_stimulus_dm, prf_grid_coordinates
+    
+    def make_prf_DM(self, participant = None, ses = 'mean', mask_bool_df = None, stim_on_screen = [], filename = None,
+                        prf_condition_per_TR = [], transpose_dm = False):
+
+        """
+        Get prf stimulus array for participant
+        """
+
+        visual_dm = None
+        save_dm = False
+
+        if isinstance(ses, str) and 'ses' in ses: # to account for differences in input
+            ses = re.search(r'(?<=ses-).*', ses)[0]
+
+        if filename:
+            if op.exists(filename):
+                print('Loading {file}'.format(file = filename))
+                visual_dm = np.load(filename)
+            else:
+                save_dm = True
+
+        # make design matrix
+        if visual_dm is None:
+
+            print('Making DM for sub-{pp}'.format(pp = participant))
+            
+            ## if we want to mask DM, then load behav mask
+            if mask_bool_df is not None:
+
+                # if we set a specific session, then select that one, else combine
+                if ses == 'mean':
+                    mask_bool = mask_bool_df[mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant)]['mask_bool'].values
+                else:
+                    mask_bool = mask_bool_df[(mask_bool_df['ses'] == 'ses-{s}'.format(s = ses)) & \
+                                        (mask_bool_df['sj'] == 'sub-{sj}'.format(sj = participant))]['mask_bool'].values
+                dm_mask = np.prod(mask_bool, axis = 0)
+            else:
+                dm_mask = np.ones(np.array(stim_on_screen).shape[0])
+
+            # multiply boolean array with mask
+            stim_on_screen = stim_on_screen * dm_mask
+
+            # set DM size 
+            dm_size = 80
+            
+            # get prf bar pass dict, for reference
+            prf_bar_pass_dict = self.create_prf_barpass_arr(dm_size = dm_size)
+
+            # save screen display for each TR
+            visual_dm_array = np.zeros((len(prf_condition_per_TR), dm_size, dm_size))
+            i = 0
+
+            # loop over bar pass directions
+            for trl, bartype in enumerate(prf_condition_per_TR): 
+                
+                if bartype not in np.array(['empty','empty_long']): # if not empty screen
+
+                    visual_dm_array[trl] = prf_bar_pass_dict[bartype][i] * stim_on_screen[trl]
+
+                    # increment counter
+                    if trl < (len(prf_condition_per_TR) - 1):
+                        i = i+1 if prf_condition_per_TR[trl] == prf_condition_per_TR[trl+1] else 0  
+
+            if transpose_dm:
+                # swap axis to have time in last axis [x,y,t]
+                visual_dm = visual_dm_array.transpose([1,2,0])
+            else:
+                visual_dm = visual_dm_array.copy() # t, x, y
+
+            if save_dm:
+                # save design matrix
+                print('Making and saving {file}'.format(file = filename))
+                np.save(filename, visual_dm)  
+                    
+        return self.MRIObj.mri_utils.normalize(visual_dm)
+    
+    def create_prf_barpass_arr(self, dm_size = 80):
+
+        """
+        Get dict with prf bar pass array (for all bar pass directions)
+        """
+
+        # set bar width
+        dm_bar_width = int(dm_size * self.MRIObj.bar_width['FA'])
+
+        ## first create L-R bar pass array
+        barpass_arr = []
+        coord_ind_arr = (np.arange(-1, dm_size, dm_bar_width/2)+1).astype(int)
+
+        for b_ind in range(self.MRIObj.pRF_nr_TRs['L-R']):
+
+            trl_arr = np.zeros((dm_size, dm_size))
+            
+            if b_ind == 0:
+                trl_arr[:int(coord_ind_arr[int(b_ind)] + (dm_bar_width/2))] = 1
+            elif b_ind <= self.MRIObj.pRF_nr_TRs['L-R']:
+                trl_arr[coord_ind_arr[int(b_ind - 1)]:int(coord_ind_arr[int(b_ind)] + (dm_bar_width/2))] = 1
+
+            barpass_arr.append(trl_arr)
+        barpass_arr = np.stack(barpass_arr) # time, x, y
+
+        ## create dict of barpass arrays, for each condition
+        prf_bar_pass_dict = {'L-R': barpass_arr,
+                             'R-L': np.flip(barpass_arr, axis=0),
+                             'U-D': np.rot90(barpass_arr, axes=(1, 2)),
+                             'D-U': np.rot90(barpass_arr, axes=(2, 1)),
+                             }
+        
+        return prf_bar_pass_dict
+
     
             
     def get_trl_ecc_dist_df(self, position_df = None, bars_pos = 'parallel', bar_ecc = 'far', abs_inter_bar_dist = 5):
@@ -883,7 +999,8 @@ class Decoding_Model(GLMsingle_Model):
         prf_stimulus_dm, prf_grid_coordinates = self.get_prf_stim_grid(participant = participant, 
                                                                         ses = ses, 
                                                                         mask_bool_df = mask_bool_df, 
-                                                                        stim_on_screen = stim_on_screen)
+                                                                        stim_on_screen = stim_on_screen,
+                                                                        prf_condition_per_TR = self.prf_condition_per_TR)
         
         ## fit prf data with decoder model
         prf_decoder_model, pars_gd = self.fit_encoding_model(model_type = model_type, 
@@ -912,7 +1029,7 @@ class Decoding_Model(GLMsingle_Model):
                                         parameters = pars_gd, 
                                         fit_method = 't', 
                                         best_vox = best_voxels,
-                                        max_n_iterations = 5000, #10000, 
+                                        max_n_iterations = 10000, 
                                         learning_rate = 0.02, 
                                         min_n_iterations = 100,
                                         filename = pars_filename.replace('_pars.h5', '_resid.npz'))
@@ -1725,7 +1842,8 @@ class Decoding_Model(GLMsingle_Model):
                 prf_stimulus_dm, prf_grid_coordinates = self.get_prf_stim_grid(participant = participant, 
                                                                                 ses = ses, 
                                                                                 mask_bool_df = mask_bool_df, 
-                                                                                stim_on_screen = stim_on_screen)
+                                                                                stim_on_screen = stim_on_screen,
+                                                                                prf_condition_per_TR = self.prf_condition_per_TR)
 
                 ## need to select best voxels 
                 # get rsq

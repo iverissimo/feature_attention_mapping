@@ -129,7 +129,8 @@ class Decoding_Model(GLMsingle_Model):
         
         return group_index_df
         
-    def get_prf_ROI_data(self, participant = None, roi_name = 'V1', index_arr = [], overwrite_T1 = False, overwrite_func = False, file_ext = None):
+    def get_prf_ROI_data(self, participant = None, roi_name = 'V1', index_arr = [], overwrite_T1 = False, 
+                                overwrite_func = False, file_ext = None):
         
         """Get pRF data for the ROI of a participant, averaged across runs,
         and return dataframe in a format compatible with braindecoder 
@@ -166,13 +167,13 @@ class Decoding_Model(GLMsingle_Model):
         
         ## get stimulus array (time, y, x)
         prfpy_dm = self.pRFModelObj.get_DM(participant, 
-                                    ses = ses, 
-                                    mask_bool_df = mask_bool_df, 
-                                    stim_on_screen = stim_on_screen,
-                                    filename = None, 
-                                    osf = osf, 
-                                    res_scaling = res_scaling,
-                                    transpose_dm = False)
+                                        ses = ses, 
+                                        mask_bool_df = mask_bool_df, 
+                                        stim_on_screen = stim_on_screen,
+                                        filename = None, 
+                                        osf = osf, 
+                                        res_scaling = res_scaling,
+                                        transpose_dm = False)
 
         ## and swap positions to get (time, x, y)
         prf_stimulus_dm = np.rollaxis(prfpy_dm, 2, 1)
@@ -455,12 +456,19 @@ class Decoding_Model(GLMsingle_Model):
             
         return average_stim
     
-    def get_decoder_grid_coords(self):
+    def get_decoder_grid_coords(self, y_coords_deg = None, x_coords_deg = None):
         
-        """Get grid coordinates for FA task, to use in decoder (8x8 grid)
+        """Get grid coordinates for FA task, to use in decoder 
+        default will be (8x8 grid)
         """
-        new_y, new_x = np.meshgrid(np.flip(self.y_coords_deg), 
-                                    self.x_coords_deg)
+
+        if y_coords_deg is None:
+            y_coords_deg = self.y_coords_deg
+        if x_coords_deg is None:
+            x_coords_deg = self.x_coords_deg
+
+        new_y, new_x = np.meshgrid(np.flip(np.sort(y_coords_deg)), 
+                                    np.sort(x_coords_deg))
         fa_grid_coordinates = pd.DataFrame({'x':new_x.ravel(), 'y': new_y.ravel()}).astype(np.float32)
         
         return fa_grid_coordinates
@@ -2684,13 +2692,32 @@ class Decoding_Model(GLMsingle_Model):
         if filename is not None:
             fig.savefig(filename, dpi= 200)
         
-    def get_pp_stim_visual_dm_correlation(self, reconstructed_stim_dict = None, lowres_DM_dict = None, data_keys_dict = []):
+    def get_pp_stim_visual_dm_correlation(self, reconstructed_stim_dict = None, lowres_DM_dict = None, data_keys_dict = [],
+                                                mask_nan = False):
         
         """
         correlate reconstructed stim with downsampled DM
         across runs for a given participant
         """ 
         
+        ## if single trial correlation, flatten 2D arrays
+        stim_runs, dm_runs = self.flatten_stim_dm(reconstructed_stim_dict = reconstructed_stim_dict, 
+                                                  lowres_DM_dict = lowres_DM_dict, 
+                                                  data_keys_dict = data_keys_dict, 
+                                                  mask_nan = mask_nan)
+        
+        # correlate reconstructed stim with downsampled DM
+        corr, pval = scipy.stats.pointbiserialr(stim_runs, dm_runs)
+        
+        return corr, pval
+    
+    def flatten_stim_dm(self, reconstructed_stim_dict = None, lowres_DM_dict = None, data_keys_dict = [], mask_nan = False):
+
+        """
+        convert reconstructed stim and downsampled DM matrix to 1D array
+        and stack horizontally all participant runs
+        """
+
         # check for masked trials -> make index array for each run
         bar_present_dict = {df_key: np.where((np.sum(np.sum(lowres_DM_dict[df_key], 
                                          axis = -1), 
@@ -2699,42 +2726,149 @@ class Decoding_Model(GLMsingle_Model):
         # concatenate arrays across runs
         stim_runs = np.hstack((reconstructed_stim_dict[df_key].values[bar_present_dict[df_key]].ravel() for df_key in data_keys_dict))
         dm_runs = np.hstack((lowres_DM_dict[df_key][bar_present_dict[df_key]].ravel() for df_key in data_keys_dict))
-        
-        # correlate reconstructed stim with downsampled DM
-        #corr, pval = scipy.stats.pearsonr(stim_runs, dm_runs)
-        corr, pval = scipy.stats.pointbiserialr(stim_runs, dm_runs)
-        
-        return corr, pval
-    
+
+        # if we want to mask nan 
+        if mask_nan:
+            mask_ind = np.where((~np.isnan(dm_runs)))[0]
+            stim_runs = stim_runs[mask_ind]
+            dm_runs = dm_runs[mask_ind]
+
+        return stim_runs, dm_runs
+
     def get_stim_visual_dm_correlation(self, participant_list = [], reconstructed_stim_dict = None, 
-                                            lowres_DM_dict = None, data_keys_dict = []):
+                                            lowres_DM_dict = None, data_keys_dict = [], ROI_list = [], mask_nan = False):
         
         """
-        correlate reconstructed stim with downsampled DM
+        For each ROI, correlate reconstructed stim with downsampled DM
         across runs for all participants
         and return df with values
         """ 
         
         stim_corr_df = []
-        
-        for participant in participant_list:
-            
-            pp_corr, pp_pval = self.get_pp_stim_visual_dm_correlation(reconstructed_stim_dict = reconstructed_stim_dict['sub-{sj}'.format(sj = participant)], 
-                                                                      lowres_DM_dict = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['full_stim'], 
-                                                                      data_keys_dict = data_keys_dict['sub-{sj}'.format(sj = participant)])
-        
-            stim_corr_df.append(pd.DataFrame({'sj': ['sub-{sj}'.format(sj = participant)],
-                                              'corr': [pp_corr],
-                                              'pval': [pp_pval]}
-                                             ))
 
-            print('sub-{sj} correlation between reconstructed stim and DM is {c}, {p}'.format(sj = participant,
-                                                                                            c = '%.2f'%pp_corr,
-                                                                                            p = '%.2f'%pp_pval))
+        for roi_name in  ROI_list:
+
+            print('Correlation %s'%roi_name)
+        
+            for participant in participant_list:
+                
+                pp_corr, pp_pval = self.get_pp_stim_visual_dm_correlation(reconstructed_stim_dict = reconstructed_stim_dict[roi_name]['sub-{sj}'.format(sj = participant)], 
+                                                                        lowres_DM_dict = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['full_stim'], 
+                                                                        data_keys_dict = data_keys_dict['sub-{sj}'.format(sj = participant)],
+                                                                        mask_nan = mask_nan)
+            
+                stim_corr_df.append(pd.DataFrame({'sj': ['sub-{sj}'.format(sj = participant)],
+                                                'corr': [pp_corr],
+                                                'pval': [pp_pval],
+                                                'ROI': [roi_name]}
+                                                ))
+
+                print('sub-{sj} correlation between reconstructed stim and DM is {c}, {p}'.format(sj = participant,
+                                                                                                c = '%.2f'%pp_corr,
+                                                                                                p = '%.2f'%pp_pval))
         
         stim_corr_df = pd.concat(stim_corr_df, ignore_index=True)  
         
-        return stim_corr_df      
+        return stim_corr_df
+    
+    def get_run_avg_stim_dm_correlation(self, participant_list = [], ROI_list = [], group_stim_dict = None, 
+                                            group_refDM_dict = None):
+        
+        """
+        For each ROI, correlate reconstructed stim (average over runs) 
+        with downsampled DM (in order of GLMsingle DM)
+        for all participants
+        and return df with values
+        """ 
+        
+        avg_stim_corr_df = []
+
+        for roi_name in  ROI_list:
+
+            print('Correlation %s'%roi_name)
+        
+            for participant in participant_list:
+                
+                # first get reference dm and set values as binary
+                dm4corr = group_refDM_dict['sub-{sj}'.format(sj = participant)].copy()
+                dm4corr[dm4corr>0] = 1
+                # mask out nan conditions
+                mask_ind = np.where((~np.isnan(dm4corr)[...,0,0]))[0]
+
+                pp_corr, pp_pval = scipy.stats.pointbiserialr(group_stim_dict[roi_name]['sub-{sj}'.format(sj = participant)].values[mask_ind].ravel(), 
+                                                            dm4corr[mask_ind].ravel())
+            
+                avg_stim_corr_df.append(pd.DataFrame({'sj': ['sub-{sj}'.format(sj = participant)],
+                                                'corr': [pp_corr],
+                                                'pval': [pp_pval],
+                                                'ROI': [roi_name]}
+                                                ))
+
+                print('sub-{sj} correlation between reconstructed stim and DM is {c}, {p}'.format(sj = participant,
+                                                                                                c = '%.2f'%pp_corr,
+                                                                                                p = '%.2f'%pp_pval))
+        
+        avg_stim_corr_df = pd.concat(avg_stim_corr_df, ignore_index=True)  
+        
+        return avg_stim_corr_df
+
+    def get_run_avg_stim_glmsing_trials(self, participant_list = [], ROI_list = [], FA_run_position_df = None, 
+                                            trial_combinations_df = None, reconstructed_stim_dict = None, data_keys_dict = None,
+                                            lowres_DM_dict = None):
+
+        """
+        Average recontructed stim, for each ROI and participant,
+        across runs.
+        Using same order as DM of GLMsingle (for ease averaging of group and plotting)
+        """
+
+        ## store info for all participants
+        group_stim_dict = {roi_name: {} for roi_name in ROI_list}
+        group_refDM_dict = {}
+
+        ## iterate over ROIs
+        for ind, roi_name in enumerate(ROI_list):
+
+            ## for a given ROI, get all participants reconstructed stim
+            for participant in participant_list:
+                
+                pp_avg_stim_df, pp_reference_dm = self.average_pp_stim_glmsing_trials(participant, 
+                                                                                    pp_bar_pos_df = FA_run_position_df[FA_run_position_df['sj'] == 'sub-{sj}'.format(sj = participant)], 
+                                                                                    trial_combinations_df = trial_combinations_df, 
+                                                                                    reconstructed_stim_dict = reconstructed_stim_dict[roi_name], 
+                                                                                    data_keys_dict = data_keys_dict,
+                                                                                    lowres_DM_dict = lowres_DM_dict)
+            
+                group_stim_dict[roi_name]['sub-{sj}'.format(sj = participant)] = pp_avg_stim_df
+                if ind == 0:
+                    group_refDM_dict['sub-{sj}'.format(sj = participant)] = pp_reference_dm
+
+        return group_stim_dict, group_refDM_dict
+    
+    def average_group_stim_glmsing_trials(self, participant_list = [], ROI_list = [], group_stim_dict = None, group_refDM_dict = None):
+
+        """
+        Take participant run-average reconstructed stim, and create group average df
+        Using same order as DM of GLMsingle (for ease averaging of group and plotting)
+        """
+
+        ## store group average
+        avg_stim_dict = {roi_name: [] for roi_name in ROI_list}
+
+        ## iterate over ROIs
+        for roi_name in ROI_list:
+
+            # copy structure of first participant
+            avg_stim2plot = group_stim_dict[roi_name]['sub-{sj}'.format(sj = participant_list[1])].copy()
+            ## average over participants
+            avg_stim2plot.loc[:] = np.nanmean(np.stack((group_stim_dict[roi_name]['sub-{sj}'.format(sj = pp)] for pp in participant_list)), axis = 0)
+            ## add to dict
+            avg_stim_dict[roi_name] = avg_stim2plot
+
+        # also return DM, for consistency
+        avg_refDM_dict = group_refDM_dict['sub-{sj}'.format(sj = participant_list[1])].copy()
+
+        return avg_stim_dict, avg_refDM_dict
     
     def get_pp_stim_same_bar_pos_correlation(self, reconstructed_stim_dict = None, lowres_DM_dict = None, data_keys_dict = []):
         

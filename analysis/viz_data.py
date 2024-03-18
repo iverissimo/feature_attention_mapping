@@ -197,9 +197,14 @@ match data_type:
                     # get accuracy per ecc
                     acc_df = FAM_beh.get_FA_accuracy(att_RT_df = att_RT_df)
 
+                    # get accuracy per distance
+                    acc_dist_df = FAM_beh.get_FA_accuracy(att_RT_df = att_RT_df[att_RT_df['bars_pos'] == 'parallel'], 
+                                                        condition = 'interbar_dist_deg')
+
                     # actually plot
                     plotter.plot_FA_behavior(att_RT_df = att_RT_df, 
                                              acc_df = acc_df, 
+                                             acc_dist_df = acc_dist_df,
                                              participant_list = FAM_data.sj_num)
                     
                 elif task == 'pRF':

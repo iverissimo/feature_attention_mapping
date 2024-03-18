@@ -493,3 +493,42 @@ class Utils:
         dict_colors = {key: col_arr[i] for i, key in enumerate(key_list)}
 
         return dict_colors
+    
+    def calc_within_sub_sem(self, df_data = None, main_var = 'RT', conditions = ['bar_ecc_deg', 'interbar_dist_deg'], 
+                                pp_key = 'sj'):
+
+        """
+        remove between-subject variability
+        and calculate SEM (for plotting purposes)
+        """
+
+        ## get subject average
+        sub_avg = df_data.groupby([pp_key]).mean(numeric_only=True).reset_index()
+        sub_avg = sub_avg.loc[:, [pp_key, main_var]]
+        # rename to new column
+        sub_avg.rename(columns={main_var: 'avg_%s'%main_var}, inplace=True)
+        # add column with grand average
+        sub_avg.loc[:, ['group_avg_%s'%main_var]] = df_data[main_var].mean()
+
+        ## merge values to dataframe
+        df_data = df_data.merge(sub_avg, on=[pp_key])
+
+        ## remove the between-subject variability
+        norm_value = df_data[main_var].values - df_data['avg_%s'%main_var].values + df_data['group_avg_%s'%main_var].values
+        df_data.loc[:, ['norm_%s'%main_var]] = norm_value
+
+        ## calculate the standard error of the mean
+        sem_df = df_data.groupby(conditions)['norm_%s'%main_var].sem().reset_index()
+        sem_df.rename(columns={'norm_%s'%main_var: 'SEM_%s'%main_var}, inplace=True)
+        
+        ## final merge
+        df_data = df_data.merge(sem_df, on=conditions)
+
+        return df_data
+
+
+
+
+
+
+

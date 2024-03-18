@@ -546,14 +546,12 @@ class PreprocBeh:
 
         return att_RT_df
     
-    def get_FA_accuracy(self, att_RT_df = None):
+    def get_FA_accuracy(self, att_RT_df = None, condition = 'unatt_bar_ecc_deg'):
 
         """
         For each attended ecc, 
-        split data into unattended bar ecc,
+        split data into unattended bar ecc (or distance)
         and get accuracy
-
-        Boxplot + swarmplot
 
         Parameters
         ----------
@@ -562,15 +560,15 @@ class PreprocBeh:
         """
 
         ## create accuracy DF
-        count_df = att_RT_df.groupby(['sj', 'bar_ecc_deg', 'unatt_bar_ecc_deg', 'correct']).count().reset_index()
-        count_df = count_df.loc[:, ['sj', 'bar_ecc_deg', 'unatt_bar_ecc_deg', 'correct', 'color_category']]
+        count_df = att_RT_df.groupby(['sj', 'bar_ecc_deg', condition, 'correct']).count().reset_index()
+        count_df = count_df.loc[:, ['sj', 'bar_ecc_deg', condition, 'correct', 'color_category']]
         count_df.rename(columns={'color_category': 'n_trials'}, inplace=True)
 
-        sum_df = count_df.groupby(['sj', 'bar_ecc_deg', 'unatt_bar_ecc_deg']).sum().reset_index()
-        sum_df = sum_df.loc[:, ['sj', 'bar_ecc_deg', 'unatt_bar_ecc_deg', 'n_trials']]
+        sum_df = count_df.groupby(['sj', 'bar_ecc_deg', condition]).sum().reset_index()
+        sum_df = sum_df.loc[:, ['sj', 'bar_ecc_deg', condition, 'n_trials']]
         sum_df.rename(columns={'n_trials': 'total_trials'}, inplace=True)
 
-        acc_df = count_df.merge(sum_df, on = ['sj', 'bar_ecc_deg', 'unatt_bar_ecc_deg'])
+        acc_df = count_df.merge(sum_df, on = ['sj', 'bar_ecc_deg', condition])
         acc_df.loc[:, 'accuracy'] = acc_df.n_trials.values/acc_df.total_trials.values * 100
 
         return acc_df

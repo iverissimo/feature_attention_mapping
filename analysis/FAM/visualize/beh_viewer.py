@@ -123,7 +123,7 @@ class BehViewer(Viewer):
             fig.savefig(op.join(self.figures_pth,'sub-GROUP_task-pRF_RT_accuracy.png'), dpi=100,bbox_inches = 'tight')
 
 
-    def plot_FA_behavior(self, att_RT_df = None, acc_df = None, participant_list = []):
+    def plot_FA_behavior(self, att_RT_df = None, acc_df = None, acc_dist_df = None, participant_list = []):
 
         """
         Plot behavioral results for FA
@@ -196,6 +196,17 @@ class BehViewer(Viewer):
                         figsize = (8,5), 
                         ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'],
                         per_pp = False)
+        # also for distance
+        self.plot_FA_ACCdist(acc_df = acc_dist_df, 
+                            filename = filename.format(sj = 'GROUP',  
+                                                    data_type = 'Accuracy_DIST'), 
+                            figsize = (8,5), 
+                            cmap = 'magma')
+        self.plot_FA_ACCdist(acc_df = acc_dist_df, 
+                            filename = filename.format(sj = 'GROUP',  
+                                                    data_type = 'Accuracy_DIST2'), 
+                            figsize = (8,5), 
+                            ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'])
 
     def plot_FA_RTecc(self, att_RT_df = None, filename = None, figsize = (8,5), ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'], 
                             sub_id = None):
@@ -320,7 +331,7 @@ class BehViewer(Viewer):
         else:
             return fig
 
-    def plot_FA_RTdist(self, att_RT_df = None, filename = None, figsize = (8,5), cmap = 'magma', sub_id = None, ecc_colors = None):
+    def plot_FA_RTdist(self, att_RT_df = None, filename = None, figsize = (8,5), cmap = 'magma', sub_id = None, ecc_colors = None, error_bars = 'within'):
 
         """
         For each attended ecc (of parallel trials)
@@ -341,6 +352,14 @@ class BehViewer(Viewer):
             df2plot_dist = att_RT_df[(att_RT_df['correct'] == 1) &\
                                     (att_RT_df['bars_pos'] == 'parallel')].groupby(['sj', 'bar_ecc_deg', 
                                                                                     'interbar_dist_deg']).mean(numeric_only=True).reset_index()
+            
+            ## if we want to calculate within sub error 
+            if error_bars == 'within':
+                df2plot_dist = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot_dist, 
+                                                                        main_var = 'RT', 
+                                                                        conditions = ['bar_ecc_deg', 'interbar_dist_deg'], 
+                                                                        pp_key = 'sj')
+
         else:
             df2plot_dist = att_RT_df[(att_RT_df['correct'] == 1)  &\
                                 (att_RT_df['bars_pos'] == 'parallel') &\
@@ -350,19 +369,38 @@ class BehViewer(Viewer):
         fig, axes0 = plt.subplots(nrows=1, ncols=1, figsize = figsize)
 
         if ecc_colors is not None:
-            ## lineplots to show the linear trends,    
-            line_p = sns.lineplot(data = df2plot_dist,
-                                y = 'RT', hue = 'bar_ecc_deg', x = 'interbar_dist_deg', palette = ecc_colors,
-                                err_style='bars', errorbar='se', marker='o', ms=10, err_kws = {'capsize': 5},
-                                linewidth=5, ax=axes0, legend=True)
+
+            if sub_id is None and error_bars == 'within':
+
+                ## lineplots to show the linear trends,    
+                line_p = sns.lineplot(data = df2plot_dist,
+                                    y = 'RT', hue = 'bar_ecc_deg', x = 'interbar_dist_deg', palette = ecc_colors,
+                                    err_style='bars', errorbar=None, marker='o', ms=10, err_kws = {'capsize': 5},
+                                    linewidth=5, ax=axes0, legend=True)
+                # plot error bars per condition
+                for i, becc in enumerate(np.sort(df2plot_dist.bar_ecc_deg.unique())):
+
+                    becc_df = df2plot_dist[df2plot_dist['bar_ecc_deg'] == becc].copy()
+                    
+                    axes0.errorbar(becc_df.groupby(['interbar_dist_deg']).mean(numeric_only=True).reset_index().interbar_dist_deg.values,
+                                becc_df.groupby(['interbar_dist_deg']).mean(numeric_only=True).reset_index().RT.values , 
+                                yerr = becc_df.groupby(['interbar_dist_deg']).mean(numeric_only=True).reset_index().SEM_RT.values , 
+                                elinewidth = 2, capsize = 5,
+                                zorder = 0, c=ecc_colors[i], alpha=.9, fmt='none')
+            else:
+                ## lineplots to show the linear trends,    
+                line_p = sns.lineplot(data = df2plot_dist,
+                                    y = 'RT', hue = 'bar_ecc_deg', x = 'interbar_dist_deg', palette = ecc_colors,
+                                    err_style='bars', errorbar='se', marker='o', ms=10, err_kws = {'capsize': 5},
+                                    linewidth=5, ax=axes0, legend=True)
 
             handles, labels = line_p.get_legend_handles_labels()
             line_p.legend(handles, ['{eval} deg'.format(eval = label[:4]) for label in labels], title = 'Target bar ecc', 
-                        loc='upper left', fontsize = 'small', title_fontsize= 'medium')
+                        loc='upper right', fontsize = 'small', title_fontsize= 'medium')
 
             axes0.set_ylabel('RT [s]', fontsize = 16, labelpad = 15)
             if sub_id is None:
-                axes0.set_ylim([.6, .9])
+                axes0.set_ylim([.65, .82])
             axes0.set_xlabel('Inter-bar distance [deg]', fontsize = 16, labelpad = 15)
             axes0.set_title('Average RT per inter-bar distance',fontsize=14)
             axes0.tick_params(axis='both', labelsize=14)
@@ -373,11 +411,30 @@ class BehViewer(Viewer):
                                                             cmap = cmap, 
                                                             num_col = None)
 
-            ## lineplots to show the linear trends,    
-            line_p = sns.lineplot(data = df2plot_dist,
-                                y = 'RT', x = 'bar_ecc_deg', hue = 'interbar_dist_deg', palette = dist_colors,
-                                err_style='bars', errorbar='se', marker='o', ms=10, err_kws = {'capsize': 5},
-                                linewidth=5, ax=axes0, legend=True)
+            if sub_id is None and error_bars == 'within':
+
+                ## lineplots to show the linear trends,    
+                line_p = sns.lineplot(data = df2plot_dist,
+                                    y = 'RT', x = 'bar_ecc_deg', hue = 'interbar_dist_deg', palette = dist_colors,
+                                    err_style='bars', errorbar=None, marker='o', ms=10, err_kws = {'capsize': 5},
+                                    linewidth=5, ax=axes0, legend=True)
+                # plot error bars per condition
+                for i, bedist in enumerate(np.sort(df2plot_dist.interbar_dist_deg.unique())):
+
+                    bedist_df = df2plot_dist[df2plot_dist['interbar_dist_deg'] == bedist].copy()
+                    
+                    axes0.errorbar(bedist_df.groupby(['bar_ecc_deg']).mean(numeric_only=True).reset_index().bar_ecc_deg.values,
+                                bedist_df.groupby(['bar_ecc_deg']).mean(numeric_only=True).reset_index().RT.values , 
+                                yerr = bedist_df.groupby(['bar_ecc_deg']).mean(numeric_only=True).reset_index().SEM_RT.values , 
+                                elinewidth = 2, capsize = 5,
+                                zorder = 0, c=dist_colors[bedist], alpha=.9, fmt='none')
+                
+            else:
+                ## lineplots to show the linear trends,    
+                line_p = sns.lineplot(data = df2plot_dist,
+                                    y = 'RT', x = 'bar_ecc_deg', hue = 'interbar_dist_deg', palette = dist_colors,
+                                    err_style='bars', errorbar='se', marker='o', ms=10, err_kws = {'capsize': 5},
+                                    linewidth=5, ax=axes0, legend=True)
 
             handles, labels = line_p.get_legend_handles_labels()
 
@@ -386,9 +443,122 @@ class BehViewer(Viewer):
 
             axes0.set_ylabel('RT [s]', fontsize = 16, labelpad = 15)
             if sub_id is None:
-                axes0.set_ylim([.6, .9])
+                axes0.set_ylim([.65, .82])
             axes0.set_xlabel('Target bar ecc [deg]', fontsize = 16, labelpad = 15)
             axes0.set_title('Average RT per inter-bar distance',fontsize=14)
+            axes0.tick_params(axis='both', labelsize=14)
+
+        # if we provided filename, save
+        if filename:
+            fig.savefig(filename, bbox_inches='tight')
+        else:
+            return fig
+        
+    def plot_FA_ACCdist(self, acc_df = None, filename = None, figsize = (8,5), cmap = 'magma', ecc_colors = None, error_bars = 'within'):
+
+        """
+        For each attended ecc (of parallel trials)
+        and distance between bars,
+        plot mean accuracy
+
+        Lineplot
+
+        Parameters
+        ----------
+        acc_df: df
+            behavioral dataframe from preproc class
+        """
+
+        # filter for correct trials only
+        # make group plot
+        df2plot_dist = acc_df[(acc_df['correct'] == 1)]
+        
+        ## if we want to calculate within sub error 
+        if error_bars == 'within':
+            df2plot_dist = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot_dist, 
+                                                                    main_var = 'accuracy', 
+                                                                    conditions = ['bar_ecc_deg', 'interbar_dist_deg'], 
+                                                                    pp_key = 'sj')
+        
+        ## create figure
+        fig, axes0 = plt.subplots(nrows=1, ncols=1, figsize = figsize)
+
+        if ecc_colors is not None:
+
+            if error_bars == 'within':
+
+                ## lineplots to show the linear trends,    
+                line_p = sns.lineplot(data = df2plot_dist,
+                                    y = 'accuracy', hue = 'bar_ecc_deg', x = 'interbar_dist_deg', palette = ecc_colors,
+                                    err_style='bars', errorbar=None, marker='o', ms=10, err_kws = {'capsize': 5},
+                                    linewidth=5, ax=axes0, legend=True)
+                # plot error bars per condition
+                for i, becc in enumerate(np.sort(df2plot_dist.bar_ecc_deg.unique())):
+
+                    becc_df = df2plot_dist[df2plot_dist['bar_ecc_deg'] == becc].copy()
+                    
+                    axes0.errorbar(becc_df.groupby(['interbar_dist_deg']).mean(numeric_only=True).reset_index().interbar_dist_deg.values,
+                                becc_df.groupby(['interbar_dist_deg']).mean(numeric_only=True).reset_index().accuracy.values , 
+                                yerr = becc_df.groupby(['interbar_dist_deg']).mean(numeric_only=True).reset_index().SEM_accuracy.values , 
+                                elinewidth = 2, capsize = 5,
+                                zorder = 0, c=ecc_colors[i], alpha=.9, fmt='none')
+            else:
+                ## lineplots to show the linear trends,    
+                line_p = sns.lineplot(data = df2plot_dist,
+                                    y = 'accuracy', hue = 'bar_ecc_deg', x = 'interbar_dist_deg', palette = ecc_colors,
+                                    err_style='bars', errorbar='se', marker='o', ms=10, err_kws = {'capsize': 5},
+                                    linewidth=5, ax=axes0, legend=True)
+
+            handles, labels = line_p.get_legend_handles_labels()
+            line_p.legend(handles, ['{eval} deg'.format(eval = label[:4]) for label in labels], title = 'Target bar ecc', 
+                        loc='lower right', fontsize = 'small', title_fontsize= 'medium')
+
+            axes0.set_ylabel('Accuracy [%]', fontsize = 16, labelpad = 15)
+            axes0.set_ylim([80, 100])
+            axes0.set_xlabel('Inter-bar distance [deg]', fontsize = 16, labelpad = 15)
+            axes0.set_title('Average acc per inter-bar distance',fontsize=14)
+            axes0.tick_params(axis='both', labelsize=14)
+
+        else:
+            # create color palette
+            dist_colors = self.MRIObj.beh_utils.create_palette(key_list = np.sort(df2plot_dist.interbar_dist_deg.unique()), 
+                                                            cmap = cmap, 
+                                                            num_col = None)
+
+            if error_bars == 'within':
+
+                ## lineplots to show the linear trends,    
+                line_p = sns.lineplot(data = df2plot_dist,
+                                    y = 'accuracy', x = 'bar_ecc_deg', hue = 'interbar_dist_deg', palette = dist_colors,
+                                    err_style='bars', errorbar=None, marker='o', ms=10, err_kws = {'capsize': 5},
+                                    linewidth=5, ax=axes0, legend=True)
+                # plot error bars per condition
+                for i, bedist in enumerate(np.sort(df2plot_dist.interbar_dist_deg.unique())):
+
+                    bedist_df = df2plot_dist[df2plot_dist['interbar_dist_deg'] == bedist].copy()
+                    
+                    axes0.errorbar(bedist_df.groupby(['bar_ecc_deg']).mean(numeric_only=True).reset_index().bar_ecc_deg.values,
+                                bedist_df.groupby(['bar_ecc_deg']).mean(numeric_only=True).reset_index().accuracy.values , 
+                                yerr = bedist_df.groupby(['bar_ecc_deg']).mean(numeric_only=True).reset_index().SEM_accuracy.values , 
+                                elinewidth = 2, capsize = 5,
+                                zorder = 0, c=dist_colors[bedist], alpha=.9, fmt='none')
+                
+            else:
+                ## lineplots to show the linear trends,    
+                line_p = sns.lineplot(data = df2plot_dist,
+                                    y = 'accuracy', x = 'bar_ecc_deg', hue = 'interbar_dist_deg', palette = dist_colors,
+                                    err_style='bars', errorbar='se', marker='o', ms=10, err_kws = {'capsize': 5},
+                                    linewidth=5, ax=axes0, legend=True)
+
+            handles, labels = line_p.get_legend_handles_labels()
+
+            line_p.legend(handles, ['{eval} deg'.format(eval = label[:4]) for label in labels], title = 'Inter-bar distance', 
+                        loc='lower right', fontsize = 'small', title_fontsize= 'medium')
+
+            axes0.set_ylabel('Accuracy [%]', fontsize = 16, labelpad = 15)
+            axes0.set_ylim([80, 100])
+            axes0.set_xlabel('Target bar ecc [deg]', fontsize = 16, labelpad = 15)
+            axes0.set_title('Average acc per inter-bar distance',fontsize=14)
             axes0.tick_params(axis='both', labelsize=14)
 
         # if we provided filename, save

@@ -189,8 +189,8 @@ class Decoding_Model(GLMsingle_Model):
 
         y, x = np.meshgrid(np.flip(coord_y), 
                             coord_x)
-        x_deg = x.ravel()
-        y_deg = y.ravel()
+        x_deg = x.ravel().astype(np.float32)
+        y_deg = y.ravel().astype(np.float32)
 
         prf_grid_coordinates = pd.DataFrame({'x':x_deg, 'y': y_deg}).astype(np.float32)
         
@@ -269,7 +269,7 @@ class Decoding_Model(GLMsingle_Model):
                 print('Making and saving {file}'.format(file = filename))
                 np.save(filename, visual_dm)  
                     
-        return self.MRIObj.mri_utils.normalize(visual_dm)
+        return self.MRIObj.mri_utils.normalize(visual_dm).astype(np.float32)
     
     def create_prf_barpass_arr(self, dm_size = 80):
 
@@ -305,8 +305,159 @@ class Decoding_Model(GLMsingle_Model):
         
         return prf_bar_pass_dict
 
-    
+    def create_barpass_arr(self, dm_size = 80, num_b = 8):
+
+        """
+        Get dict with FA bar pass array (for both horizontal and vertical bar positions)
+        """
+
+        # set bar width
+        dm_bar_width = int(dm_size/num_b)
+
+        ## first create horizontal bar pass array
+        barpass_arr = []
+        coord_ind_arr = np.linspace(dm_bar_width/2, dm_size + dm_bar_width/2, 9, endpoint=True)[:-1].astype(int)
+
+        for b_ind in range(num_b):
+
+            trl_arr = np.zeros((dm_size, dm_size))
             
+            if b_ind == 0:
+                trl_arr[:int(coord_ind_arr[int(b_ind)] + (dm_bar_width/2))] = 1
+            else:
+                trl_arr[int(coord_ind_arr[int(b_ind)] - (dm_bar_width/2)):int(coord_ind_arr[int(b_ind)] + (dm_bar_width/2))] = 1
+
+            barpass_arr.append(trl_arr)
+        barpass_arr = np.stack(barpass_arr) # time, x, y
+
+        ## create dict of barpass arrays, for each condition
+        bar_pass_dict = {'horizontal': barpass_arr,
+                        'vertical': np.rot90(barpass_arr, axes=(2, 1))
+                        }
+        
+        return bar_pass_dict
+
+    def make_run_visual_dm(self, midpoint_bar = None, direction_bar = None, trial_mask = None, dm_size = 80):
+
+        """
+        make DM array for given run 
+        """
+
+        # number of possible bar positions
+        num_b = int(self.MRIObj.screen_res[0]/self.bar_width_pix[0])
+        # reference bar midpoint coordinates in pixels
+        ref_midpoints = np.linspace(-self.MRIObj.screen_res[0]/2 + self.bar_width_pix[0]/2, 
+                                    self.MRIObj.screen_res[0]/2 - self.bar_width_pix[0]/2, 
+                                    num_b)
+        
+        # get dict with FA bar pass array (for both horizontal and vertical bar positions)
+        bar_pass_dict = self.create_barpass_arr(dm_size = dm_size, num_b = num_b)
+
+        # save screen display for each TR
+        visual_dm_array = np.zeros((len(direction_bar), dm_size, dm_size))
+        
+        for trl, bar_center in enumerate(midpoint_bar): # loop over trials
+
+            if direction_bar[trl] == 'vertical':
+
+                bar_coord = bar_center[-1]
+
+            elif direction_bar[trl] == 'horizontal':  
+
+                bar_coord = bar_center[0]
+
+            # get index of bar poisition
+            bar_ind = np.where((ref_midpoints == bar_coord))[0][0]
+
+            # store array
+            visual_dm_array[trl] = bar_pass_dict[direction_bar[trl]][bar_ind]
+
+        # if we provided a trial mask, then set those trials to 0
+        if trial_mask is not None:
+            visual_dm_array[trial_mask] = 0
+
+        return self.MRIObj.mri_utils.normalize(visual_dm_array).astype(np.float32)
+
+    def make_DM_dict(self, pp_bar_pos_df = None, pp_prf_bar_coords_dict = None, dm_size = 80):
+    
+        """
+        return dict for each participant run,
+        with visual DM for each type of regressor (attended bar, unattended bar, overlap, both bars, etc)
+        
+        ex:
+        out_dict['ses-1_run-1'] = {'att_bar': [trial, x,y], 'unatt_bar': [trial,x,y], ...}
+
+        Parameters
+        ----------
+        pp_bar_pos_df: df/dict
+            from behavioral object, with bar position info of participant runs
+        pp_prf_bar_coords_dict: df/dict
+            dict with prf bar positions for participant, vertical/horizontal runs
+            when given will be used to mask out not visible bar locations
+        """ 
+        
+        # set empty dicts
+        out_dict = {}
+        
+        for ses_key in pp_bar_pos_df.keys():
+            for run_key in pp_bar_pos_df[ses_key].keys():
+                
+                # get run identifier
+                ses_run_id = '{sn}_{rn}'.format(sn = ses_key, rn = run_key)
+                print('loading bar positions for {srid}'. format(srid = ses_run_id))
+                
+                # initialize dict
+                out_dict[ses_run_id] = {}
+                
+                ## get bar position df for run
+                run_bar_pos_df = pp_bar_pos_df[ses_key][run_key]
+
+                ## get run bar midpoint and direction values
+                # for each bar type (arrays will have len == total number of trial types)
+                AttBar_bar_midpoint, AttBar_bar_pass_direction = run_bar_pos_df.loc[(run_bar_pos_df['attend_condition'] == 1), 
+                                                                                    ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
+                UnattBar_bar_midpoint, UnattBar_bar_pass_direction = run_bar_pos_df.loc[(run_bar_pos_df['attend_condition'] == 0), 
+                                                                                    ['bar_midpoint_at_TR', 'bar_pass_direction_at_TR']].to_numpy()[0]
+
+                # if possible, mask out not visible bar positions
+                if pp_prf_bar_coords_dict is not None:
+                    # get trial indices to mask out
+                    t_mask = self.MRIObj.beh_utils.get_trial_ind_mask(AttBar_bar_midpoint = AttBar_bar_midpoint, 
+                                                                    AttBar_bar_pass_direction = AttBar_bar_pass_direction,
+                                                                    UnattBar_bar_midpoint = UnattBar_bar_midpoint, 
+                                                                    UnattBar_bar_pass_direction = UnattBar_bar_pass_direction,
+                                                                    prf_bar_coords_dict = pp_prf_bar_coords_dict)
+                else:
+                    t_mask = None
+                    
+                ## GET DM FOR ATTENDED BAR
+                out_dict[ses_run_id]['att_bar'] = self.make_run_visual_dm(midpoint_bar = AttBar_bar_midpoint, 
+                                                                        direction_bar = AttBar_bar_pass_direction, 
+                                                                        dm_size = dm_size,
+                                                                        trial_mask = t_mask)
+                ## GET DM FOR UNATTENDED BAR
+                out_dict[ses_run_id]['unatt_bar'] = self.make_run_visual_dm(midpoint_bar = UnattBar_bar_midpoint, 
+                                                                        direction_bar = UnattBar_bar_pass_direction, 
+                                                                        dm_size = dm_size,
+                                                                        trial_mask = t_mask)
+
+                ## GET DM FOR OVERLAP OF BARS
+                out_dict[ses_run_id]['overlap'] = self.MRIObj.mri_utils.get_bar_overlap_dm(np.stack((out_dict[ses_run_id]['att_bar'],
+                                                                                                    out_dict[ses_run_id]['unatt_bar'])))
+
+                ## GET DM FOR BOTH BARS COMBINED (FULL STIM THAT WAS ON SCREEN)
+                stimulus_dm = np.sum(np.stack((out_dict[ses_run_id]['att_bar'],
+                                                out_dict[ses_run_id]['unatt_bar'])), axis = 0)
+                stimulus_dm[stimulus_dm >=1] = 1
+                
+                out_dict[ses_run_id]['full_stim'] = stimulus_dm
+
+        # get keys for each condition
+        condition_dm_keys = list(out_dict[ses_run_id].keys())
+                
+        return out_dict, condition_dm_keys
+
+
     def get_trl_ecc_dist_df(self, position_df = None, bars_pos = 'parallel', bar_ecc = 'far', abs_inter_bar_dist = 5):
         
         """Given a data frame with bar positions and indices for each trial for a given run,
@@ -585,7 +736,7 @@ class Decoding_Model(GLMsingle_Model):
 
         new_y, new_x = np.meshgrid(np.flip(np.sort(y_coords_deg)), 
                                     np.sort(x_coords_deg))
-        fa_grid_coordinates = pd.DataFrame({'x':new_x.ravel(), 'y': new_y.ravel()}).astype(np.float32)
+        fa_grid_coordinates = pd.DataFrame({'x':new_x.ravel().astype(np.float32), 'y': new_y.ravel().astype(np.float32)}).astype(np.float32)
         
         return fa_grid_coordinates
     
@@ -609,14 +760,14 @@ class Decoding_Model(GLMsingle_Model):
         elif flip_type == 'ud':
             return np.flip(og_arr, axis = 0)
     
-    def downsample_DM(self, DM_arr = None):
+    def downsample_DM(self, DM_arr = None, dm_size = 80, new_size = 8):
         
         """downsample FA FAM to 8x8 grid
         to correlate with reconstructed image
         """
         
         ## reduce dimensionality 
-        downsample_FA_DM = scipy.ndimage.zoom(DM_arr, (1, 8/108., 8/108.))
+        downsample_FA_DM = scipy.ndimage.zoom(DM_arr, (1, new_size/dm_size, new_size/dm_size))
         # binarize again
         downsample_FA_DM[downsample_FA_DM > .5] = 1
         downsample_FA_DM[downsample_FA_DM<.5] = 0
@@ -955,6 +1106,8 @@ class Decoding_Model(GLMsingle_Model):
         Fit decoder across participants
         and ROIs
         """
+
+        print('Model type --> %s'%model_type)
         
         # iterate over participants
         for pp in participant_list:
@@ -1046,7 +1199,8 @@ class Decoding_Model(GLMsingle_Model):
         ## get FA DM and grid coordinates (8x8)
         FA_DM_dict, fa_grid_coordinates = self.get_FA_stim_grid(participant = participant, 
                                                                 group_bar_pos_df = {'sub-{sj}'.format(sj = participant): pp_bar_pos_df},
-                                                                prf_bar_coords_dict = prf_bar_coords_dict)
+                                                                prf_bar_coords_dict = prf_bar_coords_dict,
+                                                                dm_size = prf_stimulus_dm.shape[-1])
         
         ## decode over runs
         # save reconstructed stim as HDF5 file, to later load
@@ -1070,7 +1224,9 @@ class Decoding_Model(GLMsingle_Model):
             file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(df_key)
             print('downsampling FA DM for ses-{sn}, run-{rn}'.format(sn = file_sn, rn=file_rn))
             
-            lowres_DM = self.downsample_DM(DM_arr = FA_DM_dict[df_key]['full_stim'])
+            lowres_DM = self.downsample_DM(DM_arr = FA_DM_dict[df_key]['full_stim'],
+                                        dm_size = FA_DM_dict[df_key]['full_stim'].shape[-1],
+                                        new_size = 8)
             
             ## and set downsampled DM as mask, if such is the case
             mask_fa = lowres_DM.astype(bool) if mask_barpos else None
@@ -1154,7 +1310,8 @@ class Decoding_Model(GLMsingle_Model):
         
         return reconstructed_stimulus
          
-    def get_FA_stim_grid(self, participant = None, group_bar_pos_df = None, prf_bar_coords_dict = None):
+    def get_FA_stim_grid(self, participant = None, group_bar_pos_df = None, prf_bar_coords_dict = None, dm_size = 80, 
+                            y_coords_deg = None, x_coords_deg = None):
         
         """Get participant FA DM + grid coordinates that will be used in decoder
         """
@@ -1165,11 +1322,12 @@ class Decoding_Model(GLMsingle_Model):
             prf_bar_coords_dict['sub-{sj}'.format(sj = participant)] = None
         
         ## get FA DM
-        FA_DM_dict, _ = self.get_visual_DM_dict(pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = participant)],
-                                                pp_prf_bar_coords_dict = prf_bar_coords_dict['sub-{sj}'.format(sj = participant)])
+        FA_DM_dict, _ = self.make_DM_dict(pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = participant)],
+                                        pp_prf_bar_coords_dict = prf_bar_coords_dict['sub-{sj}'.format(sj = participant)],
+                                        dm_size = dm_size)
         
         ## get grid coordinates (8x8)
-        fa_grid_coordinates = self.get_decoder_grid_coords()
+        fa_grid_coordinates = self.get_decoder_grid_coords(y_coords_deg = y_coords_deg, x_coords_deg = x_coords_deg)
         
         return FA_DM_dict, fa_grid_coordinates
         

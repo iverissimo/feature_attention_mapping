@@ -935,6 +935,262 @@ class DecoderViewer(Viewer):
                                         error_bars = error_bars, 
                                         figsize=(15,5), 
                                         filename = base_filename+'_attention_bar_configuration.{fext}'.format(fext = fig_type))
+        
+        ## plot pixel values
+        # separating by bar type, pixel ecc and pixel distance to competing object
+        # per ROI
+        self.plot_pix_DistEcc(pixel_df = pixel_df, 
+                            ROI_list = ROI_list, 
+                            error_bars = error_bars, 
+                            figsize=(15,5), 
+                            fig_type = 'png',
+                            combine_rois = False,
+                            filename = base_filename+'_attention_DistEcc.{fext}'.format(fext = fig_type))
+        
+        # all ROIs in same fig
+        self.plot_pix_DistEcc(pixel_df = pixel_df, 
+                            ROI_list = ROI_list, 
+                            error_bars = error_bars, 
+                            figsize=(15,5), 
+                            fig_type = 'png',
+                            combine_rois = True,
+                            filename = base_filename+'_attention_DistEcc.{fext}'.format(fext = fig_type))
+
+
+
+    def plot_withinsub_errorbars(self, df2plot = None, axes = None, cond2group = 'ecc', yvar = 'intensity', color = ''):
+
+        """
+        Helper function that plots within-sub error bars
+        in given axis
+        """
+
+        # plot error bars per condition    
+        axes.errorbar(df2plot.groupby([cond2group]).mean(numeric_only=True).reset_index()[cond2group].values,
+                    df2plot.groupby([cond2group]).mean(numeric_only=True).reset_index()[yvar].values , 
+                    yerr = df2plot.groupby([cond2group]).mean(numeric_only=True).reset_index()['SEM_'+yvar].values , 
+                    elinewidth = 2, capsize = 5,
+                    zorder = 0, c = color, alpha=.9, fmt='none')
+        
+        return axes
+    
+    def plot_ROI_pix_DistEcc(self, pixel_df = None, axes = None, roi_name = 'V1', dist_colors = None, error_bars = 'within',
+                                showtitle = False, showxlabel = False, bartype_colors = {'att_bar': 'black', 'unatt_bar': 'grey'},
+                                leg_loc = 'lower left'):
+        
+        """
+        For a given ROI,
+        plot pixel values on axes,
+        separating by bar type, pixel ecc and pixel distance to competing object
+
+        note - axes is assumed to have # columns >= # distances
+        """
+
+        ## first get mean values
+        df2plot = pixel_df[pixel_df['ROI'] == roi_name].groupby(['sj', 'bar_type', 'ecc', 'min_dist']).mean(numeric_only=True).reset_index()
+        
+        # also collapsed across distances
+        df2plot_ecc = pixel_df[pixel_df['ROI'] == roi_name].groupby(['sj', 'bar_type', 'ecc']).mean(numeric_only=True).reset_index()
+        
+        if error_bars == 'within':
+            ## calculate within sub error bars 
+            df2plot = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot, 
+                                                                main_var = 'intensity', 
+                                                                conditions = ['bar_type', 'ecc', 'min_dist'], 
+                                                                pp_key = 'sj')
+            df2plot_ecc = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot_ecc, 
+                                                            main_var = 'intensity', 
+                                                            conditions = ['bar_type', 'ecc'], 
+                                                            pp_key = 'sj')
+            
+            error_key = None
+        else:
+            error_key = ('se')
+
+
+        # for each distance
+        for ind_dist, dist in enumerate(np.sort(df2plot.min_dist.unique())):
+
+            ## get target target bar
+            df2plot_att = df2plot[(df2plot['bar_type'] == 'att_bar') &\
+                                    (df2plot['min_dist'] == dist)]
+            
+            line_p = sns.lineplot(data = df2plot_att,
+                                y = 'intensity', x = 'ecc', hue = 'min_dist', palette = dist_colors,
+                                err_style='bars', errorbar=error_key, marker='o', ms=10, err_kws = {'capsize': 5},
+                                linewidth=5, ax=axes[ind_dist], legend=False)
+
+            ## distractor bar
+            df2plot_unatt = df2plot[(df2plot['bar_type'] == 'unatt_bar') &\
+                                    (df2plot['min_dist'] == dist)]
+            
+            line_p2 = sns.lineplot(data = df2plot_unatt,
+                                y = 'intensity', x = 'ecc', hue = 'min_dist', palette = dist_colors,
+                                err_style='bars', errorbar=error_key, marker='X', ms=10, err_kws = {'capsize': 5}, linestyle='--',
+                                linewidth=5, ax=axes[ind_dist], legend=False)
+            
+            if error_key is None:
+                # plot error bars per condition - target
+                axes[ind_dist] = self.plot_withinsub_errorbars(df2plot = df2plot_att, 
+                                                                axes = axes[ind_dist], 
+                                                                cond2group = 'ecc', 
+                                                                yvar = 'intensity', 
+                                                                color = dist_colors[dist])
+
+                # plot error bars per condition - distractor
+                axes[ind_dist] = self.plot_withinsub_errorbars(df2plot = df2plot_unatt, 
+                                                                axes = axes[ind_dist], 
+                                                                cond2group = 'ecc', 
+                                                                yvar = 'intensity', 
+                                                                color = dist_colors[dist])
+            
+            if showtitle:
+                axes[ind_dist].set_title('Min. Distance = %.2f deg'%dist,fontsize=14)
+            if showxlabel:
+                axes[ind_dist].set_xlabel('Pixel eccentricity [deg]',fontsize = 16, labelpad = 15)
+            axes[ind_dist].tick_params(axis='both', labelsize=13)
+
+        ##### plot lines collapsed across distances
+
+        ## target bar
+        df2plot_ecc_att = df2plot_ecc[(df2plot_ecc['bar_type'] == 'att_bar')]
+
+        line_p = sns.lineplot(data = df2plot_ecc_att,
+                            y = 'intensity', x = 'ecc', hue = 'bar_type', palette = bartype_colors,
+                            err_style='bars', errorbar = error_key, marker='o', ms=10, err_kws = {'capsize': 5},
+                            linewidth=5, ax=axes[ind_dist + 1], legend=False)
+
+        ## distractor bar
+        df2plot_ecc_unatt = df2plot_ecc[(df2plot_ecc['bar_type'] == 'unatt_bar')]
+
+        line_p2 = sns.lineplot(data = df2plot_ecc_unatt,
+                            y = 'intensity', x = 'ecc', hue = 'bar_type', palette = bartype_colors,
+                            err_style='bars', errorbar = error_key, marker='X', ms=10, err_kws = {'capsize': 5}, linestyle='--',
+                            linewidth=5, ax=axes[ind_dist + 1], legend=False)
+        
+        if error_key is None:
+            # plot error bars per condition
+            axes[ind_dist + 1] = self.plot_withinsub_errorbars(df2plot = df2plot_ecc_att, 
+                                                                axes = axes[ind_dist + 1], 
+                                                                cond2group = 'ecc', 
+                                                                yvar = 'intensity', 
+                                                                color = bartype_colors['att_bar'])
+
+            # plot error bars per condition
+            axes[ind_dist + 1] = self.plot_withinsub_errorbars(df2plot = df2plot_ecc_unatt, 
+                                                                axes = axes[ind_dist + 1], 
+                                                                cond2group = 'ecc', 
+                                                                yvar = 'intensity', 
+                                                                color = bartype_colors['unatt_bar'])
+
+        if showtitle:
+            axes[ind_dist + 1].set_title('Across Distances',fontsize=14)
+        if showxlabel:
+            axes[ind_dist + 1].set_xlabel('Pixel eccentricity [deg]',fontsize = 16, labelpad = 15)
+        axes[ind_dist + 1].tick_params(axis='both', labelsize=13)
+
+        axes[0].set_ylabel('%s\n\nMean Drive [a.u.]'%roi_name, fontsize = 16, labelpad = 15)
+
+        handleA = mpatches.Patch(facecolor='w',edgecolor = 'k',label='Attended bar', fill=True, linewidth=1)
+        handleB = mpatches.Patch( facecolor='w',edgecolor = 'k',label='Unattended bar',hatch = '||',linewidth=1)
+
+        leg = axes[ind_dist + 1].legend(handles = [handleA,handleB], loc = leg_loc, fontsize = 'medium')
+
+        frame = leg.get_frame()
+        frame.set_facecolor('w') 
+        frame.set_edgecolor('k')
+
+        return axes
+
+    def plot_pix_DistEcc(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
+                            figsize=(15,5), filename = None, combine_rois = False):
+
+        """
+        Plot mean pixel intensity values
+        for target vs distractor bar positions
+        for different conditions of interest
+
+        """
+
+        ## plot pixel values
+        # separating by bar type, pixel ecc and pixel distance to competing object
+
+        # create color palette
+        dist_colors = self.MRIObj.beh_utils.create_palette(key_list = np.sort(pixel_df.min_dist.unique()), 
+                                                            cmap = 'magma', 
+                                                            num_col = None)
+
+        # make big grid plot, with all ROIs
+        if combine_rois:
+
+            fig, axes = plt.subplots(nrows=len(ROI_list), 
+                                    ncols=len(pixel_df.min_dist.unique()) + 1, figsize = (15, 4 * 6), sharey=True, sharex=True)
+            
+            for ind_roi, roi_name in enumerate(ROI_list):
+
+                showtitle = True
+                showxlabel = True
+                    
+                if ind_roi> 0:
+                    if roi_name == ROI_list[-1]:
+                        showxlabel = True
+                    else:
+                        showxlabel = False
+                    showtitle = False
+                    
+                axes[ind_roi] = self.plot_ROI_pix_DistEcc(pixel_df = pixel_df, 
+                                                            axes = axes[ind_roi], 
+                                                            roi_name = roi_name, 
+                                                            dist_colors = dist_colors, 
+                                                            error_bars = error_bars,
+                                                            showtitle = showtitle, 
+                                                            showxlabel = showxlabel,
+                                                            leg_loc = 'upper right',
+                                                            bartype_colors = {'att_bar': 'black', 
+                                                                            'unatt_bar': 'grey'})
+
+            axes[ind_roi][0].set_ylim([.08, .23])
+            plt.margins(x=0.075)
+
+            #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
+            plt.subplots_adjust(wspace=0.05, hspace=0.02)
+
+            plt.tight_layout()
+
+            ## save figure
+            if filename is not None:
+                fig.savefig(filename.replace('.{fext}'.format(fext = fig_type), 
+                                            '_ROI-ALL.{fext}'.format(fext = fig_type)))
+
+        else:
+            for roi_name in ROI_list:
+
+                fig, axes = plt.subplots(nrows=1, ncols=len(pixel_df.min_dist.unique())+1, figsize = (15, 4), sharey=True, sharex=True)
+
+                axes = self.plot_ROI_pix_DistEcc(pixel_df = pixel_df, 
+                                                    axes = axes, 
+                                                    roi_name = roi_name, 
+                                                    dist_colors = dist_colors, 
+                                                    error_bars = error_bars,
+                                                    showtitle = True, 
+                                                    showxlabel = True, 
+                                                    leg_loc = 'upper right',
+                                                    bartype_colors = {'att_bar': 'black', 
+                                                                    'unatt_bar': 'grey'})
+
+                axes[0].set_ylim([.10, .22])
+                plt.margins(x=0.075)
+
+                #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
+                plt.subplots_adjust(wspace=0.05, hspace=0.02)
+
+                plt.tight_layout()
+
+                ## save figure
+                if filename is not None:
+                    fig.savefig(filename.replace('.{fext}'.format(fext = fig_type), 
+                                                '_ROI-{rname}.{fext}'.format(fext = fig_type,
+                                                                             rname = roi_name)))
 
 
 

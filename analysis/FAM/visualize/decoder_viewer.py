@@ -699,3 +699,242 @@ class DecoderViewer(Viewer):
                     vmin = vmin, vmax = vmax, fmt='.2f')
         axes[0].vlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
         axes[0].hlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
+
+    def barplot_mean_pix_intensity(self, pixel_df = None, ROI_list = ['V1'], error_bars = 'within', figsize=(8,5), filename = None):
+
+        """
+        Make barplot with attend vs unattend pixel values
+        across ROIs
+
+        """
+
+        ## first get mean values
+        df2plot = pixel_df.groupby(['ROI', 'sj', 'bar_type']).mean(numeric_only=True).reset_index()
+
+        if error_bars == 'within':
+            ## calculate within sub error bars 
+            df2plot = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot, 
+                                                                        main_var = 'intensity', 
+                                                                        conditions = ['ROI', 'bar_type'], 
+                                                                        pp_key = 'sj')
+            error_key = None
+        else:
+            error_key = ('se')
+
+        ## make bar plot
+        fig, ax1 = plt.subplots(1,1, figsize = figsize)
+
+        v1 = sns.barplot(data = df2plot[df2plot['bar_type'] == 'att_bar'], 
+                    x = 'ROI', y = 'intensity', width = .35,
+                    order = ROI_list, hue = 'ROI', hue_order = ROI_list,
+                    palette = self.MRIObj.params['plotting']['ROI_pal'],
+                    estimator = np.mean, errorbar=error_key, ax=ax1)
+
+        v2 = sns.barplot(data = df2plot[df2plot['bar_type'] == 'unatt_bar'], 
+                    x = 'ROI', y = 'intensity', width = .35,
+                    order = ROI_list, hue = 'ROI', hue_order = ROI_list,
+                    palette = self.MRIObj.params['plotting']['ROI_pal'],
+                    estimator = np.mean, errorbar=error_key, ax=ax1)
+
+        ## change position of bars to make then not overlap
+        factor = np.repeat([-1,1], len(ROI_list))
+        new_value = .2
+
+        for ind, patch in enumerate(ax1.patches):
+            # we move the bar
+            patch.set_x(patch.get_x() + new_value * factor[ind])
+
+            if factor[ind] > 0: # if other condition bar
+                patch.set_hatch('//')
+
+            if error_key is not None:
+                # also change the error bar location
+                ax1.lines[ind].set_xdata(ax1.lines[ind].get_xdata() + new_value * factor[ind])
+
+        handleA = mpatches.Patch(facecolor='w',edgecolor = 'k',label='Attended bar')
+        handleB = mpatches.Patch( facecolor='w',edgecolor = 'k',label='Unattended bar',hatch = '//')
+
+        #leg = ax1.legend(handles = [handleA,handleB],loc='center left', bbox_to_anchor=(1, 0.5))
+        leg = ax1.legend(handles = [handleA,handleB],loc='upper right')
+
+        frame = leg.get_frame()
+        frame.set_facecolor('w')
+        frame.set_edgecolor('k')
+
+        v1.set(xlabel=None)
+        v1.set(ylabel=None)
+        plt.margins(x=0.075)
+        ax1.tick_params(axis='both', labelsize=13)
+
+        ax1.set_xlabel('ROI',fontsize = 16, labelpad = 15)
+        ax1.set_ylabel('Mean drive [a.u.]',fontsize = 16, labelpad = 15)
+        ax1.set_ylim(0.08,.2)
+
+        ## add within sub error bars
+        if error_bars == 'within':
+
+            att_intensity = [df2plot[(df2plot['bar_type'] == 'att_bar') &\
+                                    (df2plot['ROI'] == rname)].intensity.values.mean() for rname in ROI_list]
+            att_sem = [df2plot[(df2plot['bar_type'] == 'att_bar') &\
+                                (df2plot['ROI'] == rname)].SEM_intensity.values.mean() for rname in ROI_list]
+
+            unatt_intensity = [df2plot[(df2plot['bar_type'] == 'unatt_bar') &\
+                                    (df2plot['ROI'] == rname)].intensity.values.mean() for rname in ROI_list]
+            unatt_sem = [df2plot[(df2plot['bar_type'] == 'unatt_bar') &\
+                                (df2plot['ROI'] == rname)].SEM_intensity.values.mean() for rname in ROI_list]
+            ## target bar
+            ax1.errorbar(x = np.array(ax1.get_xticks()) - new_value, 
+                        y = att_intensity, 
+                        yerr = att_sem,
+                        elinewidth = 3, capsize = 5, capthick=2,
+                        zorder = 100, c='#545759', alpha=1, fmt='none')
+
+            ## distractor bar
+            ax1.errorbar(x = np.array(ax1.get_xticks()) + new_value, 
+                        y = unatt_intensity, 
+                        yerr = unatt_sem,
+                        elinewidth = 3, capsize = 5, capthick=2,
+                        zorder = 100, c='#545759', alpha=1, fmt='none')
+
+        plt.tight_layout()
+
+        ## save figure
+        if filename is not None:
+            fig.savefig(filename)
+
+    def pointplot_mean_bar_configuration(self, pixel_df = None, ROI_list = ['V1'], error_bars = 'within', figsize=(15,5), filename = None,
+                                            bars_pos_colors = {'crossed': '#1cad98', 'parallel': '#de921f'}):
+
+        """
+        Make pointplot with attend vs unattend pixel values
+        per bar configuration and
+        across ROIs
+
+        """
+
+        ## first get mean values
+        df2plot = pixel_df.groupby(['ROI', 'sj', 'bar_type', 'bars_pos']).mean(numeric_only=True).reset_index()
+
+        if error_bars == 'within':
+            ## calculate within sub error bars 
+            df2plot = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot, 
+                                                                        main_var = 'intensity', 
+                                                                        conditions = ['ROI', 'bar_type', 'bars_pos'], 
+                                                                        pp_key = 'sj')
+            error_key = None
+        else:
+            error_key = ('se')
+
+        ## make pointplots
+            
+        fig, axes = plt.subplots(nrows=1, ncols=len(ROI_list), figsize = figsize, sharey=True, sharex=True)
+
+        for ind, roi_name in enumerate(ROI_list):
+            
+            # plot conditions for given ROI
+            sns.pointplot(data = df2plot[df2plot['ROI'] == roi_name], 
+                        y = 'intensity', hue = 'bars_pos', x = 'bar_type',
+                        errorbar = error_key, order=['att_bar', 'unatt_bar'],
+                        markersize=8, dodge = False, palette = bars_pos_colors,
+                        ax = axes[ind], legend=False)
+
+            axes[ind].set_title(roi_name, fontsize=14)
+            axes[ind].set_xlabel('Bar type',fontsize = 16, labelpad = 15)
+            axes[ind].tick_params(axis='both', labelsize=14)
+            axes[ind].set_xticks([0, 1])
+            axes[ind].set_xticklabels(['Target', 'Distractor'])
+
+            ## add error bars
+            if error_key is None:
+
+                for e_ind, bar_cond in enumerate(['att_bar', 'unatt_bar']):
+                    
+                    ## PARALLEL
+                    error_parallel_df = df2plot[(df2plot['ROI'] == roi_name) &\
+                                                (df2plot['bars_pos'] == 'parallel') &\
+                                                (df2plot['bar_type'] == bar_cond)]
+                    
+                    axes[ind].errorbar(x = axes[ind].get_xticks()[e_ind], 
+                                        y = [error_parallel_df.intensity.values.mean()], 
+                                        yerr = [error_parallel_df.SEM_intensity.values.mean()],
+                                elinewidth = 2, capsize = 5,
+                                zorder = 0, c = bars_pos_colors['parallel'], 
+                                alpha=1, fmt='none')
+                    
+                    ## CROSSED
+                    error_crossed_df = df2plot[(df2plot['ROI'] == roi_name) &\
+                                                (df2plot['bars_pos'] == 'crossed') &\
+                                                (df2plot['bar_type'] == bar_cond)]
+                    
+                    axes[ind].errorbar(x = axes[ind].get_xticks()[e_ind], 
+                                        y = [error_crossed_df.intensity.values.mean()], 
+                                        yerr = [error_crossed_df.SEM_intensity.values.mean()],
+                                elinewidth = 2, capsize = 5,
+                                zorder = 0, c = bars_pos_colors['crossed'], 
+                                alpha=1, fmt='none')
+                    ##
+
+        axes[0].set_ylabel('Mean Drive [a.u.]',fontsize = 16, labelpad = 15)
+        axes[0].set_ylim([.115, .18])
+        axes[0].set_xlim([-.5, 1.5])
+
+        plt.margins(x=0.075)
+
+        #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
+        plt.subplots_adjust(wspace=0.02, hspace=0.02)
+
+        handleA = mpatches.Patch(facecolor = bars_pos_colors['crossed'], edgecolor = 'k',label='Crossed', fill=True, linewidth=1)
+        handleB = mpatches.Patch(facecolor = bars_pos_colors['parallel'],edgecolor = 'k',label='Parallel', fill=True,linewidth=1)
+
+        leg = axes[ind].legend(handles = [handleA,handleB],loc='upper right', fontsize = 'medium',
+                            title= 'Bar configuration', title_fontsize = 'medium')
+
+        frame = leg.get_frame()
+        frame.set_facecolor('w') 
+        frame.set_edgecolor('k')
+
+        plt.tight_layout()
+
+        ## save figure
+        if filename is not None:
+            fig.savefig(filename)
+
+
+    def plot_group_pixel_results(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', figsize=(8,5), 
+                                        model_type = 'gauss_hrf', fig_type = 'png'):
+
+        """
+        Create and save several group plots
+        comparing average pixel intensity values
+        across conditions and ROIs
+        """
+
+        # make dir to save estimates
+        fig_dir = op.join(self.figures_pth, 'pixel_drive')
+        # and set base figurename 
+        fig_id = 'sub-GROUP_task-FA_pRFmodel-{modname}_pixel_intensity'.format(modname = model_type)
+
+        # base filename for figures 
+        base_filename = op.join(fig_dir, fig_id)
+
+        os.makedirs(fig_dir, exist_ok = True)
+        print('saving figures in %s'%fig_dir)
+
+        ## first make plot with attend vs unattend pixel values
+        # across ROIs
+        self.barplot_mean_pix_intensity(pixel_df = pixel_df, 
+                                        ROI_list = ROI_list, 
+                                        error_bars = error_bars, 
+                                        figsize=(8,5), 
+                                        filename = base_filename+'_attention_diff.{fext}'.format(fext = fig_type))
+
+        ## make plot with attend vs unattend pixel values
+        # across ROIs and per bar configuration
+        self.pointplot_mean_bar_configuration(pixel_df = pixel_df, 
+                                        ROI_list = ROI_list, 
+                                        error_bars = error_bars, 
+                                        figsize=(15,5), 
+                                        filename = base_filename+'_attention_bar_configuration.{fext}'.format(fext = fig_type))
+
+
+

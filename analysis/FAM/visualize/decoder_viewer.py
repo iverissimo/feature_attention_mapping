@@ -1055,7 +1055,7 @@ class DecoderViewer(Viewer):
                 axes[ind_dist].set_title('Min. Distance = %.2f deg'%dist,fontsize=14)
             if showxlabel:
                 axes[ind_dist].set_xlabel('Pixel eccentricity [deg]',fontsize = 16, labelpad = 15)
-            axes[ind_dist].tick_params(axis='both', labelsize=13)
+            axes[ind_dist].tick_params(axis='both', labelsize=11)
 
         ##### plot lines collapsed across distances
 
@@ -1094,7 +1094,7 @@ class DecoderViewer(Viewer):
             axes[ind_dist + 1].set_title('Across Distances',fontsize=14)
         if showxlabel:
             axes[ind_dist + 1].set_xlabel('Pixel eccentricity [deg]',fontsize = 16, labelpad = 15)
-        axes[ind_dist + 1].tick_params(axis='both', labelsize=13)
+        axes[ind_dist + 1].tick_params(axis='both', labelsize=11)
 
         axes[0].set_ylabel('%s\n\nMean Drive [a.u.]'%roi_name, fontsize = 16, labelpad = 15)
 
@@ -1131,7 +1131,7 @@ class DecoderViewer(Viewer):
         if combine_rois:
 
             fig, axes = plt.subplots(nrows=len(ROI_list), 
-                                    ncols=len(pixel_df.min_dist.unique()) + 1, figsize = (15, 4 * 6), sharey=True, sharex=True)
+                                    ncols=len(pixel_df.min_dist.unique()) + 1, figsize = (18, 3 * 6), sharey=True, sharex=True)
             
             for ind_roi, roi_name in enumerate(ROI_list):
 
@@ -1173,7 +1173,7 @@ class DecoderViewer(Viewer):
         else:
             for roi_name in ROI_list:
 
-                fig, axes = plt.subplots(nrows=1, ncols=len(pixel_df.min_dist.unique())+1, figsize = (15, 4), sharey=True, sharex=True)
+                fig, axes = plt.subplots(nrows=1, ncols=len(pixel_df.min_dist.unique())+1, figsize = (18, 3), sharey=True, sharex=True)
 
                 axes = self.plot_ROI_pix_DistEcc(pixel_df = pixel_df, 
                                                     axes = axes, 
@@ -1223,7 +1223,7 @@ class DecoderViewer(Viewer):
 
         for roi_name in ROI_list:
 
-            fig, axes = plt.subplots(nrows=2, ncols=len(pixel_df.min_dist.unique())+1, figsize = (15, 4), sharey=True, sharex=True)
+            fig, axes = plt.subplots(nrows=2, ncols=len(pixel_df.min_dist.unique())+1, figsize = (18, 8), sharey=True, sharex=True)
 
             ## PARALLEL ##
             axes[0] = self.plot_ROI_pix_DistEcc(pixel_df = pixel_df[pixel_df['bars_pos'] == 'parallel'], 

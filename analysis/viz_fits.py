@@ -9,8 +9,10 @@ from FAM.processing import load_exp_settings, preproc_mridata, preproc_behdata
 from FAM.fitting.prf_model import pRF_model
 from FAM.fitting.glm_single_model import GLMsingle_Model
 from FAM.fitting.feature_model import Gain_model, GLM_model, FullStim_model
+from FAM.fitting.decoding_model import Decoding_Model
 
 from FAM.visualize.fitting_viewer import pRFViewer, FAViewer
+from FAM.visualize.decoder_viewer import DecoderViewer
 
 # load settings from yaml
 with open('exp_params.yml', 'r') as f_in:
@@ -61,6 +63,15 @@ parser.add_argument("--fa_model_name",
                     default = 'glmsingle',
                     help="Type of FA model to fit: glmsingle [default], gain, glm, etc...]"
                     )
+parser.add_argument("--encoding_model",
+                    type = str, 
+                    default = 'gauss_hrf',
+                    help="Type of pRF encoding model to use in FA decoder: gauss_hrf [default], dog_hrf, etc...]"
+                    )
+parser.add_argument("--mask_fa", 
+                    action = 'store_true',
+                    help="if option called, use position mask in decoder"
+                    )
 parser.add_argument("--ses2fit", 
                     default = 'mean',
                     help="Session to fit (if mean [default] then will average both session when that's possible)"
@@ -104,6 +115,8 @@ fit_now = args.fit_now
 run_type = args.run_type
 ses2fit = args.ses2fit 
 fa_model_name = args.fa_model_name
+encoding_model_name = args.encoding_model
+mask_fa = args.mask_fa
 
 # vertex list
 if len(args.vertex)>0:
@@ -134,6 +147,12 @@ FAM_pRF = pRF_model(FAM_data, use_atlas = use_atlas)
 # set specific params
 FAM_pRF.model_type['pRF'] = prf_model_name
 FAM_pRF.fit_hrf = fit_hrf
+
+## load FA Decoding model class
+FAM_Decoder = Decoding_Model(FAM_data, use_atlas = use_atlas, pRFModelObj = FAM_pRF)
+
+nifti_bool = False
+
 
 ## run specific steps ##
 match task:
@@ -227,109 +246,110 @@ match task:
                                             )
 
     case 'FA':
+        
+        # if plotting decoder results
+        if 'decoder' in py_cmd:
 
-        print('Visualizing FA {mn} model outcomes\n'.format(mn = fa_model_name))
+            ## load plotter class
+            plotter = DecoderViewer(FAM_data, DecoderObj = FAM_Decoder, use_atlas = use_atlas)
 
-        ## get file extension for post fmriprep
-        # processed files
-        file_ext = FAM_mri.get_mrifile_ext()['FA']
-
-        ## load FA model class
-        match fa_model_name:
-
-            case 'glmsingle':
-                FAM_FA = GLMsingle_Model(FAM_data, use_atlas = use_atlas)
-
-            case 'full_stim':   
-                FAM_FA = FullStim_model(FAM_data)
-            case 'gain':
-                FAM_FA = Gain_model(FAM_data)
-            case 'glm':
-                FAM_FA = GLM_model(FAM_data)
+            # get all participant bar positions for FA task
+            group_bar_pos_df = FAM_beh.get_group_FA_bar_position_dict(participant_list = FAM_data.sj_num, 
+                                                                    ses_num = None, 
+                                                                    ses_type = 'func', 
+                                                                    run_num = None)  
             
-        ## load plotter class
-        plotter = FAViewer(FAM_data, pRFModelObj = FAM_pRF, FAModelObj = FAM_FA, use_atlas = use_atlas)
+            ## get prf bar position dict
+            # to mask out FA trials that were not fully visible
+            prf_bar_coords_dict = FAM_beh.get_pRF_masked_bar_coords(participant_list = FAM_data.sj_num, 
+                                                                    ses = 'mean')
 
-        ## load a few extra params, for specific commands
-        match py_cmd:
+            match py_cmd:
 
-            case 'betas_coord' | 'attention_mod' | 'bar_dist':
+                case 'decoder_prf':
 
-                orientation_bars = {0: 'parallel_vertical', 1: 'parallel_horizontal', 2: 'crossed', 3: 'parallel'}
-                
-                choice = None
-                while choice not in (0,1,2, 3):
-                    choice = int(input("Which trial type?\n0) parallel vertical\n1) parallel horizontal\n2) crossed\n3) parallel (combined)\nNumber picked: "))
-
-                # get participant run number and session number
-                # by attended bar
-                group_att_color_ses_run = {'sub-{sj}'.format(sj = pp): FAM_beh.get_run_ses_by_color(pp, ses_num = None, 
-                                                                                                    ses_type = 'func', 
-                                                                                                    run_num = None) for pp in FAM_data.sj_num}
-
-        ## run specific vizualizer
-        match py_cmd:
-
-            case 'fa_estimates':
-                plotter.plot_glmsingle_estimates(participant_list = FAM_data.sj_num, 
-                                                model_type = ['D'], #['A','D'],
+                    plotter.plot_prf_diagnostics(participant_list = FAM_data.sj_num, 
+                                                ROI_list = ['V1','V2','V3','hV4','V3AB','LO'], #['V1'], 
+                                                model_type = encoding_model_name,
+                                                ses = 'mean', 
+                                                prf_file_ext =  FAM_mri.get_mrifile_ext(nifti_file = True)['pRF'], 
                                                 mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
-                                                                                crop_nr = FAM_data.task_nr_cropTR['pRF'], 
-                                                                                shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
+                                                                                        crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                        shift = FAM_data.shift_TRs_num), 
                                                 stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
-                                                                                    crop_nr = FAM_data.task_nr_cropTR['pRF'], 
-                                                                                    shift = FAM_data.shift_TRs_num),
-                                                angles2plot_list = ['lateral_left', 'lateral_right', 'back']
-                                                )
+                                                                                            crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                            shift = FAM_data.shift_TRs_num),
+                                                fig_type = 'png') 
+
+        else:
+
+            print('Visualizing FA {mn} model outcomes\n'.format(mn = fa_model_name))
+
+            ## get file extension for post fmriprep
+            # processed files
+            file_ext = FAM_mri.get_mrifile_ext()['FA']
+
+            ## load FA model class
+            match fa_model_name:
+
+                case 'glmsingle':
+                    FAM_FA = GLMsingle_Model(FAM_data, use_atlas = use_atlas)
+
+                case 'full_stim':   
+                    FAM_FA = FullStim_model(FAM_data)
+                case 'gain':
+                    FAM_FA = Gain_model(FAM_data)
+                case 'glm':
+                    FAM_FA = GLM_model(FAM_data)
                 
-            case 'betas_coord':
+            ## load plotter class
+            plotter = FAViewer(FAM_data, pRFModelObj = FAM_pRF, FAModelObj = FAM_FA, use_atlas = use_atlas)
 
-                print('plotting GLMsingle beta estimates...')
+            ## load a few extra params, for specific commands
+            match py_cmd:
 
-                plotter.plot_betas_coord(participant_list = FAM_data.sj_num, 
-                                        model_type = 'D',
-                                        file_ext = '_cropped.npy', 
-                                        orientation_bars = orientation_bars[choice], 
-                                        ROI_list = ['V1', 'V2', 'V3', 'V3AB', 'hV4', 'LO'], #['V1'], #, 'hV4'], #['V1', 'V2', 'V3'],
-                                        demean = False, 
-                                        betas_per_color = False,
-                                        mask_betas = True,
-                                        rsq_threshold = .1, positive_rf = True, size_std = 2.5,
-                                        att_color_ses_run_dict = group_att_color_ses_run,
-                                        mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
-                                                                    crop_nr = FAM_data.task_nr_cropTR['pRF'], 
-                                                                    shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
-                                        stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
-                                                                        crop_nr = FAM_data.task_nr_cropTR['pRF'], 
-                                                                        shift = FAM_data.shift_TRs_num)
-                                        )
-            case 'attention_mod':
+                case 'betas_coord' | 'attention_mod' | 'bar_dist':
 
-                print('plotting GLMsingle attention modulation...')
+                    orientation_bars = {0: 'parallel_vertical', 1: 'parallel_horizontal', 2: 'crossed', 3: 'parallel'}
+                    
+                    choice = None
+                    while choice not in (0,1,2, 3):
+                        choice = int(input("Which trial type?\n0) parallel vertical\n1) parallel horizontal\n2) crossed\n3) parallel (combined)\nNumber picked: "))
 
-                plotter.plot_att_modulation(participant_list = FAM_data.sj_num, 
-                                                 model_type = 'D',
-                                                 file_ext = '_cropped.npy', 
-                                                 orientation_bars = orientation_bars[choice], 
-                                                 ROI_list = ['V1', 'V2', 'V3'],
-                                                 att_color_ses_run_dict = group_att_color_ses_run,
-                                                 mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
-                                                                                crop_nr = FAM_data.task_nr_cropTR['pRF'], 
-                                                                                shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
-                                                 stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                    # get participant run number and session number
+                    # by attended bar
+                    group_att_color_ses_run = {'sub-{sj}'.format(sj = pp): FAM_beh.get_run_ses_by_color(pp, ses_num = None, 
+                                                                                                        ses_type = 'func', 
+                                                                                                        run_num = None) for pp in FAM_data.sj_num}
+
+            ## run specific vizualizer
+            match py_cmd:
+
+                case 'fa_estimates':
+                    plotter.plot_glmsingle_estimates(participant_list = FAM_data.sj_num, 
+                                                    model_type = ['D'], #['A','D'],
+                                                    mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
                                                                                     crop_nr = FAM_data.task_nr_cropTR['pRF'], 
-                                                                                    shift = FAM_data.shift_TRs_num)
-                                                )
+                                                                                    shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
+                                                    stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                                                        crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                        shift = FAM_data.shift_TRs_num),
+                                                    angles2plot_list = ['lateral_left', 'lateral_right', 'back']
+                                                    )
+                    
+                case 'betas_coord':
 
-            case 'bar_dist':
+                    print('plotting GLMsingle beta estimates...')
 
-                print('plotting GLMsingle mean beta vs bar distance...')
-
-                plotter.plot_betas_bar_dist(participant_list = FAM_data.sj_num, 
+                    plotter.plot_betas_coord(participant_list = FAM_data.sj_num, 
                                             model_type = 'D',
                                             file_ext = '_cropped.npy', 
                                             orientation_bars = orientation_bars[choice], 
-                                            ROI_list = ['V1', 'hV4'], #['V1', 'V2', 'V3'],
+                                            ROI_list = ['V1', 'V2', 'V3', 'V3AB', 'hV4', 'LO'], #['V1'], #, 'hV4'], #['V1', 'V2', 'V3'],
+                                            demean = False, 
+                                            betas_per_color = False,
+                                            mask_betas = True,
+                                            rsq_threshold = .1, positive_rf = True, size_std = 2.5,
                                             att_color_ses_run_dict = group_att_color_ses_run,
                                             mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
                                                                         crop_nr = FAM_data.task_nr_cropTR['pRF'], 
@@ -337,19 +357,54 @@ match task:
                                             stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
                                                                             crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                             shift = FAM_data.shift_TRs_num)
-                                        )
+                                            )
+                case 'attention_mod':
 
-            case 'single_vertex':
-                plotter.plot_singlevert_FA(sj, vertex = vertex, file_ext = file_ext, 
-                                        ses = ses2fit, run_type = run_type, prf_ses = 'mean', prf_run_type = 'mean',
-                                        fit_now = fit_now, prf_model_name = prf_model_name, fa_model_name = fa_model_name)
+                    print('plotting GLMsingle attention modulation...')
 
-            case 'click':
-                plotter.open_click_viewer(sj, task2viz = 'FA',
-                                        prf_ses = 'mean', prf_run_type = 'mean', 
-                                        fa_ses = ses2fit, fa_run_type = run_type,
-                                        prf_model_name = prf_model_name, fa_model_name = fa_model_name,
-                                        fa_file_ext = file_ext, prf_file_ext = FAM_mri.get_mrifile_ext()['pRF'])
+                    plotter.plot_att_modulation(participant_list = FAM_data.sj_num, 
+                                                    model_type = 'D',
+                                                    file_ext = '_cropped.npy', 
+                                                    orientation_bars = orientation_bars[choice], 
+                                                    ROI_list = ['V1', 'V2', 'V3'],
+                                                    att_color_ses_run_dict = group_att_color_ses_run,
+                                                    mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                                                    crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                    shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
+                                                    stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                                                        crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                        shift = FAM_data.shift_TRs_num)
+                                                    )
+
+                case 'bar_dist':
+
+                    print('plotting GLMsingle mean beta vs bar distance...')
+
+                    plotter.plot_betas_bar_dist(participant_list = FAM_data.sj_num, 
+                                                model_type = 'D',
+                                                file_ext = '_cropped.npy', 
+                                                orientation_bars = orientation_bars[choice], 
+                                                ROI_list = ['V1', 'hV4'], #['V1', 'V2', 'V3'],
+                                                att_color_ses_run_dict = group_att_color_ses_run,
+                                                mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                                            crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                            shift = FAM_data.shift_TRs_num), # Make DM boolean mask based on subject responses
+                                                stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                                                crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                shift = FAM_data.shift_TRs_num)
+                                            )
+
+                case 'single_vertex':
+                    plotter.plot_singlevert_FA(sj, vertex = vertex, file_ext = file_ext, 
+                                            ses = ses2fit, run_type = run_type, prf_ses = 'mean', prf_run_type = 'mean',
+                                            fit_now = fit_now, prf_model_name = prf_model_name, fa_model_name = fa_model_name)
+
+                case 'click':
+                    plotter.open_click_viewer(sj, task2viz = 'FA',
+                                            prf_ses = 'mean', prf_run_type = 'mean', 
+                                            fa_ses = ses2fit, fa_run_type = run_type,
+                                            prf_model_name = prf_model_name, fa_model_name = fa_model_name,
+                                            fa_file_ext = file_ext, prf_file_ext = FAM_mri.get_mrifile_ext()['pRF'])
 
 
 

@@ -2309,6 +2309,58 @@ class MRIUtils(Utils):
             avg_onset = avg_onset[crop_TR:] - avg_onset[crop_TR]
             
         return avg_onset
+    
+    def fwhmax_fwatmin(self, model, amplitude = None, size = None, sa = None, ss = None, ns = None, normalize_RFs=False, return_profiles=False):
+    
+        """
+        taken from marco aqil's code, all credits go to him
+        """
+        
+        model = model.lower()
+        x=np.linspace(-50,50,1000).astype('float32')
+
+        prf = amplitude * np.exp(-0.5*x[...,np.newaxis]**2 / size**2)
+        vol_prf =  2*np.pi*size**2
+
+        if 'dog' in model:
+            srf = sa * np.exp(-0.5*x[...,np.newaxis]**2 / ss**2)
+            vol_srf = 2*np.pi*ss*2
+
+        if normalize_RFs==True:
+
+            if model == 'gauss':
+                profile =  prf / vol_prf
+            elif model == 'css':
+                #amplitude is outside exponent in CSS
+                profile = (prf / vol_prf)**ns * amplitude**(1 - ns)
+            elif model =='dog':
+                profile = prf / vol_prf - \
+                        srf / vol_srf
+        else:
+            if model == 'gauss':
+                profile = prf
+            elif model == 'css':
+                #amplitude is outside exponent in CSS
+                profile = prf**ns * amplitude**(1 - ns)
+            elif model =='dog':
+                profile = prf - srf 
+
+        half_max = np.max(profile, axis=0)/2
+        fwhmax = np.abs(2*x[np.argmin(np.abs(profile-half_max), axis=0)])
+
+        if 'dog' in model:
+
+            min_profile = np.min(profile, axis=0)
+            fwatmin = np.abs(2*x[np.argmin(np.abs(profile-min_profile), axis=0)])
+
+            result = fwhmax, fwatmin
+        else:
+            result = fwhmax
+
+        if return_profiles:
+            return result, profile.T
+        else:
+            return result
 
 
 

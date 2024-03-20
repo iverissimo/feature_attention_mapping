@@ -24,6 +24,9 @@ from FAM.visualize.viewer import Viewer
 
 from PIL import Image, ImageDraw
 
+from matplotlib.animation import FuncAnimation
+from IPython.display import HTML, display
+
 
 class DecoderViewer(Viewer):
 
@@ -430,7 +433,7 @@ class DecoderViewer(Viewer):
 
     def plot_ground_truth_correlations(self, participant_list = [], reconstructed_stim_dict = None, lowres_DM_dict = None, 
                                             data_keys_dict = [],  ROI_list = ['V1'], mask_nan = True, return_df = False,
-                                            figsize=(8,5), model_type = 'gauss_hrf', fig_type = 'png', avg_runs = False):
+                                            figsize=(8,5), model_type = 'gauss_hrf', fig_type = 'png'):
         
         """
         Plot correlation of reconstructed stim with downsampled DM
@@ -491,5 +494,208 @@ class DecoderViewer(Viewer):
         if return_df:
             return ROIs_stim_dm_corr_df
         
+    def plot_runAVG_ground_truth_correlations(self, participant_list = [], group_stim_dict = None, group_refDM_dict = None, 
+                                                    ROI_list = ['V1'], return_df = False,
+                                                    figsize=(8,5), model_type = 'gauss_hrf', fig_type = 'png'):
+                
+        """
+        Plot correlation of reconstructed stim with downsampled DM
+        AVERAGED over runs for all participants and ROIs
+        """
 
+        # make dir to save estimates
+        fig_dir = op.join(self.figures_pth, 'correlations_decoder')
+
+        os.makedirs(fig_dir, exist_ok = True)
+        print('saving figures in %s'%fig_dir)
         
+        # and set base figurename 
+        fig_id = 'sub-GROUP_task-FA_pRFmodel-{modname}_ground_truth_correlations_runAVG.{fext}'.format(modname = model_type, 
+                                                                                                        fext = fig_type)
+        # filename for figures 
+        filename = op.join(fig_dir, fig_id)
+
+        ## get correlation of across run average
+        avg_stim_corr_df = self.DecoderObj.get_run_avg_stim_dm_correlation(participant_list = participant_list, 
+                                                                            ROI_list = ROI_list, 
+                                                                            group_stim_dict = group_stim_dict, 
+                                                                            group_refDM_dict = group_refDM_dict)
+        
+        ## plot correlation values per ROI
+        fig, ax1 = plt.subplots(1,1, figsize=figsize)
+
+        sns.barplot(y = 'corr', x = 'ROI',
+                    data = avg_stim_corr_df, 
+                    palette = self.MRIObj.params['plotting']['ROI_pal'],
+                    order = ROI_list,
+                    hue = 'ROI', hue_order = ROI_list,
+                    width=.8, linewidth = 1.5,
+                    errorbar = 'se',
+                    ax = ax1)
+
+        sns.stripplot(data = avg_stim_corr_df, 
+                    x = 'ROI', y = 'corr', hue = 'sj',
+                    order = ROI_list,
+                    alpha = 1, zorder=100, jitter = .15,
+                    palette = sns.color_palette("bright", len(participant_list)),
+                    ax=ax1)
+        ax1.legend(title = None, loc='upper right', fontsize = 'medium')
+
+        ax1.axhline(y=0, color='k', linestyle='--')
+
+        ax1.tick_params(axis='both', which='major', labelsize=14)
+        ax1.set_ylim(-.03,.4)
+        ax1.set_title('Ground truth correlation (single trial, average across runs)',fontsize=14)
+        ax1.set_ylabel(r'Point-biserial Correlation ($\it{r_{pb}}$)', fontsize = 16, labelpad = 15)
+        ax1.set_xlabel('')
+        fig.tight_layout()
+
+        fig.savefig(filename)
+
+        if return_df:
+            return avg_stim_corr_df
+        
+
+    def plot_trial_stim_movie(self, participant_list = [], ROI_list = ['V1'], model_type = 'gauss_hrf', 
+                                    group_stim_dict = None, group_refDM_dict = None, avg_pp = False, fig_type = 'mp4',
+                                    cmap = 'magma', annot = False, interval = 132, figsize = (8,5), fps = 6, dpi = 100):
+
+        """
+        Plot and save video animation of recontructed stim, 
+        averaged across runs,
+        for each ROI and participant
+        """
+
+        # make dir to save estimates
+        fig_dir = op.join(self.figures_pth, 'movies_reconstructed_stim')
+        # and set base figurename 
+        fig_id = 'sub-GROUP_task-FA_pRFmodel-{modname}_decoded_stim'.format(modname = model_type)
+
+        # base filename for figures 
+        base_filename = op.join(fig_dir, fig_id)
+    
+        ## if we want to plot group average
+        if len(participant_list) > 1 and avg_pp:
+
+            os.makedirs(fig_dir, exist_ok = True)
+            print('saving figures in %s'%fig_dir)
+
+            # and average across participants (for plotting mainly)
+            avg_stim_dict, avg_refDM_dict = self.DecoderObj.average_group_stim_glmsing_trials(participant_list = participant_list, 
+                                                                                            ROI_list = ROI_list, 
+                                                                                            group_stim_dict = group_stim_dict, 
+                                                                                            group_refDM_dict = group_refDM_dict)
+            
+            ## for each ROI
+            for roi_name in ROI_list:
+
+                ani = self.make_trial_stim_movie(roi_name = roi_name, 
+                                                            stim2plot = avg_stim_dict[roi_name], 
+                                                            dm2plot = avg_refDM_dict, 
+                                                            vmin = np.nanquantile(avg_stim_dict[roi_name].values.ravel(),
+                                                                                .01), 
+                                                            vmax = np.nanquantile(avg_stim_dict[roi_name].values.ravel(),
+                                                                                .99), 
+                                                            cmap = cmap,
+                                                            annot = annot, 
+                                                            interval = interval, 
+                                                            figsize = figsize, 
+                                                            name = 'GROUP', 
+                                                            frame_inds = None, 
+                                                            filename = base_filename+'_ROI-{rname}.{fext}'.format(rname = roi_name,
+                                                                                                                fext = fig_type), 
+                                                            fps = fps, 
+                                                            dpi = dpi)
+                
+        else:
+            ## now actually plot
+            for pp in participant_list:
+                
+                # make dir to save estimates
+                pp_fig_dir = op.join(fig_dir, 'sub-{sj}'.format(sj = pp))
+                pp_fig_id = fig_id.replace('sub-GROUP', 'sub-{sj}'.format(sj = pp)) 
+            
+                os.makedirs(pp_fig_dir, exist_ok = True)
+                print('saving figures in %s'%pp_fig_dir)
+                
+                # base filename for figures 
+                pp_base_filename = op.join(pp_fig_dir, pp_fig_id)
+
+                ## for each ROI
+                for roi_name in ROI_list:
+
+                    ani = self.make_trial_stim_movie(roi_name = roi_name, 
+                                                                stim2plot = group_stim_dict[roi_name]['sub-{sj}'.format(sj = pp)], 
+                                                                dm2plot = group_refDM_dict['sub-{sj}'.format(sj = pp)], 
+                                                                vmin = np.nanquantile(group_stim_dict[roi_name]['sub-{sj}'.format(sj = pp)].values.ravel(),
+                                                                                    .01), 
+                                                                vmax = np.nanquantile(group_stim_dict[roi_name]['sub-{sj}'.format(sj = pp)].values.ravel(),
+                                                                                    .99), 
+                                                                cmap = cmap,
+                                                                annot = annot, 
+                                                                interval = interval, 
+                                                                figsize = figsize, 
+                                                                name = 'sub-{sj}'.format(sj = pp), 
+                                                                frame_inds = None, 
+                                                                filename = pp_base_filename+'_ROI-{rname}.{fext}'.format(rname = roi_name,
+                                                                                                                        fext = fig_type), 
+                                                                fps = fps, 
+                                                                dpi = dpi)
+                
+    def make_trial_stim_movie(self, roi_name = 'V1', stim2plot = None, dm2plot = None, vmin = 0, vmax = .29, cmap = 'magma',
+                                    annot = False, interval = 132, figsize = (8,5), name = 'Group', frame_inds = None, 
+                                    filename = None, fps=24, dpi=100):
+
+        """
+        Create animation of recontructed stim,
+        for a given ROI of participant/group
+        """
+
+        # if we didnt specify frame indices
+        if frame_inds is None:
+            frame_inds = range(dm2plot.shape[0])
+
+        ## initialize base figure
+        fig, axes = plt.subplots(nrows=1, ncols=2, figsize = figsize)
+
+        fig.suptitle('Reconstructed stimulus (%s), ROI - %s'%(name, roi_name), fontsize=14)
+
+        ## create animation      
+        ani = FuncAnimation(fig, self.update_movie_frame, 
+                            frames = frame_inds, 
+                            fargs = (stim2plot.stack('y', future_stack=True), 
+                                    dm2plot,
+                                    axes,
+                                    vmin, 
+                                    vmax, 
+                                    cmap, 
+                                    annot),
+                            interval=interval)
+        
+        if filename is None:
+            return ani
+        else:
+            ani.save(filename=filename, writer="ffmpeg", fps=fps, dpi=dpi) # save mp4 file+
+
+    ## set function to update frames
+    def update_movie_frame(self, frame, stim_arr = [], dm_list = [], axes = [],
+                                vmin = 0, vmax = .4, cmap = 'plasma', annot = False,
+                                line_color = 'green', alpha = .5, title = ''):
+        
+        # clear axis of fig
+        axes[0].clear() 
+        axes[1].clear() 
+
+        # DMs
+        # attend left
+        axes[1].imshow(dm_list[frame].T, cmap = 'binary_r', vmax = 1.5)
+        axes[1].vlines(3.5, -.5, 7.5, linestyles='dashed', color=line_color, alpha = alpha)
+        axes[1].hlines(3.5, -.5, 7.5, linestyles='dashed', color=line_color, alpha = alpha)
+
+        # plot stim
+        sns.heatmap(stim_arr.loc[frame], cmap = cmap, ax = axes[0], 
+                    square = True, cbar = False,
+                    annot=annot, annot_kws={"size": 7},
+                    vmin = vmin, vmax = vmax, fmt='.2f')
+        axes[0].vlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
+        axes[0].hlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)

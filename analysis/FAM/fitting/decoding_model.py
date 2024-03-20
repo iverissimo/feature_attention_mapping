@@ -3302,59 +3302,7 @@ class Decoding_Model(GLMsingle_Model):
 
         return pp_avg_stim_df, pp_reference_dm
     
-    def plot_trial_stim_movie(self, roi_name = 'V1', stim2plot = None, dm2plot = None, vmin = 0, vmax = .29, cmap = 'magma',
-                              annot = False, interval = 132, figsize = (8,5), name = 'Group', frame_inds = None, 
-                              filename = None, fps=24, dpi=100):
-
-        """
-        Create animation of (average) recontructed stim, for a given ROI of participant/group
-        And save video
-        """
-
-        # if we didnt specify frame indices
-        if frame_inds is None:
-            frame_inds = range(dm2plot.shape[0])
-
-        ## initialize base figure
-        fig, axes = plt.subplots(nrows=1, ncols=2, figsize = figsize)
-
-        fig.suptitle('Reconstructed stimulus (%s), ROI - %s'%(name,roi_name), fontsize=14)
-
-        ## set function to update frames
-        def update_stim(frame, stim_arr = [], dm_list = [],
-                        vmin = 0, vmax = .4, cmap = 'plasma', annot = False,
-                    line_color = 'green', alpha = .5, title = ''):
-            
-            # clear axis of fig
-            axes[0].clear() 
-            axes[1].clear() 
-
-            # DMs
-            # attend left
-            axes[1].imshow(dm_list[frame].T, cmap = 'binary_r', vmax = 1.5)
-            axes[1].vlines(3.5, -.5, 7.5, linestyles='dashed', color=line_color, alpha = alpha)
-            axes[1].hlines(3.5, -.5, 7.5, linestyles='dashed', color=line_color, alpha = alpha)
-
-            # plot stim
-            sns.heatmap(stim_arr.loc[frame], cmap = cmap, ax = axes[0], 
-                        square = True, cbar = False,
-                        annot=annot, annot_kws={"size": 7},
-                        vmin = vmin, vmax = vmax, fmt='.2f')
-            axes[0].vlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
-            axes[0].hlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
-
-        ## create animation      
-        ani = FuncAnimation(fig, update_stim, 
-                            frames = frame_inds, 
-                            fargs = (stim2plot.stack('y', future_stack=True), 
-                                    dm2plot,
-                                    vmin, vmax, cmap, annot),
-                            interval=interval)
-        
-        if filename is None:
-            return ani
-        else:
-            ani.save(filename=filename, writer="ffmpeg", fps=fps, dpi=dpi) # save mp4 file
+    
         
 
 

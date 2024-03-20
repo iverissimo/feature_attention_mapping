@@ -800,7 +800,7 @@ class DecoderViewer(Viewer):
 
         ## save figure
         if filename is not None:
-            fig.savefig(filename)
+            fig.savefig(filename, dpi = 100)
 
     def pointplot_mean_bar_configuration(self, pixel_df = None, ROI_list = ['V1'], error_bars = 'within', figsize=(15,5), filename = None,
                                             bars_pos_colors = {'crossed': '#1cad98', 'parallel': '#de921f'}):
@@ -897,7 +897,7 @@ class DecoderViewer(Viewer):
 
         ## save figure
         if filename is not None:
-            fig.savefig(filename)
+            fig.savefig(filename, dpi = 100)
 
 
     def plot_group_pixel_results(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', figsize=(8,5), 
@@ -955,7 +955,14 @@ class DecoderViewer(Viewer):
                             fig_type = 'png',
                             combine_rois = True,
                             filename = base_filename+'_attention_DistEcc.{fext}'.format(fext = fig_type))
-
+        
+        ### Now split into crossed vs parallel bars
+        self.plot_pix_DistEcc_bar_configuration(pixel_df = pixel_df, 
+                                                ROI_list = ROI_list, 
+                                                error_bars = error_bars, 
+                                                figsize=(15,5), 
+                                                fig_type = 'png', 
+                                                filename = base_filename+'_attention_DistEcc_bar_configuration.{fext}'.format(fext = fig_type))
 
 
     def plot_withinsub_errorbars(self, df2plot = None, axes = None, cond2group = 'ecc', yvar = 'intensity', color = ''):
@@ -1160,7 +1167,8 @@ class DecoderViewer(Viewer):
             ## save figure
             if filename is not None:
                 fig.savefig(filename.replace('.{fext}'.format(fext = fig_type), 
-                                            '_ROI-ALL.{fext}'.format(fext = fig_type)))
+                                            '_ROI-ALL.{fext}'.format(fext = fig_type)),
+                            dpi = 100)
 
         else:
             for roi_name in ROI_list:
@@ -1190,7 +1198,77 @@ class DecoderViewer(Viewer):
                 if filename is not None:
                     fig.savefig(filename.replace('.{fext}'.format(fext = fig_type), 
                                                 '_ROI-{rname}.{fext}'.format(fext = fig_type,
-                                                                             rname = roi_name)))
+                                                                             rname = roi_name)),
+                                dpi = 100)
+                    
+    def plot_pix_DistEcc_bar_configuration(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
+                                                figsize=(15,5), filename = None):
+
+        """
+        Plot mean pixel intensity values
+        for target vs distractor bar positions
+        for different conditions of interest
+
+        split into crossed vs parallel bars
+
+        """
+
+        ## plot pixel values
+        # separating by bar type, pixel ecc and pixel distance to competing object
+
+        # create color palette
+        dist_colors = self.MRIObj.beh_utils.create_palette(key_list = np.sort(pixel_df.min_dist.unique()), 
+                                                            cmap = 'magma', 
+                                                            num_col = None)
+
+        for roi_name in ROI_list:
+
+            fig, axes = plt.subplots(nrows=2, ncols=len(pixel_df.min_dist.unique())+1, figsize = (15, 4), sharey=True, sharex=True)
+
+            ## PARALLEL ##
+            axes[0] = self.plot_ROI_pix_DistEcc(pixel_df = pixel_df[pixel_df['bars_pos'] == 'parallel'], 
+                                                axes = axes[0], 
+                                                roi_name = roi_name, 
+                                                dist_colors = dist_colors, 
+                                                error_bars = error_bars,
+                                                showtitle = True, 
+                                                showxlabel = False, 
+                                                leg_loc = 'lower left',
+                                                bartype_colors = {'att_bar': 'black', 
+                                                                'unatt_bar': 'grey'})
+
+            ## CROSSED ##
+            axes[1] = self.plot_ROI_pix_DistEcc(pixel_df = pixel_df[pixel_df['bars_pos'] == 'crossed'], 
+                                                    axes = axes[1], 
+                                                    roi_name = roi_name, 
+                                                    dist_colors = dist_colors, 
+                                                    error_bars = error_bars,
+                                                    showtitle = False, 
+                                                    showxlabel = True, 
+                                                    leg_loc = 'lower left',
+                                                    bartype_colors = {'att_bar': 'black', 
+                                                                    'unatt_bar': 'grey'})
+
+            axes[0][0].set_ylabel('%s PARALLEL\n\nMean Drive [a.u.]'%roi_name, fontsize = 16, labelpad = 15)
+            axes[1][0].set_ylabel('%s CROSSED\n\nMean Drive [a.u.]'%roi_name, fontsize = 16, labelpad = 15)
+
+            axes[0][0].set_ylim([.08, .22])
+            plt.margins(x=0.075)
+
+            #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
+            plt.subplots_adjust(wspace=0.05, hspace=0.02)
+
+            plt.tight_layout()
+
+            ## save figure
+            if filename is not None:
+                fig.savefig(filename.replace('.{fext}'.format(fext = fig_type), 
+                                            '_ROI-{rname}.{fext}'.format(fext = fig_type,
+                                                                            rname = roi_name)),
+                            dpi = 100)
+
+
+
 
 
 

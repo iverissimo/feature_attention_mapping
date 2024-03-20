@@ -427,3 +427,69 @@ class DecoderViewer(Viewer):
             #     lh.set_alpha(1)
             
             # lm.figure.savefig(base_filename+'_pRF_ECC-SIZE_bestvox.png')
+
+    def plot_ground_truth_correlations(self, participant_list = [], reconstructed_stim_dict = None, lowres_DM_dict = None, 
+                                            data_keys_dict = [],  ROI_list = ['V1'], mask_nan = True, return_df = False,
+                                            figsize=(8,5), model_type = 'gauss_hrf', fig_type = 'png', avg_runs = False):
+        
+        """
+        Plot correlation of reconstructed stim with downsampled DM
+        across runs for all participants and ROIs
+        """
+
+        # make dir to save estimates
+        fig_dir = op.join(self.figures_pth, 'correlations_decoder')
+
+        os.makedirs(fig_dir, exist_ok = True)
+        print('saving figures in %s'%fig_dir)
+        
+        # and set base figurename 
+        fig_id = 'sub-GROUP_task-FA_pRFmodel-{modname}_ground_truth_correlations.{fext}'.format(modname = model_type, 
+                                                                                              fext = fig_type)
+        # filename for figures 
+        filename = op.join(fig_dir, fig_id)
+
+        ## correlate average reconstructed stim (all trials) with downsampled DM
+        ROIs_stim_dm_corr_df = self.DecoderObj.get_stim_visual_dm_correlation(participant_list = participant_list, 
+                                                                            reconstructed_stim_dict = reconstructed_stim_dict, 
+                                                                            lowres_DM_dict = lowres_DM_dict, 
+                                                                            data_keys_dict = data_keys_dict,
+                                                                            ROI_list = ROI_list, 
+                                                                            mask_nan = mask_nan)
+        
+        ## plot correlation values per ROI
+        fig, ax1 = plt.subplots(1,1, figsize=figsize)
+
+        sns.barplot(y = 'corr', x = 'ROI',
+                    data = ROIs_stim_dm_corr_df, 
+                    palette = self.MRIObj.params['plotting']['ROI_pal'],
+                    order = ROI_list,
+                    hue = 'ROI', hue_order = ROI_list,
+                    width=.8, linewidth = 1.5,
+                    errorbar = 'se',
+                    ax = ax1)
+
+        sns.stripplot(data = ROIs_stim_dm_corr_df, 
+                    x = 'ROI', y = 'corr', hue = 'sj',
+                    order = ROI_list,
+                    alpha = 1, zorder=100, jitter = .15,
+                    palette = sns.color_palette("bright", len(participant_list)),
+                    ax=ax1)
+        ax1.legend(title = None, loc='upper right', fontsize = 'small')
+
+        ax1.axhline(y=0, color='k', linestyle='--')
+
+        ax1.tick_params(axis='both', which='major', labelsize=14)
+        ax1.set_ylim(-.03,.25)
+        ax1.set_title('Ground truth correlation (single trial, across runs)',fontsize=14)
+        ax1.set_ylabel(r'Point-biserial Correlation ($\it{r_{pb}}$)', fontsize = 16, labelpad = 15)
+        ax1.set_xlabel('')
+        fig.tight_layout()
+
+        fig.savefig(filename)
+
+        if return_df:
+            return ROIs_stim_dm_corr_df
+        
+
+        

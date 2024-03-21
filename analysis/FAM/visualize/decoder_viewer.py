@@ -555,6 +555,47 @@ class DecoderViewer(Viewer):
         if return_df:
             return avg_stim_corr_df
         
+    def plot_pix_ecc_ref_heatmap(self, pixel_df = None, cmap = 'Spectral', desat = .8, figsize = (8,5), filename = None, dpi = 100):
+
+        """
+        Helper function to create a reference image
+        showing pixel eccentricity in a 2D heatmap 
+        """
+
+        ## get grid coordinates
+        fa_grid_coordinates = self.DecoderObj.get_decoder_grid_coords()
+
+        # create reference df
+        coord_df = pixel_df.groupby(['coord_ind']).mean(numeric_only=True).reset_index()
+        ref_pix_ecc_df = fa_grid_coordinates.join(coord_df.set_index('coord_ind').loc[:, 'ecc'], how="inner")
+
+        # and convert to matrix form
+        ref_pix_ecc_df = ref_pix_ecc_df.pivot_table(columns='x', index='y', values='ecc', fill_value = 0, dropna=True, sort = False)
+
+        ## create color map array
+        col_arr = sns.color_palette(cmap, len(pixel_df.ecc.unique()), desat = desat)
+        ## create dict of ecc colors
+        pix_ecc_colors = {key: col_arr[i] for i, key in enumerate(np.sort(pixel_df.ecc.unique()))}
+
+        ## actually plot
+        fig, axes = plt.subplots(nrows=1, ncols=1, figsize = figsize)
+
+        sns.heatmap(ref_pix_ecc_df, square=True, 
+                    vmin = pixel_df.ecc.min() + .1, 
+                    vmax = pixel_df.ecc.max(),
+                    cmap = col_arr, 
+                    cbar = False, annot=True, fmt='.2f',
+                    ax=axes,
+                    xticklabels = np.round(ref_pix_ecc_df.columns.values, 2),
+                    yticklabels = np.round(ref_pix_ecc_df.index.values, 2))
+        axes.vlines(3, 0, 8, linestyles='dashed', color='k', alpha = .3)
+        axes.hlines(3, 0, 8, linestyles='dashed', color='k', alpha = .3)
+
+        if filename:
+            fig.savefig(filename, dpi = dpi)
+        else:
+            return fig, pix_ecc_colors
+
 
     def plot_trial_stim_movie(self, participant_list = [], ROI_list = ['V1'], model_type = 'gauss_hrf', 
                                     group_stim_dict = None, group_refDM_dict = None, avg_pp = False, fig_type = 'mp4',
@@ -710,7 +751,10 @@ class DecoderViewer(Viewer):
         sns.heatmap(stim_arr.loc[frame], cmap = cmap, ax = axes[0], 
                     square = True, cbar = False, mask = edge_mask_arr,
                     annot=annot, annot_kws={"size": 7},
-                    vmin = vmin, vmax = vmax, fmt='.2f')
+                    vmin = vmin, vmax = vmax, fmt='.2f',
+                    xticklabels = np.round(stim_arr.loc[frame].columns.values, 2),
+                    yticklabels = np.round(stim_arr.loc[frame].index.values, 2))
+        
         axes[0].vlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
         axes[0].hlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
 

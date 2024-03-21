@@ -558,7 +558,8 @@ class DecoderViewer(Viewer):
 
     def plot_trial_stim_movie(self, participant_list = [], ROI_list = ['V1'], model_type = 'gauss_hrf', 
                                     group_stim_dict = None, group_refDM_dict = None, avg_pp = False, fig_type = 'mp4',
-                                    cmap = 'magma', annot = False, interval = 132, figsize = (8,5), fps = 6, dpi = 100):
+                                    cmap = 'magma', annot = False, interval = 132, figsize = (8,5), fps = 6, dpi = 100,
+                                    mask_edges = False):
 
         """
         Plot and save video animation of recontructed stim, 
@@ -570,6 +571,10 @@ class DecoderViewer(Viewer):
         fig_dir = op.join(self.figures_pth, 'movies_reconstructed_stim')
         # and set base figurename 
         fig_id = 'sub-GROUP_task-FA_pRFmodel-{modname}_decoded_stim'.format(modname = model_type)
+
+        # if we want to mask edges
+        if mask_edges:
+            fig_id = fig_id+'_edge_mask'
 
         # base filename for figures 
         base_filename = op.join(fig_dir, fig_id)
@@ -605,7 +610,8 @@ class DecoderViewer(Viewer):
                                                             filename = base_filename+'_ROI-{rname}.{fext}'.format(rname = roi_name,
                                                                                                                 fext = fig_type), 
                                                             fps = fps, 
-                                                            dpi = dpi)
+                                                            dpi = dpi,
+                                                            mask_edges = mask_edges)
                 
         else:
             ## now actually plot
@@ -640,11 +646,12 @@ class DecoderViewer(Viewer):
                                                                 filename = pp_base_filename+'_ROI-{rname}.{fext}'.format(rname = roi_name,
                                                                                                                         fext = fig_type), 
                                                                 fps = fps, 
-                                                                dpi = dpi)
+                                                                dpi = dpi,
+                                                                mask_edges = mask_edges)
                 
     def make_trial_stim_movie(self, roi_name = 'V1', stim2plot = None, dm2plot = None, vmin = 0, vmax = .29, cmap = 'magma',
                                     annot = False, interval = 132, figsize = (8,5), name = 'Group', frame_inds = None, 
-                                    filename = None, fps=24, dpi=100):
+                                    filename = None, fps=24, dpi=100, mask_edges = False):
 
         """
         Create animation of recontructed stim,
@@ -654,6 +661,12 @@ class DecoderViewer(Viewer):
         # if we didnt specify frame indices
         if frame_inds is None:
             frame_inds = range(dm2plot.shape[0])
+
+        ## if we want to mask the edges 
+        edge_mask_arr = np.zeros(dm2plot[0].shape)
+        if mask_edges:
+            edge_mask_arr[[0,-1],:] = 1
+            edge_mask_arr[:, [0,-1]] = 1
 
         ## initialize base figure
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize = figsize)
@@ -665,6 +678,7 @@ class DecoderViewer(Viewer):
                             frames = frame_inds, 
                             fargs = (stim2plot.stack('y', future_stack=True), 
                                     dm2plot,
+                                    edge_mask_arr.astype(bool),
                                     axes,
                                     vmin, 
                                     vmax, 
@@ -678,7 +692,7 @@ class DecoderViewer(Viewer):
             ani.save(filename=filename, writer="ffmpeg", fps=fps, dpi=dpi) # save mp4 file+
 
     ## set function to update frames
-    def update_movie_frame(self, frame, stim_arr = [], dm_list = [], axes = [],
+    def update_movie_frame(self, frame, stim_arr = [], dm_list = [], edge_mask_arr = None, axes = [],
                                 vmin = 0, vmax = .4, cmap = 'plasma', annot = False,
                                 line_color = 'green', alpha = .5, title = ''):
         
@@ -694,7 +708,7 @@ class DecoderViewer(Viewer):
 
         # plot stim
         sns.heatmap(stim_arr.loc[frame], cmap = cmap, ax = axes[0], 
-                    square = True, cbar = False,
+                    square = True, cbar = False, mask = edge_mask_arr,
                     annot=annot, annot_kws={"size": 7},
                     vmin = vmin, vmax = vmax, fmt='.2f')
         axes[0].vlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
@@ -945,6 +959,7 @@ class DecoderViewer(Viewer):
                             figsize=(15,5), 
                             fig_type = 'png',
                             combine_rois = False,
+                            ylim = [.10, .22],
                             filename = base_filename+'_attention_DistEcc.{fext}'.format(fext = fig_type))
         
         # all ROIs in same fig
@@ -954,6 +969,7 @@ class DecoderViewer(Viewer):
                             figsize=(15,5), 
                             fig_type = 'png',
                             combine_rois = True,
+                            ylim = [.08, .23],
                             filename = base_filename+'_attention_DistEcc.{fext}'.format(fext = fig_type))
         
         ### Now split into crossed vs parallel bars
@@ -962,6 +978,7 @@ class DecoderViewer(Viewer):
                                                 error_bars = error_bars, 
                                                 figsize=(15,5), 
                                                 fig_type = 'png', 
+                                                ylim = [.08, .22],
                                                 filename = base_filename+'_attention_DistEcc_bar_configuration.{fext}'.format(fext = fig_type))
 
 
@@ -1110,7 +1127,7 @@ class DecoderViewer(Viewer):
         return axes
 
     def plot_pix_DistEcc(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
-                            figsize=(15,5), filename = None, combine_rois = False):
+                            figsize=(15,5), filename = None, combine_rois = False, ylim = [.10, .22]):
 
         """
         Plot mean pixel intensity values
@@ -1156,7 +1173,7 @@ class DecoderViewer(Viewer):
                                                             bartype_colors = {'att_bar': 'black', 
                                                                             'unatt_bar': 'grey'})
 
-            axes[ind_roi][0].set_ylim([.08, .23])
+            axes[ind_roi][0].set_ylim(ylim)
             plt.margins(x=0.075)
 
             #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
@@ -1186,7 +1203,7 @@ class DecoderViewer(Viewer):
                                                     bartype_colors = {'att_bar': 'black', 
                                                                     'unatt_bar': 'grey'})
 
-                axes[0].set_ylim([.10, .22])
+                axes[0].set_ylim(ylim)
                 plt.margins(x=0.075)
 
                 #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
@@ -1202,7 +1219,7 @@ class DecoderViewer(Viewer):
                                 dpi = 100)
                     
     def plot_pix_DistEcc_bar_configuration(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
-                                                figsize=(15,5), filename = None):
+                                                figsize=(15,5), filename = None, ylim = [.08, .22]):
 
         """
         Plot mean pixel intensity values
@@ -1252,7 +1269,7 @@ class DecoderViewer(Viewer):
             axes[0][0].set_ylabel('%s PARALLEL\n\nMean Drive [a.u.]'%roi_name, fontsize = 16, labelpad = 15)
             axes[1][0].set_ylabel('%s CROSSED\n\nMean Drive [a.u.]'%roi_name, fontsize = 16, labelpad = 15)
 
-            axes[0][0].set_ylim([.08, .22])
+            axes[0][0].set_ylim(ylim)
             plt.margins(x=0.075)
 
             #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)

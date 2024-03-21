@@ -1029,9 +1029,17 @@ class DecoderViewer(Viewer):
         self.plot_pix_EccDist(pixel_df = pixel_df, 
                             ROI_list = ROI_list, 
                             error_bars = error_bars, 
-                            figsize=(15,3), 
+                            figsize=(18,3), 
                             fig_type = 'png',
                             combine_rois = False,
+                            ylim = [.08, .22], #[.10, .22],
+                            filename = base_filename+'_attention_EccDist.{fext}'.format(fext = fig_type))
+        self.plot_pix_EccDist(pixel_df = pixel_df, 
+                            ROI_list = ROI_list, 
+                            error_bars = error_bars, 
+                            figsize=(18,3), 
+                            fig_type = 'png',
+                            combine_rois = True,
                             ylim = [.08, .22], #[.10, .22],
                             filename = base_filename+'_attention_EccDist.{fext}'.format(fext = fig_type))
 
@@ -1231,7 +1239,7 @@ class DecoderViewer(Viewer):
             plt.margins(x=0.075)
 
             #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-            plt.subplots_adjust(wspace=0.05, hspace=0.02)
+            plt.subplots_adjust(wspace=0.04, hspace=0.02)
 
             plt.tight_layout()
 
@@ -1261,7 +1269,7 @@ class DecoderViewer(Viewer):
                 plt.margins(x=0.075)
 
                 #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-                plt.subplots_adjust(wspace=0.05, hspace=0.02)
+                plt.subplots_adjust(wspace=0.04, hspace=0.02)
 
                 plt.tight_layout()
 
@@ -1327,7 +1335,7 @@ class DecoderViewer(Viewer):
             plt.margins(x=0.075)
 
             #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-            plt.subplots_adjust(wspace=0.05, hspace=0.02)
+            plt.subplots_adjust(wspace=0.04, hspace=0.02)
 
             plt.tight_layout()
 
@@ -1353,6 +1361,10 @@ class DecoderViewer(Viewer):
 
         ## first get mean values
         df2plot = pixel_df[pixel_df['ROI'] == roi_name].groupby(['sj', 'bar_type', 'ecc', 'min_dist']).mean(numeric_only=True).reset_index()
+
+        # also collapsed across ecc
+        df2plot_dist = pixel_df[pixel_df['ROI'] == roi_name].groupby(['sj', 'bar_type', 'min_dist']).mean(numeric_only=True).reset_index()
+        
         
         # if we didnt provide ecc list, plot all
         if ecc2plot is None:
@@ -1364,6 +1376,10 @@ class DecoderViewer(Viewer):
                                                                 main_var = 'intensity', 
                                                                 conditions = ['bar_type', 'ecc', 'min_dist'], 
                                                                 pp_key = 'sj')
+            df2plot_dist = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot_dist, 
+                                                            main_var = 'intensity', 
+                                                            conditions = ['bar_type', 'min_dist'], 
+                                                            pp_key = 'sj')
             
             error_key = None
         else:
@@ -1412,12 +1428,51 @@ class DecoderViewer(Viewer):
                 axes[ind].set_xlabel('Min. Distance [deg]',fontsize = 16, labelpad = 15)
             axes[ind].tick_params(axis='both', labelsize=11)
 
+        ##### plot lines collapsed across ecc
+
+        ## target bar
+        df2plot_dist_att = df2plot_dist[(df2plot_dist['bar_type'] == 'att_bar')]
+
+        line_p = sns.lineplot(data = df2plot_dist_att,
+                            y = 'intensity', x = 'min_dist', hue = 'bar_type', palette = bartype_colors,
+                            err_style='bars', errorbar = error_key, marker='o', ms=10, err_kws = {'capsize': 5},
+                            linewidth=5, ax=axes[ind + 1], legend=False)
+
+        ## distractor bar
+        df2plot_dist_unatt = df2plot_dist[(df2plot_dist['bar_type'] == 'unatt_bar')]
+
+        line_p2 = sns.lineplot(data = df2plot_dist_unatt,
+                            y = 'intensity', x = 'min_dist', hue = 'bar_type', palette = bartype_colors,
+                            err_style='bars', errorbar = error_key, marker='X', ms=10, err_kws = {'capsize': 5}, linestyle='--',
+                            linewidth=5, ax=axes[ind + 1], legend=False)
+        
+        if error_key is None:
+            # plot error bars per condition
+            axes[ind + 1] = self.plot_withinsub_errorbars(df2plot = df2plot_dist_att, 
+                                                        axes = axes[ind + 1], 
+                                                        cond2group = 'min_dist', 
+                                                        yvar = 'intensity', 
+                                                        color = bartype_colors['att_bar'])
+
+            # plot error bars per condition
+            axes[ind + 1] = self.plot_withinsub_errorbars(df2plot = df2plot_dist_unatt, 
+                                                        axes = axes[ind + 1], 
+                                                        cond2group = 'min_dist', 
+                                                        yvar = 'intensity', 
+                                                        color = bartype_colors['unatt_bar'])
+
+        if showtitle:
+            axes[ind + 1].set_title('Across Pix ecc'%ecc,fontsize=14)
+        if showxlabel:
+            axes[ind + 1].set_xlabel('Min. Distance [deg]',fontsize = 16, labelpad = 15)
+        axes[ind + 1].tick_params(axis='both', labelsize=11)
+
         axes[0].set_ylabel('%s\n\nMean Drive [a.u.]'%roi_name, fontsize = 16, labelpad = 15)
 
         handleA = mpatches.Patch(facecolor='w',edgecolor = 'k',label='Attended bar', fill=True, linewidth=1)
         handleB = mpatches.Patch( facecolor='w',edgecolor = 'k',label='Unattended bar',hatch = '||',linewidth=1)
 
-        leg = axes[ind].legend(handles = [handleA,handleB], loc = leg_loc, fontsize = 'medium')
+        leg = axes[ind + 1].legend(handles = [handleA,handleB], loc = leg_loc, fontsize = 'medium')
 
         frame = leg.get_frame()
         frame.set_facecolor('w') 
@@ -1426,7 +1481,7 @@ class DecoderViewer(Viewer):
         return axes
 
     def plot_pix_EccDist(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
-                            figsize=(15,3), filename = None, combine_rois = False, ylim = [.10, .22]):
+                            figsize=(18,3), filename = None, combine_rois = False, ylim = [.10, .22]):
 
         """
         Plot mean pixel intensity values
@@ -1456,7 +1511,7 @@ class DecoderViewer(Viewer):
         if combine_rois:
 
             fig, axes = plt.subplots(nrows=len(ROI_list), 
-                                    ncols=len(pixel_df.ecc.unique()), figsize = (15, 3 * 6), sharey=True, sharex=True)
+                                    ncols=len(pixel_df.ecc.unique()) + 1, figsize = (18, 3 * 6), sharey=True, sharex=True)
             
             for ind_roi, roi_name in enumerate(ROI_list):
 
@@ -1485,7 +1540,7 @@ class DecoderViewer(Viewer):
             plt.margins(x=0.075)
 
             #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-            plt.subplots_adjust(wspace=0.05, hspace=0.02)
+            plt.subplots_adjust(wspace=0.04, hspace=0.02)
 
             plt.tight_layout()
 
@@ -1498,7 +1553,7 @@ class DecoderViewer(Viewer):
         else:
             for roi_name in ROI_list:
 
-                fig, axes = plt.subplots(nrows=1, ncols=len(pixel_df.ecc.unique()), figsize = figsize, sharey=True, sharex=True)
+                fig, axes = plt.subplots(nrows=1, ncols=len(pixel_df.ecc.unique()) + 1, figsize = figsize, sharey=True, sharex=True)
 
                 axes = self.plot_ROI_pix_EccDist(pixel_df = pixel_df, 
                                                 axes = axes, 
@@ -1515,7 +1570,7 @@ class DecoderViewer(Viewer):
                 plt.margins(x=0.075)
 
                 #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-                plt.subplots_adjust(wspace=0.05, hspace=0.02)
+                plt.subplots_adjust(wspace=0.04, hspace=0.02)
 
                 plt.tight_layout()
 

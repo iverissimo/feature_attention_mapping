@@ -1581,5 +1581,153 @@ class DecoderViewer(Viewer):
                                                                              rname = roi_name)),
                                 dpi = 100)
 
+    def plot_pix_Dist_AttDiff(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
+                                                figsize=(15,5), filename = None, ylim = [.08, .22]):
+
+        """
+        Show the attention effect (so attended minus unattended) 
+        per distance
+
+        """
+
+        ## plot pixel values
+        # separating by bar type, pixel ecc and pixel distance to competing object
+
+        fig, axes = plt.subplots(nrows=1, ncols=len(ROI_list), figsize = (15, 3), sharey=True, sharex=True)
+
+        for ind, roi_name in enumerate(ROI_list):
+
+            df2plot_dist = pixel_df[pixel_df['ROI'] == roi_name].groupby(['sj', 'bar_type', 'min_dist']).mean(numeric_only=True).reset_index()
+
+            ### Calculate the attention effect (so attended minus unattended)
+            diff_dist_df = []
+            for row_index, row in df2plot_dist.groupby(['sj', 'min_dist'], as_index = True):
+                #col = row['column']
+                row_df = pd.DataFrame({'sj': [row.sj.values[0]],
+                                    'ROI': [roi_name],
+                                    'min_dist': [row.min_dist.values[0]],
+                                    'att_diff': [row[row['bar_type'] == 'att_bar'].intensity.values[0] - row[row['bar_type'] == 'unatt_bar'].intensity.values[0]]
+                                    })
+                diff_dist_df.append(row_df)
+            diff_dist_df = pd.concat(diff_dist_df, ignore_index=True)
+
+            if error_bars == 'within':
+                ## calculate within sub error bars 
+                diff_dist_df = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = diff_dist_df, 
+                                                                    main_var = 'att_diff', 
+                                                                    conditions = ['min_dist'], 
+                                                                    pp_key = 'sj')
+                error_key = None
+            else:
+                error_key = ('se')
+
+            ## actually plot
+
+            line_p = sns.lineplot(data = diff_dist_df,
+                    y = 'att_diff', x = 'min_dist', 
+                    err_style='bars', errorbar = error_key, marker='o', ms=10, err_kws = {'capsize': 5},
+                    linewidth=5, ax=axes[ind], legend=False)
+
+            if error_key is None:
+                self.plot_withinsub_errorbars(df2plot = diff_dist_df, 
+                                                axes = axes[ind], 
+                                                cond2group = 'min_dist', 
+                                                yvar = 'att_diff', 
+                                                color = 'blue')
+            
+            axes[ind].set_title(roi_name, fontsize=14)
+            axes[ind].set_xlabel('Min. Distance [deg]',fontsize = 16, labelpad = 15)
+
+        axes[0].set_ylabel('Att - Unatt intensity [a.u.]', fontsize = 16, labelpad = 15)
+
+        axes[0].set_ylim(ylim)
+        plt.margins(x=0.075)
+
+        #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
+        plt.subplots_adjust(wspace=0.03, hspace=0.02)
+
+        plt.tight_layout()
+
+        ## save figure
+        if filename is not None:
+            fig.savefig(filename.replace('.{fext}'.format(fext = fig_type), 
+                                        '_ROI-{rname}.{fext}'.format(fext = fig_type,
+                                                                        rname = roi_name)),
+                        dpi = 100)
+            
+    def plot_pix_Ecc_AttDiff(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
+                                                figsize=(15,5), filename = None, ylim = [.08, .22]):
+
+        """
+        Show the attention effect (so attended minus unattended) 
+        per ecc
+
+        """
+
+        ## plot pixel values
+        # separating by bar type, pixel ecc and pixel distance to competing object
+
+        fig, axes = plt.subplots(nrows=1, ncols=len(ROI_list), figsize = (15, 3), sharey=True, sharex=True)
+
+        for ind, roi_name in enumerate(ROI_list):
+
+            df2plot_ecc = pixel_df[pixel_df['ROI'] == roi_name].groupby(['sj', 'bar_type', 'ecc']).mean(numeric_only=True).reset_index()
+
+            ### Calculate the attention effect (so attended minus unattended)
+            diff_ecc_df = []
+            for row_index, row in df2plot_ecc.groupby(['sj', 'ecc'], as_index = True):
+                #col = row['column']
+                row_df = pd.DataFrame({'sj': [row.sj.values[0]],
+                                    'ROI': [roi_name],
+                                    'ecc': [row.ecc.values[0]],
+                                    'att_diff': [row[row['bar_type'] == 'att_bar'].intensity.values[0] - row[row['bar_type'] == 'unatt_bar'].intensity.values[0]]
+                                    })
+                diff_ecc_df.append(row_df)
+            diff_ecc_df = pd.concat(diff_ecc_df, ignore_index=True)
+
+            if error_bars == 'within':
+                ## calculate within sub error bars 
+                diff_ecc_df = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = diff_ecc_df, 
+                                                                    main_var = 'att_diff', 
+                                                                    conditions = ['ecc'], 
+                                                                    pp_key = 'sj')
+                error_key = None
+            else:
+                error_key = ('se')
+
+            ## actually plot
+
+            line_p = sns.lineplot(data = diff_ecc_df,
+                    y = 'att_diff', x = 'ecc', 
+                    err_style='bars', errorbar = error_key, marker='o', ms=10, err_kws = {'capsize': 5},
+                    linewidth=5, ax=axes[ind], legend=False)
+
+            if error_key is None:
+                self.plot_withinsub_errorbars(df2plot = diff_ecc_df, 
+                                                axes = axes[ind], 
+                                                cond2group = 'ecc', 
+                                                yvar = 'att_diff', 
+                                                color = 'blue')
+            
+            axes[ind].set_title(roi_name, fontsize=14)
+            axes[ind].set_xlabel('Pix ecc [deg]',fontsize = 16, labelpad = 15)
+
+        axes[0].set_ylabel('Att - Unatt intensity [a.u.]', fontsize = 16, labelpad = 15)
+
+        axes[0].set_ylim(ylim)
+        plt.margins(x=0.075)
+
+        #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
+        plt.subplots_adjust(wspace=0.03, hspace=0.02)
+
+        plt.tight_layout()
+
+        ## save figure
+        if filename is not None:
+            fig.savefig(filename.replace('.{fext}'.format(fext = fig_type), 
+                                        '_ROI-{rname}.{fext}'.format(fext = fig_type,
+                                                                        rname = roi_name)),
+                        dpi = 100)
+
 
 

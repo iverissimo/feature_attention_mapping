@@ -555,7 +555,8 @@ class DecoderViewer(Viewer):
         if return_df:
             return avg_stim_corr_df
         
-    def plot_pix_ecc_ref_heatmap(self, pixel_df = None, cmap = 'Spectral', desat = .8, figsize = (8,5), filename = None, dpi = 100):
+    def plot_pix_ecc_ref_heatmap(self, pixel_df = None, cmap = 'Spectral', desat = .8, figsize = (8,5), filename = None, dpi = 100,
+                                    ring_ecc = False, ring_ecc_colors = None):
 
         """
         Helper function to create a reference image
@@ -573,7 +574,15 @@ class DecoderViewer(Viewer):
         ref_pix_ecc_df = ref_pix_ecc_df.pivot_table(columns='x', index='y', values='ecc', fill_value = 0, dropna=True, sort = False)
 
         ## create color map array
-        col_arr = sns.color_palette(cmap, len(pixel_df.ecc.unique()), desat = desat)
+        # if we are grouping pixel ecc into rings
+        if ring_ecc:
+
+            if ring_ecc_colors is None:
+                ring_ecc_colors = self.MRIObj.params['plotting']['ring_ecc_colors']
+
+            col_arr = list(np.hstack([np.repeat(ring_ecc_colors[val], val) for val in ring_ecc_colors.keys()]))
+        else:
+            col_arr = list(sns.color_palette(cmap, len(pixel_df.ecc.unique()), desat = desat).as_hex())
         ## create dict of ecc colors
         pix_ecc_colors = {key: col_arr[i] for i, key in enumerate(np.sort(pixel_df.ecc.unique()))}
 
@@ -1042,6 +1051,24 @@ class DecoderViewer(Viewer):
                             combine_rois = True,
                             ylim = [.08, .22], #[.10, .22],
                             filename = base_filename+'_attention_EccDist.{fext}'.format(fext = fig_type))
+        
+        ### Show the attention effect (so attended minus unattended) per distance
+        self.plot_pix_Dist_AttDiff(pixel_df = pixel_df,  
+                              ROI_list = ROI_list, 
+                              error_bars = error_bars,  
+                              fig_type = 'png',
+                              figsize=(15,5), 
+                              ylim = [-.01, .03],
+                              filename = base_filename+'_AttDiffDist.{fext}'.format(fext = fig_type))
+        
+        ### Show the attention effect (so attended minus unattended) per ecc
+        self.plot_pix_Ecc_AttDiff(pixel_df = pixel_df,  
+                              ROI_list = ROI_list, 
+                              error_bars = error_bars,  
+                              fig_type = 'png',
+                              figsize=(15,5), 
+                              ylim = [-.01, .03],
+                              filename = base_filename+'_AttDiffEcc.{fext}'.format(fext = fig_type))
 
 
     def plot_withinsub_errorbars(self, df2plot = None, axes = None, cond2group = 'ecc', yvar = 'intensity', color = ''):
@@ -1582,13 +1609,16 @@ class DecoderViewer(Viewer):
                                 dpi = 100)
 
     def plot_pix_Dist_AttDiff(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
-                                                figsize=(15,5), filename = None, ylim = [.08, .22]):
+                                                figsize=(15,5), filename = None, ylim = [-.01, .03]):
 
         """
         Show the attention effect (so attended minus unattended) 
         per distance
 
         """
+
+        ## get average attention effect for given conditions
+        diff_dist_df = self.DecoderObj.get_avg_attDiff(pixel_df = pixel_df, conditions = ['ROI', 'min_dist'])
 
         ## plot pixel values
         # separating by bar type, pixel ecc and pixel distance to competing object
@@ -1597,23 +1627,11 @@ class DecoderViewer(Viewer):
 
         for ind, roi_name in enumerate(ROI_list):
 
-            df2plot_dist = pixel_df[pixel_df['ROI'] == roi_name].groupby(['sj', 'bar_type', 'min_dist']).mean(numeric_only=True).reset_index()
-
-            ### Calculate the attention effect (so attended minus unattended)
-            diff_dist_df = []
-            for row_index, row in df2plot_dist.groupby(['sj', 'min_dist'], as_index = True):
-                #col = row['column']
-                row_df = pd.DataFrame({'sj': [row.sj.values[0]],
-                                    'ROI': [roi_name],
-                                    'min_dist': [row.min_dist.values[0]],
-                                    'att_diff': [row[row['bar_type'] == 'att_bar'].intensity.values[0] - row[row['bar_type'] == 'unatt_bar'].intensity.values[0]]
-                                    })
-                diff_dist_df.append(row_df)
-            diff_dist_df = pd.concat(diff_dist_df, ignore_index=True)
+            df2plot_dist = diff_dist_df[diff_dist_df['ROI'] == roi_name]
 
             if error_bars == 'within':
                 ## calculate within sub error bars 
-                diff_dist_df = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = diff_dist_df, 
+                df2plot_dist = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot_dist, 
                                                                     main_var = 'att_diff', 
                                                                     conditions = ['min_dist'], 
                                                                     pp_key = 'sj')
@@ -1622,14 +1640,14 @@ class DecoderViewer(Viewer):
                 error_key = ('se')
 
             ## actually plot
-
-            line_p = sns.lineplot(data = diff_dist_df,
+            line_p = sns.lineplot(data = df2plot_dist,
                     y = 'att_diff', x = 'min_dist', 
                     err_style='bars', errorbar = error_key, marker='o', ms=10, err_kws = {'capsize': 5},
                     linewidth=5, ax=axes[ind], legend=False)
+            axes[ind].hlines(0, 0, 8, linestyles='dashed', color='k', alpha = .3)
 
             if error_key is None:
-                self.plot_withinsub_errorbars(df2plot = diff_dist_df, 
+                self.plot_withinsub_errorbars(df2plot = df2plot_dist, 
                                                 axes = axes[ind], 
                                                 cond2group = 'min_dist', 
                                                 yvar = 'att_diff', 
@@ -1641,6 +1659,8 @@ class DecoderViewer(Viewer):
         axes[0].set_ylabel('Att - Unatt intensity [a.u.]', fontsize = 16, labelpad = 15)
 
         axes[0].set_ylim(ylim)
+        axes[0].set_xlim([df2plot_dist.min_dist.min() - .3, 
+                          df2plot_dist.min_dist.max() + .3])
         plt.margins(x=0.075)
 
         #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
@@ -1650,19 +1670,20 @@ class DecoderViewer(Viewer):
 
         ## save figure
         if filename is not None:
-            fig.savefig(filename.replace('.{fext}'.format(fext = fig_type), 
-                                        '_ROI-{rname}.{fext}'.format(fext = fig_type,
-                                                                        rname = roi_name)),
+            fig.savefig(filename.replace('.{fext}'.format(fext = fig_type)),
                         dpi = 100)
             
     def plot_pix_Ecc_AttDiff(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
-                                                figsize=(15,5), filename = None, ylim = [.08, .22]):
+                                                figsize=(15,5), filename = None, ylim = [-.01, .03]):
 
         """
         Show the attention effect (so attended minus unattended) 
         per ecc
 
         """
+
+        ## get average attention effect for given conditions
+        diff_ecc_df = self.DecoderObj.get_avg_attDiff(pixel_df = pixel_df, conditions = ['ROI', 'ecc'])
 
         ## plot pixel values
         # separating by bar type, pixel ecc and pixel distance to competing object
@@ -1671,23 +1692,11 @@ class DecoderViewer(Viewer):
 
         for ind, roi_name in enumerate(ROI_list):
 
-            df2plot_ecc = pixel_df[pixel_df['ROI'] == roi_name].groupby(['sj', 'bar_type', 'ecc']).mean(numeric_only=True).reset_index()
-
-            ### Calculate the attention effect (so attended minus unattended)
-            diff_ecc_df = []
-            for row_index, row in df2plot_ecc.groupby(['sj', 'ecc'], as_index = True):
-                #col = row['column']
-                row_df = pd.DataFrame({'sj': [row.sj.values[0]],
-                                    'ROI': [roi_name],
-                                    'ecc': [row.ecc.values[0]],
-                                    'att_diff': [row[row['bar_type'] == 'att_bar'].intensity.values[0] - row[row['bar_type'] == 'unatt_bar'].intensity.values[0]]
-                                    })
-                diff_ecc_df.append(row_df)
-            diff_ecc_df = pd.concat(diff_ecc_df, ignore_index=True)
+            df2plot_ecc = diff_ecc_df[diff_ecc_df['ROI'] == roi_name]
 
             if error_bars == 'within':
                 ## calculate within sub error bars 
-                diff_ecc_df = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = diff_ecc_df, 
+                df2plot_ecc = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot_ecc, 
                                                                     main_var = 'att_diff', 
                                                                     conditions = ['ecc'], 
                                                                     pp_key = 'sj')
@@ -1696,14 +1705,14 @@ class DecoderViewer(Viewer):
                 error_key = ('se')
 
             ## actually plot
-
-            line_p = sns.lineplot(data = diff_ecc_df,
+            line_p = sns.lineplot(data = df2plot_ecc,
                     y = 'att_diff', x = 'ecc', 
                     err_style='bars', errorbar = error_key, marker='o', ms=10, err_kws = {'capsize': 5},
                     linewidth=5, ax=axes[ind], legend=False)
+            axes[ind].hlines(0, 0, 8, linestyles='dashed', color='k', alpha = .3)
 
             if error_key is None:
-                self.plot_withinsub_errorbars(df2plot = diff_ecc_df, 
+                self.plot_withinsub_errorbars(df2plot = df2plot_ecc, 
                                                 axes = axes[ind], 
                                                 cond2group = 'ecc', 
                                                 yvar = 'att_diff', 
@@ -1715,6 +1724,8 @@ class DecoderViewer(Viewer):
         axes[0].set_ylabel('Att - Unatt intensity [a.u.]', fontsize = 16, labelpad = 15)
 
         axes[0].set_ylim(ylim)
+        axes[0].set_xlim([df2plot_ecc.ecc.min() - .3, 
+                          df2plot_ecc.ecc.max() + .3])
         plt.margins(x=0.075)
 
         #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
@@ -1724,9 +1735,7 @@ class DecoderViewer(Viewer):
 
         ## save figure
         if filename is not None:
-            fig.savefig(filename.replace('.{fext}'.format(fext = fig_type), 
-                                        '_ROI-{rname}.{fext}'.format(fext = fig_type,
-                                                                        rname = roi_name)),
+            fig.savefig(filename.replace('.{fext}'.format(fext = fig_type)),
                         dpi = 100)
 
 

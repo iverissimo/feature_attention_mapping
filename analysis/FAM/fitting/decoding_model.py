@@ -3301,9 +3301,36 @@ class Decoding_Model(GLMsingle_Model):
                 pp_reference_dm[cond_ind] = np.nan #0
 
         return pp_avg_stim_df, pp_reference_dm
-    
-    
-        
+       
+    def get_avg_attDiff(self, pixel_df = None, conditions = ['ROI', 'min_dist']):
+
+        """
+        Given df with pixel intensity values, calculate the average attention effect (so attended minus unattended) per pp, 
+        for specific conditions
+        """ 
+
+        all_cond = ['sj', 'bar_type']+conditions
+        sj_cond = ['sj']+conditions
+
+        df_ROIcond = pixel_df.groupby(all_cond).mean(numeric_only=True).reset_index()
+
+        ### Calculate the attention effect (so attended minus unattended)
+        diff_df = []
+
+        for row_index, row in df_ROIcond.groupby(sj_cond, as_index = True):
+
+            row_df = pd.DataFrame({'att_diff': [row[row['bar_type'] == 'att_bar'].intensity.values[0] - row[row['bar_type'] == 'unatt_bar'].intensity.values[0]]
+                                })
+
+            for i in range(len(sj_cond)):
+                row_df.loc[:, [sj_cond[i]]] = row[sj_cond[i]].values[0]
+            
+            diff_df.append(row_df)
+
+        diff_df = pd.concat(diff_df, ignore_index=True)
+
+        return diff_df
+
 
 
 

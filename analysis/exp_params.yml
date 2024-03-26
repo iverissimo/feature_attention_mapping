@@ -279,6 +279,9 @@ plotting:
     blue: [0.00784314, 0.61960784, 0.44705882]
     yellow: [0.52941176, 0.61960784, 0.00784314]
 
+  # for ecc plots
+  ecc_colors: ['near': '#ee5007', middle: '#f8cb2e', 'far': '#006e7f']
+  ring_ecc_colors: {1: '#e3855b', 2: '#f5d771', 3: '#7fb5b8'}
 
   pycortex_sub: 'hcp_999999' #'fsaverage'
   use_sub_rois: False #True

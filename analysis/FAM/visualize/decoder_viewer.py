@@ -1409,7 +1409,7 @@ class DecoderViewer(Viewer):
 
     def plot_ROI_pix_EccDist(self, pixel_df = None, axes = None, roi_name = 'V1', pix_ecc_colors = None, error_bars = 'within',
                                 showtitle = False, showxlabel = False, bartype_colors = {'att_bar': 'black', 'unatt_bar': 'grey'},
-                                leg_loc = 'lower left', ecc2plot = None):
+                                leg_loc = 'lower left', ecc2plot = None, point_color = '#FF0080'):
         
         """
         For a given ROI,
@@ -1423,8 +1423,16 @@ class DecoderViewer(Viewer):
         ## first get mean values
         df2plot = pixel_df[pixel_df['ROI'] == roi_name].groupby(['sj', 'bar_type', 'ecc', 'min_dist']).mean(numeric_only=True).reset_index()
 
+        ## get average attention effect for given conditions
+        att_diff_df = self.DecoderObj.get_avg_attDiff(pixel_df = pixel_df[pixel_df['ROI'] == roi_name], 
+                                                      conditions = ['min_dist', 'ecc'])
+
         # also collapsed across ecc
         df2plot_dist = pixel_df[pixel_df['ROI'] == roi_name].groupby(['sj', 'bar_type', 'min_dist']).mean(numeric_only=True).reset_index()
+
+        ## get average attention effect for given conditions
+        avg_att_diff_df = self.DecoderObj.get_avg_attDiff(pixel_df = pixel_df[pixel_df['ROI'] == roi_name], 
+                                                        conditions = ['min_dist'])
         
         
         # if we didnt provide ecc list, plot all
@@ -1437,10 +1445,19 @@ class DecoderViewer(Viewer):
                                                                 main_var = 'intensity', 
                                                                 conditions = ['bar_type', 'ecc', 'min_dist'], 
                                                                 pp_key = 'sj')
+            att_diff_df = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = att_diff_df, 
+                                                                    main_var = 'att_diff', 
+                                                                    conditions = ['min_dist','ecc'], 
+                                                                    pp_key = 'sj')
+            
             df2plot_dist = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot_dist, 
                                                             main_var = 'intensity', 
                                                             conditions = ['bar_type', 'min_dist'], 
                                                             pp_key = 'sj')
+            avg_att_diff_df = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = avg_att_diff_df, 
+                                                                    main_var = 'att_diff', 
+                                                                    conditions = ['min_dist'], 
+                                                                    pp_key = 'sj')
             
             error_key = None
         else:
@@ -1471,10 +1488,10 @@ class DecoderViewer(Viewer):
             if error_key is None:
                 # plot error bars per condition - target
                 axes[ind] = self.plot_withinsub_errorbars(df2plot = df2plot_att, 
-                                                                axes = axes[ind], 
-                                                                cond2group = 'min_dist', 
-                                                                yvar = 'intensity', 
-                                                                color = pix_ecc_colors[ecc])
+                                                        axes = axes[ind], 
+                                                        cond2group = 'min_dist', 
+                                                        yvar = 'intensity', 
+                                                        color = pix_ecc_colors[ecc])
 
                 # plot error bars per condition - distractor
                 axes[ind] = self.plot_withinsub_errorbars(df2plot = df2plot_unatt, 
@@ -1488,6 +1505,28 @@ class DecoderViewer(Viewer):
             if showxlabel:
                 axes[ind].set_xlabel('Min. Distance [deg]',fontsize = 16, labelpad = 15)
             axes[ind].tick_params(axis='both', labelsize=11)
+
+            #### add attention effect values in twin axis
+            ## copy axis 
+            ax2 = axes[ind].twinx()
+
+            sns.lineplot(data = att_diff_df[(att_diff_df['ecc'] == ecc)],
+                        y = 'att_diff', x = 'min_dist', color = point_color,
+                        err_style='bars', errorbar=error_key, marker='o', ms=10, err_kws = {'capsize': 5},
+                        linestyle = 'none', linewidth=5, ax = ax2, legend=False)
+            
+            if error_key is None:
+                # plot error bars per condition - target
+                ax2 = self.plot_withinsub_errorbars(df2plot = att_diff_df[(att_diff_df['ecc'] == ecc)],
+                                                    axes = ax2, 
+                                                    cond2group = 'min_dist', 
+                                                    yvar = 'att_diff', 
+                                                    color = point_color)
+            ax2.hlines(0, 0, 8, linestyles='dashed', color = point_color, alpha = .3)
+            ax2.tick_params(axis='x', labelsize=13)
+            ax2.set_xticklabels(np.round(np.sort(df2plot.ecc.unique()), 2))
+            #ax2.set_ylim(ylim2)
+            ax2.set_ylabel(None)
 
         ##### plot lines collapsed across ecc
 

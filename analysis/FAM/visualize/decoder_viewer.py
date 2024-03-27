@@ -766,7 +766,8 @@ class DecoderViewer(Viewer):
         axes[0].vlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
         axes[0].hlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
 
-    def barplot_mean_pix_intensity(self, pixel_df = None, ROI_list = ['V1'], error_bars = 'within', figsize=(8,5), filename = None):
+    def barplot_mean_pix_intensity(self, pixel_df = None, ROI_list = ['V1'], error_bars = 'within', figsize=(8,5), filename = None,
+                                        point_color = '#FF0080', ylim = [0.1,.18], ylim2 = [0,.016]):
 
         """
         Make barplot with attend vs unattend pixel values
@@ -777,12 +778,22 @@ class DecoderViewer(Viewer):
         ## first get mean values
         df2plot = pixel_df.groupby(['ROI', 'sj', 'bar_type']).mean(numeric_only=True).reset_index()
 
+        ## get average attention effect for given conditions
+        att_diff_df = self.DecoderObj.get_avg_attDiff(pixel_df = pixel_df, 
+                                                      conditions = ['ROI'])
+
         if error_bars == 'within':
             ## calculate within sub error bars 
             df2plot = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot, 
                                                                         main_var = 'intensity', 
                                                                         conditions = ['ROI', 'bar_type'], 
                                                                         pp_key = 'sj')
+            
+            att_diff_df = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = att_diff_df, 
+                                                                    main_var = 'att_diff', 
+                                                                    conditions = ['ROI'], 
+                                                                    pp_key = 'sj')
+
             error_key = None
         else:
             error_key = ('se')
@@ -834,7 +845,7 @@ class DecoderViewer(Viewer):
 
         ax1.set_xlabel('ROI',fontsize = 16, labelpad = 15)
         ax1.set_ylabel('Mean drive [a.u.]',fontsize = 16, labelpad = 15)
-        ax1.set_ylim(0.08,.2)
+        ax1.set_ylim(ylim)
 
         ## add within sub error bars
         if error_bars == 'within':
@@ -861,6 +872,30 @@ class DecoderViewer(Viewer):
                         yerr = unatt_sem,
                         elinewidth = 3, capsize = 5, capthick=2,
                         zorder = 100, c='#545759', alpha=1, fmt='none')
+            
+        #### add attention effect values as a pointplot in twin axis
+        
+        ## copy axis 
+        ax2 = ax1.twinx()
+
+        sns.pointplot(data = att_diff_df, 
+                    y = 'att_diff', x = 'ROI', 
+                    ax = ax2, linestyle = 'none', errorbar = error_key, 
+                    color = point_color, markersize = 10)
+        
+        if error_bars == 'within':
+
+            ax2.errorbar(x = np.array(ax2.get_xticks()), 
+                        y = np.array([att_diff_df[(att_diff_df['ROI'] == rname)].att_diff.values.mean() for rname in ROI_list]),
+                        yerr = np.array([att_diff_df[(att_diff_df['ROI'] == rname)].SEM_att_diff.values.mean() for rname in ROI_list]),
+                        elinewidth = 3, capsize = 5, capthick=2,
+                        zorder = 100, c = point_color, alpha=1, fmt='none')
+        ax2.hlines(0, -1, 6, linestyles='dashed', color = point_color, alpha = .3)
+        ax2.set_xlim(-.5,5.5)
+        ax2.set_ylim(ylim2)
+        ax2.set_ylabel(None)
+        ax2.tick_params(axis='y', labelsize=13, color = point_color, labelcolor = point_color, length=5, width=2)
+        ax2.set_ylabel('Attention Effect', fontsize = 16, labelpad = 20, color = point_color, rotation = 270)
 
         plt.tight_layout()
 

@@ -123,7 +123,7 @@ class BehViewer(Viewer):
             fig.savefig(op.join(self.figures_pth,'sub-GROUP_task-pRF_RT_accuracy.png'), dpi=100,bbox_inches = 'tight')
 
 
-    def plot_FA_behavior(self, att_RT_df = None, acc_df = None, acc_dist_df = None, participant_list = []):
+    def plot_FA_behavior(self, att_RT_df = None, acc_df = None, acc_dist_df = None, participant_list = [], ecc_colors=['#ee5007', '#f8cb2e', '#006e7f']):
 
         """
         Plot behavioral results for FA
@@ -143,7 +143,7 @@ class BehViewer(Viewer):
                             filename = filename.format(sj = pp, 
                                                        data_type = 'RT_ECC'), 
                             figsize = (8,5), 
-                            ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'])
+                            ecc_colors = ecc_colors)
             
             ## RT over accuracy
             self.plot_FA_RTdist(att_RT_df = att_RT_df, 
@@ -158,7 +158,7 @@ class BehViewer(Viewer):
                             filename = filename.format(sj = pp, 
                                                        data_type = 'RT_DIST2'), 
                             figsize = (8,5), 
-                            ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'])
+                            ecc_colors = ecc_colors)
             
         ## also plot group
 
@@ -167,7 +167,7 @@ class BehViewer(Viewer):
                         filename = filename.format(sj = 'GROUP', 
                                                     data_type = 'RT_ECC'), 
                         figsize = (8,5), 
-                        ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'])
+                        ecc_colors = ecc_colors)
         
         self.plot_FA_RTdist(att_RT_df = att_RT_df, 
                         sub_id = None,
@@ -181,20 +181,20 @@ class BehViewer(Viewer):
                         filename = filename.format(sj = 'GROUP',  
                                                     data_type = 'RT_DIST2'), 
                         figsize = (8,5), 
-                        ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'])
+                        ecc_colors = ecc_colors)
         
         # plot accuracy
         self.plot_FA_ACCecc(acc_df = acc_df, 
                         filename = filename.format(sj = 'GROUP', 
                                                     data_type = 'Accuracy_ECC_pp'), 
                         figsize = (8,5), 
-                        ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'],
+                        ecc_colors = ecc_colors,
                         per_pp = True)
         self.plot_FA_ACCecc(acc_df = acc_df, 
                         filename = filename.format(sj = 'GROUP', 
                                                     data_type = 'Accuracy_ECC_group'), 
                         figsize = (8,5), 
-                        ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'],
+                        ecc_colors = ecc_colors,
                         per_pp = False)
         # also for distance
         self.plot_FA_ACCdist(acc_df = acc_dist_df, 
@@ -206,9 +206,9 @@ class BehViewer(Viewer):
                             filename = filename.format(sj = 'GROUP',  
                                                     data_type = 'Accuracy_DIST2'), 
                             figsize = (8,5), 
-                            ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'])
+                            ecc_colors = ecc_colors)
 
-    def plot_FA_RTecc(self, att_RT_df = None, filename = None, figsize = (8,5), ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'], 
+    def plot_FA_RTecc(self, att_RT_df = None, filename = None, figsize = (8,5), ecc_colors=['#ee5007', '#f8cb2e', '#006e7f'], 
                             sub_id = None):
 
         """
@@ -267,7 +267,7 @@ class BehViewer(Viewer):
         else:
             return fig
         
-    def plot_FA_ACCecc(self, acc_df = None, filename = None, figsize = (8,5), ecc_colors=['#006e7f', '#f8cb2e', '#ee5007'], per_pp = False):
+    def plot_FA_ACCecc(self, acc_df = None, filename = None, figsize = (8,5), ecc_colors=['#ee5007', '#f8cb2e', '#006e7f'], per_pp = False):
 
         """
         For each attended ecc, 

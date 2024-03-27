@@ -1086,12 +1086,22 @@ class DecoderViewer(Viewer):
                             ylim = [.08, .22], #[.10, .22],
                             filename = base_filename+'_attention_EccDist.{fext}'.format(fext = fig_type))
         
+        ## and make barplots
+        self.plot_pix_EccDist_barplot(pixel_df = pixel_df,  
+                                    ROI_list = ROI_list, 
+                                    error_bars = error_bars, 
+                                    figsize=(18,3), 
+                                    fig_type = 'png',
+                                    filename = base_filename+'_attention_barplots_EccDist.{fext}'.format(fext = fig_type),
+                                    ylim = [.10, .22], 
+                                    group_ecc = False)
+        
         ### Show the attention effect (so attended minus unattended) per distance
         self.plot_pix_Dist_AttDiff(pixel_df = pixel_df,  
                               ROI_list = ROI_list, 
                               error_bars = error_bars,  
                               fig_type = 'png',
-                              figsize=(15,5), 
+                              figsize=(15,3), 
                               ylim = [-.01, .03],
                               filename = base_filename+'_AttDiffDist.{fext}'.format(fext = fig_type))
         
@@ -1100,9 +1110,32 @@ class DecoderViewer(Viewer):
                               ROI_list = ROI_list, 
                               error_bars = error_bars,  
                               fig_type = 'png',
-                              figsize=(15,5), 
+                              figsize=(15,3), 
                               ylim = [-.01, .03],
                               filename = base_filename+'_AttDiffEcc.{fext}'.format(fext = fig_type))
+        
+        ### GROUP ECC INTO 3 RINGS ####
+        ## add ring values to pix df
+        ring_pix_df = self.DecoderObj.group_ecc_rings(pixel_df = pixel_df)
+
+        ### Show the attention effect per ecc rings 
+        self.plot_pix_ringEcc_AttDiff(ring_pix_df = ring_pix_df,  
+                                    ROI_list = ROI_list, 
+                                    error_bars = error_bars,  
+                                    fig_type = 'png',
+                                    figsize=(15,3), 
+                                    ylim = [-.01, .03],
+                                    filename = base_filename+'_AttDiff_ringEcc.{fext}'.format(fext = fig_type))
+        
+        ## and make barplots
+        self.plot_pix_EccDist_barplot(pixel_df = ring_pix_df,  
+                                    ROI_list = ROI_list, 
+                                    error_bars = error_bars, 
+                                    figsize=(18,3), 
+                                    fig_type = 'png',
+                                    filename = base_filename+'_attention_barplots_ringEccDist.{fext}'.format(fext = fig_type),
+                                    ylim = [.10, .22], 
+                                    group_ecc = True)
 
 
     def plot_withinsub_errorbars(self, df2plot = None, axes = None, cond2group = 'ecc', yvar = 'intensity', color = ''):
@@ -1423,18 +1456,9 @@ class DecoderViewer(Viewer):
         ## first get mean values
         df2plot = pixel_df[pixel_df['ROI'] == roi_name].groupby(['sj', 'bar_type', 'ecc', 'min_dist']).mean(numeric_only=True).reset_index()
 
-        ## get average attention effect for given conditions
-        att_diff_df = self.DecoderObj.get_avg_attDiff(pixel_df = pixel_df[pixel_df['ROI'] == roi_name], 
-                                                      conditions = ['min_dist', 'ecc'])
-
         # also collapsed across ecc
         df2plot_dist = pixel_df[pixel_df['ROI'] == roi_name].groupby(['sj', 'bar_type', 'min_dist']).mean(numeric_only=True).reset_index()
 
-        ## get average attention effect for given conditions
-        avg_att_diff_df = self.DecoderObj.get_avg_attDiff(pixel_df = pixel_df[pixel_df['ROI'] == roi_name], 
-                                                        conditions = ['min_dist'])
-        
-        
         # if we didnt provide ecc list, plot all
         if ecc2plot is None:
             ecc2plot = np.sort(df2plot.ecc.unique())
@@ -1445,19 +1469,11 @@ class DecoderViewer(Viewer):
                                                                 main_var = 'intensity', 
                                                                 conditions = ['bar_type', 'ecc', 'min_dist'], 
                                                                 pp_key = 'sj')
-            att_diff_df = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = att_diff_df, 
-                                                                    main_var = 'att_diff', 
-                                                                    conditions = ['min_dist','ecc'], 
-                                                                    pp_key = 'sj')
             
             df2plot_dist = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot_dist, 
                                                             main_var = 'intensity', 
                                                             conditions = ['bar_type', 'min_dist'], 
                                                             pp_key = 'sj')
-            avg_att_diff_df = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = avg_att_diff_df, 
-                                                                    main_var = 'att_diff', 
-                                                                    conditions = ['min_dist'], 
-                                                                    pp_key = 'sj')
             
             error_key = None
         else:
@@ -1506,27 +1522,6 @@ class DecoderViewer(Viewer):
                 axes[ind].set_xlabel('Min. Distance [deg]',fontsize = 16, labelpad = 15)
             axes[ind].tick_params(axis='both', labelsize=11)
 
-            #### add attention effect values in twin axis
-            ## copy axis 
-            ax2 = axes[ind].twinx()
-
-            sns.lineplot(data = att_diff_df[(att_diff_df['ecc'] == ecc)],
-                        y = 'att_diff', x = 'min_dist', color = point_color,
-                        err_style='bars', errorbar=error_key, marker='o', ms=10, err_kws = {'capsize': 5},
-                        linestyle = 'none', linewidth=5, ax = ax2, legend=False)
-            
-            if error_key is None:
-                # plot error bars per condition - target
-                ax2 = self.plot_withinsub_errorbars(df2plot = att_diff_df[(att_diff_df['ecc'] == ecc)],
-                                                    axes = ax2, 
-                                                    cond2group = 'min_dist', 
-                                                    yvar = 'att_diff', 
-                                                    color = point_color)
-            ax2.hlines(0, 0, 8, linestyles='dashed', color = point_color, alpha = .3)
-            ax2.tick_params(axis='x', labelsize=13)
-            ax2.set_xticklabels(np.round(np.sort(df2plot.ecc.unique()), 2))
-            #ax2.set_ylim(ylim2)
-            ax2.set_ylabel(None)
 
         ##### plot lines collapsed across ecc
 
@@ -1682,7 +1677,7 @@ class DecoderViewer(Viewer):
                                 dpi = 100)
 
     def plot_pix_Dist_AttDiff(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
-                                                figsize=(15,5), filename = None, ylim = [-.01, .03]):
+                                                figsize=(15,3), filename = None, ylim = [-.01, .03], point_color = '#FF0080'):
 
         """
         Show the attention effect (so attended minus unattended) 
@@ -1696,7 +1691,7 @@ class DecoderViewer(Viewer):
         ## plot pixel values
         # separating by bar type, pixel ecc and pixel distance to competing object
 
-        fig, axes = plt.subplots(nrows=1, ncols=len(ROI_list), figsize = (15, 3), sharey=True, sharex=True)
+        fig, axes = plt.subplots(nrows=1, ncols=len(ROI_list), figsize = figsize, sharey=True, sharex=True)
 
         for ind, roi_name in enumerate(ROI_list):
 
@@ -1714,7 +1709,7 @@ class DecoderViewer(Viewer):
 
             ## actually plot
             line_p = sns.lineplot(data = df2plot_dist,
-                    y = 'att_diff', x = 'min_dist', 
+                    y = 'att_diff', x = 'min_dist', color = point_color,
                     err_style='bars', errorbar = error_key, marker='o', ms=10, err_kws = {'capsize': 5},
                     linewidth=5, ax=axes[ind], legend=False)
             axes[ind].hlines(0, 0, 8, linestyles='dashed', color='k', alpha = .3)
@@ -1724,7 +1719,7 @@ class DecoderViewer(Viewer):
                                                 axes = axes[ind], 
                                                 cond2group = 'min_dist', 
                                                 yvar = 'att_diff', 
-                                                color = 'blue')
+                                                color = point_color)
             
             axes[ind].set_title(roi_name, fontsize=14)
             axes[ind].set_xlabel('Min. Distance [deg]',fontsize = 16, labelpad = 15)
@@ -1746,7 +1741,7 @@ class DecoderViewer(Viewer):
             fig.savefig(filename, dpi = 100)
             
     def plot_pix_Ecc_AttDiff(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
-                                                figsize=(15,5), filename = None, ylim = [-.01, .03]):
+                                                figsize=(15,3), filename = None, ylim = [-.01, .03], point_color = '#FF0080'):
 
         """
         Show the attention effect (so attended minus unattended) 
@@ -1760,7 +1755,7 @@ class DecoderViewer(Viewer):
         ## plot pixel values
         # separating by bar type, pixel ecc and pixel distance to competing object
 
-        fig, axes = plt.subplots(nrows=1, ncols=len(ROI_list), figsize = (15, 3), sharey=True, sharex=True)
+        fig, axes = plt.subplots(nrows=1, ncols=len(ROI_list), figsize = figsize, sharey=True, sharex=True)
 
         for ind, roi_name in enumerate(ROI_list):
 
@@ -1778,7 +1773,7 @@ class DecoderViewer(Viewer):
 
             ## actually plot
             line_p = sns.lineplot(data = df2plot_ecc,
-                    y = 'att_diff', x = 'ecc', 
+                    y = 'att_diff', x = 'ecc', color = point_color,
                     err_style='bars', errorbar = error_key, marker='o', ms=10, err_kws = {'capsize': 5},
                     linewidth=5, ax=axes[ind], legend=False)
             axes[ind].hlines(0, 0, 8, linestyles='dashed', color='k', alpha = .3)
@@ -1788,7 +1783,7 @@ class DecoderViewer(Viewer):
                                                 axes = axes[ind], 
                                                 cond2group = 'ecc', 
                                                 yvar = 'att_diff', 
-                                                color = 'blue')
+                                                color = point_color)
             
             axes[ind].set_title(roi_name, fontsize=14)
             axes[ind].set_xlabel('Pix ecc [deg]',fontsize = 16, labelpad = 15)
@@ -1798,6 +1793,71 @@ class DecoderViewer(Viewer):
         axes[0].set_ylim(ylim)
         axes[0].set_xlim([df2plot_ecc.ecc.min() - .3, 
                           df2plot_ecc.ecc.max() + .3])
+        plt.margins(x=0.075)
+
+        #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
+        plt.subplots_adjust(wspace=0.03, hspace=0.02)
+
+        plt.tight_layout()
+
+        ## save figure
+        if filename is not None:
+            fig.savefig(filename, dpi = 100)
+
+    def plot_pix_ringEcc_AttDiff(self, ring_pix_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
+                                                figsize=(15,3), filename = None, ylim = [-.01, .03], point_color = '#FF0080'):
+
+        """
+        Show the attention effect (so attended minus unattended) 
+        per ecc (when grouped into rings)
+
+        """
+
+        ## get average attention effect for given conditions
+        diff_ecc_df = self.DecoderObj.get_avg_attDiff(pixel_df = ring_pix_df, 
+                                                      conditions = ['ROI', 'ring_ecc'])
+
+        ## plot pixel values
+        # separating by bar type, pixel ecc and pixel distance to competing object
+
+        fig, axes = plt.subplots(nrows=1, ncols=len(ROI_list), figsize = figsize, sharey=True, sharex=True)
+
+        for ind, roi_name in enumerate(ROI_list):
+
+            df2plot_ecc = diff_ecc_df[diff_ecc_df['ROI'] == roi_name]
+
+            if error_bars == 'within':
+                ## calculate within sub error bars 
+                df2plot_ecc = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot_ecc, 
+                                                                    main_var = 'att_diff', 
+                                                                    conditions = ['ring_ecc'], 
+                                                                    pp_key = 'sj')
+                error_key = None
+            else:
+                error_key = ('se')
+
+            ## actually plot
+            line_p = sns.lineplot(data = df2plot_ecc,
+                    y = 'att_diff', x = 'ring_ecc', color = point_color,
+                    err_style='bars', errorbar = error_key, marker='o', ms=10, err_kws = {'capsize': 5},
+                    linewidth=5, ax=axes[ind], legend=False)
+            axes[ind].hlines(0, 0, 8, linestyles='dashed', color='k', alpha = .3)
+
+            if error_key is None:
+                self.plot_withinsub_errorbars(df2plot = df2plot_ecc, 
+                                                axes = axes[ind], 
+                                                cond2group = 'ring_ecc', 
+                                                yvar = 'att_diff', 
+                                                color = point_color)
+            
+            axes[ind].set_title(roi_name, fontsize=14)
+            axes[ind].set_xlabel('Ring ecc [deg]',fontsize = 16, labelpad = 15)
+
+        axes[0].set_ylabel('Att - Unatt intensity [a.u.]', fontsize = 16, labelpad = 15)
+
+        axes[0].set_ylim(ylim)
+        axes[0].set_xlim([df2plot_ecc.ring_ecc.min() - .3, 
+                          df2plot_ecc.ring_ecc.max() + .3])
         plt.margins(x=0.075)
 
         #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
@@ -2144,8 +2204,9 @@ class DecoderViewer(Viewer):
                             elinewidth = 3, capsize = 5, capthick=2,
                             zorder = 100, c = point_color, alpha=1, fmt='none')
             ax2.hlines(0, -1, 6, linestyles='dashed', color = point_color, alpha = .3)
-            ax2.tick_params(axis='x', labelsize=13)
-            ax2.set_xticklabels(np.round(np.sort(df2plot.ecc.unique()), 2))
+            if d_ind == 0:
+                ax2.tick_params(axis='x', labelsize=13)
+                ax2.set_xticklabels(np.round(np.sort(df2plot.ecc.unique()), 2))
             ax2.set_ylim(ylim2)
             ax2.set_ylabel(None)
             
@@ -2166,3 +2227,58 @@ class DecoderViewer(Viewer):
                                         '_ROI-{rname}.{fext}'.format(fext = fig_type,
                                                                     rname = roi_name)),
                         dpi = 100)
+            
+    def plot_pix_EccDist_barplot(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
+                                        figsize=(18,3), filename = None, combine_rois = False, ylim = [.10, .22], group_ecc = True):
+
+        """
+        Plot mean pixel intensity values
+        for target vs distractor bar positions
+        for different conditions of interest
+
+        (variation of plot_pix_DistEcc, where columns and axis are swapped)
+
+        """
+
+        # create color palette and reference 2D ecc image
+        fig, _ = self.plot_pix_ecc_ref_heatmap(pixel_df = pixel_df, 
+                                                cmap = 'Spectral', 
+                                                desat = .8, 
+                                                figsize = (8,5), 
+                                                filename = None, 
+                                                dpi = 100,
+                                                ring_ecc = group_ecc)
+        if filename:
+            fig.savefig(filename.replace('.{fext}'.format(fext = fig_type), 
+                                        '_ecc_color_reference.{fext}'.format(fext = fig_type)),
+                                dpi = 100)
+
+        for roi_name in ROI_list:
+            
+            ## if plotting ecc values grouped into rings
+            if group_ecc:
+
+                self.plot_ROI_pix_ringEccDist_barplot(ring_pix_df = pixel_df, 
+                                                    roi_name = roi_name,
+                                                    filename = filename, 
+                                                    ylim = [0,.2], 
+                                                    ylim2 = [-.015,.04],
+                                                    figsize = (20,5), 
+                                                    error_bars =  error_bars, 
+                                                    showtitle = True, 
+                                                    showxlabel = True, 
+                                                    ring_ecc_colors = None, 
+                                                    point_color = '#FF0080')
+            
+            else:
+                self.plot_ROI_pix_EccDist_barplot(pixel_df = pixel_df, 
+                                                roi_name = roi_name,
+                                                filename = filename, 
+                                                ylim = [0,.23], 
+                                                ylim2 = [-.035,.065],
+                                                figsize = (30,5), 
+                                                error_bars =  error_bars, 
+                                                showtitle = True, 
+                                                showxlabel = True, 
+                                                ecc_colors = None, 
+                                                point_color = '#FF0080')

@@ -3330,6 +3330,25 @@ class Decoding_Model(GLMsingle_Model):
         diff_df = pd.concat(diff_df, ignore_index=True)
 
         return diff_df
+    
+    def group_ecc_rings(self, pixel_df = None):
+
+        """
+        Given df with pixel intensity values, group ecc values into 3 rings
+        """
+
+        ring_ecc = {1: np.sort(pixel_df.ecc.unique())[:1],
+                    2: np.sort(pixel_df.ecc.unique())[1:3],
+                    3: np.sort(pixel_df.ecc.unique())[3:]}
+        
+        ## add ring values to pix df
+        ring_pix_df = pixel_df.copy()
+
+        for key in ring_ecc.keys():
+            ind_vals = ring_pix_df[ring_pix_df['ecc'].isin(ring_ecc[key])].index.values
+            ring_pix_df.loc[list(ind_vals), ['ring_ecc']] = int(key)
+
+        return ring_pix_df
 
 
 

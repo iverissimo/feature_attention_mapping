@@ -576,7 +576,6 @@ class DecoderViewer(Viewer):
         ## create color map array
         # if we are grouping pixel ecc into rings
         if ring_ecc:
-
             if ring_ecc_colors is None:
                 ring_ecc_colors = self.MRIObj.params['plotting']['ring_ecc_colors']
 
@@ -1670,8 +1669,7 @@ class DecoderViewer(Viewer):
 
         ## save figure
         if filename is not None:
-            fig.savefig(filename.replace('.{fext}'.format(fext = fig_type)),
-                        dpi = 100)
+            fig.savefig(filename, dpi = 100)
             
     def plot_pix_Ecc_AttDiff(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
                                                 figsize=(15,5), filename = None, ylim = [-.01, .03]):
@@ -1735,8 +1733,362 @@ class DecoderViewer(Viewer):
 
         ## save figure
         if filename is not None:
-            fig.savefig(filename.replace('.{fext}'.format(fext = fig_type)),
+            fig.savefig(filename, dpi = 100)
+
+    def plot_ROI_pix_ringEccDist_barplot(self, ring_pix_df = None, roi_name = 'V1', fig_type = 'png', filename = None, ylim = [0.08,.2], ylim2 = [-.01,.035],
+                                        figsize = (20,5), error_bars =  'within', showtitle = True, showxlabel = True, 
+                                        ring_ecc_colors = None, point_color = '#FF0080'):
+
+        """
+        For a given ROI, make barplot that combines drive values
+        for different conditions of interest 
+        (when grouping ecc in rings)
+        """
+
+        ## color palette
+        if ring_ecc_colors is None:
+            ring_ecc_colors = self.MRIObj.params['plotting']['ring_ecc_colors']
+
+        ## get average attention effect for given conditions
+        att_diff_df = self.DecoderObj.get_avg_attDiff(pixel_df = ring_pix_df[ring_pix_df['ROI'] == roi_name], 
+                                                      conditions = ['min_dist', 'ring_ecc'])
+        
+        ## create average values df
+        avg_pix_df = ring_pix_df[ring_pix_df['ROI'] == roi_name].groupby(['sj', 'bar_type', 'min_dist', 'ring_ecc']).mean(numeric_only=True).reset_index()
+        
+        ## calculate within sub error bars 
+        if error_bars == 'within':
+            att_diff_df = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = att_diff_df, 
+                                                                    main_var = 'att_diff', 
+                                                                    conditions = ['min_dist','ring_ecc'], 
+                                                                    pp_key = 'sj')
+            ## calculate within sub error bars 
+            avg_pix_df = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = avg_pix_df, 
+                                                                main_var = 'intensity', 
+                                                                conditions = ['bar_type', 'min_dist', 'ring_ecc'], 
+                                                                pp_key = 'sj')
+            error_key = None
+        else:
+            error_key = ('se')
+
+    
+        ## make figure
+        fig, ax1 = plt.subplots(nrows = 1, ncols = len(ring_pix_df.min_dist.unique()), 
+                                figsize = figsize, sharex=True, sharey=True)
+
+        ## iterate over distances
+        for d_ind, dist in enumerate(np.sort(ring_pix_df.min_dist.unique())):
+
+            ## filter average values df
+            df2plot = avg_pix_df[(avg_pix_df['min_dist'] == dist)]
+
+            ## and attention effect values
+            att_diff2plot = att_diff_df[(att_diff_df['min_dist'] == dist)]
+
+            #df2plot.astype({'ring_ecc': 'str'}).dtypes
+            
+            ## make bar plot
+            # target 
+            v1 = sns.barplot(data = df2plot[(df2plot['bar_type'] == 'att_bar')], 
+                            x = 'ring_ecc', y = 'intensity', width = .35,
+                            hue = 'ring_ecc', hue_order = ring_ecc_colors.keys(),
+                            palette = ring_ecc_colors, legend = False,
+                            estimator = np.mean, errorbar = error_key, ax = ax1[d_ind])
+            # distractor 
+            v2 = sns.barplot(data = df2plot[(df2plot['bar_type'] == 'unatt_bar')], 
+                            x = 'ring_ecc', y = 'intensity', width = .35,
+                            hue = 'ring_ecc', hue_order = ring_ecc_colors.keys(),
+                            palette = ring_ecc_colors, legend = False,
+                            estimator = np.mean, errorbar = error_key, ax = ax1[d_ind])
+
+            ## get plot patchs to move 
+            patch_bars = np.array(ax1[d_ind].patches) 
+            patch_x = np.array([ax1[d_ind].patches[i].get_x() for i in range(len(ax1[d_ind].patches))])
+            patch_bars = patch_bars[np.where((patch_x != 0))[0]] # fix to remove blanks (created because non-categorical factors)
+            
+            ## change position of bars to make then not overlap
+            factor = np.repeat([-1,1], len(df2plot.ring_ecc.unique()))
+            new_value = .2
+            
+            for ind, patch in enumerate(patch_bars):
+                
+                # we move the bar
+                patch.set_x(patch.get_x() + new_value * factor[ind])
+            
+                if factor[ind] > 0: # if other condition bar
+                    patch.set_hatch('//')
+            
+                if error_key is not None:
+                    # also change the error bar location
+                    ax1[d_ind].lines[ind].set_xdata(ax1[d_ind].lines[ind].get_xdata() + new_value * factor[ind])
+
+            ## make legend (plotted in last subplot)
+            if dist == np.sort(ring_pix_df.min_dist.unique())[-1]:
+                handleA = mpatches.Patch(facecolor='w',edgecolor = 'k',label='Attended bar')
+                handleB = mpatches.Patch(facecolor='w',edgecolor = 'k',label='Unattended bar',hatch = '//')
+                
+                leg = ax1[d_ind].legend(handles = [handleA,handleB],loc='upper left')
+                
+                frame = leg.get_frame()
+                frame.set_facecolor('w')
+                frame.set_edgecolor('k')
+            
+            v1.set(xlabel=None)
+            v1.set(ylabel=None)
+            plt.margins(x=0.075)
+            
+            if showtitle:
+                ax1[d_ind].set_title('Min. Distance = %.2f deg'%dist,fontsize=14)
+            if showxlabel:
+                ax1[d_ind].set_xlabel('Ring Ecc [a. u.]',fontsize = 16, labelpad = 15)
+                
+            ax1[d_ind].tick_params(axis='both', labelsize=13)
+            
+            ax1[0].set_ylabel('%s\n\nMean Drive [a.u.]'%roi_name, fontsize = 16, labelpad = 15)
+            ax1[d_ind].set_ylim(ylim)
+            ax1[d_ind].set_xlim(-.5,2.5)
+            
+            ## add within sub error bars
+            if error_bars == 'within':
+            
+                att_intensity = [df2plot[(df2plot['bar_type'] == 'att_bar') &\
+                                        (df2plot['ring_ecc'] == eval)].intensity.values.mean() for eval in ring_ecc_colors.keys()]
+                att_sem = [df2plot[(df2plot['bar_type'] == 'att_bar') &\
+                                    (df2plot['ring_ecc'] == eval)].SEM_intensity.values.mean() for eval in ring_ecc_colors.keys()]
+            
+                unatt_intensity = [df2plot[(df2plot['bar_type'] == 'unatt_bar') &\
+                                        (df2plot['ring_ecc'] == eval)].intensity.values.mean() for eval in ring_ecc_colors.keys()]
+                unatt_sem = [df2plot[(df2plot['bar_type'] == 'unatt_bar') &\
+                                    (df2plot['ring_ecc'] == eval)].SEM_intensity.values.mean() for eval in ring_ecc_colors.keys()]
+                ## target bar
+                ax1[d_ind].errorbar(x = np.array(ax1[d_ind].get_xticks()) - new_value, 
+                            y = att_intensity, 
+                            yerr = att_sem,
+                            elinewidth = 3, capsize = 5, capthick=2,
+                            zorder = 100, c='#545759', alpha=1, fmt='none')
+            
+                ## distractor bar
+                ax1[d_ind].errorbar(x = np.array(ax1[d_ind].get_xticks()) + new_value, 
+                            y = unatt_intensity, 
+                            yerr = unatt_sem,
+                            elinewidth = 3, capsize = 5, capthick=2,
+                            zorder = 100, c='#545759', alpha=1, fmt='none')
+
+            #### add attention effect values as a pointplot in twin axis
+        
+            ## copy axis 
+            ax2 = ax1[d_ind].twinx()
+
+            sns.pointplot(data = att_diff2plot, 
+                        y = 'att_diff', x = 'ring_ecc', 
+                        ax = ax2, linestyle = 'none', errorbar = error_key, 
+                        color = point_color, markersize = 10)
+            if error_bars == 'within':
+                ax2.errorbar(x = att_diff2plot.groupby(['ring_ecc']).mean(numeric_only=True).reset_index().ring_ecc.values-1, 
+                            y = att_diff2plot.groupby(['ring_ecc']).mean(numeric_only=True).reset_index().att_diff.values, 
+                            yerr = att_diff2plot.groupby(['ring_ecc']).mean(numeric_only=True).reset_index().SEM_att_diff.values,
+                            elinewidth = 3, capsize = 5, capthick=2,
+                            zorder = 100, c = point_color, alpha=1, fmt='none')
+            ax2.hlines(0, -1, 4, linestyles='dashed', color = point_color, alpha = .3)
+            ax2.set_ylim(ylim2)
+            ax2.set_ylabel(None)
+            
+            # plot label in last subplot
+            if dist == np.sort(ring_pix_df.min_dist.unique())[-1]:
+                ax2.tick_params(axis='y', labelsize=13, color = point_color, labelcolor = point_color, length=5, width=2)
+                ax2.set_ylabel('Att - Unatt drive [a.u.]', fontsize = 16, labelpad = 18, color = point_color, rotation = 270)
+            else:
+                ax2.set_yticks([])
+                #ax2.tick_params(axis='y', labelsize=13, color = 'red', labelcolor='red', length=5, width=2)
+
+        plt.tight_layout()
+
+        ## save figure
+        if filename is not None:
+            fig.savefig(filename.replace('.{fext}'.format(fext = fig_type), 
+                                        '_ROI-{rname}.{fext}'.format(fext = fig_type,
+                                                                    rname = roi_name)),
                         dpi = 100)
+            
+    def plot_ROI_pix_EccDist_barplot(self, pixel_df = None, roi_name = 'V1', fig_type = 'png', filename = None, ylim = [0.08,.2], ylim2 = [-.01,.035],
+                                        figsize = (20,5), error_bars =  'within', showtitle = True, showxlabel = True, 
+                                        ecc_colors = None, point_color = '#FF0080', cmap = 'Spectral', desat = .8, wspace=0.05, hspace=0.2):
 
+        """
+        For a given ROI, make barplot that combines drive values
+        for different conditions of interest 
+        """
 
+        ## color palette
+        if ecc_colors is None:
+            ## create color map array
+            col_arr = sns.color_palette(cmap, len(pixel_df.ecc.unique()), desat = desat)
+            ## create dict of ecc colors
+            ecc_colors = {key: col_arr[i] for i, key in enumerate(np.sort(pixel_df.ecc.unique()))}
 
+        ## get average attention effect for given conditions
+        att_diff_df = self.DecoderObj.get_avg_attDiff(pixel_df = pixel_df[pixel_df['ROI'] == roi_name], 
+                                                      conditions = ['min_dist', 'ecc'])
+        
+        ## create average values df
+        avg_pix_df = pixel_df[pixel_df['ROI'] == roi_name].groupby(['sj', 'bar_type', 'min_dist', 'ecc']).mean(numeric_only=True).reset_index()
+        
+        ## calculate within sub error bars 
+        if error_bars == 'within':
+            att_diff_df = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = att_diff_df, 
+                                                                    main_var = 'att_diff', 
+                                                                    conditions = ['min_dist','ecc'], 
+                                                                    pp_key = 'sj')
+            ## calculate within sub error bars 
+            avg_pix_df = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = avg_pix_df, 
+                                                                main_var = 'intensity', 
+                                                                conditions = ['bar_type', 'min_dist', 'ecc'], 
+                                                                pp_key = 'sj')
+            error_key = None
+        else:
+            error_key = ('se')
+
+    
+        ## make figure
+        fig, ax1 = plt.subplots(nrows = 1, ncols = len(pixel_df.min_dist.unique()), 
+                                figsize = figsize, sharex=True, sharey=True)
+
+        ## iterate over distances
+        for d_ind, dist in enumerate(np.sort(pixel_df.min_dist.unique())):
+
+            ## filter average values df
+            df2plot = avg_pix_df[(avg_pix_df['min_dist'] == dist)]
+
+            ## and attention effect values
+            att_diff2plot = att_diff_df[(att_diff_df['min_dist'] == dist)]
+            
+            ## make bar plot
+            # target 
+            v1 = sns.barplot(data = df2plot[(df2plot['bar_type'] == 'att_bar')], 
+                            x = 'ecc', y = 'intensity', width = .35,
+                            hue = 'ecc', hue_order = ecc_colors.keys(),
+                            palette = ecc_colors, legend = False,
+                            estimator = np.mean, errorbar = error_key, ax = ax1[d_ind])
+            # distractor 
+            v2 = sns.barplot(data = df2plot[(df2plot['bar_type'] == 'unatt_bar')], 
+                            x = 'ecc', y = 'intensity', width = .35,
+                            hue = 'ecc', hue_order = ecc_colors.keys(),
+                            palette = ecc_colors, legend = False,
+                            estimator = np.mean, errorbar = error_key, ax = ax1[d_ind])
+
+            ## get plot patchs to move 
+            patch_bars = np.array(ax1[d_ind].patches) 
+            patch_x = np.array([ax1[d_ind].patches[i].get_x() for i in range(len(ax1[d_ind].patches))])
+            patch_bars = patch_bars[np.where((patch_x != 0))[0]] # fix to remove blanks (created because non-categorical factors)
+            
+            ## change position of bars to make then not overlap
+            factor = np.repeat([-1,1], len(df2plot.ecc.unique()))
+            new_value = .2
+            
+            for ind, patch in enumerate(patch_bars):
+                
+                # we move the bar
+                patch.set_x(patch.get_x() + new_value * factor[ind])
+            
+                if factor[ind] > 0: # if other condition bar
+                    patch.set_hatch('//')
+            
+                if error_key is not None:
+                    # also change the error bar location
+                    ax1[d_ind].lines[ind].set_xdata(ax1[d_ind].lines[ind].get_xdata() + new_value * factor[ind])
+
+            ## make legend (plotted in last subplot)
+            if dist == np.sort(pixel_df.min_dist.unique())[-1]:
+                handleA = mpatches.Patch(facecolor='w',edgecolor = 'k',label='Attended bar')
+                handleB = mpatches.Patch(facecolor='w',edgecolor = 'k',label='Unattended bar',hatch = '//')
+                
+                leg = ax1[d_ind].legend(handles = [handleA,handleB],loc='upper left')
+                
+                frame = leg.get_frame()
+                frame.set_facecolor('w')
+                frame.set_edgecolor('k')
+            
+            v1.set(xlabel=None)
+            v1.set(ylabel=None)
+            plt.margins(x=0.075)
+            
+            if showtitle:
+                ax1[d_ind].set_title('Min. Distance = %.2f deg'%dist,fontsize=14)
+            if showxlabel:
+                ax1[d_ind].set_xlabel('Ring Ecc [a. u.]',fontsize = 16, labelpad = 15)
+                
+            ax1[d_ind].tick_params(axis='both', labelsize=13)
+            
+            ax1[0].set_ylabel('%s\n\nMean Drive [a.u.]'%roi_name, fontsize = 16, labelpad = 15)
+            ax1[d_ind].set_ylim(ylim)
+            ax1[d_ind].set_xlim(-.5,2.5)
+            
+            ## add within sub error bars
+            if error_bars == 'within':
+            
+                att_intensity = [df2plot[(df2plot['bar_type'] == 'att_bar') &\
+                                        (df2plot['ecc'] == eval)].intensity.values.mean() for eval in ecc_colors.keys()]
+                att_sem = [df2plot[(df2plot['bar_type'] == 'att_bar') &\
+                                    (df2plot['ecc'] == eval)].SEM_intensity.values.mean() for eval in ecc_colors.keys()]
+            
+                unatt_intensity = [df2plot[(df2plot['bar_type'] == 'unatt_bar') &\
+                                        (df2plot['ecc'] == eval)].intensity.values.mean() for eval in ecc_colors.keys()]
+                unatt_sem = [df2plot[(df2plot['bar_type'] == 'unatt_bar') &\
+                                    (df2plot['ecc'] == eval)].SEM_intensity.values.mean() for eval in ecc_colors.keys()]
+                ## target bar
+                ax1[d_ind].errorbar(x = np.array(ax1[d_ind].get_xticks()) - new_value, 
+                            y = att_intensity, 
+                            yerr = att_sem,
+                            elinewidth = 3, capsize = 5, capthick=2,
+                            zorder = 100, c='#545759', alpha=1, fmt='none')
+            
+                ## distractor bar
+                ax1[d_ind].errorbar(x = np.array(ax1[d_ind].get_xticks()) + new_value, 
+                            y = unatt_intensity, 
+                            yerr = unatt_sem,
+                            elinewidth = 3, capsize = 5, capthick=2,
+                            zorder = 100, c='#545759', alpha=1, fmt='none')
+
+            #### add attention effect values as a pointplot in twin axis
+        
+            ## copy axis 
+            ax2 = ax1[d_ind].twinx()
+
+            sns.pointplot(data = att_diff2plot, 
+                        y = 'att_diff', x = 'ecc', 
+                        ax = ax2, linestyle = 'none', errorbar = error_key, 
+                        color = point_color, markersize = 10)
+            if error_bars == 'within':
+                # quick hack for plotting
+                x_coord2plot =  np.array(ax2.get_xticks())
+                if len(att_diff2plot.ecc.unique()) < len(x_coord2plot):
+                    x_coord2plot = x_coord2plot[-1 * len(att_diff2plot.ecc.unique()):]
+
+                ax2.errorbar(x = x_coord2plot, 
+                            y = att_diff2plot.groupby(['ecc']).mean(numeric_only=True).reset_index().att_diff.values, 
+                            yerr = att_diff2plot.groupby(['ecc']).mean(numeric_only=True).reset_index().SEM_att_diff.values,
+                            elinewidth = 3, capsize = 5, capthick=2,
+                            zorder = 100, c = point_color, alpha=1, fmt='none')
+            ax2.hlines(0, -1, 6, linestyles='dashed', color = point_color, alpha = .3)
+            ax2.tick_params(axis='x', labelsize=13)
+            ax2.set_xticklabels(np.round(np.sort(df2plot.ecc.unique()), 2))
+            ax2.set_ylim(ylim2)
+            ax2.set_ylabel(None)
+            
+            # plot label in last subplot
+            if dist == np.sort(pixel_df.min_dist.unique())[-1]:
+                ax2.tick_params(axis='y', labelsize=13, color = point_color, labelcolor = point_color, length=5, width=2)
+                ax2.set_ylabel('Att - Unatt drive [a.u.]', fontsize = 16, labelpad = 18, color = point_color, rotation = 270)
+            else:
+                ax2.set_yticks([])
+                #ax2.tick_params(axis='y', labelsize=13, color = 'red', labelcolor='red', length=5, width=2)
+
+        plt.subplots_adjust(wspace=wspace, hspace=hspace)
+        plt.tight_layout()
+
+        ## save figure
+        if filename is not None:
+            fig.savefig(filename.replace('.{fext}'.format(fext = fig_type), 
+                                        '_ROI-{rname}.{fext}'.format(fext = fig_type,
+                                                                    rname = roi_name)),
+                        dpi = 100)

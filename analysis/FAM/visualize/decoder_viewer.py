@@ -2282,3 +2282,107 @@ class DecoderViewer(Viewer):
                                                 showxlabel = True, 
                                                 ecc_colors = None, 
                                                 point_color = '#FF0080')
+                
+
+    def plot_prf_timecourses(self, prf_decoder_model = None, prf_masked_data_df = None, pars2plot = None, 
+                                    roi_name = 'V1', vert_list = [], fig_type = 'png',
+                                    filename = None, figsize = (15,5)):
+
+        """
+        Make figure with timeseries data + prediction for specific vertices
+        + RF representation
+        """
+
+        ## get df with model prediction as time courses
+        # 
+        predictions_df = prf_decoder_model.predict(parameters = pars2plot)
+
+        ## also get respective RF profile
+        prf_decoder_model.parameters = pars2plot
+        rfs = prf_decoder_model.get_rf(as_frame=True)
+
+        ## setup figure
+        fig, axes = plt.subplots(nrows = len(vert_list), ncols = 2, figsize = figsize, sharey=False, sharex=False, width_ratios=[2, 1])
+        
+        ## iterate over vertices
+        for ind, vert in enumerate(vert_list):
+
+            if len(vert_list) == 1:
+                axes = self.plot_prf_vert_tc(axes, 
+                                            vert = vert,
+                                            data2plot = prf_masked_data_df[vert].values, 
+                                            model2plot = predictions_df[vert].values, 
+                                            rf2plot = rfs.xs(vert, level=0, axis=0, drop_level=False).T.stack('y', future_stack=True), 
+                                            pars2plot = pars2plot, 
+                                            roi_name = roi_name)
+            else:
+                axes[ind] = self.plot_prf_vert_tc(axes[ind], 
+                                                vert = vert,
+                                                data2plot = prf_masked_data_df[vert].values, 
+                                                model2plot = predictions_df[vert].values, 
+                                                rf2plot = rfs.xs(vert, level=0, axis=0, drop_level=False).T.stack('y', future_stack=True), 
+                                                pars2plot = pars2plot, 
+                                                roi_name = roi_name)
+                
+        fig.tight_layout()
+        
+        ## save figure
+        if filename is not None:
+            fig.savefig(filename.replace('.{fext}'.format(fext = fig_type), 
+                                        '_ROI-{rname}.{fext}'.format(fext = fig_type,
+                                                                    rname = roi_name)),
+                        dpi = 100)
+
+    def plot_prf_vert_tc(self, axes, vert = None, data2plot = None, model2plot = None, rf2plot = None, pars2plot = None, roi_name = None):
+
+        """
+        plot timecourse on given axis (expects axis to have 2 columns)
+        """
+
+        ## set time to seconds
+        time_sec = np.linspace(0, data2plot.shape[0] * self.MRIObj.TR, data2plot.shape[0])
+
+        ## plot timeseries
+        axes[0].plot(time_sec, data2plot, linestyle = '-.', color = 'k', marker = 'o', 
+                    linewidth = 1, markersize = 3, label = 'Data')
+        axes[0].plot(time_sec, model2plot, color = '#2b8043', linewidth=3, 
+                    label = 'Model', zorder = 1)
+
+        axes[0].set_xlabel('Time (s)', fontsize = 16, labelpad = 15)
+        axes[0].set_ylabel('BOLD signal change (%)', fontsize = 16, labelpad = 15)
+        axes[0].tick_params(axis='both', labelsize=13)
+
+        axes[0].set_xlim(0, data2plot.shape[0] * self.MRIObj.TR)
+
+        handles,labels = axes[0].axes.get_legend_handles_labels()
+        axes[0].legend(handles,labels,loc='upper left',fontsize='small')   
+
+        ## plot RF
+        axes[1].imshow(rf2plot, vmin = -0.017, vmax = 0.017, cmap = 'coolwarm')
+
+        axes[1].vlines(rf2plot.shape[0]/2, 0, rf2plot.shape[0], linestyles='dashed', color='k', alpha = .15)
+        axes[1].hlines(rf2plot.shape[0]/2, 0, rf2plot.shape[0], linestyles='dashed', color='k', alpha = .15)
+
+        axes[1].set_xlim(0, rf2plot.shape[0])
+        axes[1].set_ylim(rf2plot.shape[0], 0)
+
+        ## change ticks
+        screen_coords_deg = np.linspace(-1 * self.DecoderObj.convert_pix2dva(self.MRIObj.screen_res[0]/2),
+                                        self.DecoderObj.convert_pix2dva(self.MRIObj.screen_res[0]/2), 
+                                        5)
+        axes[1].set_xticks(np.linspace(0,80, 5).astype(int), labels = np.round(screen_coords_deg, 2))
+        axes[1].set_yticks(np.linspace(0,80, 5).astype(int), labels = np.round(np.flip(screen_coords_deg), 2))
+        axes[1].tick_params(axis='both', labelsize=11)
+        axes[1].text(rf2plot.shape[0] + 3, rf2plot.shape[0]- 25, 
+                    '{rname} pRF\n\n\nR$^2$: {rval} %\n\nECC: {eval} deg\n\nPA: {paval}$^\circ$\n\nSD: {sval} deg\n\nSurroundSD: {ssval} deg'.format(rname = roi_name,
+                        rval = np.round(float(pars2plot.loc[vert].r2), 2) * 100,
+                        eval = np.round(np.abs(pars2plot.loc[vert].x + pars2plot.loc[vert].y * 1j), 2),
+                        paval = np.round(np.angle(pars2plot.loc[vert].x + pars2plot.loc[vert].y * 1j, deg = True), 2),
+                        sval = np.round(float(pars2plot.loc[vert].sd), 2),
+                        ssval = np.round(float(pars2plot.loc[vert].srf_size), 2)
+                        ), 
+                        fontsize=12)
+
+        return axes
+
+

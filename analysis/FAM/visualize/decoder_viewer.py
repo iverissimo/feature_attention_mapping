@@ -604,7 +604,6 @@ class DecoderViewer(Viewer):
         else:
             return fig, pix_ecc_colors
 
-
     def plot_trial_stim_movie(self, participant_list = [], ROI_list = ['V1'], model_type = 'gauss_hrf', 
                                     group_stim_dict = None, group_refDM_dict = None, avg_pp = False, fig_type = 'mp4',
                                     cmap = 'magma', annot = False, interval = 132, figsize = (8,5), fps = 6, dpi = 100,
@@ -740,10 +739,13 @@ class DecoderViewer(Viewer):
         else:
             ani.save(filename=filename, writer="ffmpeg", fps=fps, dpi=dpi) # save mp4 file+
 
-    ## set function to update frames
     def update_movie_frame(self, frame, stim_arr = [], dm_list = [], edge_mask_arr = None, axes = [],
                                 vmin = 0, vmax = .4, cmap = 'plasma', annot = False,
                                 line_color = 'green', alpha = .5, title = ''):
+        
+        """
+        update movie frames
+        """
         
         # clear axis of fig
         axes[0].clear() 
@@ -2471,5 +2473,151 @@ class DecoderViewer(Viewer):
             axes[1].tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
 
         return axes
+    
+    def plot_reconstructed_frame(self, dm2plot = None, stim2plot = None, frame = None, figsize = (10,5), 
+                                        vmin = 0, vmax = .25, cmap = 'magma', annot = False, line_color = 'green', alpha = .5, mask_edges = False,
+                                        filename = None, showticks = True, lw = 3):
+
+        """
+        plot reconstructed stim for specific trial (frame)
+        """
+
+        ## if we want to mask the edges 
+        edge_mask_arr = np.zeros(dm2plot[0].shape)
+        if mask_edges:
+            edge_mask_arr[[0,-1],:] = 1
+            edge_mask_arr[:, [0,-1]] = 1
+        
+        ## initialize base figure
+        fig, axes = plt.subplots(nrows=1, ncols=2, figsize = figsize)
+        
+        # DMs
+        axes[0].imshow(dm2plot[frame].T, cmap = 'binary_r', vmax = 1.5)
+        axes[0].vlines(3.5, -.5, 7.5, linestyles='dashed', color=line_color, alpha = alpha, lw = lw)
+        axes[0].hlines(3.5, -.5, 7.5, linestyles='dashed', color=line_color, alpha = alpha, lw = lw)
+        axes[0].set_xticks(np.arange(0, 8, 1).astype(int), 
+                        labels = np.round(stim2plot.stack('y', future_stack=True).loc[frame].columns.values, 2))
+        axes[0].set_yticks(np.arange(0, 8, 1).astype(int), 
+                        labels = np.round(stim2plot.stack('y', future_stack=True).loc[frame].index.values, 2))
+        
+        # plot stim
+        sns.heatmap(stim2plot.stack('y', future_stack=True).loc[frame], 
+                    cmap = cmap, ax = axes[1], 
+                    square = True, cbar = False, mask = edge_mask_arr,
+                    annot = annot, annot_kws = {"size": 7},
+                    vmin = vmin, vmax = vmax, fmt = '.2f',
+                    xticklabels = np.round(stim2plot.stack('y', future_stack=True).loc[frame].columns.values, 2),
+                    yticklabels = np.round(stim2plot.stack('y', future_stack=True).loc[frame].index.values, 2))
+        
+        axes[1].vlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha, lw = lw)
+        axes[1].hlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha, lw = lw)
+        axes[1].set_yticklabels(axes[0].get_yticklabels(), rotation=0)
+
+        if showticks == False:
+            axes[0].tick_params(top=True, bottom=True, left=True, right=True, labelleft=False, labelbottom=False)
+            axes[1].tick_params(top=True, bottom=True, left=True, right=True, labelleft=False, labelbottom=False)
+            axes[1].set_xlabel(None)
+            axes[1].set_ylabel(None)
+
+        if filename:
+            fig.savefig(filename, dpi = 100)
+
+
+    def plot_trial_stim(self, participant_list = [], ROI_list = ['V1'], frame_list = None, mask_edges = False,
+                            group_stim_dict = None, group_refDM_dict = None,
+                            model_type = 'gauss_hrf', prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean', avg_pp = False, 
+                            mask_bool_df = None, stim_on_screen = [], fig_type = 'png', wspace = 0.05, hspace = 0.2, figsize = (15,20)):
+        
+        """
+        Plot and save frames with recontructed stim, 
+        averaged across runs,
+        for each ROI and participant
+        """
+
+        # make dir to save estimates
+        fig_dir = op.join(self.figures_pth, 'reconstructed_stim')
+        # and set base figurename 
+        fig_id = 'sub-GROUP_task-FA_pRFmodel-{modname}_decoded_stim.{fext}'.format(modname = model_type,
+                                                                                   fext = fig_type)
+
+        # if we want to mask edges
+        if mask_edges:
+            fig_id = fig_id+'_edge_mask'
+
+        # base filename for figures 
+        base_filename = op.join(fig_dir, fig_id)
+
+        ## if we want to plot group average
+        if len(participant_list) > 1 and avg_pp:
+
+            os.makedirs(fig_dir, exist_ok = True)
+            print('saving figures in %s'%fig_dir)
+
+            # and average across participants (for plotting mainly)
+            avg_stim_dict, avg_refDM_dict = self.DecoderObj.average_group_stim_glmsing_trials(participant_list = participant_list, 
+                                                                                            ROI_list = ROI_list, 
+                                                                                            group_stim_dict = group_stim_dict, 
+                                                                                            group_refDM_dict = group_refDM_dict)
+            
+            ## if no frame list provided, plot all
+            frame_list = np.arange(avg_refDM_dict.shape[0]) if frame_list is None else frame_list
+
+            ## for each ROI
+            for roi_name in ROI_list:
+                
+                ## actually plot
+                for frame in frame_list:
+
+                    self.plot_reconstructed_frame(dm2plot = avg_refDM_dict, 
+                                                stim2plot = avg_stim_dict[roi_name], 
+                                                frame = frame, 
+                                                figsize = (10,5), vmin = 0.05, vmax = .24, 
+                                                cmap = 'plasma', 
+                                                filename = base_filename.replace('.{fext}'.format(fext = fig_type),
+                                                                                    'ROI-{rname}_frame-{fnum}.{fext}'.format(rname = roi_name,
+                                                                                                                                fnum = str(frame).zfill(3),
+                                                                                                                                fext = fig_type)
+                                                                                    ), 
+                                                showticks = False,
+                                                alpha = 1, line_color = '#14914d', lw = 3)
+
+        else:
+            ## now actually plot
+            for pp in participant_list:
+
+                ## if no frame list provided, plot all
+                frame_list = np.arange(group_refDM_dict['sub-{sj}'.format(sj = pp)].shape[0]) if frame_list is None else frame_list
+                
+                # make dir to save estimates
+                pp_fig_dir = op.join(fig_dir, 'sub-{sj}'.format(sj = pp))
+                pp_fig_id = fig_id.replace('sub-GROUP', 'sub-{sj}'.format(sj = pp)) 
+            
+                os.makedirs(pp_fig_dir, exist_ok = True)
+                print('saving figures in %s'%pp_fig_dir)
+                
+                # base filename for figures 
+                pp_base_filename = op.join(pp_fig_dir, pp_fig_id)
+
+                ## for each ROI
+                for roi_name in ROI_list:
+
+                    ## actually plot
+                    for frame in frame_list:
+
+                        self.plot_reconstructed_frame(dm2plot = group_refDM_dict['sub-{sj}'.format(sj = pp)], 
+                                                    stim2plot = group_stim_dict[roi_name]['sub-{sj}'.format(sj = pp)], 
+                                                    frame = frame, 
+                                                    figsize = (10,5), vmin = 0.05, vmax = .24, 
+                                                    cmap = 'plasma', 
+                                                    filename = pp_base_filename.replace('.{fext}'.format(fext = fig_type),
+                                                                                        'ROI-{rname}_frame-{fnum}.{fext}'.format(rname = roi_name,
+                                                                                                                                 fnum = str(frame).zfill(3),
+                                                                                                                                 fext = fig_type)
+                                                                                        ), 
+                                                    showticks = False,
+                                                    alpha = 1, line_color = '#14914d', lw = 3)
+
+                                        
+    
 
 

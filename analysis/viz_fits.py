@@ -280,6 +280,24 @@ match task:
                                                                                             crop_nr = FAM_data.task_nr_cropTR['pRF'], 
                                                                                             shift = FAM_data.shift_TRs_num),
                                                 fig_type = 'png') 
+                
+                case 'decoder_prf_tc':
+
+                    plotter.make_prf_tcplot(participant = FAM_data.sj_num[0], 
+                                            vox2plot_dict = {'V1': [235, 321, 202, 182, 698, 640]},
+                                            model_type = encoding_model_name,
+                                            ses = 'mean', 
+                                            prf_file_ext =  FAM_mri.get_mrifile_ext(nifti_file = True)['pRF'], 
+                                            mask_bool_df = FAM_beh.get_pRF_mask_bool(ses_type = 'func',
+                                                                                    crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                    shift = FAM_data.shift_TRs_num), 
+                                            stim_on_screen = FAM_beh.get_stim_on_screen(task = 'pRF', 
+                                                                                        crop_nr = FAM_data.task_nr_cropTR['pRF'], 
+                                                                                        shift = FAM_data.shift_TRs_num),
+                                            fig_type = 'png', 
+                                            wspace=0.05, 
+                                            hspace=0.07, 
+                                            figsize = (13,20))
 
         else:
 

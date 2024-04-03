@@ -2283,10 +2283,82 @@ class DecoderViewer(Viewer):
                                                 ecc_colors = None, 
                                                 point_color = '#FF0080')
                 
+    def make_prf_tcplot(self, participant = None, vox2plot_dict = {'V1': []},
+                            model_type = 'gauss_hrf', prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean', 
+                            mask_bool_df = None, stim_on_screen = [], fig_type = 'png', wspace=0.05, hspace=0.2, figsize = (15,20)):
+        
+        """
+        Make figure with encoding model (pRF) timecourses + predicted model fit + RF shape in visual space
+        for specific vertices of a participant and ROI 
+        """
+
+        ## if we also fitted HRF parameters
+        fit_hrf = True if 'hrf' in model_type else False
+
+        ## get ROI list from dictionary of voxel inds to plot
+        ROI_list = list(vox2plot_dict.keys())
+        
+        # get pars for all ROIs and participants
+        # in decoder specific multiindex shape
+        pars2plot_dict, best_vert_dict = self.DecoderObj.load_encoding_model_pars(participant_list = [participant], 
+                                                                                ROI_list = ROI_list,
+                                                                                model_type = model_type,
+                                                                                prf_file_ext = prf_file_ext, 
+                                                                                ses = ses, 
+                                                                                mask_bool_df = mask_bool_df, 
+                                                                                stim_on_screen = stim_on_screen,
+                                                                                pars_as_df = False)                
+        # make dir to save plots
+        fig_dir = op.join(self.figures_pth, 'prf_voxel_tc', 'sub-{sj}'.format(sj = participant))
+        os.makedirs(fig_dir, exist_ok = True)
+        print('saving figures in %s'%fig_dir)
+        
+        # and set base figurename 
+        fig_id = 'sub-{sj}_task-pRF_pRFmodel-{modname}_timecourse.{fext}'.format(sj = participant,
+                                                                                modname = model_type,
+                                                                                fext = fig_type)
+        # base filename for figures 
+        fig_filename = op.join(fig_dir, fig_id)
+
+        for roi_name in ROI_list:
+
+            # get prf stimulus DM and grid coordinates
+            prf_stimulus_dm, prf_grid_coordinates = self.DecoderObj.get_prf_stim_grid(participant = participant, 
+                                                                                    ses = ses, 
+                                                                                    mask_bool_df = mask_bool_df, 
+                                                                                    stim_on_screen = stim_on_screen,
+                                                                                    prf_condition_per_TR = self.DecoderObj.prf_condition_per_TR)
+            # get masked prf ROI data, averaged across runs
+            prf_masked_data_df = self.DecoderObj.get_prf_ROI_data(participant = participant,  
+                                                                roi_name = roi_name, 
+                                                                index_arr = [], 
+                                                                overwrite_T1 = False, 
+                                                                overwrite_func = False,
+                                                                file_ext = prf_file_ext)
+            # get prf model used in decoding            
+            prf_decoder_model = self.DecoderObj.setup_prf_model(data = prf_masked_data_df, 
+                                                            grid_coordinates = prf_grid_coordinates, 
+                                                            model_type = model_type,
+                                                            paradigm = prf_stimulus_dm, 
+                                                            fit_hrf = fit_hrf) 
+            
+            ## selct parameters from this ROI
+            pars2plot = pars2plot_dict[roi_name]['sub-{sj}'.format(sj = participant)].iloc[best_vert_dict[roi_name]['sub-{sj}'.format(sj = participant)]]
+
+            ## actually plot
+            self.plot_prf_timecourses(prf_decoder_model = prf_decoder_model, 
+                                    prf_masked_data_df = prf_masked_data_df, 
+                                    pars2plot = pars2plot, 
+                                    roi_name = roi_name, 
+                                    vert_list = vox2plot_dict[roi_name], 
+                                    filename = fig_filename, 
+                                    wspace = wspace, 
+                                    hspace = hspace,
+                                    figsize = figsize)
 
     def plot_prf_timecourses(self, prf_decoder_model = None, prf_masked_data_df = None, pars2plot = None, 
-                                    roi_name = 'V1', vert_list = [], fig_type = 'png',
-                                    filename = None, figsize = (15,5)):
+                                    roi_name = 'V1', vert_list = [], fig_type = 'png', wspace=0.05, hspace=0.2,
+                                    filename = None, figsize = (15,5), width_ratios=[2, 1]):
 
         """
         Make figure with timeseries data + prediction for specific vertices
@@ -2302,10 +2374,12 @@ class DecoderViewer(Viewer):
         rfs = prf_decoder_model.get_rf(as_frame=True)
 
         ## setup figure
-        fig, axes = plt.subplots(nrows = len(vert_list), ncols = 2, figsize = figsize, sharey=False, sharex=False, width_ratios=[2, 1])
+        fig, axes = plt.subplots(nrows = len(vert_list), ncols = 2, figsize = figsize, sharey=False, sharex=False, width_ratios=width_ratios)
         
         ## iterate over vertices
         for ind, vert in enumerate(vert_list):
+
+            showxlabel = True if len(vert_list) == 1 or vert == vert_list[-1] else False
 
             if len(vert_list) == 1:
                 axes = self.plot_prf_vert_tc(axes, 
@@ -2314,7 +2388,8 @@ class DecoderViewer(Viewer):
                                             model2plot = predictions_df[vert].values, 
                                             rf2plot = rfs.xs(vert, level=0, axis=0, drop_level=False).T.stack('y', future_stack=True), 
                                             pars2plot = pars2plot, 
-                                            roi_name = roi_name)
+                                            roi_name = roi_name,
+                                            showxlabel = showxlabel)
             else:
                 axes[ind] = self.plot_prf_vert_tc(axes[ind], 
                                                 vert = vert,
@@ -2322,9 +2397,11 @@ class DecoderViewer(Viewer):
                                                 model2plot = predictions_df[vert].values, 
                                                 rf2plot = rfs.xs(vert, level=0, axis=0, drop_level=False).T.stack('y', future_stack=True), 
                                                 pars2plot = pars2plot, 
-                                                roi_name = roi_name)
+                                                roi_name = roi_name,
+                                                showxlabel = showxlabel)
                 
         fig.tight_layout()
+        fig.subplots_adjust(wspace=wspace, hspace=hspace)
         
         ## save figure
         if filename is not None:
@@ -2333,7 +2410,7 @@ class DecoderViewer(Viewer):
                                                                     rname = roi_name)),
                         dpi = 100)
 
-    def plot_prf_vert_tc(self, axes, vert = None, data2plot = None, model2plot = None, rf2plot = None, pars2plot = None, roi_name = None):
+    def plot_prf_vert_tc(self, axes, vert = None, data2plot = None, model2plot = None, rf2plot = None, pars2plot = None, roi_name = None, showxlabel = True):
 
         """
         plot timecourse on given axis (expects axis to have 2 columns)
@@ -2373,7 +2450,7 @@ class DecoderViewer(Viewer):
         axes[1].set_xticks(np.linspace(0,80, 5).astype(int), labels = np.round(screen_coords_deg, 2))
         axes[1].set_yticks(np.linspace(0,80, 5).astype(int), labels = np.round(np.flip(screen_coords_deg), 2))
         axes[1].tick_params(axis='both', labelsize=11)
-        axes[1].text(rf2plot.shape[0] + 3, rf2plot.shape[0]- 25, 
+        axes[1].text(rf2plot.shape[0] + 3, rf2plot.shape[0]- 20, 
                     '{rname} pRF\n\n\nR$^2$: {rval} %\n\nECC: {eval} deg\n\nPA: {paval}$^\circ$\n\nSD: {sval} deg\n\nSurroundSD: {ssval} deg'.format(rname = roi_name,
                         rval = np.round(float(pars2plot.loc[vert].r2), 2) * 100,
                         eval = np.round(np.abs(pars2plot.loc[vert].x + pars2plot.loc[vert].y * 1j), 2),
@@ -2381,7 +2458,17 @@ class DecoderViewer(Viewer):
                         sval = np.round(float(pars2plot.loc[vert].sd), 2),
                         ssval = np.round(float(pars2plot.loc[vert].srf_size), 2)
                         ), 
-                        fontsize=12)
+                        fontsize=11)
+        
+        # suppress x label and ticks because combining plots
+        if showxlabel == False:
+            axes[0].tick_params(axis='x',          # changes apply to the x-axis
+                            which='both',      # both major and minor ticks are affected
+                            bottom=True,      # ticks along the bottom edge 
+                            top=False,         # ticks along the top edge 
+                            labelbottom=False) # labels along the bottom edge are off
+            axes[0].set_xlabel(None)
+            axes[1].tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
 
         return axes
 

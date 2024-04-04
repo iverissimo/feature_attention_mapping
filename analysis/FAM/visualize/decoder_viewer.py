@@ -2522,6 +2522,226 @@ class DecoderViewer(Viewer):
         if filename:
             fig.savefig(filename, dpi = 100)
 
+    def plot_collapsed_frame(self, dm2plot = None, stim2plot = None, flip_stim2plot = None, frame = None, figsize = (15,5), 
+                                vmin = 0, vmax = .25, cmap = 'magma', annot = False, line_color = 'green', alpha = .5, mask_edges = False,
+                                filename = None, showticks = True, lw = 3, x_coords_deg = None, y_coords_deg = None, showtitle = True, cbar = False):
+
+        """
+        plot reconstructed stim for specific trial (frame)
+        """
+
+        ## if we want to mask the edges 
+        edge_mask_arr = np.zeros(dm2plot[0].shape)
+        if mask_edges:
+            edge_mask_arr[[0,-1],:] = 1
+            edge_mask_arr[:, [0,-1]] = 1
+        
+        ## initialize base figure
+        fig, axes = plt.subplots(nrows=1, ncols=3, figsize = figsize)
+
+        # DMs
+        axes[0].imshow(dm2plot[frame].T, cmap = 'binary_r', vmax = 1.5)
+        axes[0].vlines(3.5, -.5, 7.5, linestyles='dashed', color=line_color, alpha = alpha, lw = lw)
+        axes[0].hlines(3.5, -.5, 7.5, linestyles='dashed', color=line_color, alpha = alpha, lw = lw)
+        axes[0].set_xticks(np.arange(0, 8, 1).astype(int), 
+                        labels = np.round(x_coords_deg, 2))
+        axes[0].set_yticks(np.arange(0, 8, 1).astype(int), 
+                        labels = np.round(y_coords_deg, 2))
+
+        # plot stim
+        sns.heatmap(stim2plot, 
+                    cmap = cmap, ax = axes[1], 
+                    square = True, cbar = False, mask = edge_mask_arr,
+                    annot = annot, annot_kws = {"size": 7},
+                    vmin = vmin, vmax = vmax, fmt = '.2f',
+                    xticklabels = np.round(x_coords_deg, 2),
+                    yticklabels = np.round(y_coords_deg, 2))
+
+        axes[1].vlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha, lw = lw)
+        axes[1].hlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha, lw = lw)
+        axes[1].set_yticklabels(axes[0].get_yticklabels(), rotation=0)
+
+        # plot flipped stim
+        sns.heatmap(flip_stim2plot, 
+                    cmap = cmap, ax = axes[2], 
+                    square = True, cbar = cbar, mask = edge_mask_arr,
+                    cbar_kws = dict(use_gridspec=False,location="right"),
+                    annot = annot, annot_kws = {"size": 7},
+                    vmin = vmin, vmax = vmax, fmt = '.2f',
+                    xticklabels = np.round(x_coords_deg, 2),
+                    yticklabels = np.round(y_coords_deg, 2))
+
+        axes[2].vlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha, lw = lw)
+        axes[2].hlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha, lw = lw)
+        axes[2].set_yticklabels(axes[0].get_yticklabels(), rotation=0)
+
+        if showtitle:
+            axes[0].set_title('DM', fontsize=14)
+            axes[1].set_title('Average stim', fontsize=14)
+            axes[2].set_title('Flipped case', fontsize=14)
+
+        if showticks == False:
+            axes[0].tick_params(top=True, bottom=True, left=True, right=True, labelleft=False, labelbottom=False)
+            axes[1].tick_params(top=True, bottom=True, left=True, right=True, labelleft=False, labelbottom=False)
+            axes[2].tick_params(top=True, bottom=True, left=True, right=True, labelleft=False, labelbottom=False)
+            axes[1].set_xlabel(None)
+            axes[1].set_ylabel(None)
+            axes[2].set_xlabel(None)
+            axes[2].set_ylabel(None)
+
+        if filename:
+            fig.savefig(filename, dpi = 100)
+
+    def plot_collapsed_stim(self, participant_list = [], ROI_list = ['V1'], mask_edges = False,
+                            group_stim_dict = None, group_refDM_dict = None, trial_combinations_df = None,
+                            model_type = 'gauss_hrf', avg_pp = False, alpha = 1, line_color = '#14914d', lw = 3,
+                            fig_type = 'png', wspace = 0.05, hspace = 0.2, figsize = (10,5), vmin = 0.05, vmax = .24, 
+                            cmap = 'plasma', annot = False, cbar = False, showticks = True, showtitle = True):
+        
+        """
+        Plot and save frames with collapsed stim, 
+        across unique bar positions,
+        for each ROI and participant
+        """
+
+        # make dir to save estimates
+        fig_dir = op.join(self.figures_pth, 'reconstructed_stim')
+        os.makedirs(fig_dir, exist_ok = True)
+
+        # and set base figurename 
+        fig_id = 'sub-GROUP_task-FA_pRFmodel-{modname}_decoded_stim_unique.{fext}'.format(modname = model_type,
+                                                                                   fext = fig_type)
+
+        # if we want to mask edges
+        if mask_edges:
+            fig_id = fig_id+'_edge_mask'
+
+        # base filename for figures 
+        base_filename = op.join(fig_dir, fig_id)
+        
+        ## convert trial combination df to a "run position" style df
+        trial_combinations_position_df = self.DecoderObj.convert_trial_combinations_2_run_position_df(trial_combinations_df = trial_combinations_df)
+
+        ## get average stim (across unique bar positions) for all ROIs
+        # and bar type (parallel or crossed)
+        unique_stim_dict = {'parallel': {}, 'crossed': {}}
+        flip_unique_stim_dict = {'parallel': {}, 'crossed': {}}
+
+        unique_stim_dict['parallel'], flip_unique_stim_dict['parallel'] = self.DecoderObj.get_group_collapsed_stim_dict(participant_list = participant_list, 
+                                                                                                                    ROI_list = ROI_list, 
+                                                                                                                    group_stim_dict = group_stim_dict, 
+                                                                                                                    trial_combinations_position_df = trial_combinations_position_df, 
+                                                                                                                    group_refDM_dict = group_refDM_dict, 
+                                                                                                                    bar_type = 'parallel', 
+                                                                                                                    avg_pp = avg_pp)
+
+        unique_stim_dict['crossed'], flip_unique_stim_dict['crossed'] = self.DecoderObj.get_group_collapsed_stim_dict(participant_list = participant_list, 
+                                                                                                                    ROI_list = ROI_list, 
+                                                                                                                    group_stim_dict = group_stim_dict, 
+                                                                                                                    trial_combinations_position_df = trial_combinations_position_df, 
+                                                                                                                    group_refDM_dict = group_refDM_dict, 
+                                                                                                                    bar_type = 'crossed', 
+                                                                                                                    avg_pp = avg_pp)
+
+        ## get reference DM to plot (from a participant)
+        # and coordinates
+        dm2plot = group_refDM_dict['sub-003']
+        x_coords_deg = group_stim_dict['V1']['sub-003'].stack('y', future_stack=True).loc[0].columns.values
+        y_coords_deg = group_stim_dict['V1']['sub-003'].stack('y', future_stack=True).loc[0].index.values
+
+        ## if we want to plot group average
+        if len(participant_list) > 1 and avg_pp:
+
+            print('saving figures in %s'%fig_dir)
+
+            ## for each ROI
+            for roi_name in ROI_list:
+                
+                ## actually plot
+                for bars_pos in ['crossed', 'parallel']:
+                    for bar_ecc in unique_stim_dict[bars_pos][roi_name].keys():
+                        for bar_dist in unique_stim_dict[bars_pos][roi_name][bar_ecc].keys():
+                            
+                            ## stim to plot
+                            stim2plot = unique_stim_dict[bars_pos][roi_name][bar_ecc][bar_dist]
+                            flip_stim2plot = flip_unique_stim_dict[bars_pos][roi_name][bar_ecc][bar_dist]
+
+                            ## get DM frame
+                            if bars_pos == 'parallel':
+                                frame = self.DecoderObj.get_uniq_cond_trl_ind(position_df = trial_combinations_position_df, 
+                                                                            bar_ecc = bar_ecc, 
+                                                                            bars_pos = bars_pos, 
+                                                                            bar_dist = bar_dist)
+                            else:
+                                frame = self.DecoderObj.get_uniq_cond_trl_ind(position_df = trial_combinations_position_df, 
+                                                                            bar_ecc = bar_ecc, 
+                                                                            bars_pos = bars_pos, 
+                                                                            same_ecc = bar_dist)
+
+                            ## actually plot
+                            self.plot_collapsed_frame(dm2plot = dm2plot, 
+                                                stim2plot = stim2plot, 
+                                                flip_stim2plot = flip_stim2plot, 
+                                                frame = frame, 
+                                                figsize = figsize, 
+                                                vmin = vmin, 
+                                                vmax = vmax, 
+                                                cmap = cmap, 
+                                                annot = annot, 
+                                                lw = lw, 
+                                                line_color = line_color, 
+                                                alpha = alpha, 
+                                                mask_edges = mask_edges,
+                                                filename = base_filename.replace('.{fext}'.format(fext = fig_type),
+                                                                            '_ROI-{rname}_barPOS-{bpos}_barECC-{becc}_barDIST-{bdist}.{fext}'.format(rname = roi_name,
+                                                                                                                                                    bpos = bars_pos,
+                                                                                                                                                    becc = bar_ecc,
+                                                                                                                                                    bdist = bar_dist,
+                                                                                                                                                    fext = fig_type)
+                                                                            ), 
+                                                showticks = showticks, 
+                                                showtitle = showtitle, 
+                                                cbar = cbar,
+                                                x_coords_deg = x_coords_deg, 
+                                                y_coords_deg = y_coords_deg)
+
+        else:
+            print('not implemented yet')
+
+            # ## now actually plot
+            # for pp in participant_list:
+
+            #     ## if no frame list provided, plot all
+            #     frame_list = np.arange(group_refDM_dict['sub-{sj}'.format(sj = pp)].shape[0]) if frame_list is None else frame_list
+                
+            #     # make dir to save estimates
+            #     pp_fig_dir = op.join(fig_dir, 'sub-{sj}'.format(sj = pp))
+            #     pp_fig_id = fig_id.replace('sub-GROUP', 'sub-{sj}'.format(sj = pp)) 
+            
+            #     os.makedirs(pp_fig_dir, exist_ok = True)
+            #     print('saving figures in %s'%pp_fig_dir)
+                
+            #     # base filename for figures 
+            #     pp_base_filename = op.join(pp_fig_dir, pp_fig_id)
+
+            #     ## for each ROI
+            #     for roi_name in ROI_list:
+
+            #         ## actually plot
+            #         for frame in frame_list:
+
+            #             self.plot_reconstructed_frame(dm2plot = group_refDM_dict['sub-{sj}'.format(sj = pp)], 
+            #                                         stim2plot = group_stim_dict[roi_name]['sub-{sj}'.format(sj = pp)], 
+            #                                         frame = frame, 
+            #                                         figsize = (10,5), vmin = 0.05, vmax = .24, 
+            #                                         cmap = 'plasma', 
+            #                                         filename = pp_base_filename.replace('.{fext}'.format(fext = fig_type),
+            #                                                                             'ROI-{rname}_frame-{fnum}.{fext}'.format(rname = roi_name,
+            #                                                                                                                      fnum = str(frame).zfill(3),
+            #                                                                                                                      fext = fig_type)
+            #                                                                             ), 
+            #                                         showticks = False,
+            #                                         alpha = 1, line_color = '#14914d', lw = 3)
 
     def plot_trial_stim(self, participant_list = [], ROI_list = ['V1'], frame_list = None, mask_edges = False,
                             group_stim_dict = None, group_refDM_dict = None,

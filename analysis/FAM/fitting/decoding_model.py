@@ -1780,47 +1780,74 @@ class Decoding_Model(GLMsingle_Model):
             
         return same_bar_pos_ind_dict
     
-    def get_group_average_stim_dict(self, participant_list = [], reconstructed_stim_dict = None, run_position_df_dict = None, 
-                                            lowres_DM_dict = None, bar_type = 'parallel'):
+    def get_group_collapsed_stim_dict(self, participant_list = [], group_stim_dict = None, trial_combinations_position_df = None, 
+                                            group_refDM_dict = None, bar_type = 'parallel', avg_pp = False, ROI_list = []):
         
-        """Get average stim dict 
-        averaged across group of participants
+        """For all participants, 
+        get reconstructed stim
+        collapse trials across conditions (where that's possible)
+
+        (can also return group average collapsed stim)
         """
+
+        unique_stim_dict = {}
+        flip_unique_stim_dict = {}
+
+        ## group average
+        if avg_pp:
         
-        ## get average stim (across unique bar positions) for all participants 
-        average_stim_dict, flip_average_stim_dict = self.get_average_stim_dict(participant_list = participant_list,
-                                                                            reconstructed_stim_dict = reconstructed_stim_dict, 
-                                                                            run_position_df_dict = run_position_df_dict, 
-                                                                            lowres_DM_dict = lowres_DM_dict, 
-                                                                            bar_type = bar_type)
-
-        group_average_stim_dict = {}
-        group_flip_average_stim_dict = {}
-
-        # average across participants
-        for keynames1 in average_stim_dict.keys():
+            # average across participants, per ROI
+            group_avg_stim_dict, group_avg_refDM_dict = self.average_group_stim_glmsing_trials(participant_list = participant_list, 
+                                                                                                ROI_list = ROI_list, 
+                                                                                                group_stim_dict = group_stim_dict, 
+                                                                                                group_refDM_dict = group_refDM_dict)
             
-            group_average_stim_dict[keynames1] = {}
-            group_flip_average_stim_dict[keynames1] = {}
-            
-            for keynames2 in average_stim_dict[keynames1].keys():
-                
-                group_average_stim_dict[keynames1][keynames2] = np.nanmean(average_stim_dict[keynames1][keynames2], axis = 0)
-                group_flip_average_stim_dict[keynames1][keynames2] = np.nanmean(flip_average_stim_dict[keynames1][keynames2], axis = 0)
+            ## iterate over ROIs
+            for roi_name in ROI_list:
+                ## get average stim (across unique bar positions) 
+                unique_stim_dict[roi_name], flip_unique_stim_dict[roi_name] = self.get_collapsed_stim(reconstructed_stim = group_avg_stim_dict[roi_name], 
+                                                                                                    run_position_df = trial_combinations_position_df, 
+                                                                                                    DM_arr = group_avg_refDM_dict, 
+                                                                                                    bar_type = bar_type)
+        else:
+            ## iterate over ROIs
+            for roi_name in ROI_list:
 
-        return group_average_stim_dict, group_flip_average_stim_dict
+                unique_stim_dict[roi_name] = {}
+                flip_unique_stim_dict[roi_name] = {}
+
+                for participant in tqdm(participant_list):
+
+                    ## get average stim (across unique bar positions) for all participants
+                    unique_stim_dict[roi_name]['sub-{sj}'.format(sj = participant)], flip_unique_stim_dict[roi_name]['sub-{sj}'.format(sj = participant)] = self.get_collapsed_stim(reconstructed_stim = group_stim_dict[roi_name]['sub-{sj}'.format(sj = participant)], 
+                                                                                                                                                                                    run_position_df = trial_combinations_position_df, 
+                                                                                                                                                                                    DM_arr = group_refDM_dict['sub-{sj}'.format(sj = participant)], 
+                                                                                                                                                                                    bar_type = bar_type)
+
+        return unique_stim_dict, flip_unique_stim_dict
     
-    def get_average_stim_dict(self, participant_list = [], reconstructed_stim_dict = None, run_position_df_dict = None, 
-                                    lowres_DM_dict = None, bar_type = 'parallel'):
+    def get_collapsed_stim(self, reconstructed_stim = None, run_position_df = None, 
+                                DM_arr = None, bar_type = 'parallel'):
         
-        """For all participants in list
-        create dict with average reconstructed stim
-        collapsed across conditions (where that's possible)
         """
-        
+        For a given run (or run average) reconstructed stim,
+        collapse trials across conditions (where that's possible)
+       
+        """
+
         # save results in dict
-        average_stim_dict = {}
-        flip_average_stim_dict = {}
+        average_stim_dict = {'far': {}, 'middle': {}, 'near': {}}
+        flip_average_stim_dict = {'far': {}, 'middle': {}, 'near': {}}
+
+        ## check if there are trial indices to mask out (DM is nan)
+        mask_ind = np.where((~np.isnan(np.sum(DM_arr.reshape(DM_arr.shape[0],-1), axis = 1))))[0]
+
+        ## and remove trials from DF
+        run_position_df = run_position_df[run_position_df['trial_ind'].isin(mask_ind)]
+
+        ## also mask nans/other values from DM array, to work with helper functions
+        DM_arr[DM_arr > 1] = 1
+        DM_arr[np.isnan(DM_arr)] = 0
         
         if bar_type == 'parallel':
 
@@ -1834,43 +1861,23 @@ class Decoding_Model(GLMsingle_Model):
             
                 for bar_dist in bar_dist_list:
                     
-                    average_stim = []
-                    flip_average_stim = []
-                    
                     print('Averaging data for parallel bars, for attended bar ecc %s, inter-bar distance %s'%(bar_ecc,str(bar_dist)))
-                    
-                    # iterate over participants
-                    for participant in tqdm(participant_list):
-                    
-                        ## average over runs
-                        pp_average_stim = []
-                        pp_flip_average_stim = []
                         
-                        ## stack all runs
-                        for snrn_key, snrn_stim in reconstructed_stim_dict['sub-{sj}'.format(sj = participant)].items():
-                            
-                            pp_average_stim.append(self.get_parallel_average_stim(reconstructed_stimulus = snrn_stim, 
-                                                                                position_df = run_position_df_dict['sub-{sj}'.format(sj = participant)][snrn_key], 
-                                                                                bar_ecc = bar_ecc, 
-                                                                                abs_inter_bar_dist = bar_dist, 
-                                                                                flipped_stim = False, 
-                                                                                DM_arr = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['full_stim'][snrn_key]))
+                    average_stim = self.get_parallel_average_stim(reconstructed_stimulus = reconstructed_stim, 
+                                                                    position_df = run_position_df, 
+                                                                    bar_ecc = bar_ecc, 
+                                                                    abs_inter_bar_dist = bar_dist, 
+                                                                    flipped_stim = False, 
+                                                                    DM_arr = DM_arr)
 
-                            # also get average flipped case
-                            pp_flip_average_stim.append(self.get_parallel_average_stim(reconstructed_stimulus = snrn_stim, 
-                                                                                position_df = run_position_df_dict['sub-{sj}'.format(sj = participant)][snrn_key], 
-                                                                                bar_ecc = bar_ecc, 
-                                                                                abs_inter_bar_dist = bar_dist, 
-                                                                                flipped_stim = True, 
-                                                                                DM_arr = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['full_stim'][snrn_key]))
-                        pp_average_stim = np.stack(pp_average_stim)
-                        pp_flip_average_stim = np.stack(pp_flip_average_stim)
-                        
-                        ## average over participant runs 
-                        # and append
-                        average_stim.append(np.nanmean(pp_average_stim, axis = 0)) 
-                        flip_average_stim.append(np.nanmean(pp_flip_average_stim, axis = 0))
-                        
+                    # also get average flipped case
+                    flip_average_stim = self.get_parallel_average_stim(reconstructed_stimulus = reconstructed_stim, 
+                                                                        position_df = run_position_df, 
+                                                                        bar_ecc = bar_ecc, 
+                                                                        abs_inter_bar_dist = bar_dist, 
+                                                                        flipped_stim = True, 
+                                                                        DM_arr = DM_arr)
+                    
                     # save in dict
                     average_stim_dict[bar_ecc][bar_dist] = np.stack(average_stim)
                     flip_average_stim_dict[bar_ecc][bar_dist] = np.stack(flip_average_stim)
@@ -1888,43 +1895,22 @@ class Decoding_Model(GLMsingle_Model):
                 # and if crossed bars where equidistant to center or not
                 for same_ecc in [True, False]:
                     
-                    average_stim = []
-                    flip_average_stim = []
-                    
                     print('Averaging data for crossed bars, for attended bar ecc %s, bars at same distance = %s'%(bar_ecc, str(same_ecc)))
-                    
-                    # iterate over participants
-                    for participant in tqdm(participant_list):
-                    
-                        ## average over runs
-                        pp_average_stim = []
-                        pp_flip_average_stim = []
-                    
-                        ## stack all runs
-                        for snrn_key, snrn_stim in reconstructed_stim_dict['sub-{sj}'.format(sj = participant)].items():
                             
-                            pp_average_stim.append(self.get_crossed_average_stim(reconstructed_stimulus = snrn_stim, 
-                                                                                position_df = run_position_df_dict['sub-{sj}'.format(sj = participant)][snrn_key], 
-                                                                                bar_ecc = bar_ecc, 
-                                                                                same_ecc = same_ecc,  
-                                                                                flipped_stim = False, 
-                                                                                DM_arr = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['full_stim'][snrn_key]))
+                    average_stim = self.get_crossed_average_stim(reconstructed_stimulus = reconstructed_stim, 
+                                                                position_df = run_position_df, 
+                                                                bar_ecc = bar_ecc, 
+                                                                same_ecc = same_ecc,  
+                                                                flipped_stim = False, 
+                                                                DM_arr = DM_arr)
 
-                            # also get average flipped case
-                            pp_flip_average_stim.append(self.get_crossed_average_stim(reconstructed_stimulus = snrn_stim, 
-                                                                                position_df = run_position_df_dict['sub-{sj}'.format(sj = participant)][snrn_key],
-                                                                                bar_ecc = bar_ecc, 
-                                                                                same_ecc = same_ecc, 
-                                                                                flipped_stim = True, 
-                                                                                DM_arr = lowres_DM_dict['sub-{sj}'.format(sj = participant)]['full_stim'][snrn_key]))
-
-                        pp_average_stim = np.stack(pp_average_stim)
-                        pp_flip_average_stim = np.stack(pp_flip_average_stim)
-                        
-                        ## average over participant runs 
-                        # and append
-                        average_stim.append(np.nanmean(pp_average_stim, axis = 0)) 
-                        flip_average_stim.append(np.nanmean(pp_flip_average_stim, axis = 0))
+                    # also get average flipped case
+                    flip_average_stim = self.get_crossed_average_stim(reconstructed_stimulus = reconstructed_stim, 
+                                                                    position_df = run_position_df,
+                                                                    bar_ecc = bar_ecc, 
+                                                                    same_ecc = same_ecc, 
+                                                                    flipped_stim = True, 
+                                                                    DM_arr = DM_arr)
                         
                     # save in dict
                     average_stim_dict[bar_ecc][int(same_ecc)] = np.stack(average_stim)
@@ -3350,7 +3336,98 @@ class Decoding_Model(GLMsingle_Model):
 
         return ring_pix_df
 
+    def convert_trial_combinations_2_run_position_df(self, trial_combinations_df = None):
 
+        """
+        Helper func to convert trial combinations df 
+        to a "run position" style df 
+        (this is, with info on bar distance, configuration, etc)
+        """
+
+        ## find parallel + crossed bar trial indices
+        parallel_bar_ind = np.where((trial_combinations_df.AttBar_bar_pass_direction == trial_combinations_df.UnattBar_bar_pass_direction))[0]
+        crossed_bar_ind = np.where((trial_combinations_df.AttBar_bar_pass_direction != trial_combinations_df.UnattBar_bar_pass_direction))[0]
+
+        ## make summary dataframe 
+        position_df = []
+
+        for keys, ind_arr in {'parallel': parallel_bar_ind, 'crossed': crossed_bar_ind}.items():
+            for att_bool, att_key in {0:'UnattBar_bar_midpoint', 1:'AttBar_bar_midpoint'}.items():
+                
+                tmp_df = pd.DataFrame({'x_pos': np.stack(trial_combinations_df[att_key].values[ind_arr])[:,0],
+                                    'y_pos': np.stack(trial_combinations_df[att_key].values[ind_arr])[:,1],
+                                    'trial_ind': ind_arr})
+                tmp_df['attend_condition'] = bool(att_bool)
+                tmp_df['bars_pos'] = keys
+                position_df.append(tmp_df)
+        position_df = pd.concat(position_df, ignore_index = True)
+
+        ## add interbar distance (only for parallel bars)
+        # for x
+        inds_uatt = position_df[((position_df['attend_condition'] == 0) &\
+                                (position_df['bars_pos'] == 'parallel') &\
+                                (position_df['x_pos'] != 0))].sort_values('trial_ind').index
+        inds_att = position_df[((position_df['attend_condition'] == 1) &\
+                                (position_df['bars_pos'] == 'parallel') &\
+                                (position_df['x_pos'] != 0))].sort_values('trial_ind').index
+        inter_bar_dist = (position_df.iloc[inds_uatt].x_pos.values - position_df.iloc[inds_att].x_pos.values)/self.bar_width_pix[0]
+
+        position_df.loc[inds_uatt,'inter_bar_dist'] = inter_bar_dist
+        position_df.loc[inds_att,'inter_bar_dist'] = inter_bar_dist
+
+        # for y
+        inds_uatt = position_df[((position_df['attend_condition'] == 0) &\
+                                (position_df['bars_pos'] == 'parallel') &\
+                                (position_df['y_pos'] != 0))].sort_values('trial_ind').index
+        inds_att = position_df[((position_df['attend_condition'] == 1) &\
+                                (position_df['bars_pos'] == 'parallel') &\
+                                (position_df['y_pos'] != 0))].sort_values('trial_ind').index
+        inter_bar_dist = (position_df.iloc[inds_uatt].y_pos.values - position_df.iloc[inds_att].y_pos.values)/self.bar_width_pix[0]
+
+        position_df.loc[inds_uatt,'inter_bar_dist'] = inter_bar_dist
+        position_df.loc[inds_att,'inter_bar_dist'] = inter_bar_dist
+        
+        ## add bar eccentricity
+        ecc_dict = {'far': self.bar_x_coords_pix[0::5], 'middle': self.bar_x_coords_pix[1::3], 'near': self.bar_x_coords_pix[2:4]}
+
+        for ecc_key in ecc_dict.keys():
+            inds = position_df[((position_df['x_pos'].isin(ecc_dict[ecc_key])) |\
+                        (position_df['y_pos'].isin(ecc_dict[ecc_key])))].sort_values('trial_ind').index
+            position_df.loc[inds,'bar_ecc'] = ecc_key
+            
+        ## also add absolute distance
+        position_df.loc[:,'abs_inter_bar_dist'] = np.absolute(position_df.inter_bar_dist.values)
+        
+        ## add bar eccentricity in deg
+        
+        # get near absolute ecc value in deg
+        min_ecc = self.bar_width_pix[0]/2 * self.MRIObj.beh_utils.dva_per_pix(height_cm = self.MRIObj.params['monitor']['height'], 
+                                                            distance_cm = self.MRIObj.params['monitor']['distance'], 
+                                                            vert_res_pix = self.MRIObj.screen_res[1])
+
+        # replace ecc with numeric value
+        ecc_deg = position_df.bar_ecc.values.copy()
+        ecc_deg[ecc_deg == 'near'] = min_ecc
+        ecc_deg[ecc_deg == 'middle'] = min_ecc + min_ecc*2
+        ecc_deg[ecc_deg == 'far'] = min_ecc + min_ecc*4
+        position_df.loc[:, 'bar_ecc_deg'] = ecc_deg
+        
+        ## also add label indicating if competing bar is closer to fovea (for given trial)
+        position_df.loc[:, 'compbar_closer2fix'] = False
+        # for attended bars
+        ind_list = position_df[(position_df.sort_values(['attend_condition'],ascending=False).groupby('trial_ind')['bar_ecc_deg'].transform(lambda x: x.values[0] > x.values[1])) &\
+                                (position_df['attend_condition'] == True)].index.values
+        position_df.loc[ind_list, 'compbar_closer2fix'] = True
+        # and unattended bars
+        ind_list = position_df[(position_df.sort_values(['attend_condition'],ascending=False).groupby('trial_ind')['bar_ecc_deg'].transform(lambda x: x.values[0] < x.values[1])) &\
+                                (position_df['attend_condition'] == False)].index.values
+        position_df.loc[ind_list, 'compbar_closer2fix'] = True
+
+        ## add label for attended condition
+        position_df.loc[position_df.query('attend_condition').index.values, 'bar_type'] = 'att_bar'
+        position_df.loc[position_df.query('~attend_condition').index.values, 'bar_type'] = 'unatt_bar'
+   
+        return position_df
 
 
 

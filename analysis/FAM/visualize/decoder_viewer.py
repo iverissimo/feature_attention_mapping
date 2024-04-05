@@ -769,7 +769,7 @@ class DecoderViewer(Viewer):
         axes[0].hlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
 
     def barplot_mean_pix_intensity(self, pixel_df = None, ROI_list = ['V1'], error_bars = 'within', figsize=(8,5), filename = None,
-                                        point_color = '#FF0080', ylim = [0.1,.18], ylim2 = [0,.016]):
+                                        point_color = '#f5007b', ylim2 = [0,.03], ylim = [0,.2]):
 
         """
         Make barplot with attend vs unattend pixel values
@@ -846,7 +846,7 @@ class DecoderViewer(Viewer):
         ax1.tick_params(axis='both', labelsize=13)
 
         ax1.set_xlabel('ROI',fontsize = 16, labelpad = 15)
-        ax1.set_ylabel('Mean drive [a.u.]',fontsize = 16, labelpad = 15)
+        ax1.set_ylabel('Mean Drive [a.u.]',fontsize = 16, labelpad = 15)
         ax1.set_ylim(ylim)
 
         ## add within sub error bars
@@ -897,7 +897,7 @@ class DecoderViewer(Viewer):
         ax2.set_ylim(ylim2)
         ax2.set_ylabel(None)
         ax2.tick_params(axis='y', labelsize=13, color = point_color, labelcolor = point_color, length=5, width=2)
-        ax2.set_ylabel('Attention Effect', fontsize = 16, labelpad = 20, color = point_color, rotation = 270)
+        ax2.set_ylabel('Attention Effect\n'+r'($\Delta$ Drive)', fontsize = 16, labelpad = 45, color = point_color, rotation = 270)
 
         fig.tight_layout()
 
@@ -1332,7 +1332,7 @@ class DecoderViewer(Viewer):
                                                                             'unatt_bar': 'grey'})
 
             axes[ind_roi][0].set_ylim(ylim)
-            fig.margins(x=0.075)
+            plt.margins(x=0.075)
 
             #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
             fig.subplots_adjust(wspace=0.04, hspace=0.02)
@@ -1362,7 +1362,7 @@ class DecoderViewer(Viewer):
                                                                     'unatt_bar': 'grey'})
 
                 axes[0].set_ylim(ylim)
-                fig.margins(x=0.075)
+                plt.margins(x=0.075)
 
                 #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
                 fig.subplots_adjust(wspace=0.04, hspace=0.02)
@@ -1428,7 +1428,7 @@ class DecoderViewer(Viewer):
             axes[1][0].set_ylabel('%s CROSSED\n\nMean Drive [a.u.]'%roi_name, fontsize = 16, labelpad = 15)
 
             axes[0][0].set_ylim(ylim)
-            fig.margins(x=0.075)
+            plt.margins(x=0.075)
 
             #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
             fig.subplots_adjust(wspace=0.04, hspace=0.02)
@@ -1634,7 +1634,7 @@ class DecoderViewer(Viewer):
                                                                             'unatt_bar': 'grey'})
 
             axes[ind_roi][0].set_ylim(ylim)
-            fig.margins(x=0.075)
+            plt.margins(x=0.075)
 
             #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
             fig.subplots_adjust(wspace=0.04, hspace=0.02)
@@ -1664,7 +1664,7 @@ class DecoderViewer(Viewer):
                                                                 'unatt_bar': 'grey'})
 
                 axes[0].set_ylim(ylim)
-                fig.margins(x=0.075)
+                plt.margins(x=0.075)
 
                 #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
                 fig.subplots_adjust(wspace=0.04, hspace=0.02)
@@ -1731,7 +1731,7 @@ class DecoderViewer(Viewer):
         axes[0].set_ylim(ylim)
         axes[0].set_xlim([df2plot_dist.min_dist.min() - .3, 
                           df2plot_dist.min_dist.max() + .3])
-        fig.margins(x=0.075)
+        plt.margins(x=0.075)
 
         #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
         fig.subplots_adjust(wspace=0.03, hspace=0.02)
@@ -1795,7 +1795,7 @@ class DecoderViewer(Viewer):
         axes[0].set_ylim(ylim)
         axes[0].set_xlim([df2plot_ecc.ecc.min() - .3, 
                           df2plot_ecc.ecc.max() + .3])
-        fig.margins(x=0.075)
+        plt.margins(x=0.075)
 
         #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
         fig.subplots_adjust(wspace=0.03, hspace=0.02)
@@ -1860,7 +1860,7 @@ class DecoderViewer(Viewer):
         axes[0].set_ylim(ylim)
         axes[0].set_xlim([df2plot_ecc.ring_ecc.min() - .3, 
                           df2plot_ecc.ring_ecc.max() + .3])
-        fig.margins(x=0.075)
+        plt.margins(x=0.075)
 
         #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
         fig.subplots_adjust(wspace=0.03, hspace=0.02)

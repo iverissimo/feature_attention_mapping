@@ -116,8 +116,8 @@ class DecoderViewer(Viewer):
                 
                 axes[ind].legend(loc='upper right', fontsize='x-small')
         
-        plt.subplots_adjust(wspace=wspace, hspace=hspace)
-        plt.tight_layout()
+        fig.subplots_adjust(wspace=wspace, hspace=hspace)
+        fig.tight_layout()
 
         ## if we gave filename, then save
         if filename:
@@ -160,7 +160,7 @@ class DecoderViewer(Viewer):
         axes0.set_ylim(0,1)
         axes0.set_ylabel('RSQ',fontsize = 16, labelpad=15)
         axes0.set_xlabel('')
-        plt.tight_layout()
+        fig.tight_layout()
 
         ## if we gave filename, then save
         if filename:
@@ -204,7 +204,7 @@ class DecoderViewer(Viewer):
         ax1.set_ylim(.2,.9)
         ax1.set_ylabel('RSQ', fontsize = 16, labelpad = 15)
         ax1.set_xlabel('')
-        plt.tight_layout()
+        fig.tight_layout()
 
         ## if we gave filename, then save
         if filename:
@@ -899,7 +899,7 @@ class DecoderViewer(Viewer):
         ax2.tick_params(axis='y', labelsize=13, color = point_color, labelcolor = point_color, length=5, width=2)
         ax2.set_ylabel('Attention Effect', fontsize = 16, labelpad = 20, color = point_color, rotation = 270)
 
-        plt.tight_layout()
+        fig.tight_layout()
 
         ## save figure
         if filename is not None:
@@ -996,7 +996,7 @@ class DecoderViewer(Viewer):
         frame.set_facecolor('w') 
         frame.set_edgecolor('k')
 
-        plt.tight_layout()
+        fig.tight_layout()
 
         ## save figure
         if filename is not None:
@@ -1332,12 +1332,12 @@ class DecoderViewer(Viewer):
                                                                             'unatt_bar': 'grey'})
 
             axes[ind_roi][0].set_ylim(ylim)
-            plt.margins(x=0.075)
+            fig.margins(x=0.075)
 
             #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-            plt.subplots_adjust(wspace=0.04, hspace=0.02)
+            fig.subplots_adjust(wspace=0.04, hspace=0.02)
 
-            plt.tight_layout()
+            fig.tight_layout()
 
             ## save figure
             if filename is not None:
@@ -1362,12 +1362,12 @@ class DecoderViewer(Viewer):
                                                                     'unatt_bar': 'grey'})
 
                 axes[0].set_ylim(ylim)
-                plt.margins(x=0.075)
+                fig.margins(x=0.075)
 
                 #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-                plt.subplots_adjust(wspace=0.04, hspace=0.02)
+                fig.subplots_adjust(wspace=0.04, hspace=0.02)
 
-                plt.tight_layout()
+                fig.tight_layout()
 
                 ## save figure
                 if filename is not None:
@@ -1428,12 +1428,12 @@ class DecoderViewer(Viewer):
             axes[1][0].set_ylabel('%s CROSSED\n\nMean Drive [a.u.]'%roi_name, fontsize = 16, labelpad = 15)
 
             axes[0][0].set_ylim(ylim)
-            plt.margins(x=0.075)
+            fig.margins(x=0.075)
 
             #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-            plt.subplots_adjust(wspace=0.04, hspace=0.02)
+            fig.subplots_adjust(wspace=0.04, hspace=0.02)
 
-            plt.tight_layout()
+            fig.tight_layout()
 
             ## save figure
             if filename is not None:
@@ -1634,12 +1634,12 @@ class DecoderViewer(Viewer):
                                                                             'unatt_bar': 'grey'})
 
             axes[ind_roi][0].set_ylim(ylim)
-            plt.margins(x=0.075)
+            fig.margins(x=0.075)
 
             #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-            plt.subplots_adjust(wspace=0.04, hspace=0.02)
+            fig.subplots_adjust(wspace=0.04, hspace=0.02)
 
-            plt.tight_layout()
+            fig.tight_layout()
 
             ## save figure
             if filename is not None:
@@ -1664,12 +1664,12 @@ class DecoderViewer(Viewer):
                                                                 'unatt_bar': 'grey'})
 
                 axes[0].set_ylim(ylim)
-                plt.margins(x=0.075)
+                fig.margins(x=0.075)
 
                 #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-                plt.subplots_adjust(wspace=0.04, hspace=0.02)
+                fig.subplots_adjust(wspace=0.04, hspace=0.02)
 
-                plt.tight_layout()
+                fig.tight_layout()
 
                 ## save figure
                 if filename is not None:
@@ -1731,12 +1731,12 @@ class DecoderViewer(Viewer):
         axes[0].set_ylim(ylim)
         axes[0].set_xlim([df2plot_dist.min_dist.min() - .3, 
                           df2plot_dist.min_dist.max() + .3])
-        plt.margins(x=0.075)
+        fig.margins(x=0.075)
 
         #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-        plt.subplots_adjust(wspace=0.03, hspace=0.02)
+        fig.subplots_adjust(wspace=0.03, hspace=0.02)
 
-        plt.tight_layout()
+        fig.tight_layout()
 
         ## save figure
         if filename is not None:
@@ -1795,12 +1795,12 @@ class DecoderViewer(Viewer):
         axes[0].set_ylim(ylim)
         axes[0].set_xlim([df2plot_ecc.ecc.min() - .3, 
                           df2plot_ecc.ecc.max() + .3])
-        plt.margins(x=0.075)
+        fig.margins(x=0.075)
 
         #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-        plt.subplots_adjust(wspace=0.03, hspace=0.02)
+        fig.subplots_adjust(wspace=0.03, hspace=0.02)
 
-        plt.tight_layout()
+        fig.tight_layout()
 
         ## save figure
         if filename is not None:
@@ -1860,12 +1860,12 @@ class DecoderViewer(Viewer):
         axes[0].set_ylim(ylim)
         axes[0].set_xlim([df2plot_ecc.ring_ecc.min() - .3, 
                           df2plot_ecc.ring_ecc.max() + .3])
-        plt.margins(x=0.075)
+        fig.margins(x=0.075)
 
         #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-        plt.subplots_adjust(wspace=0.03, hspace=0.02)
+        fig.subplots_adjust(wspace=0.03, hspace=0.02)
 
-        plt.tight_layout()
+        fig.tight_layout()
 
         ## save figure
         if filename is not None:
@@ -2037,7 +2037,7 @@ class DecoderViewer(Viewer):
                 ax2.set_yticks([])
                 #ax2.tick_params(axis='y', labelsize=13, color = 'red', labelcolor='red', length=5, width=2)
 
-        plt.tight_layout()
+        fig.tight_layout()
 
         ## save figure
         if filename is not None:
@@ -2221,7 +2221,7 @@ class DecoderViewer(Viewer):
                 #ax2.tick_params(axis='y', labelsize=13, color = 'red', labelcolor='red', length=5, width=2)
 
         plt.subplots_adjust(wspace=wspace, hspace=hspace)
-        plt.tight_layout()
+        fig.tight_layout()
 
         ## save figure
         if filename is not None:

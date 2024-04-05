@@ -123,7 +123,7 @@ class BehViewer(Viewer):
             fig.savefig(op.join(self.figures_pth,'sub-GROUP_task-pRF_RT_accuracy.png'), dpi=100,bbox_inches = 'tight')
 
 
-    def plot_FA_behavior(self, att_RT_df = None, acc_df = None, acc_dist_df = None, participant_list = [], ecc_colors=['#ee5007', '#f8cb2e', '#006e7f']):
+    def plot_FA_behavior(self, att_RT_df = None, acc_df = None, acc_dist_df = None, participant_list = [], ecc_colors=['#ee5007', '#f8cb2e', '#006e7f'], fig_type = 'png'):
 
         """
         Plot behavioral results for FA
@@ -132,7 +132,7 @@ class BehViewer(Viewer):
         """ 
 
         # set generic filename
-        filename = op.join(self.figures_pth, 'sub-{sj}_task-FA_{data_type}.png')
+        filename = op.join(self.figures_pth, 'sub-{sj}_task-FA_{data_type}'+'.{fext}'.format(fext = fig_type))
 
         ## loop over participants in dataframe
         for pp in participant_list:

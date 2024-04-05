@@ -205,7 +205,8 @@ match data_type:
                     plotter.plot_FA_behavior(att_RT_df = att_RT_df, 
                                              acc_df = acc_df, 
                                              acc_dist_df = acc_dist_df,
-                                             participant_list = FAM_data.sj_num)
+                                             participant_list = FAM_data.sj_num,
+                                             fig_type = 'png')
                     
                 elif task == 'pRF':
                     

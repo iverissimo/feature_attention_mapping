@@ -984,19 +984,19 @@ class DecoderViewer(Viewer):
         plt.margins(x=0.075)
 
         #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-        plt.subplots_adjust(wspace=0.02, hspace=0.02)
 
         handleA = mpatches.Patch(facecolor = bars_pos_colors['crossed'], edgecolor = 'k',label='Crossed', fill=True, linewidth=1)
         handleB = mpatches.Patch(facecolor = bars_pos_colors['parallel'],edgecolor = 'k',label='Parallel', fill=True,linewidth=1)
 
         leg = axes[ind].legend(handles = [handleA,handleB],loc='upper right', fontsize = 'medium',
-                            title= 'Bar configuration', title_fontsize = 'medium')
+                            title= 'Bar Configuration', title_fontsize = 'medium')
 
         frame = leg.get_frame()
         frame.set_facecolor('w') 
         frame.set_edgecolor('k')
 
-        fig.tight_layout()
+        fig.subplots_adjust(wspace=0.08, hspace=0.01)
+        #fig.tight_layout()
 
         ## save figure
         if filename is not None:
@@ -1046,7 +1046,7 @@ class DecoderViewer(Viewer):
                             ROI_list = ROI_list, 
                             error_bars = error_bars, 
                             figsize=(15,5), 
-                            fig_type = 'png',
+                            fig_type = fig_type,
                             combine_rois = False,
                             ylim = [.08, .22],#[.10, .22],
                             filename = base_filename+'_attention_DistEcc.{fext}'.format(fext = fig_type))
@@ -1056,7 +1056,7 @@ class DecoderViewer(Viewer):
                             ROI_list = ROI_list, 
                             error_bars = error_bars, 
                             figsize=(15,5), 
-                            fig_type = 'png',
+                            fig_type = fig_type,
                             combine_rois = True,
                             ylim = [.08, .23],
                             filename = base_filename+'_attention_DistEcc.{fext}'.format(fext = fig_type))
@@ -1066,7 +1066,7 @@ class DecoderViewer(Viewer):
                                                 ROI_list = ROI_list, 
                                                 error_bars = error_bars, 
                                                 figsize=(15,5), 
-                                                fig_type = 'png', 
+                                                fig_type = fig_type,
                                                 ylim = [.08, .22],
                                                 filename = base_filename+'_attention_DistEcc_bar_configuration.{fext}'.format(fext = fig_type))
         
@@ -1075,7 +1075,7 @@ class DecoderViewer(Viewer):
                             ROI_list = ROI_list, 
                             error_bars = error_bars, 
                             figsize=(18,3), 
-                            fig_type = 'png',
+                            fig_type = fig_type,
                             combine_rois = False,
                             ylim = [.08, .22], #[.10, .22],
                             filename = base_filename+'_attention_EccDist.{fext}'.format(fext = fig_type))
@@ -1083,7 +1083,7 @@ class DecoderViewer(Viewer):
                             ROI_list = ROI_list, 
                             error_bars = error_bars, 
                             figsize=(18,3), 
-                            fig_type = 'png',
+                            fig_type = fig_type,
                             combine_rois = True,
                             ylim = [.08, .22], #[.10, .22],
                             filename = base_filename+'_attention_EccDist.{fext}'.format(fext = fig_type))
@@ -1093,7 +1093,7 @@ class DecoderViewer(Viewer):
                                     ROI_list = ROI_list, 
                                     error_bars = error_bars, 
                                     figsize=(18,3), 
-                                    fig_type = 'png',
+                                    fig_type = fig_type,
                                     filename = base_filename+'_attention_barplots_EccDist.{fext}'.format(fext = fig_type),
                                     ylim = [.10, .22], 
                                     group_ecc = False)
@@ -1102,8 +1102,8 @@ class DecoderViewer(Viewer):
         self.plot_pix_Dist_AttDiff(pixel_df = pixel_df,  
                               ROI_list = ROI_list, 
                               error_bars = error_bars,  
-                              fig_type = 'png',
-                              figsize=(15,3), 
+                              fig_type = fig_type,
+                              figsize=(18,3), 
                               ylim = [-.01, .03],
                               filename = base_filename+'_AttDiffDist.{fext}'.format(fext = fig_type))
         
@@ -1111,8 +1111,8 @@ class DecoderViewer(Viewer):
         self.plot_pix_Ecc_AttDiff(pixel_df = pixel_df,  
                               ROI_list = ROI_list, 
                               error_bars = error_bars,  
-                              fig_type = 'png',
-                              figsize=(15,3), 
+                              fig_type = fig_type,
+                              figsize=(18,3), 
                               ylim = [-.01, .03],
                               filename = base_filename+'_AttDiffEcc.{fext}'.format(fext = fig_type))
         
@@ -1124,8 +1124,8 @@ class DecoderViewer(Viewer):
         self.plot_pix_ringEcc_AttDiff(ring_pix_df = ring_pix_df,  
                                     ROI_list = ROI_list, 
                                     error_bars = error_bars,  
-                                    fig_type = 'png',
-                                    figsize=(15,3), 
+                                    fig_type = fig_type,
+                                    figsize=(18,3), 
                                     ylim = [-.01, .03],
                                     filename = base_filename+'_AttDiff_ringEcc.{fext}'.format(fext = fig_type))
         
@@ -1134,7 +1134,7 @@ class DecoderViewer(Viewer):
                                     ROI_list = ROI_list, 
                                     error_bars = error_bars, 
                                     figsize=(18,3), 
-                                    fig_type = 'png',
+                                    fig_type = fig_type,
                                     filename = base_filename+'_attention_barplots_ringEccDist.{fext}'.format(fext = fig_type),
                                     ylim = [.10, .22], 
                                     group_ecc = True)
@@ -1444,7 +1444,7 @@ class DecoderViewer(Viewer):
 
     def plot_ROI_pix_EccDist(self, pixel_df = None, axes = None, roi_name = 'V1', pix_ecc_colors = None, error_bars = 'within',
                                 showtitle = False, showxlabel = False, bartype_colors = {'att_bar': 'black', 'unatt_bar': 'grey'},
-                                leg_loc = 'lower left', ecc2plot = None, point_color = '#FF0080'):
+                                leg_loc = 'lower left', ecc2plot = None, point_color = '#f5007b'):
         
         """
         For a given ROI,
@@ -1679,7 +1679,7 @@ class DecoderViewer(Viewer):
                                 dpi = 100)
 
     def plot_pix_Dist_AttDiff(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
-                                                figsize=(15,3), filename = None, ylim = [-.01, .03], point_color = '#FF0080'):
+                                                figsize=(15,3), filename = None, ylim = [-.01, .03], point_color = '#f5007b'):
 
         """
         Show the attention effect (so attended minus unattended) 
@@ -1726,24 +1726,30 @@ class DecoderViewer(Viewer):
             axes[ind].set_title(roi_name, fontsize=14)
             axes[ind].set_xlabel('Min. Distance [deg]',fontsize = 16, labelpad = 15)
 
-        axes[0].set_ylabel('Att - Unatt intensity [a.u.]', fontsize = 16, labelpad = 15)
+            ### replace x tick values
+            axes[ind].set_xticks(np.linspace(df2plot_dist.min_dist.min(), df2plot_dist.min_dist.max(), 3))
+            axes[ind].set_xticklabels(np.round(np.linspace(df2plot_dist.min_dist.min(), df2plot_dist.min_dist.max(), 3), 2))
+
+            axes[ind].tick_params(axis='both', labelsize=13)
+
+        axes[0].set_ylabel('Attention Effect\n'+r'($\Delta$ Drive)', fontsize = 16, labelpad = 15)
 
         axes[0].set_ylim(ylim)
-        axes[0].set_xlim([df2plot_dist.min_dist.min() - .3, 
-                          df2plot_dist.min_dist.max() + .3])
+        axes[0].set_xlim([df2plot_dist.min_dist.min() - .5, 
+                          df2plot_dist.min_dist.max() + .5])
         plt.margins(x=0.075)
 
         #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-        fig.subplots_adjust(wspace=0.03, hspace=0.02)
+        fig.subplots_adjust(wspace=0.09, hspace=0.02)
 
-        fig.tight_layout()
+        #fig.tight_layout()
 
         ## save figure
         if filename is not None:
             fig.savefig(filename, dpi = 100)
             
     def plot_pix_Ecc_AttDiff(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
-                                                figsize=(15,3), filename = None, ylim = [-.01, .03], point_color = '#FF0080'):
+                                                figsize=(15,3), filename = None, ylim = [-.01, .03], point_color = '#f5007b'):
 
         """
         Show the attention effect (so attended minus unattended) 
@@ -1789,9 +1795,9 @@ class DecoderViewer(Viewer):
             
             axes[ind].set_title(roi_name, fontsize=14)
             axes[ind].set_xlabel('Pix ecc [deg]',fontsize = 16, labelpad = 15)
+            axes[ind].tick_params(axis='both', labelsize=13)
 
-        axes[0].set_ylabel('Att - Unatt intensity [a.u.]', fontsize = 16, labelpad = 15)
-
+        axes[0].set_ylabel('Attention Effect\n'+r'($\Delta$ Drive)', fontsize = 16, labelpad = 15)
         axes[0].set_ylim(ylim)
         axes[0].set_xlim([df2plot_ecc.ecc.min() - .3, 
                           df2plot_ecc.ecc.max() + .3])
@@ -1807,7 +1813,7 @@ class DecoderViewer(Viewer):
             fig.savefig(filename, dpi = 100)
 
     def plot_pix_ringEcc_AttDiff(self, ring_pix_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
-                                                figsize=(15,3), filename = None, ylim = [-.01, .03], point_color = '#FF0080'):
+                                                figsize=(15,3), filename = None, ylim = [-.01, .03], point_color = '#f5007b'):
 
         """
         Show the attention effect (so attended minus unattended) 
@@ -1853,9 +1859,13 @@ class DecoderViewer(Viewer):
                                                 color = point_color)
             
             axes[ind].set_title(roi_name, fontsize=14)
-            axes[ind].set_xlabel('Ring ecc [deg]',fontsize = 16, labelpad = 15)
+            axes[ind].set_xlabel('Eccentricity',fontsize = 16, labelpad = 15)
+            ## replace x tick values
+            axes[ind].set_xticks(np.sort(df2plot_ecc.ring_ecc.unique()))
+            axes[ind].set_xticklabels(['Near', 'Middle', 'Far'])
+            axes[ind].tick_params(axis='both', labelsize=13)
 
-        axes[0].set_ylabel('Att - Unatt intensity [a.u.]', fontsize = 16, labelpad = 15)
+        axes[0].set_ylabel('Attention Effect\n'+r'($\Delta$ Drive)', fontsize = 16, labelpad = 15)
 
         axes[0].set_ylim(ylim)
         axes[0].set_xlim([df2plot_ecc.ring_ecc.min() - .3, 
@@ -1863,17 +1873,17 @@ class DecoderViewer(Viewer):
         plt.margins(x=0.075)
 
         #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-        fig.subplots_adjust(wspace=0.03, hspace=0.02)
+        fig.subplots_adjust(wspace=0.09, hspace=0.02)
 
-        fig.tight_layout()
+        #fig.tight_layout()
 
         ## save figure
         if filename is not None:
             fig.savefig(filename, dpi = 100)
 
-    def plot_ROI_pix_ringEccDist_barplot(self, ring_pix_df = None, roi_name = 'V1', fig_type = 'png', filename = None, ylim = [0.08,.2], ylim2 = [-.01,.035],
+    def plot_ROI_pix_ringEccDist_barplot(self, ring_pix_df = None, roi_name = 'V1', fig_type = 'png', filename = None, ylim = [0.08,.2], ylim2 = [-.01,.04],
                                         figsize = (20,5), error_bars =  'within', showtitle = True, showxlabel = True, 
-                                        ring_ecc_colors = None, point_color = '#FF0080'):
+                                        ring_ecc_colors = None, point_color = '#f5007b'):
 
         """
         For a given ROI, make barplot that combines drive values
@@ -1976,9 +1986,14 @@ class DecoderViewer(Viewer):
             if showtitle:
                 ax1[d_ind].set_title('Min. Distance = %.2f deg'%dist,fontsize=14)
             if showxlabel:
-                ax1[d_ind].set_xlabel('Ring Ecc [a. u.]',fontsize = 16, labelpad = 15)
+                #ax1[d_ind].set_xlabel('Ring Ecc [a. u.]',fontsize = 16, labelpad = 15)
+                ax1[d_ind].set_xlabel('Eccentricity',fontsize = 16, labelpad = 15)
                 
             ax1[d_ind].tick_params(axis='both', labelsize=13)
+
+            ## replace x tick values
+            ax1[d_ind].set_xticks([0,1,2])
+            ax1[d_ind].set_xticklabels(['Near', 'Middle', 'Far'])
             
             ax1[0].set_ylabel('%s\n\nMean Drive [a.u.]'%roi_name, fontsize = 16, labelpad = 15)
             ax1[d_ind].set_ylim(ylim)
@@ -2032,7 +2047,7 @@ class DecoderViewer(Viewer):
             # plot label in last subplot
             if dist == np.sort(ring_pix_df.min_dist.unique())[-1]:
                 ax2.tick_params(axis='y', labelsize=13, color = point_color, labelcolor = point_color, length=5, width=2)
-                ax2.set_ylabel('Att - Unatt drive [a.u.]', fontsize = 16, labelpad = 18, color = point_color, rotation = 270)
+                ax2.set_ylabel('Attention Effect\n'+r'($\Delta$ Drive)', fontsize = 16, labelpad = 45, color = point_color, rotation = 270)
             else:
                 ax2.set_yticks([])
                 #ax2.tick_params(axis='y', labelsize=13, color = 'red', labelcolor='red', length=5, width=2)
@@ -2048,7 +2063,7 @@ class DecoderViewer(Viewer):
             
     def plot_ROI_pix_EccDist_barplot(self, pixel_df = None, roi_name = 'V1', fig_type = 'png', filename = None, ylim = [0.08,.2], ylim2 = [-.01,.035],
                                         figsize = (20,5), error_bars =  'within', showtitle = True, showxlabel = True, 
-                                        ecc_colors = None, point_color = '#FF0080', cmap = 'Spectral', desat = .8, wspace=0.05, hspace=0.2):
+                                        ecc_colors = None, point_color = '#f5007b', cmap = 'Spectral', desat = .8, wspace=0.05, hspace=0.2):
 
         """
         For a given ROI, make barplot that combines drive values
@@ -2215,7 +2230,7 @@ class DecoderViewer(Viewer):
             # plot label in last subplot
             if dist == np.sort(pixel_df.min_dist.unique())[-1]:
                 ax2.tick_params(axis='y', labelsize=13, color = point_color, labelcolor = point_color, length=5, width=2)
-                ax2.set_ylabel('Att - Unatt drive [a.u.]', fontsize = 16, labelpad = 18, color = point_color, rotation = 270)
+                ax2.set_ylabel('Attention Effect\n'+r'($\Delta$ Drive)', fontsize = 16, labelpad = 45, color = point_color, rotation = 270)
             else:
                 ax2.set_yticks([])
                 #ax2.tick_params(axis='y', labelsize=13, color = 'red', labelcolor='red', length=5, width=2)
@@ -2230,7 +2245,7 @@ class DecoderViewer(Viewer):
                                                                     rname = roi_name)),
                         dpi = 100)
             
-    def plot_pix_EccDist_barplot(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png',
+    def plot_pix_EccDist_barplot(self, pixel_df = None,  ROI_list = ['V1'], error_bars = 'within', fig_type = 'png', point_color = '#f5007b',
                                         figsize=(18,3), filename = None, combine_rois = False, ylim = [.10, .22], group_ecc = True):
 
         """
@@ -2263,14 +2278,15 @@ class DecoderViewer(Viewer):
                 self.plot_ROI_pix_ringEccDist_barplot(ring_pix_df = pixel_df, 
                                                     roi_name = roi_name,
                                                     filename = filename, 
-                                                    ylim = [0,.2], 
-                                                    ylim2 = [-.015,.04],
+                                                    ylim = [0,.21], 
+                                                    ylim2 = [-.01,.04],
                                                     figsize = (20,5), 
                                                     error_bars =  error_bars, 
                                                     showtitle = True, 
                                                     showxlabel = True, 
                                                     ring_ecc_colors = None, 
-                                                    point_color = '#FF0080')
+                                                    point_color = point_color,
+                                                    fig_type = fig_type)
             
             else:
                 self.plot_ROI_pix_EccDist_barplot(pixel_df = pixel_df, 
@@ -2283,7 +2299,8 @@ class DecoderViewer(Viewer):
                                                 showtitle = True, 
                                                 showxlabel = True, 
                                                 ecc_colors = None, 
-                                                point_color = '#FF0080')
+                                                point_color = point_color,
+                                                fig_type = fig_type)
                 
     def make_prf_tcplot(self, participant = None, vox2plot_dict = {'V1': []},
                             model_type = 'gauss_hrf', prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean', 

@@ -906,7 +906,7 @@ class DecoderViewer(Viewer):
             fig.savefig(filename, dpi = 100)
 
     def pointplot_mean_bar_configuration(self, pixel_df = None, ROI_list = ['V1'], error_bars = 'within', figsize=(15,5), filename = None,
-                                            bars_pos_colors = {'crossed': '#1cad98', 'parallel': '#de921f'}):
+                                            bars_pos_colors = {'crossed': '#1cad98', 'parallel': '#de921f'}, show_diff = False):
 
         """
         Make pointplot with attend vs unattend pixel values
@@ -915,81 +915,136 @@ class DecoderViewer(Viewer):
 
         """
 
-        ## first get mean values
-        df2plot = pixel_df.groupby(['ROI', 'sj', 'bar_type', 'bars_pos']).mean(numeric_only=True).reset_index()
-
-        if error_bars == 'within':
-            ## calculate within sub error bars 
-            df2plot = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot, 
-                                                                        main_var = 'intensity', 
-                                                                        conditions = ['ROI', 'bar_type', 'bars_pos'], 
-                                                                        pp_key = 'sj')
-            error_key = None
-        else:
-            error_key = ('se')
-
-        ## make pointplots
+        ## if we want to plot attention effect (delta drive) instead
+        if show_diff:
+            ## get average attention effect for given conditions
+            df2plot = self.DecoderObj.get_avg_attDiff(pixel_df = pixel_df, 
+                                                    conditions = ['ROI', 'bars_pos'])
             
-        fig, axes = plt.subplots(nrows=1, ncols=len(ROI_list), figsize = figsize, sharey=True, sharex=True)
+            if error_bars == 'within':
+                ## calculate within sub error bars 
+                df2plot = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot, 
+                                                                    main_var = 'att_diff', 
+                                                                    conditions = ['ROI', 'bars_pos'], 
+                                                                    pp_key = 'sj')
+                error_key = None
+            else:
+                error_key = ('se')
 
-        for ind, roi_name in enumerate(ROI_list):
-            
+            ## make pointplots
+            fig, axes = plt.subplots(nrows=1, ncols=1, figsize = figsize, sharey=True, sharex=True)
+                
             # plot conditions for given ROI
-            sns.pointplot(data = df2plot[df2plot['ROI'] == roi_name], 
-                        y = 'intensity', hue = 'bars_pos', x = 'bar_type',
-                        errorbar = error_key, order=['att_bar', 'unatt_bar'],
-                        markersize=8, dodge = False, palette = bars_pos_colors,
-                        ax = axes[ind], legend=False)
+            sns.pointplot(data = df2plot, 
+                        y = 'att_diff', hue = 'bars_pos', x = 'ROI',
+                        linestyle = 'none', errorbar = error_key, order = ROI_list,
+                        markersize = 10, dodge = 0.2, palette = bars_pos_colors,
+                        ax = axes, legend = False)
 
-            axes[ind].set_title(roi_name, fontsize=14)
-            axes[ind].set_xlabel('Bar type',fontsize = 16, labelpad = 15)
-            axes[ind].tick_params(axis='both', labelsize=14)
-            axes[ind].set_xticks([0, 1])
-            axes[ind].set_xticklabels(['Target', 'Distractor'])
+            axes.tick_params(axis='both', labelsize=14)
+            axes.set_ylabel('Attention Effect\n'+r'($\Delta$ Drive)', fontsize = 16, labelpad = 15)
 
             ## add error bars
             if error_key is None:
+                ## PARALLEL
+                axes.errorbar(x = np.array(axes.get_xticks()) + .1, # position is amount of dodge/2
+                            y = [df2plot[(df2plot['ROI'] == roi_name) & (df2plot['bars_pos'] == 'parallel')].att_diff.values.mean() for roi_name in ROI_list], 
+                            yerr = [df2plot[(df2plot['ROI'] == roi_name) & (df2plot['bars_pos'] == 'parallel')].SEM_att_diff.values.mean() for roi_name in ROI_list],
+                            elinewidth = 2, capsize = 5,
+                            zorder = 0, c = bars_pos_colors['parallel'], 
+                            alpha=1, fmt='none')
+                
+                ## CROSSED        
+                axes.errorbar(x = np.array(axes.get_xticks()) - .1, # position is amount of dodge/2
+                            y = [df2plot[(df2plot['ROI'] == roi_name) & (df2plot['bars_pos'] == 'crossed')].att_diff.values.mean() for roi_name in ROI_list], 
+                            yerr = [df2plot[(df2plot['ROI'] == roi_name) & (df2plot['bars_pos'] == 'crossed')].SEM_att_diff.values.mean() for roi_name in ROI_list],
+                            elinewidth = 2, capsize = 5,
+                            zorder = 0, c = bars_pos_colors['crossed'], 
+                            alpha=1, fmt='none')
+                ##
+            axes.set_ylim([0, .021])
 
-                for e_ind, bar_cond in enumerate(['att_bar', 'unatt_bar']):
-                    
-                    ## PARALLEL
-                    error_parallel_df = df2plot[(df2plot['ROI'] == roi_name) &\
-                                                (df2plot['bars_pos'] == 'parallel') &\
-                                                (df2plot['bar_type'] == bar_cond)]
-                    
-                    axes[ind].errorbar(x = axes[ind].get_xticks()[e_ind], 
-                                        y = [error_parallel_df.intensity.values.mean()], 
-                                        yerr = [error_parallel_df.SEM_intensity.values.mean()],
-                                elinewidth = 2, capsize = 5,
-                                zorder = 0, c = bars_pos_colors['parallel'], 
-                                alpha=1, fmt='none')
-                    
-                    ## CROSSED
-                    error_crossed_df = df2plot[(df2plot['ROI'] == roi_name) &\
-                                                (df2plot['bars_pos'] == 'crossed') &\
-                                                (df2plot['bar_type'] == bar_cond)]
-                    
-                    axes[ind].errorbar(x = axes[ind].get_xticks()[e_ind], 
-                                        y = [error_crossed_df.intensity.values.mean()], 
-                                        yerr = [error_crossed_df.SEM_intensity.values.mean()],
-                                elinewidth = 2, capsize = 5,
-                                zorder = 0, c = bars_pos_colors['crossed'], 
-                                alpha=1, fmt='none')
-                    ##
+            handleA = mpatches.Patch(facecolor = bars_pos_colors['crossed'], edgecolor = 'k',label='Crossed', fill=True, linewidth=1)
+            handleB = mpatches.Patch(facecolor = bars_pos_colors['parallel'],edgecolor = 'k',label='Parallel', fill=True,linewidth=1)
 
-        axes[0].set_ylabel('Mean Drive [a.u.]',fontsize = 16, labelpad = 15)
-        axes[0].set_ylim([.115, .18])
-        axes[0].set_xlim([-.5, 1.5])
-
-        plt.margins(x=0.075)
-
-        #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
-
-        handleA = mpatches.Patch(facecolor = bars_pos_colors['crossed'], edgecolor = 'k',label='Crossed', fill=True, linewidth=1)
-        handleB = mpatches.Patch(facecolor = bars_pos_colors['parallel'],edgecolor = 'k',label='Parallel', fill=True,linewidth=1)
-
-        leg = axes[ind].legend(handles = [handleA,handleB],loc='upper right', fontsize = 'medium',
+            leg = axes.legend(handles = [handleA,handleB],loc='upper right', fontsize = 'medium',
                             title= 'Bar Configuration', title_fontsize = 'medium')
+
+        else:
+            ## first get mean values
+            df2plot = pixel_df.groupby(['ROI', 'sj', 'bar_type', 'bars_pos']).mean(numeric_only=True).reset_index()
+
+            if error_bars == 'within':
+                ## calculate within sub error bars 
+                df2plot = self.MRIObj.beh_utils.calc_within_sub_sem(df_data = df2plot, 
+                                                                    main_var = 'intensity', 
+                                                                    conditions = ['ROI', 'bar_type', 'bars_pos'], 
+                                                                    pp_key = 'sj')
+                error_key = None
+            else:
+                error_key = ('se')
+
+            ## make pointplots 
+            fig, axes = plt.subplots(nrows=1, ncols=len(ROI_list), figsize = figsize, sharey=True, sharex=True)
+
+            for ind, roi_name in enumerate(ROI_list):
+                
+                # plot conditions for given ROI
+                sns.pointplot(data = df2plot[df2plot['ROI'] == roi_name], 
+                            y = 'intensity', hue = 'bars_pos', x = 'bar_type',
+                            errorbar = error_key, order=['att_bar', 'unatt_bar'],
+                            markersize=8, dodge = False, palette = bars_pos_colors,
+                            ax = axes[ind], legend=False)
+
+                axes[ind].set_title(roi_name, fontsize=14)
+                axes[ind].set_xlabel('Bar type',fontsize = 16, labelpad = 15)
+                axes[ind].tick_params(axis='both', labelsize=14)
+                axes[ind].set_xticks([0, 1])
+                axes[ind].set_xticklabels(['Target', 'Distractor'])
+
+                ## add error bars
+                if error_key is None:
+
+                    for e_ind, bar_cond in enumerate(['att_bar', 'unatt_bar']):
+                        
+                        ## PARALLEL
+                        error_parallel_df = df2plot[(df2plot['ROI'] == roi_name) &\
+                                                    (df2plot['bars_pos'] == 'parallel') &\
+                                                    (df2plot['bar_type'] == bar_cond)]
+                        
+                        axes[ind].errorbar(x = axes[ind].get_xticks()[e_ind], 
+                                            y = [error_parallel_df.intensity.values.mean()], 
+                                            yerr = [error_parallel_df.SEM_intensity.values.mean()],
+                                    elinewidth = 2, capsize = 5,
+                                    zorder = 0, c = bars_pos_colors['parallel'], 
+                                    alpha=1, fmt='none')
+                        
+                        ## CROSSED
+                        error_crossed_df = df2plot[(df2plot['ROI'] == roi_name) &\
+                                                    (df2plot['bars_pos'] == 'crossed') &\
+                                                    (df2plot['bar_type'] == bar_cond)]
+                        
+                        axes[ind].errorbar(x = axes[ind].get_xticks()[e_ind], 
+                                            y = [error_crossed_df.intensity.values.mean()], 
+                                            yerr = [error_crossed_df.SEM_intensity.values.mean()],
+                                    elinewidth = 2, capsize = 5,
+                                    zorder = 0, c = bars_pos_colors['crossed'], 
+                                    alpha=1, fmt='none')
+                        ##
+
+            axes[0].set_ylabel('Mean Drive [a.u.]',fontsize = 16, labelpad = 15)
+            axes[0].set_ylim([.115, .18])
+            axes[0].set_xlim([-.5, 1.5])
+
+            plt.margins(x=0.075)
+
+            #axes[0].set_title('Attended Bar Drive Distribution',fontsize=14)
+
+            handleA = mpatches.Patch(facecolor = bars_pos_colors['crossed'], edgecolor = 'k',label='Crossed', fill=True, linewidth=1)
+            handleB = mpatches.Patch(facecolor = bars_pos_colors['parallel'],edgecolor = 'k',label='Parallel', fill=True,linewidth=1)
+
+            leg = axes[ind].legend(handles = [handleA,handleB],loc='upper right', fontsize = 'medium',
+                                title= 'Bar Configuration', title_fontsize = 'medium')
 
         frame = leg.get_frame()
         frame.set_facecolor('w') 
@@ -1036,8 +1091,9 @@ class DecoderViewer(Viewer):
         self.pointplot_mean_bar_configuration(pixel_df = pixel_df, 
                                         ROI_list = ROI_list, 
                                         error_bars = error_bars, 
-                                        figsize=(15,5), 
-                                        filename = base_filename+'_attention_bar_configuration.{fext}'.format(fext = fig_type))
+                                        figsize=(10,5), 
+                                        show_diff = True,
+                                        filename = base_filename+'_attention_effect_bar_configuration.{fext}'.format(fext = fig_type))
         
         ## plot pixel values
         # separating by bar type, pixel ecc and pixel distance to competing object

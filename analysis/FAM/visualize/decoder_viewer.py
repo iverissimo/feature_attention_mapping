@@ -719,7 +719,7 @@ class DecoderViewer(Viewer):
         ## initialize base figure
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize = figsize)
 
-        fig.suptitle('Reconstructed stimulus (%s), ROI - %s'%(name, roi_name), fontsize=14)
+        fig.suptitle('Reconstructed stimulus (%s), ROI - %s'%(name, roi_name), fontsize=14, y = .9)
 
         ## create animation      
         ani = FuncAnimation(fig, self.update_movie_frame, 
@@ -756,6 +756,10 @@ class DecoderViewer(Viewer):
         axes[1].imshow(dm_list[frame].T, cmap = 'binary_r', vmax = 1.5)
         axes[1].vlines(3.5, -.5, 7.5, linestyles='dashed', color=line_color, alpha = alpha)
         axes[1].hlines(3.5, -.5, 7.5, linestyles='dashed', color=line_color, alpha = alpha)
+        axes[1].set_xticks(np.arange(0, 8, 1).astype(int), 
+                            labels = np.round(stim_arr.loc[frame].columns.values, 2))
+        axes[1].set_yticks(np.arange(0, 8, 1).astype(int), 
+                            labels = np.round(stim_arr.loc[frame].index.values, 2))
 
         # plot stim
         sns.heatmap(stim_arr.loc[frame], cmap = cmap, ax = axes[0], 
@@ -767,6 +771,7 @@ class DecoderViewer(Viewer):
         
         axes[0].vlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
         axes[0].hlines(4, 0, 8, linestyles='dashed', color=line_color, alpha = alpha)
+        axes[0].set_yticklabels(axes[1].get_yticklabels(), rotation=0)
 
     def barplot_mean_pix_intensity(self, pixel_df = None, ROI_list = ['V1'], error_bars = 'within', figsize=(8,5), filename = None,
                                         point_color = '#f5007b', ylim2 = [0,.03], ylim = [0,.2]):

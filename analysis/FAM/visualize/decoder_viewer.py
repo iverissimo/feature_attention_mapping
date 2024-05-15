@@ -2687,7 +2687,7 @@ class DecoderViewer(Viewer):
 
         # if we want to mask edges
         if mask_edges:
-            fig_id = fig_id+'_edge_mask'
+            fig_id = fig_id.replace('.{fext}'.format(fext = fig_type), '_edge_mask.{fext}'.format(fext = fig_type))
 
         # base filename for figures 
         base_filename = op.join(fig_dir, fig_id)

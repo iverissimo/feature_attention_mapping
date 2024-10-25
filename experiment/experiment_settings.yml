@@ -6,7 +6,7 @@ preferences:
 window: # refers to the parameters for the Psychopy Window class
   units: pix
   color: [0, 0, 0] # psychopy rgb
-  fullscr: True
+  fullscr: True #False
   screen: 0 #1
   #useRetina: False
   winType: 'pyglet'

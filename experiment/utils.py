@@ -173,7 +173,7 @@ def get_object_positions(grid_pos,bar_midpoint_at_TR, bar_pass_direction_at_TR,
                     all_bar_ind.append(p)
                 
             # make mask to get background positions
-            mask = np.ones(len(grid_pos), np.bool)
+            mask = np.ones(len(grid_pos), bool)
             mask[all_bar_ind] = 0
             
             output_dict['background'] = {'xys': grid_pos[mask], 
@@ -450,8 +450,8 @@ def set_bar_positions(pos_dict = {'horizontal': [], 'vertical': []},
 
     for key in output_dict.keys():
 
-        output_dict[key]['bar_midpoint_at_TR'] = np.vstack((v for v in output_dict[key]['bar_midpoint_at_TR']))[random_ind]
-        output_dict[key]['bar_pass_direction_at_TR'] = np.hstack((v for v in output_dict[key]['bar_pass_direction_at_TR']))[random_ind]
+        output_dict[key]['bar_midpoint_at_TR'] = np.vstack([v for v in output_dict[key]['bar_midpoint_at_TR']])[random_ind]
+        output_dict[key]['bar_pass_direction_at_TR'] = np.hstack([v for v in output_dict[key]['bar_pass_direction_at_TR']])[random_ind]
     
 
 
@@ -622,11 +622,12 @@ def save_bar_position(bar_dict, output_path):
 
         attend = 1 if key == 'attended_bar' else 0 
 
-        df_bar_position = df_bar_position.append({'attend_condition': attend,
-                                                'color': bar_dict[key]['color'],
-                                                'bar_midpoint_at_TR': bar_dict[key]['bar_midpoint_at_TR'],
-                                                'bar_pass_direction_at_TR': bar_dict[key]['bar_pass_direction_at_TR']
-                                                    }, ignore_index=True)  
+        df_bar_position = pd.concat([df_bar_position, pd.DataFrame({'attend_condition': [attend],
+                                                        'color': [bar_dict[key]['color']],
+                                                        'bar_midpoint_at_TR': [bar_dict[key]['bar_midpoint_at_TR']],
+                                                        'bar_pass_direction_at_TR': [bar_dict[key]['bar_pass_direction_at_TR']]
+                                                        })], 
+                                    ignore_index=True)  
 
     df_bar_position.to_pickle(output_path)
 
@@ -700,8 +701,7 @@ def define_feature_trials(bar_pass_direction, bar_dict, empty_TR = 20, task_tria
                         temp_pos_list.append(np.array([np.nan,np.nan], dtype=float)) 
                     bar_pos_array.append(np.array(temp_pos_list).astype('float'))
 
-    
-    return trial_number, np.array(trial_type_all), np.array(bar_pass_direction_all), np.array(bar_pos_array)
+    return trial_number, np.array(trial_type_all), np.array(bar_pass_direction_all, dtype=object), np.array(bar_pos_array)
 
 
 
@@ -757,17 +757,18 @@ def save_all_TR_info(bar_dict = [], trial_type = [], ecc_ind = {},
     
     for trl in range(len(trial_type)):
         
-        df_out = df_out.append({'trial_num': trl, 
-                                'trial_type': trial_type[trl],
-                                'attend_color': bar_dict['attended_bar']['color'],
-                                'attend_task_color' : attend_task_color[trl],
-                                'unattend_color': bar_dict['unattended_bar']['color'],
-                                'unattend_task_color': unattend_task_color[trl],
-                                'bars': bar_dict.keys(),
-                                'attend_ecc_ind': attend_ecc[trl], 
-                                'unattend_ecc_ind': unattend_ecc[trl],
-                                'crossing_ind': crossing_ind[trl],
-                              }, ignore_index=True) 
+        df_out = pd.concat([df_out, pd.DataFrame({'trial_num': [trl], 
+                                                'trial_type': [trial_type[trl]],
+                                                'attend_color': [bar_dict['attended_bar']['color']],
+                                                'attend_task_color' : [attend_task_color[trl]],
+                                                'unattend_color': [bar_dict['unattended_bar']['color']],
+                                                'unattend_task_color': [unattend_task_color[trl]],
+                                                'bars': [bar_dict.keys()],
+                                                'attend_ecc_ind':[attend_ecc[trl]], 
+                                                'unattend_ecc_ind': [unattend_ecc[trl]],
+                                                'crossing_ind': [crossing_ind[trl]],
+                                            })], 
+                            ignore_index=True) 
         
     df_out.to_csv(output_path, index = False, header=True)
 

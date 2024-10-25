@@ -29,7 +29,6 @@ window_extra: # refers to the parameters for the OLD Psychopy Window class (new 
   display: 'square' # or 'rectangle', defines if square [vRes vRes] or rectangle [hRes vRes] display
   mac_bool: False
 
-
 keys: # keys to press, valid for laptop, scanner and behav lab
   right_index: ['right','b', 2, '2','num_2']
   left_index: ['left','e', 1, '1','num_1']

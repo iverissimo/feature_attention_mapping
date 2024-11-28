@@ -306,7 +306,7 @@ class PRFSession(ExpSession):
 
         ## now make phase condition array the same size as task, 
         # i.e. fill non bar trials with background
-        all_phase_conditions = (np.stack(np.tile('background', self.phase_conditions.shape[-1]) for i in range(self.trial_number)))
+        all_phase_conditions = (np.stack([np.tile('background', self.phase_conditions.shape[-1]) for i in range(self.trial_number)]))
         all_phase_conditions[self.bar_bool] = self.phase_conditions.copy()
 
         self.phase_conditions = all_phase_conditions.copy() 
@@ -827,7 +827,7 @@ class FlickerSession(ExpSession):
         self.ecc_midpoint_dict = ecc_midpoint_dict
 
         ## save eccentricities in array, to use in file naming
-        all_ecc_array = (np.hstack(self.bar_ecc_index_dict[x] for x in self.bar_ecc_index_dict.keys()))
+        all_ecc_array = (np.hstack([self.bar_ecc_index_dict[x] for x in self.bar_ecc_index_dict.keys()]))
         self.all_ecc_array = all_ecc_array*-1 +3
 
         # save total number of trials (one eccentricity per trial) 

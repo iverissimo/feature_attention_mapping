@@ -4,6 +4,7 @@
 import sys
 import os
 import os.path as op
+import shutil
 #import appnope
 from session import PRFSession, FeatureSession, FlickerSession, PylinkEyetrackerSession
 
@@ -43,9 +44,12 @@ def main():
 
     print('Running %s pRF mapping for subject-%s, run-%s'%(exp_type,sj_num,run_num))
 
-    
-    # make output dir
-    base_dir = op.split(os.getcwd())[0] # main path for all folders of project
+    ## set path to store outcomes 
+    # DEFAULTS TO ROOT FOLDER
+    ####
+    base_dir = op.split(os.getcwd())[0] # if we want to store files elsewhere, specify absolute path in string
+    ####
+    #
     output_dir = op.join(base_dir,'output','sourcedata', 'sub-{sj}'.format(sj=sj_num))#, tasks[exp_type])
 
     # if output path doesn't exist, create it

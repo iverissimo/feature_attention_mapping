@@ -6,7 +6,7 @@ preferences:
 window: # refers to the parameters for the Psychopy Window class
   units: pix
   color: [0, 0, 0] # psychopy rgb
-  fullscr: True
+  fullscr: True #False
   screen: 0 #1
   #useRetina: False
   winType: 'pyglet'
@@ -28,7 +28,6 @@ window_extra: # refers to the parameters for the OLD Psychopy Window class (new 
   framerate: 60
   display: 'square' # or 'rectangle', defines if square [vRes vRes] or rectangle [hRes vRes] display
   mac_bool: False
-
 
 keys: # keys to press, valid for laptop, scanner and behav lab
   right_index: ['right','b', 2, '2','num_2']

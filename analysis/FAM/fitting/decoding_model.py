@@ -162,9 +162,25 @@ class Decoding_Model(GLMsingle_Model):
         return masked_data_df
     
     def get_prf_stim_grid(self, participant = None, ses = 'mean', mask_bool_df = None, stim_on_screen = [], 
-                                prf_condition_per_TR = []):
+                                prf_condition_per_TR = [], dm_size = 80):
         
         """Get prf stimulus array and grid coordinates for participant
+
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        ses: str
+            session number (default is "mean" which combines all sessions)
+        mask_bool_df: DataFrame
+            boolean mask based on subject responses, indicating scanner visibility
+        stim_on_screen: arr
+            boolean array indicating on which TRs stimuli is on screen
+        prf_condition_per_TR: str
+            name of pRF bar pass direction per TR
+        dm_size: int
+            desired size of prf DM
+
         """
         
         ## get stimulus array (time, x, y)
@@ -173,19 +189,18 @@ class Decoding_Model(GLMsingle_Model):
                                         mask_bool_df = mask_bool_df, 
                                         stim_on_screen = stim_on_screen,
                                         prf_condition_per_TR = prf_condition_per_TR,
+                                        dm_size = dm_size,
                                         filename = None, 
                                         transpose_dm = False)
         
-        ## get grid coordinates
-        size = prf_stimulus_dm.shape[-1]
-
+        ## get grid coordinates (relative to DM size)
         coord_x = np.linspace(-self.convert_pix2dva(self.MRIObj.screen_res[0]/2), 
-                      self.convert_pix2dva(self.MRIObj.screen_res[0]/2), size+1, endpoint=True)
-        coord_x = np.hstack((coord_x[:int(size/2)], coord_x[int(size/2 + 1):]))
+                      self.convert_pix2dva(self.MRIObj.screen_res[0]/2), dm_size+1, endpoint=True)
+        coord_x = np.hstack((coord_x[:int(dm_size/2)], coord_x[int(dm_size/2 + 1):]))
         
         coord_y = np.linspace(-self.convert_pix2dva(self.MRIObj.screen_res[1]/2), 
-                      self.convert_pix2dva(self.MRIObj.screen_res[1]/2), size+1, endpoint=True)
-        coord_y = np.hstack((coord_y[:int(size/2)], coord_y[int(size/2 + 1):]))
+                      self.convert_pix2dva(self.MRIObj.screen_res[1]/2), dm_size+1, endpoint=True)
+        coord_y = np.hstack((coord_y[:int(dm_size/2)], coord_y[int(dm_size/2 + 1):]))
 
         y, x = np.meshgrid(np.flip(coord_y), 
                             coord_x)

@@ -194,6 +194,23 @@ class Decoding_Model(GLMsingle_Model):
                                         transpose_dm = False)
         
         ## get grid coordinates (relative to DM size)
+        prf_grid_coordinates = self.get_grid_coordinates(dm_size = dm_size)
+        
+        return prf_stimulus_dm, prf_grid_coordinates
+    
+    def get_grid_coordinates(self, dm_size = 80):
+
+        """
+        Get grid coordinates (x,y) dataframe to use in decoder, 
+        based on DM size and screen coordinates 
+
+        Parameters
+        ----------
+        dm_size: int
+            desired size of prf DM
+
+        """
+
         coord_x = np.linspace(-self.convert_pix2dva(self.MRIObj.screen_res[0]/2), 
                       self.convert_pix2dva(self.MRIObj.screen_res[0]/2), dm_size+1, endpoint=True)
         coord_x = np.hstack((coord_x[:int(dm_size/2)], coord_x[int(dm_size/2 + 1):]))
@@ -207,15 +224,32 @@ class Decoding_Model(GLMsingle_Model):
         x_deg = x.ravel().astype(np.float32)
         y_deg = y.ravel().astype(np.float32)
 
-        prf_grid_coordinates = pd.DataFrame({'x':x_deg, 'y': y_deg}).astype(np.float32)
-        
-        return prf_stimulus_dm, prf_grid_coordinates
+        return pd.DataFrame({'x':x_deg, 'y': y_deg}).astype(np.float32)
     
     def make_prf_DM(self, participant = None, ses = 'mean', mask_bool_df = None, stim_on_screen = [], filename = None,
                         prf_condition_per_TR = [], transpose_dm = False, dm_size = 80):
 
         """
         Get prf stimulus array for participant
+
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        ses: str
+            session number (default is "mean" which combines all sessions)
+        mask_bool_df: DataFrame
+            boolean mask based on subject responses, indicating scanner visibility
+        stim_on_screen: arr
+            boolean array indicating on which TRs stimuli is on screen
+        filename: str
+            absolute filename to store DM (if None, will not save)
+        prf_condition_per_TR: str
+            name of pRF bar pass direction per TR
+        transpose_dm: bool
+            if true, returns time in last axis [x,y,t]
+        dm_size: int
+            desired size of prf DM
         """
 
         visual_dm = None

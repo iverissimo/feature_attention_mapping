@@ -197,7 +197,7 @@ class Decoding_Model(GLMsingle_Model):
         return prf_stimulus_dm, prf_grid_coordinates
     
     def make_prf_DM(self, participant = None, ses = 'mean', mask_bool_df = None, stim_on_screen = [], filename = None,
-                        prf_condition_per_TR = [], transpose_dm = False):
+                        prf_condition_per_TR = [], transpose_dm = False, dm_size = 80):
 
         """
         Get prf stimulus array for participant
@@ -236,9 +236,6 @@ class Decoding_Model(GLMsingle_Model):
 
             # multiply boolean array with mask
             stim_on_screen = stim_on_screen * dm_mask
-
-            # set DM size 
-            dm_size = 80
             
             # get prf bar pass dict, for reference
             prf_bar_pass_dict = self.create_prf_barpass_arr(dm_size = dm_size)

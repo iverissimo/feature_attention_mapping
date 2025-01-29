@@ -871,21 +871,29 @@ class Decoding_Model(GLMsingle_Model):
             
         return average_stim
     
-    def get_decoder_grid_coords(self, y_coords_deg = None, x_coords_deg = None):
+    def get_decoder_grid_coords(self, dm_size = 8):
         
-        """Get grid coordinates for FA task, to use in decoder 
-        default will be (8x8 grid)
+        """Get FA task grid coordinates to use in decoder. 
+        Default will be 8x8 grid, with coordinates == center of bar position.
+
+        Parameters
+        ----------
+        dm_size: int
+            size of FA DM
+
         """
 
-        if y_coords_deg is None:
+        if dm_size != 8:
+            fa_grid_coordinates = self.get_grid_coordinates(dm_size = dm_size) # grid equally space between screen edges
+        else:
+            # use FA bar center position as reference for grid
             y_coords_deg = self.y_coords_deg
-        if x_coords_deg is None:
             x_coords_deg = self.x_coords_deg
 
-        new_y, new_x = np.meshgrid(np.flip(np.sort(y_coords_deg)), 
-                                    np.sort(x_coords_deg))
-        fa_grid_coordinates = pd.DataFrame({'x':new_x.ravel().astype(np.float32), 'y': new_y.ravel().astype(np.float32)}).astype(np.float32)
-        
+            new_y, new_x = np.meshgrid(np.flip(np.sort(y_coords_deg)), 
+                                        np.sort(x_coords_deg))
+            fa_grid_coordinates = pd.DataFrame({'x':new_x.ravel().astype(np.float32), 'y': new_y.ravel().astype(np.float32)}).astype(np.float32)
+            
         return fa_grid_coordinates
     
     def get_diag_mirror_arr(self, og_arr = None, diag_type = 'major'):
@@ -1458,8 +1466,7 @@ class Decoding_Model(GLMsingle_Model):
         
         return reconstructed_stimulus
          
-    def get_FA_stim_grid(self, participant = None, group_bar_pos_df = None, prf_bar_coords_dict = None, dm_size = 80, 
-                            y_coords_deg = None, x_coords_deg = None):
+    def get_FA_stim_grid(self, participant = None, group_bar_pos_df = None, prf_bar_coords_dict = None, dm_size = 80):
         
         """Get participant FA DM + grid coordinates that will be used in decoder
         """
@@ -1475,7 +1482,7 @@ class Decoding_Model(GLMsingle_Model):
                                         dm_size = dm_size)
         
         ## get grid coordinates (8x8)
-        fa_grid_coordinates = self.get_decoder_grid_coords(y_coords_deg = y_coords_deg, x_coords_deg = x_coords_deg)
+        fa_grid_coordinates = self.get_decoder_grid_coords()
         
         return FA_DM_dict, fa_grid_coordinates
         

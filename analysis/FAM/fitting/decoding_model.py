@@ -1279,7 +1279,7 @@ class Decoding_Model(GLMsingle_Model):
     def decode_ROI(self, participant = None, roi_name = 'V1', overwrite_T1 = False, overwrite_func = False, model_type = 'gauss_hrf',
                         prf_file_ext = '_cropped_dc_psc.nii.gz', fa_file_ext = '_cropped.nii.gz', ses = 'mean',
                         mask_bool_df = None, stim_on_screen = [], save_estimates = True, pp_bar_pos_df = None,
-                        prf_bar_coords_dict = None, mask_barpos = False):
+                        prf_bar_coords_dict = None, mask_barpos = False, fa_dm_size = 8):
         
         """For a given participant and ROI,
         run decoder analysis
@@ -1356,7 +1356,8 @@ class Decoding_Model(GLMsingle_Model):
         FA_DM_dict, fa_grid_coordinates = self.get_FA_stim_grid(participant = participant, 
                                                                 group_bar_pos_df = {'sub-{sj}'.format(sj = participant): pp_bar_pos_df},
                                                                 prf_bar_coords_dict = prf_bar_coords_dict,
-                                                                dm_size = prf_stimulus_dm.shape[-1])
+                                                                prf_dm_size = prf_stimulus_dm.shape[-1],
+                                                                fa_dm_size=fa_dm_size)
         
         ## decode over runs
         # save reconstructed stim as HDF5 file, to later load
@@ -1376,15 +1377,11 @@ class Decoding_Model(GLMsingle_Model):
         lowres_DM_dict = {}
         for ind, df_key in enumerate(masked_FAdata_dict):
             
-            ## downsample DM 
             file_rn, file_sn = self.MRIObj.mri_utils.get_run_ses_from_str(df_key)
-            print('downsampling FA DM for ses-{sn}, run-{rn}'.format(sn = file_sn, rn=file_rn))
+            print('downsampled FA DM for ses-{sn}, run-{rn}'.format(sn = file_sn, rn=file_rn))
             
-            lowres_DM = self.downsample_DM(DM_arr = FA_DM_dict[df_key]['full_stim'],
-                                        dm_size = FA_DM_dict[df_key]['full_stim'].shape[-1],
-                                        new_size = 8)
-            
-            ## and set downsampled DM as mask, if such is the case
+            ## set downsampled DM as mask, if such is the case
+            lowres_DM = FA_DM_dict[df_key]['full_stim']
             mask_fa = lowres_DM.astype(bool) if mask_barpos else None
                 
             print('decoding data from %s'%df_key)
@@ -1466,7 +1463,7 @@ class Decoding_Model(GLMsingle_Model):
         
         return reconstructed_stimulus
          
-    def get_FA_stim_grid(self, participant = None, group_bar_pos_df = None, prf_bar_coords_dict = None, dm_size = 80):
+    def get_FA_stim_grid(self, participant = None, group_bar_pos_df = None, prf_bar_coords_dict = None, prf_dm_size = 80, fa_dm_size = 8):
         
         """Get participant FA DM + grid coordinates that will be used in decoder
         """
@@ -1477,14 +1474,27 @@ class Decoding_Model(GLMsingle_Model):
             prf_bar_coords_dict['sub-{sj}'.format(sj = participant)] = None
         
         ## get FA DM
+        # first need to make DM with same size of pRF DM
         FA_DM_dict, _ = self.make_DM_dict(pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = participant)],
                                         pp_prf_bar_coords_dict = prf_bar_coords_dict['sub-{sj}'.format(sj = participant)],
-                                        dm_size = dm_size)
+                                        dm_size = prf_dm_size)
         
-        ## get grid coordinates (8x8)
-        fa_grid_coordinates = self.get_decoder_grid_coords()
+        # then we downsample FA DM
+        lowres_DM_dict = {}
+
+        for sr_key in FA_DM_dict.keys():
+
+            lowres_DM_dict[sr_key] = {key: {} for key in list(FA_DM_dict[sr_key].keys())}
+
+            for stim_key in FA_DM_dict[sr_key].keys():
+                lowres_DM_dict[sr_key][stim_key] = self.downsample_DM(DM_arr = FA_DM_dict[sr_key][stim_key],
+                                                                    dm_size = FA_DM_dict[sr_key][stim_key].shape[-1],
+                                                                    new_size = fa_dm_size)
         
-        return FA_DM_dict, fa_grid_coordinates
+        ## get grid coordinates (default is 8x8)
+        fa_grid_coordinates = self.get_decoder_grid_coords(dm_size=fa_dm_size)
+        
+        return lowres_DM_dict, fa_grid_coordinates
         
     def get_FA_ROI_data(self, participant = None, roi_name = 'V1', index_arr = [], overwrite_T1 = False, overwrite_func = False,
                             glmsingle_model = 'D', file_ext = '_cropped.nii.gz', trial_num = 132,
@@ -1804,21 +1814,15 @@ class Decoding_Model(GLMsingle_Model):
             
         return reconstructed_stim_dict
     
-    def get_lowresDM_dict(self, DM_dict = None, data_keys = ['ses-1_run-1']):
+    def swap_dict_keys(self, DM_dict = None):
         
-        """downsample FA DM and append to dicts, for later plotting
+        """swap dict keys for later plotting
         """
-    
-        ## iterate over runs
-        lowres_DM_dict = {key: {} for key in list(DM_dict[data_keys[0]].keys())}
 
-        for ind, df_key in enumerate(data_keys):
-            
-            for stim_key in lowres_DM_dict.keys():
-                # downsample DM and append to dicts
-                lowres_DM_dict[stim_key][df_key] = self.downsample_DM(DM_arr = DM_dict[df_key][stim_key])
+        stim_keys = {key: {} for key in list(DM_dict[list(DM_dict.keys())[0]].keys())}
+        new_dict = {key:{k:DM_dict[k][key] for k in DM_dict if key in DM_dict[k]} for key in stim_keys}
                     
-        return lowres_DM_dict
+        return new_dict
     
     def get_same_bar_pos_ind_dict(self, lowresDM_dict = None, data_keys = ['ses-1_run-1']):
         
@@ -2039,7 +2043,8 @@ class Decoding_Model(GLMsingle_Model):
         
         return prf_decoder_model
     
-    def load_group_DM_dict(self, participant_list = [], group_bar_pos_df = None, data_keys_dict = {}, prf_bar_coords_dict = None):
+    def load_group_DM_dict(self, participant_list = [], group_bar_pos_df = None, data_keys_dict = {}, prf_bar_coords_dict = None,
+                           prf_dm_size = 80, fa_dm_size = 8):
         
         """Load FA downsampled DM for all participants in participant list
         returns dict of DMs 
@@ -2051,14 +2056,14 @@ class Decoding_Model(GLMsingle_Model):
             
             print('Getting downsampled DM for sub-{sj}'.format(sj = participant)) 
             
-            ## get FA DM and grid coordinates (8x8)
+            ## get FA DM and grid coordinates (default 8x8)
             FA_DM_dict, _ = self.get_FA_stim_grid(participant = participant, 
                                                   group_bar_pos_df = group_bar_pos_df,
-                                                  prf_bar_coords_dict = prf_bar_coords_dict)
+                                                  prf_bar_coords_dict = prf_bar_coords_dict,
+                                                  prf_dm_size = prf_dm_size, fa_dm_size = fa_dm_size)
             
             ## get downsampled FA DM
-            group_lowres_DM_dict['sub-{sj}'.format(sj = participant)] = self.get_lowresDM_dict(DM_dict = FA_DM_dict, 
-                                                                                            data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)])
+            group_lowres_DM_dict['sub-{sj}'.format(sj = participant)] = self.swap_dict_keys(DM_dict = FA_DM_dict)
             
         return group_lowres_DM_dict
     
@@ -2313,7 +2318,8 @@ class Decoding_Model(GLMsingle_Model):
 
     def plot_decoder_results(self, participant_list = [], ROI_list = ['V1'], model_type = 'gauss_hrf',
                         prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean', fa_file_ext = '_cropped.nii.gz',
-                        mask_bool_df = None, stim_on_screen = [], group_bar_pos_df = [], prf_bar_coords_dict = None):
+                        mask_bool_df = None, stim_on_screen = [], group_bar_pos_df = [], prf_bar_coords_dict = None,
+                        prf_dm_size = 80, fa_dm_size = 8):
         
         """plot reconstructed stim averaged over unique conditions
         for all participants and ROIs
@@ -2340,7 +2346,8 @@ class Decoding_Model(GLMsingle_Model):
         lowres_DM_dict = self.load_group_DM_dict(participant_list = participant_list, 
                                                 group_bar_pos_df = group_bar_pos_df, 
                                                 data_keys_dict = data_keys_dict,
-                                                prf_bar_coords_dict = prf_bar_coords_dict)
+                                                prf_bar_coords_dict = prf_bar_coords_dict,
+                                                prf_dm_size = prf_dm_size, fa_dm_size = fa_dm_size)
         
         ## get FA bar position dict, across runs, for group
         run_position_df_dict = self.load_group_run_position_df_dict(participant_list = participant_list, 

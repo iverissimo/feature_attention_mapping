@@ -245,6 +245,8 @@ mri: # refers to the Psychopy SyncGenerator class
       glmsingle_models: {'A': 'TYPEA_ONOFF.npy', 'B': 'TYPEB_FITHRF.npy',
                         'C': 'TYPEC_FITHRF_GLMDENOISE.npy', 'D': 'TYPED_FITHRF_GLMDENOISE_RR.npy'}
 
+      decoder_dm_size: 8
+
     
 eyetracking:
 

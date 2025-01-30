@@ -60,7 +60,8 @@ class Decoding_Model(GLMsingle_Model):
         
         # prf sj space to define ROIs will be surface space
         self.prf_sj_space = 'fsnative'
-        self.decoder_dir = op.join(self.MRIObj.derivatives_pth, 'decoder')
+        self.fa_dm_size = self.MRIObj.params['mri']['fitting']['FA']['decoder_dm_size']
+        self.decoder_dir = op.join(self.MRIObj.derivatives_pth, 'decoder', "%ix%i"%self.fa_dm_size)
         self.pRFModelObj = pRFModelObj
 
         self.prf_condition_per_TR = self.pRFModelObj.condition_per_TR
@@ -135,7 +136,23 @@ class Decoding_Model(GLMsingle_Model):
                                 overwrite_func = False, file_ext = None):
         
         """Get pRF data for the ROI of a participant, averaged across runs,
-        and return dataframe in a format compatible with braindecoder 
+        and return dataframe in a format compatible with braincoder
+
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        roi_name: str
+            ROI name
+        overwrite_T1: bool
+            if we want to overwrite T1w image mask object from custom ROI label files
+        overwrite_func: bool
+            if we want to overwrite resampled functional data mask
+        index_arr: list
+            voxel index numbers, to subselect ROI data (if empty will use all voxels found in ROI)
+        file_ext: str
+            pRf run functional data filename extension
+            
         """
         
         ## load pRF bold files
@@ -1256,7 +1273,7 @@ class Decoding_Model(GLMsingle_Model):
     def fit_decoder(self, participant_list = [], ROI_list = ['V1'], overwrite_T1 = False, overwrite_func = False, model_type = 'gauss_hrf',
                         prf_file_ext = '_cropped_dc_psc.nii.gz', ses = 'mean', fa_file_ext = '_cropped.nii.gz',
                         mask_bool_df = None, stim_on_screen = [], group_bar_pos_df = [], prf_bar_coords_dict = None,
-                        mask_barpos = False):
+                        mask_barpos = False, fa_dm_size = 8):
         
         """
         Run decoder model to each ROI, for all participants in participant list
@@ -1289,6 +1306,8 @@ class Decoding_Model(GLMsingle_Model):
             prf bar position, to mask out FA trials that were not fully visible 
         mask_barpos: bool
             if we want to mask out trials where bar was not visible, during decoding
+        fa_dm_size: int
+            downsampled FA DM size (to be decoded)
         """
 
         print('Model type --> %s'%model_type)
@@ -1302,16 +1321,51 @@ class Decoding_Model(GLMsingle_Model):
                                 ses = ses, mask_bool_df = mask_bool_df, stim_on_screen = stim_on_screen,
                                 model_type = model_type, fa_file_ext = fa_file_ext, 
                                 pp_bar_pos_df = group_bar_pos_df['sub-{sj}'.format(sj = pp)],
-                                prf_bar_coords_dict = prf_bar_coords_dict, mask_barpos = mask_barpos)
+                                prf_bar_coords_dict = prf_bar_coords_dict, mask_barpos = mask_barpos,
+                                fa_dm_size = fa_dm_size)
                        
     def decode_ROI(self, participant = None, roi_name = 'V1', overwrite_T1 = False, overwrite_func = False, model_type = 'gauss_hrf',
                         prf_file_ext = '_cropped_dc_psc.nii.gz', fa_file_ext = '_cropped.nii.gz', ses = 'mean',
-                        mask_bool_df = None, stim_on_screen = [], save_estimates = True, pp_bar_pos_df = None,
+                        mask_bool_df = None, stim_on_screen = [], pp_bar_pos_df = None,
                         prf_bar_coords_dict = None, mask_barpos = False, fa_dm_size = 8):
         
-        """For a given participant and ROI,
-        run decoder analysis
+        """For a given participant and ROI, run decoder analysis
+
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        roi_name: str
+            ROI name
+        overwrite_T1: bool
+            if we want to overwrite T1w image mask object from custom ROI label files
+        overwrite_func: bool
+            if we want to overwrite resampled functional data mask
+        model_type: str
+            prf model name (the estimates will be used to select the ROI voxels to decode) 
+        prf_file_ext: str
+            pRf run functional data filename extension
+        fa_file_ext: str
+            FA run functional data filename extension
+        ses: str
+            session ID (if mean, will combine all sessions in sourcedata folder)
+        mask_bool_df: DataFrame
+            boolean mask based on subject responses, indicating scanner visibility
+        stim_on_screen: arr
+            boolean array indicating on which TRs stimuli is on screen
+        pp_bar_pos_df: DataFrame
+            participant bar positions for FA task
+        prf_bar_coords_dict: dict
+            prf bar position, to mask out FA trials that were not fully visible 
+        mask_barpos: bool
+            if we want to mask out trials where bar was not visible, during decoding
+        fa_dm_size: int
+            downsampled FA DM size (to be decoded) 
         """
+
+        # update decoder output path, according to final resolution of decoded space
+        if fa_dm_size != self.fa_dm_size:
+            self.decoder_dir = op.join(op.split(self.decoder_dir)[0], "%ix%i"%self.fa_dm_size)
         
         # make dir to save estimates
         pp_outdir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = participant))
@@ -1380,7 +1434,7 @@ class Decoding_Model(GLMsingle_Model):
                                                 file_ext = fa_file_ext,
                                                 glmsingle_model = 'D', 
                                                 trial_num = 132)
-        ## get FA DM and grid coordinates (8x8)
+        ## get FA DM and grid coordinates (default is 8x8)
         FA_DM_dict, fa_grid_coordinates = self.get_FA_stim_grid(participant = participant, 
                                                                 group_bar_pos_df = {'sub-{sj}'.format(sj = participant): pp_bar_pos_df},
                                                                 prf_bar_coords_dict = prf_bar_coords_dict,
@@ -1798,10 +1852,15 @@ class Decoding_Model(GLMsingle_Model):
         
         return prf_decoder_model, output_pars
     
-    def load_ROI_encoding_model_pars(self, participant = None, task = 'pRF', roi_name = 'V1', model_type = 'gauss_hrf'):
+    def load_ROI_encoding_model_pars(self, participant = None, task = 'pRF', roi_name = 'V1', model_type = 'gauss_hrf',
+                                        fa_dm_size = 8):
         
         """Load previously fitted parameters
         """
+
+        # update decoder output path, according to final resolution of decoded space
+        if fa_dm_size != self.fa_dm_size:
+            self.decoder_dir = op.join(op.split(self.decoder_dir)[0], "%ix%i"%self.fa_dm_size)
         
         # dir where estimates where saved 
         pp_outdir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = participant))
@@ -1823,10 +1882,14 @@ class Decoding_Model(GLMsingle_Model):
         return pars_gd
     
     def load_reconstructed_stim_dict(self, participant = None, task = 'FA', roi_name = 'V1', model_type = 'gauss_hrf',
-                                    data_keys = ['ses-1_run-1'], masked_stim = False):
+                                    data_keys = ['ses-1_run-1'], masked_stim = False, fa_dm_size = 8):
         
         """Load previously save reconstructed stim
         """
+
+        # update decoder output path, according to final resolution of decoded space
+        if fa_dm_size != self.fa_dm_size:
+            self.decoder_dir = op.join(op.split(self.decoder_dir)[0], "%ix%i"%self.fa_dm_size)
         
         # dir where estimates where saved 
         pp_outdir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = participant))

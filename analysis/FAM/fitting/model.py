@@ -410,10 +410,29 @@ class Model:
     def get_ROImask_data(self, participant, file_list = None, task = 'pRF', run_type = 'mean', ses = 'mean', 
                             roi_name = 'V1', index_arr = [], overwrite_T1 = False, overwrite_func = False):
         
-        """load data from file list of given participant
-        will subselect files from filelist depending on run/session/task at hand
+        """Get ROI masked data (from FS labels turned volume image) of given participant.
+        Will subselect files from filelist depending on run/session/task at hand
         
-        and get ROI masked data (from FS labels turned volume image) 
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        file_list: list
+            list with functional data filenames to load
+        task: str
+            task name (pRF/FA)
+        run_type: str
+            run ID (if mean will combine all runs)
+        ses: str
+            ses ID (if mean will combine all sessions)
+        roi_name: str
+            ROI name
+        overwrite_T1: bool
+            if we want to overwrite T1w image mask object from custom ROI label files
+        overwrite_func: bool
+            if we want to overwrite resampled functional data mask
+        index_arr: list
+            voxel index numbers, to subselect ROI data (if empty will use all voxels found in ROI)
         """
         
         # if loading specific run
@@ -466,11 +485,11 @@ class Model:
             
             # resample mask to func image space
             _ = self.MRIObj.mri_utils.resample_T1mask_to_func(mask_img = T1_im_mask, 
-                                                                    bold_filename = file,
-                                                                    filename = mask_name.format(tsk = task,
-                                                                                                session = file_sn,
-                                                                                                run = file_rn),
-                                                                    overwrite = overwrite_func)
+                                                            bold_filename = file,
+                                                            filename = mask_name.format(tsk = task,
+                                                                                        session = file_sn,
+                                                                                        run = file_rn),
+                                                            overwrite = overwrite_func)
             
             # store mask image filenames
             func_im_mask_filenames.append(mask_name.format(tsk = task,

@@ -1259,8 +1259,36 @@ class Decoding_Model(GLMsingle_Model):
                         mask_barpos = False):
         
         """
-        Fit decoder across participants
-        and ROIs
+        Run decoder model to each ROI, for all participants in participant list
+
+        Parameters
+        ----------
+        participant_list: list
+            list of strings with participant ID
+        ROI_list: list
+            list of strings with ROI names
+        overwrite_T1: bool
+            if we want to overwrite T1w image mask object from custom ROI label files
+        overwrite_func: bool
+            if we want to overwrite resampled functional data mask
+        model_type: str
+            prf model name (the estimates will be used to select the ROI voxels to decode) 
+        prf_file_ext: str
+            pRf run functional data filename extension
+        fa_file_ext: str
+            FA run functional data filename extension
+        ses: str
+            session ID (if mean, will combine all sessions in sourcedata folder)
+        mask_bool_df: DataFrame
+            boolean mask based on subject responses, indicating scanner visibility
+        stim_on_screen: arr
+            boolean array indicating on which TRs stimuli is on screen
+        group_bar_pos_df: DataFrame
+            all participant bar positions for FA task
+        prf_bar_coords_dict: dict
+            prf bar position, to mask out FA trials that were not fully visible 
+        mask_barpos: bool
+            if we want to mask out trials where bar was not visible, during decoding
         """
 
         print('Model type --> %s'%model_type)
@@ -1466,6 +1494,19 @@ class Decoding_Model(GLMsingle_Model):
     def get_FA_stim_grid(self, participant = None, group_bar_pos_df = None, prf_bar_coords_dict = None, prf_dm_size = 80, fa_dm_size = 8):
         
         """Get participant FA DM + grid coordinates that will be used in decoder
+
+        Parameters
+        ----------
+        participant: str
+            participant ID
+        group_bar_pos_df: DataFrame
+            all participant bar positions for FA task
+        prf_bar_coords_dict: dict
+            prf bar position, to mask out FA trials that were not fully visible 
+        prf_dm_size: int
+            pRF DM size
+        fa_dm_size: int
+            downsampled FA DM size (to be decoded)
         """
         
         # if we didnt provide a prf bar position mask, set to None
@@ -1816,7 +1857,7 @@ class Decoding_Model(GLMsingle_Model):
     
     def swap_dict_keys(self, DM_dict = None):
         
-        """swap dict keys for later plotting
+        """swap DM dict keys (for plotting)
         """
 
         stim_keys = {key: {} for key in list(DM_dict[list(DM_dict.keys())[0]].keys())}

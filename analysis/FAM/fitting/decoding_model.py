@@ -1499,6 +1499,27 @@ class Decoding_Model(GLMsingle_Model):
         
         """Decode FA betas for a given run
         and save reconstructed stim as hdf5 file
+
+        Parameters
+        ----------
+        model_type: str
+            pRF model name 
+        data: DataFrame
+            FA data
+        grid_coordinates: DataFrame
+            FA grid coordinates (relative to DM size)
+        parameters: DataFrame
+            encoding model (pRF) parameters
+        omega: float
+            omega value from residuals fitting
+        dof: int
+            dof value from residuals fitting
+        best_voxels: arr
+            voxels indices to be decoded
+        filename: str
+            absolute filename for output parameters
+        mask: arr
+            boolean mask array, if we want to maskout specific trials
         """
         
         print('using params from %i best voxels'%(len(best_voxels)))
@@ -1653,6 +1674,30 @@ class Decoding_Model(GLMsingle_Model):
                             best_vox = None, filename = None, max_n_iterations = 1000, learning_rate = 0.02, min_n_iterations = 100):
         
         """Fit noise model on residuals
+
+        Parameters
+        ----------
+        model: model object
+            encoding model (pRF) from braincoder
+        data: DataFrame
+            pRF data
+        paradigm: arr
+            pRF stimulus DM
+        parameters: DataFrame
+            encoding model (pRF) estimates
+        fit_method: str
+            use t distribution 
+        best_vox: arr
+            voxel indices
+        max_n_iterations: int
+            max number of iterations to attempt while fitting
+        min_n_iterations: int
+            min number of iterations to attempt while fitting
+        learning_rate: float
+            learning rate
+        filename: str
+            absolute filename for output
+
         """
         # if there is a pars file already, just load it
         if filename is not None and op.isfile(filename):
@@ -1690,6 +1735,25 @@ class Decoding_Model(GLMsingle_Model):
         
         """
         Get best voxels to then use in fitter
+
+        Parameters
+        ----------
+        pars_gd: DataFrame
+            encoding model (pRF) estimates
+        r2_gd: DataFrame
+            encoding model (pRF) variance explained
+        x_lim: list
+            x coordinate bounds 
+        y_lim: list
+            y coordinate bounds
+        size_min: float
+            size estimate min value (threshold) 
+        size_max: str/float
+            size estimate max value (threshold) 
+        std_val: float/int
+            if size max threshold is standard deviation, multiply by this factor to get upper bound
+        n_vox: int
+            number of best voxels to keep
         """   
         
         # sort indices according to r2 values
@@ -1724,6 +1788,19 @@ class Decoding_Model(GLMsingle_Model):
         
         """
         Fit PRF parameters (encoding model)
+
+        Parameters
+        ----------
+        data: DataFrame
+            pRF data
+        grid_coordinates: DataFrame
+            pRF grid coordinates (relative to DM size)
+        model_type: str
+            pRF model name 
+        paradigm: arr
+            pRF stimulus DM
+        filename: str
+            absolute filename for output parameters
         """
         
         # if we want to fit the hrf
@@ -1856,6 +1933,7 @@ class Decoding_Model(GLMsingle_Model):
                                         fa_dm_size = 8):
         
         """Load previously fitted parameters
+
         """
 
         # update decoder output path, according to final resolution of decoded space
@@ -2122,7 +2200,20 @@ class Decoding_Model(GLMsingle_Model):
                             paradigm = None, fit_hrf = False):
         
         """
-        set up appropriate prf decoder model
+        Set up appropriate prf decoder model
+
+        Parameters
+        ----------
+        data: DataFrame
+            pRF data
+        grid_coordinates: DataFrame
+            pRF grid coordinates (relative to DM size)
+        model_type: str
+            pRF model name 
+        paradigm: arr
+            pRF stimulus DM
+        fit_hrf: bool
+            if we want to fit HRF params
         """
         
         # set hrf model

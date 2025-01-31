@@ -61,7 +61,7 @@ class Decoding_Model(GLMsingle_Model):
         # prf sj space to define ROIs will be surface space
         self.prf_sj_space = 'fsnative'
         self.fa_dm_size = self.MRIObj.params['mri']['fitting']['FA']['decoder_dm_size']
-        self.decoder_dir = op.join(self.MRIObj.derivatives_pth, 'decoder', "%ix%i"%self.fa_dm_size)
+        self.decoder_dir = op.join(self.MRIObj.derivatives_pth, 'decoder', '{res}x{res}'.format(res = self.fa_dm_size))
         self.pRFModelObj = pRFModelObj
 
         self.prf_condition_per_TR = self.pRFModelObj.condition_per_TR
@@ -1365,7 +1365,7 @@ class Decoding_Model(GLMsingle_Model):
 
         # update decoder output path, according to final resolution of decoded space
         if fa_dm_size != self.fa_dm_size:
-            self.decoder_dir = op.join(op.split(self.decoder_dir)[0], "%ix%i"%self.fa_dm_size)
+            self.decoder_dir = op.join(op.split(self.decoder_dir)[0], '{res}x{res}'.format(res = fa_dm_size))
         
         # make dir to save estimates
         pp_outdir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = participant))
@@ -1938,7 +1938,7 @@ class Decoding_Model(GLMsingle_Model):
 
         # update decoder output path, according to final resolution of decoded space
         if fa_dm_size != self.fa_dm_size:
-            self.decoder_dir = op.join(op.split(self.decoder_dir)[0], "%ix%i"%self.fa_dm_size)
+            self.decoder_dir = op.join(op.split(self.decoder_dir)[0], '{res}x{res}'.format(res = fa_dm_size))
         
         # dir where estimates where saved 
         pp_outdir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = participant))
@@ -1967,7 +1967,7 @@ class Decoding_Model(GLMsingle_Model):
 
         # update decoder output path, according to final resolution of decoded space
         if fa_dm_size != self.fa_dm_size:
-            self.decoder_dir = op.join(op.split(self.decoder_dir)[0], "%ix%i"%self.fa_dm_size)
+            self.decoder_dir = op.join(op.split(self.decoder_dir)[0], '{res}x{res}'.format(res = fa_dm_size))
         
         # dir where estimates where saved 
         pp_outdir = op.join(self.decoder_dir, 'sub-{sj}'.format(sj = participant))

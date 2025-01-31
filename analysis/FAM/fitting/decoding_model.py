@@ -215,7 +215,7 @@ class Decoding_Model(GLMsingle_Model):
         
         return prf_stimulus_dm, prf_grid_coordinates
     
-    def get_grid_coordinates(self, dm_size = 80):
+    def get_grid_coordinates(self, dm_size = 80, shift_by = None):
 
         """
         Get grid coordinates (x,y) dataframe to use in decoder, 
@@ -225,16 +225,24 @@ class Decoding_Model(GLMsingle_Model):
         ----------
         dm_size: int
             desired size of prf DM
-
+        shift_by: float
+            value in degrees to shift the coordinates by
         """
+        x_bound = self.convert_pix2dva(self.MRIObj.screen_res[0]/2)
+        y_bound = self.convert_pix2dva(self.MRIObj.screen_res[1]/2)
 
-        coord_x = np.linspace(-self.convert_pix2dva(self.MRIObj.screen_res[0]/2), 
-                      self.convert_pix2dva(self.MRIObj.screen_res[0]/2), dm_size+1, endpoint=True)
-        coord_x = np.hstack((coord_x[:int(dm_size/2)], coord_x[int(dm_size/2 + 1):]))
-        
-        coord_y = np.linspace(-self.convert_pix2dva(self.MRIObj.screen_res[1]/2), 
-                      self.convert_pix2dva(self.MRIObj.screen_res[1]/2), dm_size+1, endpoint=True)
-        coord_y = np.hstack((coord_y[:int(dm_size/2)], coord_y[int(dm_size/2 + 1):]))
+        # if we want to shift coordinate (to not be centered on edge of screen)
+        if shift_by:
+            x_bound -= shift_by
+            coord_x = np.linspace(-x_bound, x_bound, dm_size, endpoint=True)
+            y_bound -= shift_by
+            coord_y = np.linspace(-y_bound, y_bound, dm_size, endpoint=True)
+        else:
+            coord_x = np.linspace(-x_bound, x_bound, dm_size+1, endpoint=True)
+            coord_x = np.hstack((coord_x[:int(dm_size/2)], coord_x[int(dm_size/2 + 1):]))
+            
+            coord_y = np.linspace(-y_bound, y_bound, dm_size+1, endpoint=True)
+            coord_y = np.hstack((coord_y[:int(dm_size/2)], coord_y[int(dm_size/2 + 1):]))
 
         y, x = np.meshgrid(np.flip(coord_y), 
                             coord_x)
@@ -901,7 +909,9 @@ class Decoding_Model(GLMsingle_Model):
         """
 
         if dm_size != 8:
-            fa_grid_coordinates = self.get_grid_coordinates(dm_size = dm_size) # grid equally space between screen edges
+            # shift coordinates, avoiding centers at edge of screen
+            shift_by = self.bar_width_deg[0]/2/(dm_size/8)
+            fa_grid_coordinates = self.get_grid_coordinates(dm_size = dm_size, shift_by = shift_by) # grid equally space between screen edges
         else:
             # use FA bar center position as reference for grid
             y_coords_deg = self.y_coords_deg
@@ -2263,7 +2273,7 @@ class Decoding_Model(GLMsingle_Model):
         return group_lowres_DM_dict
     
     def load_group_decoded_stim_dict(self, participant_list = [], roi_name = 'V1', task = 'FA',
-                                model_type = 'gauss_hrf', data_keys_dict = {}, masked_stim = False):
+                                model_type = 'gauss_hrf', data_keys_dict = {}, masked_stim = False, fa_dm_size = 8):
         
         """Load FA downsampled DM for all participants in participant list
         returns dict of DMs 
@@ -2279,7 +2289,8 @@ class Decoding_Model(GLMsingle_Model):
                                                                         roi_name = roi_name, 
                                                                         model_type = model_type,
                                                                         data_keys = data_keys_dict['sub-{sj}'.format(sj = participant)],
-                                                                        masked_stim = masked_stim)
+                                                                        masked_stim = masked_stim,
+                                                                        fa_dm_size = fa_dm_size)
             
             group_reconstructed_stim_dict['sub-{sj}'.format(sj = participant)] = reconstructed_stim_dict
             
